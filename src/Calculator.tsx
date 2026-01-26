@@ -13,6 +13,9 @@ import {
   StrategyRatesFormula,
   ProjectionFormula,
 } from './InfoPopup';
+import { useAdvancedMode } from './hooks/useAdvancedMode';
+import { AdvancedModeToggle } from './AdvancedMode/AdvancedModeToggle';
+import { CollapsibleSection } from './AdvancedMode/CollapsibleSection';
 
 // Format number with commas for display
 const formatWithCommas = (value: number) => {
@@ -27,6 +30,7 @@ const parseFormattedNumber = (value: string) => {
 
 export function Calculator() {
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULTS);
+  const advancedMode = useAdvancedMode();
 
   const results = useMemo(() => calculate(inputs), [inputs]);
 
@@ -367,6 +371,60 @@ export function Calculator() {
           </div>
         </div>
       </details>
+
+      {/* Advanced Mode */}
+      <section className="advanced-mode-container">
+        <AdvancedModeToggle
+          enabled={advancedMode.state.enabled}
+          onToggle={advancedMode.toggleEnabled}
+        />
+
+        {advancedMode.state.enabled && (
+          <div className="advanced-sections">
+            <CollapsibleSection
+              title="Year-by-Year Planning"
+              expanded={advancedMode.state.sections.yearByYear}
+              onToggle={() => advancedMode.toggleSection('yearByYear')}
+              hint="Model income changes and cash infusions"
+            >
+              <p className="section-description">
+                Adjust W-2 income and add cash infusions for each year of the projection.
+              </p>
+              <div className="placeholder-content">
+                Year-by-Year Planning coming in Phase 3
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Sensitivity Analysis"
+              expanded={advancedMode.state.sections.sensitivity}
+              onToggle={() => advancedMode.toggleSection('sensitivity')}
+              hint="Stress-test assumptions"
+            >
+              <p className="section-description">
+                See how changes in tax rates, returns, and strategy performance affect results.
+              </p>
+              <div className="placeholder-content">
+                Sensitivity Analysis coming in Phase 4
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Strategy Comparison"
+              expanded={advancedMode.state.sections.comparison}
+              onToggle={() => advancedMode.toggleSection('comparison')}
+              hint="Compare 2-3 strategies"
+            >
+              <p className="section-description">
+                Compare different strategies side-by-side to find the best fit.
+              </p>
+              <div className="placeholder-content">
+                Strategy Comparison coming in Phase 5
+              </div>
+            </CollapsibleSection>
+          </div>
+        )}
+      </section>
 
       {/* Results Summary */}
       <section className="results-section">
