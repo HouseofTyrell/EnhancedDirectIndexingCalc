@@ -1,4 +1,5 @@
 import { YearResult } from './types';
+import { FieldInfoPopup } from './InfoPopup';
 
 interface ResultsTableProps {
   data: YearResult[];
@@ -19,15 +20,15 @@ export function ResultsTable({ data }: ResultsTableProps) {
         <table>
           <thead>
             <tr>
-              <th>Year</th>
-              <th>Total Value</th>
-              <th>ST Gains (QFAF)</th>
-              <th>ST Losses (Collateral)</th>
-              <th>Ordinary Loss (Usable)</th>
-              <th>Excess → NOL</th>
-              <th>LT Gains</th>
-              <th>Tax Savings</th>
-              <th>Cumulative NOL</th>
+              <th>Year <FieldInfoPopup contentKey="col-year" /></th>
+              <th>Total Value <FieldInfoPopup contentKey="col-total-value" /></th>
+              <th>ST Gains (QFAF) <FieldInfoPopup contentKey="col-st-gains" /></th>
+              <th>ST Losses (Collateral) <FieldInfoPopup contentKey="col-st-losses" /></th>
+              <th>Ordinary Loss (Usable) <FieldInfoPopup contentKey="col-usable-loss" /></th>
+              <th>Excess → NOL <FieldInfoPopup contentKey="col-excess-nol" /></th>
+              <th>LT Gains <FieldInfoPopup contentKey="col-lt-gains" /></th>
+              <th>Tax Savings <FieldInfoPopup contentKey="col-tax-savings" /></th>
+              <th>Cumulative NOL <FieldInfoPopup contentKey="col-nol-carryforward" /></th>
             </tr>
           </thead>
           <tbody>

@@ -736,6 +736,73 @@ tfoot td {
   margin: 0;
 }
 
+/* Field-level info popup content */
+.field-popup {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.field-popup .field-definition {
+  margin: 0 0 1rem 0;
+  color: var(--text);
+}
+
+.field-popup .field-formula {
+  background: var(--bg);
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.field-popup .field-formula strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.field-popup .field-formula code {
+  display: block;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 0.85rem;
+  color: var(--primary);
+  white-space: pre-wrap;
+}
+
+.field-popup .field-current-value {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.field-popup .field-current-value strong {
+  margin-right: 0.5rem;
+}
+
+.field-popup .field-impact {
+  margin: 0;
+  padding: 0.75rem;
+  background: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.85rem;
+}
+
+.field-popup .field-impact strong {
+  color: #92400e;
+}
+
+/* Inline info button in labels */
+.rate-label .info-button,
+.sizing-label .info-button,
+.card h3 .info-button {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .calculator {

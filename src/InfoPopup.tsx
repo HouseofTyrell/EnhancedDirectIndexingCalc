@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getPopupContent } from './popupContent';
 
 interface InfoPopupProps {
   title: string;
@@ -42,6 +43,39 @@ export function InfoPopup({ title, children }: InfoPopupProps) {
         </div>
       )}
     </>
+  );
+}
+
+// Field-level info popup - shows definition, formula, and impact
+interface FieldInfoPopupProps {
+  contentKey: string;
+  currentValue?: string;
+}
+
+export function FieldInfoPopup({ contentKey, currentValue }: FieldInfoPopupProps) {
+  const content = getPopupContent(contentKey);
+  if (!content) return null;
+
+  return (
+    <InfoPopup title={content.title}>
+      <div className="field-popup">
+        <p className="field-definition">{content.definition}</p>
+        {content.formula && (
+          <div className="field-formula">
+            <strong>Formula:</strong>
+            <code>{content.formula}</code>
+          </div>
+        )}
+        {currentValue && (
+          <div className="field-current-value">
+            <strong>Your value:</strong> {currentValue}
+          </div>
+        )}
+        <p className="field-impact">
+          <strong>Impact:</strong> {content.impact}
+        </p>
+      </div>
+    </InfoPopup>
   );
 }
 

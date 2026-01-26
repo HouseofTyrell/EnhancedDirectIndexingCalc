@@ -7,10 +7,9 @@ import { STRATEGIES, getStrategy } from './strategyData';
 import { CalculatorInputs } from './types';
 import {
   InfoPopup,
+  FieldInfoPopup,
   TaxRatesFormula,
   QfafSizingFormula,
-  Section461lFormula,
-  TaxAlphaFormula,
   StrategyRatesFormula,
   ProjectionFormula,
 } from './InfoPopup';
@@ -186,27 +185,45 @@ export function Calculator() {
         </div>
         <div className="tax-rates-grid">
           <div className="tax-rate-item">
-            <span className="rate-label">Federal Ordinary/ST</span>
+            <span className="rate-label">
+              Federal Ordinary/ST
+              <FieldInfoPopup contentKey="federal-st-rate" currentValue={`${(federalStRate * 100).toFixed(1)}%`} />
+            </span>
             <span className="rate-value">{(federalStRate * 100).toFixed(1)}%</span>
           </div>
           <div className="tax-rate-item">
-            <span className="rate-label">Federal LT Cap Gains</span>
+            <span className="rate-label">
+              Federal LT Cap Gains
+              <FieldInfoPopup contentKey="federal-lt-rate" currentValue={`${(federalLtRate * 100).toFixed(1)}%`} />
+            </span>
             <span className="rate-value">{(federalLtRate * 100).toFixed(1)}%</span>
           </div>
           <div className="tax-rate-item">
-            <span className="rate-label">State</span>
+            <span className="rate-label">
+              State
+              <FieldInfoPopup contentKey="state-rate" currentValue={`${(stateRate * 100).toFixed(1)}%`} />
+            </span>
             <span className="rate-value">{(stateRate * 100).toFixed(1)}%</span>
           </div>
           <div className="tax-rate-item highlight">
-            <span className="rate-label">Combined Ordinary</span>
+            <span className="rate-label">
+              Combined Ordinary
+              <FieldInfoPopup contentKey="combined-st-rate" currentValue={`${(combinedStRate * 100).toFixed(1)}%`} />
+            </span>
             <span className="rate-value">{(combinedStRate * 100).toFixed(1)}%</span>
           </div>
           <div className="tax-rate-item highlight">
-            <span className="rate-label">Combined LT</span>
+            <span className="rate-label">
+              Combined LT
+              <FieldInfoPopup contentKey="combined-lt-rate" currentValue={`${(combinedLtRate * 100).toFixed(1)}%`} />
+            </span>
             <span className="rate-value">{(combinedLtRate * 100).toFixed(1)}%</span>
           </div>
           <div className="tax-rate-item accent">
-            <span className="rate-label">ST→LT Benefit</span>
+            <span className="rate-label">
+              ST→LT Benefit
+              <FieldInfoPopup contentKey="st-lt-benefit" currentValue={`${(rateDifferential * 100).toFixed(1)}%`} />
+            </span>
             <span className="rate-value">{(rateDifferential * 100).toFixed(1)}%</span>
           </div>
         </div>
@@ -222,25 +239,32 @@ export function Calculator() {
         </div>
         <div className="sizing-cards">
           <div className="sizing-card">
-            <span className="sizing-label">Collateral</span>
+            <span className="sizing-label">
+              Collateral
+              <FieldInfoPopup contentKey="collateral-value" currentValue={formatCurrency(results.sizing.collateralValue)} />
+            </span>
             <span className="sizing-value">{formatCurrency(results.sizing.collateralValue)}</span>
             <span className="sizing-sublabel">{results.sizing.strategyName}</span>
           </div>
           <div className="sizing-card">
-            <span className="sizing-label">Auto-Sized QFAF</span>
+            <span className="sizing-label">
+              Auto-Sized QFAF
+              <FieldInfoPopup contentKey="auto-sized-qfaf" currentValue={formatCurrency(results.sizing.qfafValue)} />
+            </span>
             <span className="sizing-value">{formatCurrency(results.sizing.qfafValue)}</span>
             <span className="sizing-sublabel">{formatPercent(results.sizing.qfafRatio)} of collateral</span>
           </div>
           <div className="sizing-card highlight">
-            <span className="sizing-label">Total Exposure</span>
+            <span className="sizing-label">
+              Total Exposure
+              <FieldInfoPopup contentKey="total-exposure" currentValue={formatCurrency(results.sizing.totalExposure)} />
+            </span>
             <span className="sizing-value">{formatCurrency(results.sizing.totalExposure)}</span>
           </div>
           <div className="sizing-card">
             <span className="sizing-label">
               §461(l) Limit
-              <InfoPopup title="Section 461(l) Limitation">
-                <Section461lFormula />
-              </InfoPopup>
+              <FieldInfoPopup contentKey="section-461-limit" currentValue={formatCurrency(results.sizing.section461Limit)} />
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.section461Limit)}</span>
             <span className="sizing-sublabel">{inputs.filingStatus === 'mfj' ? 'MFJ' : 'Single/Other'}</span>
@@ -249,28 +273,46 @@ export function Calculator() {
 
         <div className="offset-status">
           <div className="offset-row">
-            <span>Year 1 ST Losses (Collateral)</span>
+            <span>
+              Year 1 ST Losses (Collateral)
+              <FieldInfoPopup contentKey="year1-st-losses" currentValue={formatCurrency(results.sizing.year1StLosses)} />
+            </span>
             <span className="positive">{formatCurrency(results.sizing.year1StLosses)}</span>
           </div>
           <div className="offset-row">
-            <span>Year 1 ST Gains (QFAF)</span>
+            <span>
+              Year 1 ST Gains (QFAF)
+              <FieldInfoPopup contentKey="year1-st-gains" currentValue={formatCurrency(results.sizing.year1StGains)} />
+            </span>
             <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
           </div>
           <div className="offset-row result success">
-            <span>Net ST Position</span>
+            <span>
+              Net ST Position
+              <FieldInfoPopup contentKey="net-st-position" currentValue="$0 (Fully Matched)" />
+            </span>
             <span>Fully Matched</span>
           </div>
           <div className="offset-row">
-            <span>Year 1 Ordinary Loss (QFAF)</span>
+            <span>
+              Year 1 Ordinary Loss (QFAF)
+              <FieldInfoPopup contentKey="year1-ordinary-losses" currentValue={formatCurrency(results.sizing.year1OrdinaryLosses)} />
+            </span>
             <span className="positive">{formatCurrency(results.sizing.year1OrdinaryLosses)}</span>
           </div>
           <div className="offset-row">
-            <span>Usable Ordinary Loss</span>
+            <span>
+              Usable Ordinary Loss
+              <FieldInfoPopup contentKey="usable-ordinary-loss" currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss)} />
+            </span>
             <span className="positive">{formatCurrency(results.sizing.year1UsableOrdinaryLoss)}</span>
           </div>
           {results.sizing.year1ExcessToNol > 0 && (
             <div className="offset-row">
-              <span>Excess → NOL Carryforward</span>
+              <span>
+                Excess → NOL Carryforward
+                <FieldInfoPopup contentKey="excess-to-nol" currentValue={formatCurrency(results.sizing.year1ExcessToNol)} />
+              </span>
               <span>{formatCurrency(results.sizing.year1ExcessToNol)}</span>
             </div>
           )}
@@ -336,27 +378,34 @@ export function Calculator() {
         </div>
         <div className="summary-cards">
           <div className="card primary">
-            <h3>Total Tax Savings</h3>
+            <h3>
+              Total Tax Savings
+              <FieldInfoPopup contentKey="total-tax-savings" currentValue={formatCurrency(results.summary.totalTaxSavings)} />
+            </h3>
             <p className="big-number">{formatCurrency(results.summary.totalTaxSavings)}</p>
             <p className="subtext">Over 10 years</p>
           </div>
           <div className="card">
-            <h3>Final Portfolio Value</h3>
+            <h3>
+              Final Portfolio Value
+              <FieldInfoPopup contentKey="final-portfolio-value" currentValue={formatCurrency(results.summary.finalPortfolioValue)} />
+            </h3>
             <p className="big-number">{formatCurrency(results.summary.finalPortfolioValue)}</p>
             <p className="subtext">Year 10</p>
           </div>
           <div className="card">
             <h3>
               Annualized Tax Alpha
-              <InfoPopup title="Tax Alpha Calculation">
-                <TaxAlphaFormula />
-              </InfoPopup>
+              <FieldInfoPopup contentKey="effective-tax-alpha" currentValue={formatPercent(results.summary.effectiveTaxAlpha)} />
             </h3>
             <p className="big-number">{formatPercent(results.summary.effectiveTaxAlpha)}</p>
             <p className="subtext">Per year</p>
           </div>
           <div className="card">
-            <h3>Total NOL Generated</h3>
+            <h3>
+              Total NOL Generated
+              <FieldInfoPopup contentKey="total-nol-generated" currentValue={formatCurrency(results.summary.totalNolGenerated)} />
+            </h3>
             <p className="big-number">{formatCurrency(results.summary.totalNolGenerated)}</p>
             <p className="subtext">Cumulative excess</p>
           </div>
