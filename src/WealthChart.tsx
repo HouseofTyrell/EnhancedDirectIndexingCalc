@@ -28,9 +28,9 @@ const formatTooltipValue = (value: number) => {
 export function WealthChart({ data }: WealthChartProps) {
   const chartData = data.map(year => ({
     year: `Year ${year.year}`,
-    'Portfolio Value': year.totalValue,
+    'Total Value': year.totalValue,
     'QFAF Value': year.qfafValue,
-    'EDI Value': year.ediValue,
+    'Collateral Value': year.collateralValue,
     'Cumulative Tax Savings': data
       .slice(0, year.year)
       .reduce((sum, y) => sum + y.taxSavings, 0),
@@ -63,7 +63,7 @@ export function WealthChart({ data }: WealthChartProps) {
           <Legend />
           <Line
             type="monotone"
-            dataKey="Portfolio Value"
+            dataKey="Total Value"
             stroke="#2563eb"
             strokeWidth={3}
             dot={{ r: 4 }}

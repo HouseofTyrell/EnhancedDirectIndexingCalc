@@ -84,16 +84,18 @@ export function getFederalLtRate(income: number, status: string): number {
 }
 
 export const DEFAULTS: CalculatorInputs = {
-  investmentAmount: 1000000,
+  // Client profile
   filingStatus: 'mfj',
   stateCode: 'CA',
   stateRate: 0,
-  annualIncome: 500000,
-  ediAllocation: 0.5,
-  qfafReturn: 0.07,
-  qfafStGainPct: 0.70,
-  ediReturn: 0.08,
-  ediHarvestingYear1: 0.05,
+  annualIncome: 3000000,
+
+  // Strategy selection
+  strategyId: 'core-145-45',
+  collateralAmount: 10000000,
+
+  // Carryforwards
   existingStLossCarryforward: 0,
   existingLtLossCarryforward: 0,
+  existingNolCarryforward: 0,
 };

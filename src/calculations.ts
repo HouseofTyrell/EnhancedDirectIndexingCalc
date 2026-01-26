@@ -1,97 +1,169 @@
-import { CalculatorInputs, YearResult, CalculationResult } from './types';
+import { CalculatorInputs, YearResult, CalculationResult, CalculatedSizing } from './types';
 import { getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
+import {
+  getStrategy,
+  QFAF_ST_GAIN_RATE,
+  QFAF_ORDINARY_LOSS_RATE,
+  SECTION_461L_LIMITS,
+  NOL_OFFSET_PERCENTAGE,
+} from './strategyData';
+
+/**
+ * Calculate QFAF sizing based on strategy selection and collateral amount.
+ *
+ * QFAF is auto-sized so its ST gains equal collateral's ST losses.
+ * Formula: QFAF = (Collateral × ST_Loss_Rate) / 150%
+ */
+export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
+  const strategy = getStrategy(inputs.strategyId);
+  if (!strategy) {
+    throw new Error(`Invalid strategy ID: ${inputs.strategyId}`);
+  }
+
+  const collateralValue = inputs.collateralAmount;
+
+  // Calculate collateral ST losses
+  const year1StLosses = collateralValue * strategy.stLossRate;
+
+  // Auto-size QFAF so ST gains = ST losses
+  const qfafValue = inputs.qfafOverride ?? (year1StLosses / QFAF_ST_GAIN_RATE);
+
+  // QFAF generates ST gains and ordinary losses at 150% of MV
+  const year1StGains = qfafValue * QFAF_ST_GAIN_RATE;
+  const year1OrdinaryLosses = qfafValue * QFAF_ORDINARY_LOSS_RATE;
+
+  // Section 461(l) limitation on ordinary losses
+  const section461Limit = SECTION_461L_LIMITS[inputs.filingStatus] || SECTION_461L_LIMITS.single;
+  const year1UsableOrdinaryLoss = Math.min(year1OrdinaryLosses, section461Limit);
+  const year1ExcessToNol = year1OrdinaryLosses - year1UsableOrdinaryLoss;
+
+  return {
+    strategyId: strategy.id,
+    strategyName: strategy.name,
+    strategyType: strategy.type,
+    collateralValue,
+    qfafValue,
+    qfafMaxValue: qfafValue, // With auto-sizing, this equals qfafValue
+    totalExposure: collateralValue + qfafValue,
+    qfafRatio: collateralValue > 0 ? qfafValue / collateralValue : 0,
+    year1StLosses,
+    year1StGains,
+    year1OrdinaryLosses,
+    year1UsableOrdinaryLoss,
+    year1ExcessToNol,
+    section461Limit,
+  };
+}
 
 export function calculate(inputs: CalculatorInputs): CalculationResult {
+  const sizing = calculateSizing(inputs);
+  const strategy = getStrategy(inputs.strategyId)!;
   const years: YearResult[] = [];
-  let qfafValue = inputs.investmentAmount * (1 - inputs.ediAllocation);
-  let ediValue = inputs.investmentAmount * inputs.ediAllocation;
+
+  let qfafValue = sizing.qfafValue;
+  let collateralValue = sizing.collateralValue;
   let stCarryforward = inputs.existingStLossCarryforward;
   let ltCarryforward = inputs.existingLtLossCarryforward;
+  let nolCarryforward = inputs.existingNolCarryforward;
 
   for (let year = 1; year <= 10; year++) {
     const result = calculateYear(
       year,
       qfafValue,
-      ediValue,
+      collateralValue,
       stCarryforward,
       ltCarryforward,
-      inputs
+      nolCarryforward,
+      inputs,
+      strategy
     );
 
     years.push(result);
     qfafValue = result.qfafValue;
-    ediValue = result.ediValue;
+    collateralValue = result.collateralValue;
     stCarryforward = result.stLossCarryforward;
     ltCarryforward = result.ltLossCarryforward;
+    nolCarryforward = result.nolCarryforward;
   }
 
   return {
+    sizing,
     years,
-    summary: calculateSummary(years, inputs),
+    summary: calculateSummary(years, sizing),
   };
+}
+
+interface Strategy {
+  stLossRate: number;
+  ltGainRate: number;
 }
 
 function calculateYear(
   year: number,
   qfafValue: number,
-  ediValue: number,
+  collateralValue: number,
   stCarryforward: number,
   ltCarryforward: number,
-  inputs: CalculatorInputs
+  nolCarryforward: number,
+  inputs: CalculatorInputs,
+  strategy: Strategy
 ): YearResult {
-  // QFAF generates returns and ST gains
-  const qfafReturn = qfafValue * inputs.qfafReturn;
-  const stGainsGenerated = qfafReturn * inputs.qfafStGainPct;
+  // QFAF generates ST gains and ordinary losses (150% of MV each)
+  const stGainsGenerated = qfafValue * QFAF_ST_GAIN_RATE;
+  const ordinaryLossesGenerated = qfafValue * QFAF_ORDINARY_LOSS_RATE;
 
-  // EDI generates returns and harvests losses
-  const ediReturn = ediValue * inputs.ediReturn;
-  const harvestingRate = getHarvestingRate(year, inputs.ediHarvestingYear1);
-  const stLossesHarvested = ediValue * harvestingRate * 0.85; // 85% ST
-  const ltLossesHarvested = ediValue * harvestingRate * 0.15; // 15% LT
+  // Collateral generates ST losses and LT gains per strategy rates
+  const stLossesHarvested = collateralValue * strategy.stLossRate;
+  const ltGainsRealized = collateralValue * strategy.ltGainRate;
 
-  // EDI realizes some gains (2% of portfolio, 90% LT)
-  const realizedGains = ediValue * 0.02;
-  const ltGainsRealized = realizedGains * 0.90;
-
-  // Net positions (apply carryforwards)
+  // Net ST position (should be ~0 with proper auto-sizing)
   const grossNetSt = stGainsGenerated - stLossesHarvested;
-  const grossNetLt = ltGainsRealized - ltLossesHarvested;
 
-  // Apply carryforwards to offset gains
+  // Apply ST carryforward to offset any remaining ST gains
   let netStGainLoss = grossNetSt;
-  let netLtGainLoss = grossNetLt;
   let usedStCarryforward = 0;
-  let usedLtCarryforward = 0;
-
-  // First, use ST carryforward to offset ST gains
   if (netStGainLoss > 0 && stCarryforward > 0) {
     usedStCarryforward = Math.min(stCarryforward, netStGainLoss);
     netStGainLoss -= usedStCarryforward;
   }
 
-  // Then, use LT carryforward to offset LT gains
-  if (netLtGainLoss > 0 && ltCarryforward > 0) {
-    usedLtCarryforward = Math.min(ltCarryforward, netLtGainLoss);
-    netLtGainLoss -= usedLtCarryforward;
-  }
+  // Section 461(l) limitation on ordinary losses
+  const section461Limit = SECTION_461L_LIMITS[inputs.filingStatus] || SECTION_461L_LIMITS.single;
+  const usableOrdinaryLoss = Math.min(ordinaryLossesGenerated, section461Limit);
+  const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
 
-  // Calculate taxes
-  const { federalTax, stateTax, newStCarryforward, newLtCarryforward } =
-    calculateTaxes(netStGainLoss, netLtGainLoss, stCarryforward - usedStCarryforward, ltCarryforward - usedLtCarryforward, inputs);
+  // Calculate taxes with ordinary loss benefit and NOL usage
+  const { federalTax, stateTax, newStCarryforward, newLtCarryforward, nolUsed } =
+    calculateTaxes(
+      netStGainLoss,
+      ltGainsRealized,
+      usableOrdinaryLoss,
+      stCarryforward - usedStCarryforward,
+      ltCarryforward,
+      nolCarryforward,
+      inputs
+    );
 
-  // Baseline: what if all gains taxed at ST rates (no optimization)?
-  const baselineTax = calculateBaselineTax(stGainsGenerated + ltGainsRealized, inputs);
+  // Update NOL carryforward: add excess, subtract used
+  const newNolCarryforward = nolCarryforward + excessToNol - nolUsed;
 
-  // Update portfolio values (reinvest returns minus taxes)
-  const newQfafValue = qfafValue + qfafReturn;
-  const newEdiValue = ediValue + ediReturn;
+  // Baseline: what if we just had passive investments taxed at LT rates (no optimization)?
+  const baselineTax = calculateBaselineTax(ltGainsRealized, inputs);
+
+  // Portfolio growth assumptions (conservative ~7% annual return)
+  const portfolioGrowthRate = 0.07;
+  const newQfafValue = qfafValue * (1 + portfolioGrowthRate);
+  const newCollateralValue = collateralValue * (1 + portfolioGrowthRate);
 
   return {
     year,
     qfafValue: newQfafValue,
-    ediValue: newEdiValue,
-    totalValue: newQfafValue + newEdiValue,
+    collateralValue: newCollateralValue,
+    totalValue: newQfafValue + newCollateralValue,
     stGainsGenerated,
+    ordinaryLossesGenerated,
+    usableOrdinaryLoss,
+    excessToNol,
     stLossesHarvested,
     ltGainsRealized,
     netStGainLoss: Math.max(0, netStGainLoss),
@@ -102,69 +174,92 @@ function calculateYear(
     taxSavings: Math.max(0, baselineTax - (federalTax + stateTax)),
     stLossCarryforward: newStCarryforward,
     ltLossCarryforward: newLtCarryforward,
+    nolCarryforward: newNolCarryforward,
+    nolUsedThisYear: nolUsed,
   };
-}
-
-function getHarvestingRate(year: number, year1Rate: number): number {
-  // Decay curve based on research
-  const decayMultipliers = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.2, 0.2, 0.2, 0.2];
-  return year1Rate * (decayMultipliers[year - 1] ?? 0.2);
 }
 
 function calculateTaxes(
   netStGainLoss: number,
-  netLtGainLoss: number,
+  ltGains: number,
+  usableOrdinaryLoss: number,
   remainingStCarryforward: number,
   remainingLtCarryforward: number,
+  nolCarryforward: number,
   inputs: CalculatorInputs
-): { federalTax: number; stateTax: number; newStCarryforward: number; newLtCarryforward: number } {
+): {
+  federalTax: number;
+  stateTax: number;
+  newStCarryforward: number;
+  newLtCarryforward: number;
+  nolUsed: number;
+} {
   let taxableSt = netStGainLoss;
-  let taxableLt = netLtGainLoss;
+  let taxableLt = ltGains;
   let newStCarryforward = remainingStCarryforward;
   let newLtCarryforward = remainingLtCarryforward;
 
-  // Handle net ST loss (§1211 limitation)
+  // Apply LT carryforward to offset LT gains
+  if (taxableLt > 0 && remainingLtCarryforward > 0) {
+    const ltOffset = Math.min(remainingLtCarryforward, taxableLt);
+    taxableLt -= ltOffset;
+    newLtCarryforward -= ltOffset;
+  }
+
+  // Handle net ST loss (§1211 limitation: $3,000/year against ordinary income)
   if (netStGainLoss < 0) {
-    // Can offset up to $3,000 against ordinary income per year
     const offsetUsed = Math.min(Math.abs(netStGainLoss), 3000);
     newStCarryforward = remainingStCarryforward + Math.abs(netStGainLoss) - offsetUsed;
     taxableSt = 0;
-  }
-
-  // Handle net LT loss
-  if (netLtGainLoss < 0) {
-    newLtCarryforward = remainingLtCarryforward + Math.abs(netLtGainLoss);
-    taxableLt = 0;
   }
 
   // Federal rates
   const stRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
   const ltRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
 
-  const federalTax = Math.max(0, (taxableSt * stRate) + (taxableLt * ltRate));
+  // Ordinary loss benefit: reduces ordinary income tax
+  // At top bracket (~40.8%), this is the primary tax alpha driver
+  const ordinaryLossBenefit = usableOrdinaryLoss * stRate;
 
-  // State tax
+  // Calculate NOL usage with 80% limitation
+  // NOL can offset up to 80% of taxable income
+  const taxableIncomeBeforeNol = inputs.annualIncome + (taxableSt * stRate) + (taxableLt * ltRate);
+  const maxNolUsage = taxableIncomeBeforeNol * NOL_OFFSET_PERCENTAGE;
+  const nolUsed = Math.min(nolCarryforward, maxNolUsage);
+  const nolBenefit = nolUsed * stRate;
+
+  // Calculate taxes
+  // ST gains taxed at ordinary rates, LT gains at preferential rates
+  const grossFederalTax = (taxableSt * stRate) + (taxableLt * ltRate);
+
+  // Apply benefits from ordinary losses and NOL
+  const federalTax = Math.max(0, grossFederalTax - ordinaryLossBenefit - nolBenefit);
+
+  // State tax (simplified: all investment income at state rate)
   const stateRate = inputs.stateCode === 'OTHER'
     ? inputs.stateRate
     : getStateRate(inputs.stateCode);
-  const stateTax = Math.max(0, (taxableSt + taxableLt) * stateRate);
+  const stateTax = Math.max(0, (taxableSt + taxableLt - usableOrdinaryLoss) * stateRate);
 
-  return { federalTax, stateTax, newStCarryforward, newLtCarryforward };
+  return { federalTax, stateTax, newStCarryforward, newLtCarryforward, nolUsed };
 }
 
-function calculateBaselineTax(totalGains: number, inputs: CalculatorInputs): number {
-  // All gains taxed at ordinary income rates (no optimization)
-  const stRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
+function calculateBaselineTax(ltGains: number, inputs: CalculatorInputs): number {
+  // Baseline: LT gains taxed at LT rate (no optimization strategy)
+  const ltRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
   const stateRate = inputs.stateCode === 'OTHER'
     ? inputs.stateRate
     : getStateRate(inputs.stateCode);
-  return totalGains * (stRate + stateRate);
+  return ltGains * (ltRate + stateRate);
 }
 
-function calculateSummary(years: YearResult[], inputs: CalculatorInputs) {
+function calculateSummary(years: YearResult[], sizing: CalculatedSizing) {
   const totalTaxSavings = years.reduce((sum, y) => sum + y.taxSavings, 0);
+  const totalNolGenerated = years.reduce((sum, y) => sum + y.excessToNol, 0);
   const finalPortfolioValue = years[years.length - 1].totalValue;
-  const effectiveTaxAlpha = totalTaxSavings / inputs.investmentAmount / 10;
+  const effectiveTaxAlpha = sizing.totalExposure > 0
+    ? totalTaxSavings / sizing.totalExposure / 10
+    : 0;
 
-  return { totalTaxSavings, finalPortfolioValue, effectiveTaxAlpha };
+  return { totalTaxSavings, finalPortfolioValue, effectiveTaxAlpha, totalNolGenerated };
 }
