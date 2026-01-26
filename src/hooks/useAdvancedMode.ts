@@ -6,6 +6,7 @@ export interface AdvancedModeState {
     yearByYear: boolean;
     sensitivity: boolean;
     comparison: boolean;
+    settings: boolean;
   };
 }
 
@@ -17,6 +18,7 @@ const DEFAULT_STATE: AdvancedModeState = {
     yearByYear: false,
     sensitivity: false,
     comparison: false,
+    settings: false,
   },
 };
 

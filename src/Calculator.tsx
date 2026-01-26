@@ -4,7 +4,7 @@ import { TaxSavingsChart, PortfolioValueChart } from './WealthChart';
 import { ResultsTable } from './ResultsTable';
 import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
-import { CalculatorInputs } from './types';
+import { CalculatorInputs, YearOverride, AdvancedSettings, DEFAULT_SETTINGS, SensitivityParams, DEFAULT_SENSITIVITY } from './types';
 import {
   InfoPopup,
   FieldInfoPopup,
@@ -16,6 +16,10 @@ import {
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { AdvancedModeToggle } from './AdvancedMode/AdvancedModeToggle';
 import { CollapsibleSection } from './AdvancedMode/CollapsibleSection';
+import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
+import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
+import { StrategyComparison } from './AdvancedMode/StrategyComparison';
+import { SettingsPanel } from './AdvancedMode/SettingsPanel';
 
 // Format number with commas for display
 const formatWithCommas = (value: number) => {
@@ -28,9 +32,36 @@ const parseFormattedNumber = (value: string) => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+// Generate default year overrides for 10 years
+const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
+  return Array.from({ length: 10 }, (_, i) => ({
+    year: i + 1,
+    w2Income: baseIncome,
+    cashInfusion: 0,
+    note: '',
+  }));
+};
+
 export function Calculator() {
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULTS);
   const advancedMode = useAdvancedMode();
+
+  // Year-by-Year Planning state
+  const [yearOverrides, setYearOverrides] = useState<YearOverride[]>(() =>
+    generateDefaultOverrides(DEFAULTS.annualIncome)
+  );
+
+  // Advanced Settings state
+  const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(DEFAULT_SETTINGS);
+
+  // Sensitivity Analysis state
+  const [sensitivityParams, setSensitivityParams] = useState<SensitivityParams>(DEFAULT_SENSITIVITY);
+
+  // Strategy Comparison state (default to current strategy + one other)
+  const [comparisonStrategies, setComparisonStrategies] = useState<string[]>([
+    'core-145-45',
+    'core-130-30',
+  ]);
 
   const results = useMemo(() => calculate(inputs), [inputs]);
 
@@ -39,6 +70,31 @@ export function Calculator() {
     value: CalculatorInputs[K]
   ) => {
     setInputs(prev => ({ ...prev, [key]: value }));
+
+    // If income changes, update year overrides to use new base income
+    if (key === 'annualIncome' && typeof value === 'number') {
+      setYearOverrides(prev =>
+        prev.map(override => ({
+          ...override,
+          w2Income: override.w2Income === inputs.annualIncome ? value : override.w2Income,
+        }))
+      );
+    }
+  };
+
+  // Reset year overrides to defaults
+  const resetYearOverrides = () => {
+    setYearOverrides(generateDefaultOverrides(inputs.annualIncome));
+  };
+
+  // Reset advanced settings to defaults
+  const resetAdvancedSettings = () => {
+    setAdvancedSettings(DEFAULT_SETTINGS);
+  };
+
+  // Reset sensitivity params to defaults
+  const resetSensitivityParams = () => {
+    setSensitivityParams(DEFAULT_SENSITIVITY);
   };
 
   const formatCurrency = (value: number) => {
@@ -387,12 +443,12 @@ export function Calculator() {
               onToggle={() => advancedMode.toggleSection('yearByYear')}
               hint="Model income changes and cash infusions"
             >
-              <p className="section-description">
-                Adjust W-2 income and add cash infusions for each year of the projection.
-              </p>
-              <div className="placeholder-content">
-                Year-by-Year Planning coming in Phase 3
-              </div>
+              <YearByYearPlanning
+                baseIncome={inputs.annualIncome}
+                overrides={yearOverrides}
+                onChange={setYearOverrides}
+                onReset={resetYearOverrides}
+              />
             </CollapsibleSection>
 
             <CollapsibleSection
@@ -401,12 +457,11 @@ export function Calculator() {
               onToggle={() => advancedMode.toggleSection('sensitivity')}
               hint="Stress-test assumptions"
             >
-              <p className="section-description">
-                See how changes in tax rates, returns, and strategy performance affect results.
-              </p>
-              <div className="placeholder-content">
-                Sensitivity Analysis coming in Phase 4
-              </div>
+              <SensitivityAnalysis
+                params={sensitivityParams}
+                onChange={setSensitivityParams}
+                onReset={resetSensitivityParams}
+              />
             </CollapsibleSection>
 
             <CollapsibleSection
@@ -415,12 +470,24 @@ export function Calculator() {
               onToggle={() => advancedMode.toggleSection('comparison')}
               hint="Compare 2-3 strategies"
             >
-              <p className="section-description">
-                Compare different strategies side-by-side to find the best fit.
-              </p>
-              <div className="placeholder-content">
-                Strategy Comparison coming in Phase 5
-              </div>
+              <StrategyComparison
+                baseInputs={inputs}
+                selectedStrategies={comparisonStrategies}
+                onChange={setComparisonStrategies}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Advanced Settings"
+              expanded={advancedMode.state.sections.settings}
+              onToggle={() => advancedMode.toggleSection('settings')}
+              hint="Override formula constants"
+            >
+              <SettingsPanel
+                settings={advancedSettings}
+                onChange={setAdvancedSettings}
+                onReset={resetAdvancedSettings}
+              />
             </CollapsibleSection>
           </div>
         )}

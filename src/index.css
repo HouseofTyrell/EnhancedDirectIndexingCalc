@@ -962,6 +962,477 @@ tfoot td {
   border-radius: 6px;
 }
 
+/* ============================================
+   YEAR-BY-YEAR PLANNING
+   ============================================ */
+
+.year-by-year-planning {
+  padding-top: 0.5rem;
+}
+
+.year-table-container {
+  overflow-x: auto;
+  margin: 0 -0.5rem;
+}
+
+.year-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.year-table th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  background: var(--bg);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-light);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.year-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.year-table tbody tr:hover {
+  background: var(--bg);
+}
+
+.year-cell {
+  font-weight: 600;
+  color: var(--primary);
+  width: 60px;
+}
+
+/* Compact input for table cells */
+.input-with-prefix.compact {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.input-with-prefix.compact .prefix {
+  padding: 0.35rem 0.5rem;
+  background: transparent;
+  color: var(--text-light);
+  font-size: 0.85rem;
+  border-right: none;
+}
+
+.input-with-prefix.compact input {
+  flex: 1;
+  min-width: 80px;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.input-with-prefix.compact input:focus {
+  outline: none;
+  background: white;
+}
+
+.input-with-prefix.compact input.modified {
+  background: #fef3c7;
+  font-weight: 500;
+}
+
+.note-input {
+  width: 100%;
+  min-width: 120px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: var(--bg);
+}
+
+.note-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: white;
+}
+
+.note-input::placeholder {
+  color: #9ca3af;
+}
+
+.year-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg);
+  border-color: var(--text-light);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.changes-indicator {
+  font-size: 0.85rem;
+  color: var(--primary);
+  font-style: italic;
+}
+
+/* ============================================
+   SENSITIVITY ANALYSIS
+   ============================================ */
+
+.sensitivity-analysis {
+  padding-top: 0.5rem;
+}
+
+.sensitivity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.sensitivity-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sensitivity-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.sensitivity-value {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.sensitivity-value.negative {
+  color: #dc2626;
+}
+
+.sensitivity-value.positive {
+  color: var(--success);
+}
+
+.sensitivity-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.sensitivity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sensitivity-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sensitivity-help {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.sensitivity-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================
+   STRATEGY COMPARISON
+   ============================================ */
+
+.strategy-comparison {
+  padding-top: 0.5rem;
+}
+
+.comparison-table-container {
+  overflow-x: auto;
+  margin: 0 -0.5rem;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.comparison-table th {
+  padding: 0.75rem;
+  text-align: left;
+  background: var(--bg);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-light);
+  border-bottom: 2px solid var(--border);
+}
+
+.comparison-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.comparison-table td:not(:first-child) {
+  text-align: right;
+}
+
+.comparison-table tbody tr:hover {
+  background: var(--bg);
+}
+
+.comparison-table .winner {
+  background: #dcfce7;
+}
+
+.comparison-table .winner td {
+  font-weight: 600;
+  color: var(--success);
+}
+
+.strategy-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.strategy-type {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  text-transform: capitalize;
+}
+
+/* Strategy Selector */
+.strategy-selector {
+  margin-bottom: 1.5rem;
+}
+
+.strategy-selector h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.strategy-group {
+  margin-bottom: 1rem;
+}
+
+.strategy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.strategy-chip {
+  padding: 0.5rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.strategy-chip:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: white;
+}
+
+.strategy-chip.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.strategy-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Winner highlighting */
+.comparison-table td.winner {
+  background: #dcfce7;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.comparison-table th:not(:first-child) {
+  text-align: center;
+}
+
+/* Comparison Summary */
+.comparison-summary {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.comparison-summary p {
+  margin: 0 0 0.5rem 0;
+}
+
+.comparison-summary p:last-child {
+  margin-bottom: 0;
+}
+
+/* ============================================
+   SETTINGS / ADVANCED CONFIG
+   ============================================ */
+
+.settings-panel {
+  padding-top: 0.5rem;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.settings-section {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.settings-section h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.setting-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.setting-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.setting-hint {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.setting-input {
+  width: 100px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-align: right;
+  background: white;
+}
+
+.setting-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.setting-input.modified {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.settings-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: #fef3c7;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #92400e;
+}
+
+.settings-warning-icon {
+  flex-shrink: 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .calculator {
@@ -986,5 +1457,81 @@ tfoot td {
 
   th, td {
     padding: 0.5rem;
+  }
+
+  /* Advanced Mode responsive */
+  .advanced-mode-toggle {
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+  }
+
+  .toggle-hint {
+    display: none;
+  }
+
+  .sensitivity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .year-table-container {
+    margin: 0 -1rem;
+    padding: 0 0.5rem;
+  }
+
+  .year-table {
+    font-size: 0.75rem;
+  }
+
+  .year-table th,
+  .year-table td {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .input-with-prefix.compact input {
+    min-width: 60px;
+  }
+
+  .note-input {
+    min-width: 80px;
+  }
+
+  .strategy-chips {
+    flex-direction: column;
+  }
+
+  .strategy-chip {
+    width: 100%;
+    text-align: center;
+  }
+
+  .comparison-table {
+    font-size: 0.7rem;
+  }
+
+  .comparison-table th,
+  .comparison-table td {
+    padding: 0.5rem;
+  }
+
+  .year-actions,
+  .sensitivity-actions,
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .btn-secondary {
+    width: 100%;
+  }
+}
+
+/* Print styles for Advanced Mode */
+@media print {
+  .advanced-mode-container {
+    display: none;
   }
 }

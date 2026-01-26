@@ -339,6 +339,52 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     definition: 'Expected deviation from benchmark returns.',
     impact: 'Higher tracking error means more return volatility vs. index.',
   },
+
+  // ============================================
+  // ADVANCED MODE - SETTINGS
+  // ============================================
+
+  'setting-qfaf-multiplier': {
+    title: 'QFAF Multiplier',
+    definition: 'The rate at which QFAF generates both ST gains and ordinary losses relative to its market value.',
+    formula: 'Default: 150% (1.50x)',
+    impact: 'Changing this affects auto-sizing and all tax event calculations.',
+  },
+
+  'setting-nol-offset': {
+    title: 'NOL Offset Limit',
+    definition: 'Maximum percentage of taxable income that can be offset by NOL carryforward in any given year.',
+    formula: 'Default: 80% (per TCJA post-2017 rules)',
+    impact: 'Lower limits extend NOL usage over more years; higher limits accelerate utilization.',
+  },
+
+  'setting-annual-return': {
+    title: 'Default Annual Return',
+    definition: 'Assumed portfolio growth rate for multi-year projections.',
+    formula: 'Default: 7% (historical equity average)',
+    impact: 'Higher returns compound portfolio value; lower returns reduce projected wealth.',
+  },
+
+  'setting-niit': {
+    title: 'NIIT Rate',
+    definition: 'Net Investment Income Tax on investment income above thresholds ($250K MFJ, $200K Single).',
+    formula: 'Default: 3.8%',
+    impact: 'Added to capital gains rates for high earners.',
+  },
+
+  'setting-ltcg': {
+    title: 'LTCG Rate',
+    definition: 'Federal long-term capital gains rate (top bracket).',
+    formula: 'Default: 20%',
+    impact: 'Lower LT rates increase the value of ST→LT conversion.',
+  },
+
+  'setting-stcg': {
+    title: 'Top Ordinary Rate',
+    definition: 'Highest marginal federal ordinary income tax rate.',
+    formula: 'Default: 37%',
+    impact: 'Higher ordinary rates increase the value of ordinary loss deductions.',
+  },
 };
 
 // Helper function to get popup content by key
