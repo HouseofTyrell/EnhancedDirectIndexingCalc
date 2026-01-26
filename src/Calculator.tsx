@@ -1,10 +1,19 @@
 import { useState, useMemo } from 'react';
 import { calculate } from './calculations';
-import { WealthChart } from './WealthChart';
+import { TaxSavingsChart, PortfolioValueChart } from './WealthChart';
 import { ResultsTable } from './ResultsTable';
 import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
 import { CalculatorInputs } from './types';
+import {
+  InfoPopup,
+  TaxRatesFormula,
+  QfafSizingFormula,
+  Section461lFormula,
+  TaxAlphaFormula,
+  StrategyRatesFormula,
+  ProjectionFormula,
+} from './InfoPopup';
 
 // Format number with commas for display
 const formatWithCommas = (value: number) => {
@@ -56,7 +65,12 @@ export function Calculator() {
 
       {/* Input Form */}
       <section className="inputs-section">
-        <h2>Client Profile</h2>
+        <div className="section-header">
+          <h2>Client Profile</h2>
+          <InfoPopup title="Strategy Selection">
+            <StrategyRatesFormula />
+          </InfoPopup>
+        </div>
         <div className="input-grid">
           <div className="input-group">
             <label htmlFor="strategy">Collateral Strategy</label>
@@ -164,7 +178,12 @@ export function Calculator() {
 
       {/* Marginal Tax Rates */}
       <section className="tax-rates-section">
-        <h2>Marginal Tax Rates</h2>
+        <div className="section-header">
+          <h2>Marginal Tax Rates</h2>
+          <InfoPopup title="Tax Rate Calculations">
+            <TaxRatesFormula />
+          </InfoPopup>
+        </div>
         <div className="tax-rates-grid">
           <div className="tax-rate-item">
             <span className="rate-label">Federal Ordinary/ST</span>
@@ -195,7 +214,12 @@ export function Calculator() {
 
       {/* Strategy Sizing */}
       <section className="sizing-section">
-        <h2>Strategy Sizing</h2>
+        <div className="section-header">
+          <h2>Strategy Sizing</h2>
+          <InfoPopup title="QFAF Auto-Sizing">
+            <QfafSizingFormula />
+          </InfoPopup>
+        </div>
         <div className="sizing-cards">
           <div className="sizing-card">
             <span className="sizing-label">Collateral</span>
@@ -212,7 +236,12 @@ export function Calculator() {
             <span className="sizing-value">{formatCurrency(results.sizing.totalExposure)}</span>
           </div>
           <div className="sizing-card">
-            <span className="sizing-label">§461(l) Limit</span>
+            <span className="sizing-label">
+              §461(l) Limit
+              <InfoPopup title="Section 461(l) Limitation">
+                <Section461lFormula />
+              </InfoPopup>
+            </span>
             <span className="sizing-value">{formatCurrency(results.sizing.section461Limit)}</span>
             <span className="sizing-sublabel">{inputs.filingStatus === 'mfj' ? 'MFJ' : 'Single/Other'}</span>
           </div>
@@ -299,7 +328,12 @@ export function Calculator() {
 
       {/* Results Summary */}
       <section className="results-section">
-        <h2>10-Year Projection Results</h2>
+        <div className="section-header">
+          <h2>10-Year Projection Results</h2>
+          <InfoPopup title="Projection Methodology">
+            <ProjectionFormula />
+          </InfoPopup>
+        </div>
         <div className="summary-cards">
           <div className="card primary">
             <h3>Total Tax Savings</h3>
@@ -312,7 +346,12 @@ export function Calculator() {
             <p className="subtext">Year 10</p>
           </div>
           <div className="card">
-            <h3>Annualized Tax Alpha</h3>
+            <h3>
+              Annualized Tax Alpha
+              <InfoPopup title="Tax Alpha Calculation">
+                <TaxAlphaFormula />
+              </InfoPopup>
+            </h3>
             <p className="big-number">{formatPercent(results.summary.effectiveTaxAlpha)}</p>
             <p className="subtext">Per year</p>
           </div>
@@ -323,11 +362,14 @@ export function Calculator() {
           </div>
         </div>
 
-        {/* Chart */}
-        <WealthChart data={results.years} />
+        {/* Tax Benefits Chart */}
+        <TaxSavingsChart data={results.years} />
 
         {/* Table */}
         <ResultsTable data={results.years} />
+
+        {/* Portfolio Value Chart */}
+        <PortfolioValueChart data={results.years} />
       </section>
 
       {/* Actions */}
