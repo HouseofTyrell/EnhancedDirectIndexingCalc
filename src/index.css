@@ -186,6 +186,163 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: 0.25rem;
 }
 
+/* Input hints */
+.input-hint {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: 0.25rem;
+}
+
+/* Tax Rates Section */
+.tax-rates-section {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+}
+
+.tax-rates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.tax-rate-item {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 6px;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.tax-rate-item.highlight {
+  background: #7c3aed;
+  color: white;
+}
+
+.tax-rate-item.accent {
+  background: var(--success);
+  color: white;
+}
+
+.rate-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  margin-bottom: 0.25rem;
+}
+
+.rate-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Sizing section */
+.sizing-section {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.sizing-explanation {
+  margin: 0 0 1rem;
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+.sizing-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.sizing-card {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.sizing-card.highlight {
+  background: var(--primary);
+  color: white;
+}
+
+.sizing-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  margin-bottom: 0.25rem;
+}
+
+.sizing-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.sizing-sublabel {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-top: 0.25rem;
+}
+
+.sizing-section.warning {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+/* Offset status */
+.offset-status {
+  margin-top: 1rem;
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.offset-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.offset-row:last-child {
+  border-bottom: none;
+}
+
+.offset-row.result {
+  font-weight: 600;
+  padding-top: 0.75rem;
+  margin-top: 0.25rem;
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+}
+
+.offset-row.success span:last-child {
+  color: var(--success);
+}
+
+.offset-row.warning span:last-child {
+  color: #d97706;
+}
+
+.positive {
+  color: var(--success);
+}
+
+.negative {
+  color: #dc2626;
+}
+
+.warning-note {
+  margin: 1rem 0 0;
+  padding: 0.75rem;
+  background: #fef3c7;
+  border-left: 4px solid #d97706;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: #92400e;
+}
+
 /* Summary cards */
 .summary-cards {
   display: grid;

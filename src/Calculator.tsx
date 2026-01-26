@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { calculate } from './calculations';
 import { WealthChart } from './WealthChart';
 import { ResultsTable } from './ResultsTable';
-import { DEFAULTS, STATES } from './taxData';
+import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
 import { CalculatorInputs } from './types';
 
@@ -38,6 +38,14 @@ export function Calculator() {
   };
 
   const currentStrategy = getStrategy(inputs.strategyId);
+
+  // Calculate marginal tax rates
+  const federalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
+  const federalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+  const stateRate = inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+  const combinedStRate = federalStRate + stateRate;
+  const combinedLtRate = federalLtRate + stateRate;
+  const rateDifferential = combinedStRate - combinedLtRate;
 
   return (
     <div className="calculator">
@@ -151,6 +159,37 @@ export function Calculator() {
               </div>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Marginal Tax Rates */}
+      <section className="tax-rates-section">
+        <h2>Marginal Tax Rates</h2>
+        <div className="tax-rates-grid">
+          <div className="tax-rate-item">
+            <span className="rate-label">Federal Ordinary/ST</span>
+            <span className="rate-value">{(federalStRate * 100).toFixed(1)}%</span>
+          </div>
+          <div className="tax-rate-item">
+            <span className="rate-label">Federal LT Cap Gains</span>
+            <span className="rate-value">{(federalLtRate * 100).toFixed(1)}%</span>
+          </div>
+          <div className="tax-rate-item">
+            <span className="rate-label">State</span>
+            <span className="rate-value">{(stateRate * 100).toFixed(1)}%</span>
+          </div>
+          <div className="tax-rate-item highlight">
+            <span className="rate-label">Combined Ordinary</span>
+            <span className="rate-value">{(combinedStRate * 100).toFixed(1)}%</span>
+          </div>
+          <div className="tax-rate-item highlight">
+            <span className="rate-label">Combined LT</span>
+            <span className="rate-value">{(combinedLtRate * 100).toFixed(1)}%</span>
+          </div>
+          <div className="tax-rate-item accent">
+            <span className="rate-label">ST→LT Benefit</span>
+            <span className="rate-value">{(rateDifferential * 100).toFixed(1)}%</span>
+          </div>
         </div>
       </section>
 
