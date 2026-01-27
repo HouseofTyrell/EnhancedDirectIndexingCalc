@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
-import { calculate } from './calculations';
+import { calculate, calculateWithOverrides } from './calculations';
 
 // Lazy load chart components to reduce initial bundle size (~400KB savings)
 const TaxSavingsChart = lazy(() =>
@@ -96,9 +96,21 @@ export function Calculator() {
   // Rate version - increments when custom rates are saved to trigger recalculation
   const [rateVersion, setRateVersion] = useState(0);
 
+  // Check if any year overrides differ from defaults
+  const hasActiveOverrides = useMemo(
+    () =>
+      yearOverrides.some(
+        o => o.w2Income !== inputs.annualIncome || o.cashInfusion !== 0
+      ),
+    [yearOverrides, inputs.annualIncome]
+  );
+
   const results = useMemo(
-    () => calculate(inputs, advancedSettings),
-    [inputs, advancedSettings, rateVersion]
+    () =>
+      hasActiveOverrides
+        ? calculateWithOverrides(inputs, advancedSettings, yearOverrides)
+        : calculate(inputs, advancedSettings),
+    [inputs, advancedSettings, rateVersion, hasActiveOverrides, yearOverrides]
   );
 
   // Memoize tax rate calculations - only recalculates when dependencies change
