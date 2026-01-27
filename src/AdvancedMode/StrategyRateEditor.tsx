@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { STRATEGIES } from '../strategyData';
+import { STRATEGIES, LOSS_RATE_DECAY_FACTOR, LOSS_RATE_FLOOR } from '../strategyData';
 import {
   StrategyRateOverrides,
   getDefaultRates,
@@ -101,8 +101,8 @@ export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: Strategy
     const newRates = { ...rates };
     for (let year = 1; year <= 10; year++) {
       const key = `${strategyId}-${year}`;
-      const decayedRate = avgRate * Math.pow(0.93, year - 1);
-      newRates[key] = Math.max(decayedRate, avgRate * 0.30); // 30% floor
+      const decayedRate = avgRate * Math.pow(LOSS_RATE_DECAY_FACTOR, year - 1);
+      newRates[key] = Math.max(decayedRate, avgRate * LOSS_RATE_FLOOR);
     }
     setRates(newRates);
     setHasChanges(true);
@@ -115,7 +115,9 @@ export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: Strategy
       <div className="rate-editor-modal" onClick={e => e.stopPropagation()}>
         <div className="rate-editor-header">
           <h2>Net Capital Loss Rate Editor</h2>
-          <button className="close-btn" onClick={onClose}>&times;</button>
+          <button className="close-btn" onClick={onClose}>
+            &times;
+          </button>
         </div>
 
         <div className="rate-editor-description">
@@ -179,9 +181,7 @@ export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: Strategy
                         <div>{strategy.name}</div>
                         <div className="strategy-label">{strategy.label}</div>
                       </td>
-                      <td className="base-rate">
-                        {(baseRate * 100).toFixed(1)}%
-                      </td>
+                      <td className="base-rate">{(baseRate * 100).toFixed(1)}%</td>
                       <td className={isModified ? 'modified' : ''}>
                         <input
                           type="number"
@@ -247,7 +247,9 @@ export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: Strategy
                             min="0"
                             max="50"
                             value={(value * 100).toFixed(1)}
-                            onChange={e => handleYearlyRateChange(strategy.id, year, e.target.value)}
+                            onChange={e =>
+                              handleYearlyRateChange(strategy.id, year, e.target.value)
+                            }
                             className="rate-input"
                           />
                         </td>

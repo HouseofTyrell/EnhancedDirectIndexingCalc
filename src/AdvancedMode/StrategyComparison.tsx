@@ -18,28 +18,30 @@ export function StrategyComparison({
 }: StrategyComparisonProps) {
   // Calculate results for each selected strategy
   const comparisonResults = useMemo((): ComparisonResult[] => {
-    return selectedStrategies.map(strategyId => {
-      const strategy = getStrategy(strategyId);
-      if (!strategy) {
-        return null;
-      }
+    return selectedStrategies
+      .map(strategyId => {
+        const strategy = getStrategy(strategyId);
+        if (!strategy) {
+          return null;
+        }
 
-      // Calculate with this strategy
-      const inputs = { ...baseInputs, strategyId };
-      const results = calculate(inputs);
+        // Calculate with this strategy
+        const inputs = { ...baseInputs, strategyId };
+        const results = calculate(inputs);
 
-      return {
-        strategyId,
-        strategyName: strategy.name,
-        strategyType: strategy.type,
-        qfafRequired: results.sizing.qfafValue,
-        totalExposure: results.sizing.totalExposure,
-        year1TaxSavings: results.years[0]?.taxSavings || 0,
-        tenYearTaxSavings: results.summary.totalTaxSavings,
-        taxAlpha: results.summary.effectiveTaxAlpha,
-        trackingErrorDisplay: strategy.trackingErrorDisplay,
-      };
-    }).filter((r): r is ComparisonResult => r !== null);
+        return {
+          strategyId,
+          strategyName: strategy.name,
+          strategyType: strategy.type,
+          qfafRequired: results.sizing.qfafValue,
+          totalExposure: results.sizing.totalExposure,
+          year1TaxSavings: results.years[0]?.taxSavings || 0,
+          tenYearTaxSavings: results.summary.totalTaxSavings,
+          taxAlpha: results.summary.effectiveTaxAlpha,
+          trackingErrorDisplay: strategy.trackingErrorDisplay,
+        };
+      })
+      .filter((r): r is ComparisonResult => r !== null);
   }, [baseInputs, selectedStrategies]);
 
   // Find the best strategy for each metric
@@ -86,8 +88,8 @@ export function StrategyComparison({
   return (
     <div className="strategy-comparison">
       <p className="section-description">
-        Compare different strategies side-by-side to find the best fit for your situation.
-        Select 2-3 strategies below.
+        Compare different strategies side-by-side to find the best fit for your situation. Select
+        2-3 strategies below.
       </p>
 
       {/* Strategy Selector */}
@@ -101,7 +103,9 @@ export function StrategyComparison({
                 type="button"
                 className={`strategy-chip ${selectedStrategies.includes(strategy.id) ? 'selected' : ''}`}
                 onClick={() => toggleStrategy(strategy.id)}
-                disabled={!selectedStrategies.includes(strategy.id) && selectedStrategies.length >= 3}
+                disabled={
+                  !selectedStrategies.includes(strategy.id) && selectedStrategies.length >= 3
+                }
               >
                 {strategy.name}
               </button>
@@ -118,7 +122,9 @@ export function StrategyComparison({
                 type="button"
                 className={`strategy-chip ${selectedStrategies.includes(strategy.id) ? 'selected' : ''}`}
                 onClick={() => toggleStrategy(strategy.id)}
-                disabled={!selectedStrategies.includes(strategy.id) && selectedStrategies.length >= 3}
+                disabled={
+                  !selectedStrategies.includes(strategy.id) && selectedStrategies.length >= 3
+                }
               >
                 {strategy.name}
               </button>
@@ -224,9 +230,7 @@ export function StrategyComparison({
                   <FieldInfoPopup contentKey="comp-tracking-error" />
                 </td>
                 {comparisonResults.map(result => (
-                  <td key={result.strategyId}>
-                    {result.trackingErrorDisplay}
-                  </td>
+                  <td key={result.strategyId}>{result.trackingErrorDisplay}</td>
                 ))}
               </tr>
             </tbody>

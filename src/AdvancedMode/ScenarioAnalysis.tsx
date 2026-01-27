@@ -59,8 +59,8 @@ export function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
   return (
     <div className="scenario-analysis">
       <p className="section-description">
-        Compare strategy outcomes across different market conditions.
-        Expected values are probability-weighted (25% bull, 50% base, 25% bear).
+        Compare strategy outcomes across different market conditions. Expected values are
+        probability-weighted (25% bull, 50% base, 25% bear).
       </p>
 
       <div className="scenario-table-container">
@@ -88,9 +88,7 @@ export function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
                   {formatCurrency(s.totalTaxSavings)}
                 </td>
               ))}
-              <td className="scenario-expected">
-                {formatCurrency(expectedValues.taxSavings)}
-              </td>
+              <td className="scenario-expected">{formatCurrency(expectedValues.taxSavings)}</td>
             </tr>
             <tr>
               <td>Final Portfolio Value</td>
@@ -99,9 +97,7 @@ export function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
                   {formatCurrency(s.finalPortfolioValue)}
                 </td>
               ))}
-              <td className="scenario-expected">
-                {formatCurrency(expectedValues.portfolioValue)}
-              </td>
+              <td className="scenario-expected">{formatCurrency(expectedValues.portfolioValue)}</td>
             </tr>
             <tr>
               <td>Annualized Tax Alpha</td>
@@ -110,9 +106,7 @@ export function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
                   {formatPercent(s.effectiveTaxAlpha)}
                 </td>
               ))}
-              <td className="scenario-expected">
-                {formatPercent(expectedValues.taxAlpha)}
-              </td>
+              <td className="scenario-expected">{formatPercent(expectedValues.taxAlpha)}</td>
             </tr>
             <tr>
               <td>Total NOL Generated</td>
@@ -129,9 +123,9 @@ export function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
 
       <div className="scenario-notes">
         <p>
-          <strong>Note:</strong> Bear markets may increase tax-loss harvesting opportunities
-          while reducing portfolio growth. Bull markets grow the portfolio faster but may
-          reduce relative tax alpha.
+          <strong>Note:</strong> Bear markets may increase tax-loss harvesting opportunities while
+          reducing portfolio growth. Bull markets grow the portfolio faster but may reduce relative
+          tax alpha.
         </p>
       </div>
     </div>

@@ -65,7 +65,7 @@ describe('calculateSizing', () => {
   it('uses single filer 461(l) limit when appropriate', () => {
     const inputs = createInputs({
       filingStatus: 'single',
-      collateralAmount: 5000000
+      collateralAmount: 5000000,
     });
     const sizing = calculateSizing(inputs);
 
@@ -100,7 +100,7 @@ describe('calculate - basic behavior', () => {
     const result = calculate(createInputs());
     // Tax alpha = total savings / total exposure / 10 years
     expect(result.summary.effectiveTaxAlpha).toBeGreaterThan(0);
-    expect(result.summary.effectiveTaxAlpha).toBeLessThan(0.10); // Reasonable bound
+    expect(result.summary.effectiveTaxAlpha).toBeLessThan(0.1); // Reasonable bound
   });
 });
 
@@ -111,7 +111,7 @@ describe('calculate - Section 461(l) behavior', () => {
     // Usable = min(1M, 626K, 1M) = 626K
     const inputs = createInputs({
       annualIncome: 1000000,
-      collateralAmount: 10000000
+      collateralAmount: 10000000,
     });
     const result = calculate(inputs);
 
@@ -122,7 +122,7 @@ describe('calculate - Section 461(l) behavior', () => {
   it('sends excess ordinary losses to NOL carryforward', () => {
     const inputs = createInputs({
       annualIncome: 1000000,
-      collateralAmount: 10000000
+      collateralAmount: 10000000,
     });
     const result = calculate(inputs);
 
@@ -135,7 +135,7 @@ describe('calculate - Section 461(l) behavior', () => {
     // Low income person cannot use full 461(l) limit
     const inputs = createInputs({
       annualIncome: 100000,
-      collateralAmount: 10000000
+      collateralAmount: 10000000,
     });
     const result = calculate(inputs);
 
@@ -161,7 +161,7 @@ describe('calculate - NOL behavior', () => {
     // Start with existing NOL
     const inputs = createInputs({
       existingNolCarryforward: 1000000,
-      collateralAmount: 100000 // Small QFAF so we have taxable income
+      collateralAmount: 100000, // Small QFAF so we have taxable income
     });
     const result = calculate(inputs);
 
@@ -173,13 +173,13 @@ describe('calculate - NOL behavior', () => {
     const inputs = createInputs({
       annualIncome: 500000,
       existingNolCarryforward: 1000000,
-      collateralAmount: 10000 // Very small to maximize taxable income
+      collateralAmount: 10000, // Very small to maximize taxable income
     });
     const result = calculate(inputs);
 
     // NOL used should be <= 80% of taxable income before NOL
     // With 500K income, max NOL usage ~= 400K
-    expect(result.years[0].nolUsedThisYear).toBeLessThanOrEqual(500000 * 0.80);
+    expect(result.years[0].nolUsedThisYear).toBeLessThanOrEqual(500000 * 0.8);
   });
 });
 
@@ -279,7 +279,7 @@ describe('calculate - loss rate decay', () => {
     // Check the rate didn't collapse below floor
     // For core-130-30: base = 10%, floor = 3%
     expect(year10Rate).toBeGreaterThan(0.03);
-    expect(year10Rate / year1Rate).toBeGreaterThan(0.30);
+    expect(year10Rate / year1Rate).toBeGreaterThan(0.3);
   });
 });
 
@@ -290,7 +290,7 @@ describe('calculate - wash sale adjustment', () => {
     // Core-130-30 has 10% ST loss rate
     // Default wash sale rate is 0, so all losses are harvested
     // Gross losses = collateral × stLossRate = 1M × 10% = 100K
-    const grossLosses = 1000000 * 0.10;
+    const grossLosses = 1000000 * 0.1;
     const expectedHarvested = grossLosses; // No reduction with 0% wash sale
 
     expect(result.years[0].stLossesHarvested).toBeCloseTo(expectedHarvested, 0);
@@ -299,14 +299,14 @@ describe('calculate - wash sale adjustment', () => {
   it('respects custom wash sale rate', () => {
     const customSettings: AdvancedSettings = {
       ...DEFAULT_SETTINGS,
-      washSaleDisallowanceRate: 0.10, // 10% disallowed
+      washSaleDisallowanceRate: 0.1, // 10% disallowed
     };
     const result = calculate(createInputs(), customSettings);
 
     // Core-130-30 has 10% ST loss rate
     // With 10% wash sale, harvested = 90% of gross
-    const grossLosses = 1000000 * 0.10;
-    const expectedHarvested = grossLosses * 0.90;
+    const grossLosses = 1000000 * 0.1;
+    const expectedHarvested = grossLosses * 0.9;
 
     expect(result.years[0].stLossesHarvested).toBeCloseTo(expectedHarvested, 0);
   });
@@ -441,7 +441,7 @@ describe('fixed issues', () => {
   it('461(l) should be limited by taxable income', () => {
     const inputs = createInputs({
       annualIncome: 50000,
-      collateralAmount: 10000000
+      collateralAmount: 10000000,
     });
     const result = calculate(inputs);
 

@@ -1,4 +1,11 @@
-import { CalculatorInputs, YearResult, CalculationResult, CalculatedSizing, AdvancedSettings, DEFAULT_SETTINGS } from './types';
+import {
+  CalculatorInputs,
+  YearResult,
+  CalculationResult,
+  CalculatedSizing,
+  AdvancedSettings,
+  DEFAULT_SETTINGS,
+} from './types';
 import { getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import {
   getStrategy,
@@ -59,7 +66,7 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
 
   if (inputs.qfafEnabled !== false) {
     // Auto-size QFAF so ST gains = ST losses (or use override)
-    qfafValue = inputs.qfafOverride ?? (year1StLosses / QFAF_ST_GAIN_RATE);
+    qfafValue = inputs.qfafOverride ?? year1StLosses / QFAF_ST_GAIN_RATE;
     // QFAF generates ST gains and ordinary losses at 150% of MV
     year1StGains = qfafValue * QFAF_ST_GAIN_RATE;
     year1OrdinaryLosses = qfafValue * QFAF_ORDINARY_LOSS_RATE;
@@ -88,7 +95,10 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
   };
 }
 
-export function calculate(inputs: CalculatorInputs, settings: AdvancedSettings = DEFAULT_SETTINGS): CalculationResult {
+export function calculate(
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings = DEFAULT_SETTINGS
+): CalculationResult {
   const sizing = calculateSizing(inputs);
   const strategy = getStrategy(inputs.strategyId);
 
@@ -234,17 +244,25 @@ function calculateYear(
   // Net tax savings
   const taxSavings = safeNumber(
     ordinaryLossBenefit +
-    stToLtConversionBenefit +
-    capitalLossBenefit +
-    nolUsageBenefit -
-    ltGainCost -
-    remainingStGainCost
+      stToLtConversionBenefit +
+      capitalLossBenefit +
+      nolUsageBenefit -
+      ltGainCost -
+      remainingStGainCost
   );
 
   // For display/debugging: calculate what taxes would be without benefits
-  const grossInvestmentTax = safeNumber(Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate);
-  const federalTax = safeNumber(Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) * (stRate / combinedStRate));
-  const stateTax = safeNumber(Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) * (stateRate / combinedStRate));
+  const grossInvestmentTax = safeNumber(
+    Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
+  );
+  const federalTax = safeNumber(
+    Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
+      (stRate / combinedStRate)
+  );
+  const stateTax = safeNumber(
+    Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
+      (stateRate / combinedStRate)
+  );
   const baselineTax = ltGainsRealized * combinedLtRate;
 
   // Portfolio growth using configured annual return minus financing costs
@@ -370,7 +388,8 @@ function calculateCarryforwards(
 
   // Step 7: Calculate NOL usage with 80% limitation
   // NOL can offset up to 80% of taxable income
-  const taxableIncomeBeforeNol = inputs.annualIncome + taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome;
+  const taxableIncomeBeforeNol =
+    inputs.annualIncome + taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome;
   const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * NOL_OFFSET_PERCENTAGE;
   const nolUsed = Math.min(nolCarryforward, maxNolUsage);
 
@@ -388,9 +407,8 @@ function calculateSummary(years: YearResult[], sizing: CalculatedSizing) {
   // Safe array access (005 - fix unchecked array access)
   const lastYear = years.length > 0 ? years[years.length - 1] : undefined;
   const finalPortfolioValue = lastYear?.totalValue ?? 0;
-  const effectiveTaxAlpha = sizing.totalExposure > 0
-    ? totalTaxSavings / sizing.totalExposure / 10
-    : 0;
+  const effectiveTaxAlpha =
+    sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / 10 : 0;
 
   return { totalTaxSavings, finalPortfolioValue, effectiveTaxAlpha, totalNolGenerated };
 }

@@ -39,19 +39,12 @@ export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: Wea
     <div className="chart-container">
       <h3>Annual Tax Benefits</h3>
       <ResponsiveContainer width="100%" height={350}>
-        <AreaChart
-          data={chartData}
-          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-        >
+        <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
           <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-          <YAxis
-            tickFormatter={formatCurrencyAbbreviated}
-            tick={{ fontSize: 12 }}
-            width={80}
-          />
+          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12 }} width={80} />
           <Tooltip
-            formatter={(value) => value != null ? formatCurrency(value as number) : ''}
+            formatter={value => (value !== null ? formatCurrency(value as number) : '')}
             labelStyle={{ fontWeight: 'bold' }}
             contentStyle={{
               backgroundColor: '#fff',
@@ -98,39 +91,56 @@ export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: Wea
 });
 
 // Memoized chart component to prevent unnecessary re-renders (016)
-export const PortfolioValueChart = React.memo(function PortfolioValueChart({ data, trackingError = 0.02 }: WealthChartProps) {
+export const PortfolioValueChart = React.memo(function PortfolioValueChart({
+  data,
+  trackingError = 0.02,
+}: WealthChartProps) {
   // Memoize chart data transformation with confidence bands (007)
-  const chartData = useMemo(() => data.map(year => {
-    // Confidence bands: ±1.5 standard deviations (covers ~87% of outcomes)
-    // Tracking error compounds over time: σ_n = σ × √n
-    const annualizedError = trackingError * Math.sqrt(year.year) * 1.5;
-    const upperBound = year.totalValue * (1 + annualizedError);
-    const lowerBound = year.totalValue * (1 - annualizedError);
+  const chartData = useMemo(
+    () =>
+      data.map(year => {
+        // Confidence bands: ±1.5 standard deviations (covers ~87% of outcomes)
+        // Tracking error compounds over time: σ_n = σ × √n
+        const annualizedError = trackingError * Math.sqrt(year.year) * 1.5;
+        const upperBound = year.totalValue * (1 + annualizedError);
+        const lowerBound = year.totalValue * (1 - annualizedError);
 
-    return {
-      year: `Year ${year.year}`,
-      'Total Value': year.totalValue,
-      'QFAF Value': year.qfafValue,
-      'Collateral Value': year.collateralValue,
-      upperBound,
-      lowerBound,
-    };
-  }), [data, trackingError]);
+        return {
+          year: `Year ${year.year}`,
+          'Total Value': year.totalValue,
+          'QFAF Value': year.qfafValue,
+          'Collateral Value': year.collateralValue,
+          upperBound,
+          lowerBound,
+        };
+      }),
+    [data, trackingError]
+  );
 
   // Custom tooltip to format values cleanly
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: {
+    active?: boolean;
+    payload?: Array<{ name: string; value: number; color: string }>;
+    label?: string;
+  }) => {
     if (!active || !payload || !payload.length) return null;
 
     // Find the data point to get confidence band values
     const dataPoint = chartData.find(d => d.year === label);
 
     return (
-      <div style={{
-        backgroundColor: '#fff',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        padding: '10px',
-      }}>
+      <div
+        style={{
+          backgroundColor: '#fff',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          padding: '10px',
+        }}
+      >
         <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{label}</p>
         {payload
           .filter(entry => entry.name !== 'upperBound' && entry.name !== 'lowerBound')
@@ -140,8 +150,18 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({ dat
             </p>
           ))}
         {dataPoint && (
-          <p style={{ margin: '4px 0', color: '#6b7280', fontSize: '0.85em', borderTop: '1px solid #e5e7eb', paddingTop: '6px', marginTop: '6px' }}>
-            Range (±1.5σ): {formatCurrency(dataPoint.lowerBound)} – {formatCurrency(dataPoint.upperBound)}
+          <p
+            style={{
+              margin: '4px 0',
+              color: '#6b7280',
+              fontSize: '0.85em',
+              borderTop: '1px solid #e5e7eb',
+              paddingTop: '6px',
+              marginTop: '6px',
+            }}
+          >
+            Range (±1.5σ): {formatCurrency(dataPoint.lowerBound)} –{' '}
+            {formatCurrency(dataPoint.upperBound)}
           </p>
         )}
       </div>
@@ -152,17 +172,10 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({ dat
     <div className="chart-container">
       <h3>Portfolio Value Growth</h3>
       <ResponsiveContainer width="100%" height={350}>
-        <AreaChart
-          data={chartData}
-          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-        >
+        <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
           <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-          <YAxis
-            tickFormatter={formatCurrencyAbbreviated}
-            tick={{ fontSize: 12 }}
-            width={80}
-          />
+          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12 }} width={80} />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
           {/* Confidence band - upper area (will be masked by lower) */}

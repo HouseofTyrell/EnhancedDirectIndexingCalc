@@ -12,13 +12,27 @@ interface ResultsTableProps {
 // Chevron icons for expand/collapse
 const ChevronDown = () => (
   <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    <path
+      d="M2.5 4.5L6 8L9.5 4.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
   </svg>
 );
 
 const ChevronRight = () => (
   <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-    <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    <path
+      d="M4.5 2.5L8 6L4.5 9.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
   </svg>
 );
 
@@ -63,10 +77,7 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
     <div className="table-container">
       <div className="table-header-row">
         <h3>Year-by-Year Breakdown</h3>
-        <button
-          className="toggle-details-btn"
-          onClick={handleToggleAll}
-        >
+        <button className="toggle-details-btn" onClick={handleToggleAll}>
           {showAllDetails ? 'Collapse All' : 'Expand All'}
         </button>
       </div>
@@ -182,10 +193,14 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
             {/* Starting values row */}
             <tr className="starting-row">
               <td>Start</td>
-              <td>{formatCurrency(sizing.collateralValue + (qfafEnabled ? sizing.qfafValue : 0))}</td>
+              <td>
+                {formatCurrency(sizing.collateralValue + (qfafEnabled ? sizing.qfafValue : 0))}
+              </td>
               {expandPortfolio && qfafEnabled && (
                 <>
-                  <td className="starting-note collateral-col">{formatCurrency(sizing.collateralValue)}</td>
+                  <td className="starting-note collateral-col">
+                    {formatCurrency(sizing.collateralValue)}
+                  </td>
                   <td className="starting-note qfaf-col">{formatCurrency(sizing.qfafValue)}</td>
                 </>
               )}
@@ -236,16 +251,22 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
 
                   {/* Net Capital (collapsed view) */}
                   <td className={netCapital >= 0 ? 'positive' : 'negative'}>
-                    {netCapital >= 0 ? formatCurrency(netCapital) : `(${formatCurrency(Math.abs(netCapital))})`}
+                    {netCapital >= 0
+                      ? formatCurrency(netCapital)
+                      : `(${formatCurrency(Math.abs(netCapital))})`}
                   </td>
 
                   {/* Expanded Capital Details */}
                   {expandCapital && (
                     <>
-                      <td className="negative collateral-col">({formatCurrency(year.stLossesHarvested)})</td>
+                      <td className="negative collateral-col">
+                        ({formatCurrency(year.stLossesHarvested)})
+                      </td>
                       <td className="collateral-col">{formatCurrency(year.ltGainsRealized)}</td>
                       {qfafEnabled && (
-                        <td className="positive qfaf-col">{formatCurrency(year.stGainsGenerated)}</td>
+                        <td className="positive qfaf-col">
+                          {formatCurrency(year.stGainsGenerated)}
+                        </td>
                       )}
                     </>
                   )}
@@ -257,15 +278,19 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
 
                       {/* NOL Activity (collapsed view) */}
                       <td className={nolNet > 0 ? 'nol-generated' : nolNet < 0 ? 'nol-used' : ''}>
-                        {nolNet > 0 ? `+${formatCurrency(nolNet)}` :
-                         nolNet < 0 ? `−${formatCurrency(Math.abs(nolNet))}` :
-                         '—'}
+                        {nolNet > 0
+                          ? `+${formatCurrency(nolNet)}`
+                          : nolNet < 0
+                            ? `−${formatCurrency(Math.abs(nolNet))}`
+                            : '—'}
                       </td>
 
                       {/* Expanded NOL Details */}
                       {expandNOL && (
                         <>
-                          <td className="positive qfaf-col">{formatCurrency(year.nolUsedThisYear)}</td>
+                          <td className="positive qfaf-col">
+                            {formatCurrency(year.nolUsedThisYear)}
+                          </td>
                           <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
                         </>
                       )}
@@ -280,7 +305,9 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
 
           <tfoot>
             <tr>
-              <td colSpan={getColSpan() - 1}><strong>Total 10-Year Tax Savings</strong></td>
+              <td colSpan={getColSpan() - 1}>
+                <strong>Total 10-Year Tax Savings</strong>
+              </td>
               <td className="highlight">
                 <strong>{formatCurrency(cumulativeSavings)}</strong>
               </td>
@@ -292,17 +319,26 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
       {/* Carryforward Summary */}
       <div className="carryforward-note">
         <p>
-          <strong>Carryforward Summary (Year 10):</strong><br />
-          ST Capital Loss: {formatCurrency(data.length > 0 ? data[data.length - 1].stLossCarryforward : 0)} |
-          LT Capital Loss: {formatCurrency(data.length > 0 ? data[data.length - 1].ltLossCarryforward : 0)}
+          <strong>Carryforward Summary (Year 10):</strong>
+          <br />
+          ST Capital Loss:{' '}
+          {formatCurrency(data.length > 0 ? data[data.length - 1].stLossCarryforward : 0)} | LT
+          Capital Loss:{' '}
+          {formatCurrency(data.length > 0 ? data[data.length - 1].ltLossCarryforward : 0)}
           {qfafEnabled && (
-            <> | NOL: {formatCurrency(data.length > 0 ? data[data.length - 1].nolCarryforward : 0)}</>
+            <>
+              {' '}
+              | NOL: {formatCurrency(data.length > 0 ? data[data.length - 1].nolCarryforward : 0)}
+            </>
           )}
         </p>
         {qfafEnabled && (
           <p className="carryforward-explanation">
-            <em>Note: NOL appears to accumulate because new excess ordinary losses are generated each year.
-            Check the "NOL Used" column to see how much NOL offsets income annually (up to 80% of taxable income).</em>
+            <em>
+              Note: NOL appears to accumulate because new excess ordinary losses are generated each
+              year. Check the "NOL Used" column to see how much NOL offsets income annually (up to
+              80% of taxable income).
+            </em>
           </p>
         )}
       </div>

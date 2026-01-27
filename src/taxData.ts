@@ -71,7 +71,7 @@ export function getStateRate(code: string): number {
 // Source: IRS Rev. Proc. 2025-XX, includes OBBBA adjustments
 // Bottom two brackets get 4% inflation adjustment, upper brackets get 2.3%
 const FEDERAL_BRACKETS_MFJ = [
-  { min: 0, max: 24800, rate: 0.10 },
+  { min: 0, max: 24800, rate: 0.1 },
   { min: 24800, max: 100800, rate: 0.12 },
   { min: 100800, max: 211400, rate: 0.22 },
   { min: 211400, max: 403550, rate: 0.24 },
@@ -82,7 +82,7 @@ const FEDERAL_BRACKETS_MFJ = [
 
 // Federal brackets for 2026 (Single)
 const FEDERAL_BRACKETS_SINGLE = [
-  { min: 0, max: 12400, rate: 0.10 },
+  { min: 0, max: 12400, rate: 0.1 },
   { min: 12400, max: 50400, rate: 0.12 },
   { min: 50400, max: 105700, rate: 0.22 },
   { min: 105700, max: 201775, rate: 0.24 },
@@ -93,7 +93,7 @@ const FEDERAL_BRACKETS_SINGLE = [
 
 // Federal brackets for 2026 (Married Filing Separately)
 const FEDERAL_BRACKETS_MFS = [
-  { min: 0, max: 12400, rate: 0.10 },
+  { min: 0, max: 12400, rate: 0.1 },
   { min: 12400, max: 50400, rate: 0.12 },
   { min: 50400, max: 105700, rate: 0.22 },
   { min: 105700, max: 201775, rate: 0.24 },
@@ -104,7 +104,7 @@ const FEDERAL_BRACKETS_MFS = [
 
 // Federal brackets for 2026 (Head of Household)
 const FEDERAL_BRACKETS_HOH = [
-  { min: 0, max: 17650, rate: 0.10 },
+  { min: 0, max: 17650, rate: 0.1 },
   { min: 17650, max: 67450, rate: 0.12 },
   { min: 67450, max: 105700, rate: 0.22 },
   { min: 105700, max: 201775, rate: 0.24 },
@@ -122,19 +122,27 @@ const NIIT_RATE = 0.038;
 
 function getBrackets(status: string) {
   switch (status) {
-    case 'mfj': return FEDERAL_BRACKETS_MFJ;
-    case 'mfs': return FEDERAL_BRACKETS_MFS;
-    case 'hoh': return FEDERAL_BRACKETS_HOH;
-    default: return FEDERAL_BRACKETS_SINGLE;
+    case 'mfj':
+      return FEDERAL_BRACKETS_MFJ;
+    case 'mfs':
+      return FEDERAL_BRACKETS_MFS;
+    case 'hoh':
+      return FEDERAL_BRACKETS_HOH;
+    default:
+      return FEDERAL_BRACKETS_SINGLE;
   }
 }
 
 function getNiitThreshold(status: string) {
   switch (status) {
-    case 'mfj': return NIIT_THRESHOLD_MFJ;
-    case 'mfs': return NIIT_THRESHOLD_MFS;
-    case 'hoh': return NIIT_THRESHOLD_HOH;
-    default: return NIIT_THRESHOLD_SINGLE;
+    case 'mfj':
+      return NIIT_THRESHOLD_MFJ;
+    case 'mfs':
+      return NIIT_THRESHOLD_MFS;
+    case 'hoh':
+      return NIIT_THRESHOLD_HOH;
+    default:
+      return NIIT_THRESHOLD_SINGLE;
   }
 }
 
@@ -142,7 +150,7 @@ export function getFederalStRate(income: number, status: string): number {
   const brackets = getBrackets(status);
   const niitThreshold = getNiitThreshold(status);
 
-  let marginalRate = 0.10;
+  let marginalRate = 0.1;
   for (let i = brackets.length - 1; i >= 0; i--) {
     if (income >= brackets[i].min) {
       marginalRate = brackets[i].rate;
@@ -164,20 +172,20 @@ export function getFederalLtRate(income: number, status: string): number {
   // LTCG brackets for 2026 (inflation adjusted)
   let ltRate: number;
   if (status === 'mfj') {
-    if (income > 610350) ltRate = 0.20;
+    if (income > 610350) ltRate = 0.2;
     else if (income > 96700) ltRate = 0.15;
     else ltRate = 0;
   } else if (status === 'mfs') {
-    if (income > 305175) ltRate = 0.20;
+    if (income > 305175) ltRate = 0.2;
     else if (income > 48350) ltRate = 0.15;
     else ltRate = 0;
   } else if (status === 'hoh') {
-    if (income > 578100) ltRate = 0.20;
+    if (income > 578100) ltRate = 0.2;
     else if (income > 64750) ltRate = 0.15;
     else ltRate = 0;
   } else {
     // Single
-    if (income > 542050) ltRate = 0.20;
+    if (income > 542050) ltRate = 0.2;
     else if (income > 48350) ltRate = 0.15;
     else ltRate = 0;
   }

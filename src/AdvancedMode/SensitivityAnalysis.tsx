@@ -11,17 +11,19 @@ interface SensitivityAnalysisProps {
 const formatValue = (key: keyof SensitivityParams, value: number): string => {
   switch (key) {
     case 'federalRateChange':
-    case 'stateRateChange':
+    case 'stateRateChange': {
       const sign = value >= 0 ? '+' : '';
       return `${sign}${(value * 100).toFixed(1)}%`;
+    }
     case 'annualReturn':
       return `${(value * 100).toFixed(1)}%`;
     case 'trackingErrorMultiplier':
       return `${value.toFixed(2)}x`;
     case 'stLossRateVariance':
-    case 'ltGainRateVariance':
+    case 'ltGainRateVariance': {
       const varSign = value >= 0 ? '+' : '';
       return `${varSign}${(value * 100).toFixed(0)}%`;
+    }
     default:
       return value.toString();
   }
@@ -53,18 +55,15 @@ const getValueClass = (key: keyof SensitivityParams, value: number): string => {
   }
 };
 
-export function SensitivityAnalysis({
-  params,
-  onChange,
-  onReset,
-}: SensitivityAnalysisProps) {
+export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAnalysisProps) {
   const handleChange = (key: keyof SensitivityParams, value: number) => {
     onChange({ ...params, [key]: value });
   };
 
   // Check if any parameter has changed from defaults
   const hasChanges = Object.keys(params).some(
-    key => params[key as keyof SensitivityParams] !== DEFAULT_SENSITIVITY[key as keyof SensitivityParams]
+    key =>
+      params[key as keyof SensitivityParams] !== DEFAULT_SENSITIVITY[key as keyof SensitivityParams]
   );
 
   return (
@@ -82,7 +81,9 @@ export function SensitivityAnalysis({
               Federal Rate Change
               <FieldInfoPopup contentKey="sens-federal-rate" />
             </span>
-            <span className={`sensitivity-value ${getValueClass('federalRateChange', params.federalRateChange)}`}>
+            <span
+              className={`sensitivity-value ${getValueClass('federalRateChange', params.federalRateChange)}`}
+            >
               {formatValue('federalRateChange', params.federalRateChange)}
             </span>
           </div>
@@ -104,7 +105,9 @@ export function SensitivityAnalysis({
               State Rate Change
               <FieldInfoPopup contentKey="sens-state-rate" />
             </span>
-            <span className={`sensitivity-value ${getValueClass('stateRateChange', params.stateRateChange)}`}>
+            <span
+              className={`sensitivity-value ${getValueClass('stateRateChange', params.stateRateChange)}`}
+            >
               {formatValue('stateRateChange', params.stateRateChange)}
             </span>
           </div>
@@ -127,15 +130,17 @@ export function SensitivityAnalysis({
               Annual Return
               <FieldInfoPopup contentKey="sens-annual-return" />
             </span>
-            <span className={`sensitivity-value ${getValueClass('annualReturn', params.annualReturn)}`}>
+            <span
+              className={`sensitivity-value ${getValueClass('annualReturn', params.annualReturn)}`}
+            >
               {formatValue('annualReturn', params.annualReturn)}
             </span>
           </div>
           <input
             type="range"
             className="sensitivity-slider"
-            min={-0.20}
-            max={0.20}
+            min={-0.2}
+            max={0.2}
             step={0.01}
             value={params.annualReturn}
             onChange={e => handleChange('annualReturn', parseFloat(e.target.value))}
@@ -149,7 +154,9 @@ export function SensitivityAnalysis({
               Tracking Error Impact
               <FieldInfoPopup contentKey="sens-tracking-error" />
             </span>
-            <span className={`sensitivity-value ${getValueClass('trackingErrorMultiplier', params.trackingErrorMultiplier)}`}>
+            <span
+              className={`sensitivity-value ${getValueClass('trackingErrorMultiplier', params.trackingErrorMultiplier)}`}
+            >
               {formatValue('trackingErrorMultiplier', params.trackingErrorMultiplier)}
             </span>
           </div>
@@ -162,7 +169,9 @@ export function SensitivityAnalysis({
             value={params.trackingErrorMultiplier}
             onChange={e => handleChange('trackingErrorMultiplier', parseFloat(e.target.value))}
           />
-          <span className="sensitivity-help">Strategy deviation from expected (0x = perfect, 2x = high variance)</span>
+          <span className="sensitivity-help">
+            Strategy deviation from expected (0x = perfect, 2x = high variance)
+          </span>
         </div>
 
         {/* Strategy Performance */}
@@ -172,15 +181,17 @@ export function SensitivityAnalysis({
               ST Loss Rate Variance
               <FieldInfoPopup contentKey="sens-st-loss-variance" />
             </span>
-            <span className={`sensitivity-value ${getValueClass('stLossRateVariance', params.stLossRateVariance)}`}>
+            <span
+              className={`sensitivity-value ${getValueClass('stLossRateVariance', params.stLossRateVariance)}`}
+            >
               {formatValue('stLossRateVariance', params.stLossRateVariance)}
             </span>
           </div>
           <input
             type="range"
             className="sensitivity-slider"
-            min={-0.50}
-            max={0.50}
+            min={-0.5}
+            max={0.5}
             step={0.05}
             value={params.stLossRateVariance}
             onChange={e => handleChange('stLossRateVariance', parseFloat(e.target.value))}
@@ -194,15 +205,17 @@ export function SensitivityAnalysis({
               LT Gain Rate Variance
               <FieldInfoPopup contentKey="sens-lt-gain-variance" />
             </span>
-            <span className={`sensitivity-value ${getValueClass('ltGainRateVariance', params.ltGainRateVariance)}`}>
+            <span
+              className={`sensitivity-value ${getValueClass('ltGainRateVariance', params.ltGainRateVariance)}`}
+            >
               {formatValue('ltGainRateVariance', params.ltGainRateVariance)}
             </span>
           </div>
           <input
             type="range"
             className="sensitivity-slider"
-            min={-0.50}
-            max={0.50}
+            min={-0.5}
+            max={0.5}
             step={0.05}
             value={params.ltGainRateVariance}
             onChange={e => handleChange('ltGainRateVariance', parseFloat(e.target.value))}
@@ -212,19 +225,10 @@ export function SensitivityAnalysis({
       </div>
 
       <div className="sensitivity-actions">
-        <button
-          type="button"
-          onClick={onReset}
-          className="btn-secondary"
-          disabled={!hasChanges}
-        >
+        <button type="button" onClick={onReset} className="btn-secondary" disabled={!hasChanges}>
           Reset to Defaults
         </button>
-        {hasChanges && (
-          <span className="changes-indicator">
-            Sensitivity adjustments active
-          </span>
-        )}
+        {hasChanges && <span className="changes-indicator">Sensitivity adjustments active</span>}
       </div>
     </div>
   );

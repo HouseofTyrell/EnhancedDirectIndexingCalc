@@ -19,11 +19,7 @@ export function YearByYearPlanning({
   liquidityParams = DEFAULT_LIQUIDITY,
   onLiquidityChange,
 }: YearByYearPlanningProps) {
-  const handleChange = (
-    year: number,
-    field: keyof YearOverride,
-    value: string | number
-  ) => {
+  const handleChange = (year: number, field: keyof YearOverride, value: string | number) => {
     const newOverrides = overrides.map(override => {
       if (override.year === year) {
         return { ...override, [field]: value };
@@ -50,8 +46,8 @@ export function YearByYearPlanning({
   return (
     <div className="year-by-year-planning">
       <p className="section-description">
-        Model income changes and additional investments over time.
-        Changes affect §461(l) limits and NOL usage calculations.
+        Model income changes and additional investments over time. Changes affect §461(l) limits and
+        NOL usage calculations.
       </p>
 
       <div className="year-table-container">
@@ -104,9 +100,7 @@ export function YearByYearPlanning({
                   <input
                     type="text"
                     value={override.note}
-                    onChange={e =>
-                      handleChange(override.year, 'note', e.target.value)
-                    }
+                    onChange={e => handleChange(override.year, 'note', e.target.value)}
                     maxLength={50}
                     placeholder="Optional note"
                     className="note-input"
@@ -119,18 +113,11 @@ export function YearByYearPlanning({
       </div>
 
       <div className="year-actions">
-        <button
-          type="button"
-          onClick={onReset}
-          className="btn-secondary"
-          disabled={!hasChanges}
-        >
+        <button type="button" onClick={onReset} className="btn-secondary" disabled={!hasChanges}>
           Reset to Default
         </button>
         {hasChanges && (
-          <span className="changes-indicator">
-            Changes will be applied to projections
-          </span>
+          <span className="changes-indicator">Changes will be applied to projections</span>
         )}
       </div>
 
@@ -138,8 +125,8 @@ export function YearByYearPlanning({
       <div className="liquidity-section">
         <h4>Liquidity Constraints</h4>
         <p className="section-description">
-          QFAF investments typically have lock-up periods and early redemption penalties.
-          Consider these constraints when planning withdrawals.
+          QFAF investments typically have lock-up periods and early redemption penalties. Consider
+          these constraints when planning withdrawals.
         </p>
 
         <div className="liquidity-grid">
@@ -151,10 +138,12 @@ export function YearByYearPlanning({
                 min={0}
                 max={10}
                 value={liquidityParams.qfafLockupYears}
-                onChange={e => onLiquidityChange?.({
-                  ...liquidityParams,
-                  qfafLockupYears: parseInt(e.target.value) || 0,
-                })}
+                onChange={e =>
+                  onLiquidityChange?.({
+                    ...liquidityParams,
+                    qfafLockupYears: parseInt(e.target.value) || 0,
+                  })
+                }
               />
               <span className="input-suffix">years</span>
             </div>
@@ -170,10 +159,12 @@ export function YearByYearPlanning({
                 max={20}
                 step={0.5}
                 value={(liquidityParams.qfafRedemptionPenalty * 100).toFixed(1)}
-                onChange={e => onLiquidityChange?.({
-                  ...liquidityParams,
-                  qfafRedemptionPenalty: parseFloat(e.target.value) / 100 || 0,
-                })}
+                onChange={e =>
+                  onLiquidityChange?.({
+                    ...liquidityParams,
+                    qfafRedemptionPenalty: parseFloat(e.target.value) / 100 || 0,
+                  })
+                }
               />
               <span className="input-suffix">%</span>
             </div>
@@ -188,10 +179,12 @@ export function YearByYearPlanning({
                 min={0}
                 max={24}
                 value={liquidityParams.emergencyFundTarget}
-                onChange={e => onLiquidityChange?.({
-                  ...liquidityParams,
-                  emergencyFundTarget: parseInt(e.target.value) || 0,
-                })}
+                onChange={e =>
+                  onLiquidityChange?.({
+                    ...liquidityParams,
+                    emergencyFundTarget: parseInt(e.target.value) || 0,
+                  })
+                }
               />
               <span className="input-suffix">months</span>
             </div>
@@ -200,9 +193,10 @@ export function YearByYearPlanning({
         </div>
 
         <div className="liquidity-warning">
-          <strong>Important:</strong> Years 1-{liquidityParams.qfafLockupYears} of QFAF
-          investment are locked. Early redemption incurs a {(liquidityParams.qfafRedemptionPenalty * 100).toFixed(0)}% penalty.
-          Maintain {liquidityParams.emergencyFundTarget} months of income in liquid assets.
+          <strong>Important:</strong> Years 1-{liquidityParams.qfafLockupYears} of QFAF investment
+          are locked. Early redemption incurs a{' '}
+          {(liquidityParams.qfafRedemptionPenalty * 100).toFixed(0)}% penalty. Maintain{' '}
+          {liquidityParams.emergencyFundTarget} months of income in liquid assets.
         </div>
       </div>
     </div>
