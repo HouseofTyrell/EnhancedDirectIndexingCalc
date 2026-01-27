@@ -6,16 +6,16 @@ interface AdvancedModeToggleProps {
 export function AdvancedModeToggle({ enabled, onToggle }: AdvancedModeToggleProps) {
   return (
     <div className="advanced-mode-toggle">
-      <label className="toggle-label">
+      <label className="advanced-toggle-label">
         <span className="toggle-text">Advanced Mode</span>
-        <div className="toggle-switch">
+        <div className="advanced-toggle-switch">
           <input
             type="checkbox"
             checked={enabled}
             onChange={onToggle}
             aria-describedby="advanced-mode-hint"
           />
-          <span className="toggle-slider" />
+          <span className="advanced-toggle-knob" />
         </div>
       </label>
       <span id="advanced-mode-hint" className="toggle-hint">

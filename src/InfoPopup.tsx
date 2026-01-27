@@ -79,6 +79,80 @@ export function FieldInfoPopup({ contentKey, currentValue }: FieldInfoPopupProps
   );
 }
 
+// Clickable text info - wraps text with dotted underline that opens popup on click
+interface InfoTextProps {
+  contentKey: string;
+  children: React.ReactNode;
+  currentValue?: string;
+}
+
+export function InfoText({ contentKey, children, currentValue }: InfoTextProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const content = getPopupContent(contentKey);
+
+  // If no content, just render the children without popup functionality
+  if (!content) return <>{children}</>;
+
+  return (
+    <>
+      <span
+        className="info-text"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.stopPropagation();
+            setIsOpen(true);
+          }
+        }}
+      >
+        {children}
+      </span>
+
+      {isOpen && (
+        <div className="popup-overlay" onClick={() => setIsOpen(false)}>
+          <div className="popup-content" onClick={e => e.stopPropagation()}>
+            <div className="popup-header">
+              <h3>{content.title}</h3>
+              <button
+                type="button"
+                className="popup-close"
+                onClick={() => setIsOpen(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="popup-body">
+              <div className="field-popup">
+                <p className="field-definition">{content.definition}</p>
+                {content.formula && (
+                  <div className="field-formula">
+                    <strong>Formula:</strong>
+                    <code>{content.formula}</code>
+                  </div>
+                )}
+                {currentValue && (
+                  <div className="field-current-value">
+                    <strong>Your value:</strong> {currentValue}
+                  </div>
+                )}
+                <p className="field-impact">
+                  <strong>Impact:</strong> {content.impact}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // Pre-built formula documentation components
 export function TaxRatesFormula() {
   return (

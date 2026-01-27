@@ -112,9 +112,41 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({ dat
       'Total Value': year.totalValue,
       'QFAF Value': year.qfafValue,
       'Collateral Value': year.collateralValue,
-      confidenceBand: [lowerBound, upperBound],
+      upperBound,
+      lowerBound,
     };
   }), [data, trackingError]);
+
+  // Custom tooltip to format values cleanly
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) => {
+    if (!active || !payload || !payload.length) return null;
+
+    // Find the data point to get confidence band values
+    const dataPoint = chartData.find(d => d.year === label);
+
+    return (
+      <div style={{
+        backgroundColor: '#fff',
+        border: '1px solid #ccc',
+        borderRadius: '4px',
+        padding: '10px',
+      }}>
+        <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{label}</p>
+        {payload
+          .filter(entry => entry.name !== 'upperBound' && entry.name !== 'lowerBound')
+          .map((entry, index) => (
+            <p key={index} style={{ margin: '4px 0', color: entry.color }}>
+              {entry.name}: {formatCurrency(entry.value)}
+            </p>
+          ))}
+        {dataPoint && (
+          <p style={{ margin: '4px 0', color: '#6b7280', fontSize: '0.85em', borderTop: '1px solid #e5e7eb', paddingTop: '6px', marginTop: '6px' }}>
+            Range (±1.5σ): {formatCurrency(dataPoint.lowerBound)} – {formatCurrency(dataPoint.upperBound)}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="chart-container">
@@ -131,28 +163,25 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({ dat
             tick={{ fontSize: 12 }}
             width={80}
           />
-          <Tooltip
-            formatter={(value, name) => {
-              if (name === 'confidenceBand' && Array.isArray(value)) {
-                return `${formatCurrency(value[0])} - ${formatCurrency(value[1])}`;
-              }
-              return value != null ? formatCurrency(value as number) : '';
-            }}
-            labelStyle={{ fontWeight: 'bold' }}
-            contentStyle={{
-              backgroundColor: '#fff',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-            }}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Legend />
+          {/* Confidence band - upper area (will be masked by lower) */}
           <Area
             type="monotone"
-            dataKey="confidenceBand"
+            dataKey="upperBound"
             stroke="none"
             fill="#2563eb"
             fillOpacity={0.1}
-            name="Confidence Band (±1.5σ)"
+            legendType="none"
+          />
+          {/* Confidence band - lower area (masks the upper to create band effect) */}
+          <Area
+            type="monotone"
+            dataKey="lowerBound"
+            stroke="none"
+            fill="#ffffff"
+            fillOpacity={1}
+            legendType="none"
           />
           <Line
             type="monotone"

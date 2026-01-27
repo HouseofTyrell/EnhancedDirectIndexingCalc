@@ -115,6 +115,38 @@ body {
   color: var(--primary);
 }
 
+.sticky-header__metric--highlight .sticky-header__value {
+  color: var(--success);
+}
+
+/* Advanced Settings button in sticky header */
+.sticky-header__advanced-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sticky-header__advanced-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.sticky-header__advanced-btn svg {
+  flex-shrink: 0;
+}
+
 /* Expanded state */
 .sticky-header--expanded {
   padding: 1rem 1.5rem;
@@ -151,6 +183,15 @@ body {
 
   .sticky-header__value {
     font-size: 0.9rem;
+  }
+
+  /* Compact advanced button on mobile */
+  .sticky-header__advanced-btn {
+    padding: 0.4rem;
+  }
+
+  .sticky-header__advanced-btn span {
+    display: none;
   }
 
   .sticky-header__subtext {
@@ -194,18 +235,67 @@ body {
   right: 0;
   bottom: 0;
   width: 420px;
-  max-width: 90vw;
+  min-width: 380px;
+  max-width: min(900px, 90vw);
   background: var(--card-bg);
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
   z-index: var(--z-popup);
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.2s ease;
 }
 
 .slideout-panel.open {
   transform: translateX(0);
+}
+
+.slideout-panel.resizing {
+  transition: none;
+  box-shadow: -6px 0 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Resize handle on left edge */
+.slideout-panel__resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: transparent;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.slideout-panel__resize-handle:hover,
+.slideout-panel.resizing .slideout-panel__resize-handle {
+  background: var(--primary);
+}
+
+.slideout-panel__resize-handle::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 40px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #94a3b8 20%,
+    #94a3b8 80%,
+    transparent 100%
+  );
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.slideout-panel__resize-handle:hover::before,
+.slideout-panel.resizing .slideout-panel__resize-handle::before {
+  opacity: 1;
 }
 
 .slideout-panel__header {
@@ -303,8 +393,9 @@ body {
 
 @media (max-width: 768px) {
   .slideout-panel {
-    width: 100%;
+    width: 100% !important;
     max-width: 100%;
+    min-width: 100%;
   }
 
   .slideout-panel__header {
@@ -313,6 +404,11 @@ body {
 
   .slideout-panel__content {
     padding: 1rem;
+  }
+
+  /* Hide resize handle on mobile */
+  .slideout-panel__resize-handle {
+    display: none;
   }
 }
 
@@ -575,7 +671,8 @@ input[type="range"]::-webkit-slider-thumb {
   height: 0;
 }
 
-.toggle-switch {
+/* Toggle switch base - used for simple toggles */
+.toggle-label > .toggle-switch {
   position: relative;
   width: 44px;
   height: 24px;
@@ -585,7 +682,7 @@ input[type="range"]::-webkit-slider-thumb {
   flex-shrink: 0;
 }
 
-.toggle-switch::after {
+.toggle-label > .toggle-switch::after {
   content: '';
   position: absolute;
   top: 2px;
@@ -767,11 +864,52 @@ input[type="range"]::-webkit-slider-thumb {
   border-top: 2px solid var(--border);
 }
 
+.tax-benefit-summary.subsequent-year {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
 .tax-benefit-summary h3 {
   margin: 0 0 1rem;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.tax-benefit-summary h3 .year-note {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-light);
+}
+
+.nol-carryforward-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+  font-size: 0.875rem;
+}
+
+.nol-carryforward-note .nol-label {
+  font-weight: 600;
+  color: #92400e;
+}
+
+.nol-carryforward-note .nol-value {
+  font-weight: 700;
+  color: #b45309;
+  font-size: 1rem;
+}
+
+.nol-carryforward-note .nol-explanation {
+  color: #a16207;
+  font-size: 0.8rem;
 }
 
 .benefit-cards {
@@ -996,6 +1134,89 @@ tfoot td {
   margin-top: 0.5rem;
 }
 
+/* Year-by-Year Breakdown Table Column Groups */
+.year-breakdown-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.year-breakdown-table .group-header-row th {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 2px solid var(--border);
+}
+
+.year-breakdown-table .group-header {
+  text-align: center;
+}
+
+.year-breakdown-table .group-header.collateral-group {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border-left: 2px solid #f59e0b;
+  border-right: 1px solid #fcd34d;
+}
+
+.year-breakdown-table .group-header.qfaf-group {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border-left: 2px solid #3b82f6;
+  border-right: 1px solid #93c5fd;
+}
+
+/* Collateral column styling */
+.year-breakdown-table th.collateral-col {
+  background: #fffbeb;
+}
+
+.year-breakdown-table td.collateral-col {
+  background: rgba(254, 243, 199, 0.3);
+}
+
+.year-breakdown-table tbody tr:hover td.collateral-col {
+  background: rgba(254, 243, 199, 0.6);
+}
+
+/* QFAF column styling */
+.year-breakdown-table th.qfaf-col {
+  background: #eff6ff;
+}
+
+.year-breakdown-table td.qfaf-col {
+  background: rgba(219, 234, 254, 0.3);
+}
+
+.year-breakdown-table tbody tr:hover td.qfaf-col {
+  background: rgba(219, 234, 254, 0.6);
+}
+
+/* Starting row within groups */
+.year-breakdown-table .starting-row .collateral-start {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  font-weight: 600;
+  text-align: center;
+}
+
+.year-breakdown-table .starting-row .qfaf-start {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Colgroup styling */
+.colgroup-collateral {
+  border-left: 2px solid #f59e0b;
+}
+
+.colgroup-qfaf {
+  border-left: 2px solid #3b82f6;
+}
+
 .carryforward-note {
   margin-top: 1rem;
   padding: 1rem;
@@ -1198,6 +1419,25 @@ tfoot td {
   background: var(--primary);
   border-color: var(--primary);
   color: white;
+}
+
+/* Clickable info text - replaces (i) buttons in table headers */
+.info-text {
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+  transition: all 0.15s ease;
+}
+
+.info-text:hover {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  border-bottom-style: solid;
+}
+
+.info-text:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .popup-overlay {
@@ -1430,6 +1670,68 @@ tfoot td {
   margin-bottom: 1rem;
 }
 
+/* Advanced Mode Toggle - dedicated styles */
+.advanced-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.advanced-toggle-switch {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.advanced-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.advanced-toggle-knob {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: background-color 0.3s ease;
+  border-radius: 28px;
+}
+
+.advanced-toggle-knob:before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: transform 0.3s ease;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.advanced-toggle-switch input:checked + .advanced-toggle-knob {
+  background-color: var(--primary);
+}
+
+.advanced-toggle-switch input:checked + .advanced-toggle-knob:before {
+  transform: translateX(24px);
+}
+
+.advanced-toggle-switch input:focus + .advanced-toggle-knob {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+}
+
+/* Generic toggle-label and toggle-text (shared) */
 .toggle-label {
   display: flex;
   align-items: center;
@@ -1443,31 +1745,35 @@ tfoot td {
   font-size: 1rem;
 }
 
-.toggle-switch {
+/* Settings panel toggle switches (with .toggle-slider) */
+.settings-panel .toggle-switch {
   position: relative;
-  width: 48px;
-  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 120px;
+  flex-shrink: 0;
 }
 
-.toggle-switch input {
+.settings-panel .toggle-switch input {
   opacity: 0;
   width: 0;
   height: 0;
+  position: absolute;
 }
 
-.toggle-slider {
-  position: absolute;
+.settings-panel .toggle-slider {
+  position: relative;
+  flex-shrink: 0;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  width: 48px;
+  height: 26px;
   background-color: #cbd5e1;
   transition: background-color 0.3s ease;
   border-radius: 26px;
 }
 
-.toggle-slider:before {
+.settings-panel .toggle-slider:before {
   position: absolute;
   content: "";
   height: 20px;
@@ -1480,16 +1786,31 @@ tfoot td {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.toggle-switch input:checked + .toggle-slider {
+.settings-panel .toggle-switch input:checked + .toggle-slider {
   background-color: var(--primary);
 }
 
-.toggle-switch input:checked + .toggle-slider:before {
+.settings-panel .toggle-switch input:checked + .toggle-slider:before {
   transform: translateX(22px);
 }
 
-.toggle-switch input:focus + .toggle-slider {
+.settings-panel .toggle-switch input:focus + .toggle-slider {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+}
+
+.settings-panel .toggle-switch .toggle-label {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  white-space: nowrap;
+  font-weight: 400;
+}
+
+.settings-panel .toggle-switch.modified .toggle-slider {
+  background-color: #f59e0b;
+}
+
+.settings-panel .toggle-switch.modified input:checked + .toggle-slider {
+  background-color: #f59e0b;
 }
 
 .toggle-hint {
@@ -1582,24 +1903,30 @@ tfoot td {
 .year-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
 }
 
 .year-table th {
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.5rem;
   text-align: left;
   background: var(--bg);
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   color: var(--text-light);
   border-bottom: 2px solid var(--border);
   white-space: nowrap;
 }
 
+/* Column widths for year-by-year table */
+.year-table .col-year { width: 36px; text-align: center; }
+.year-table .col-income { width: 120px; }
+.year-table .col-infusion { width: 120px; }
+.year-table .col-notes { width: auto; }
+
 .year-table td {
-  padding: 0.5rem 0.75rem;
+  padding: 0.3rem 0.4rem;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -1611,7 +1938,7 @@ tfoot td {
 .year-cell {
   font-weight: 600;
   color: var(--primary);
-  width: 60px;
+  text-align: center;
 }
 
 /* Compact input for table cells */
@@ -1622,23 +1949,26 @@ tfoot td {
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
+  width: 100%;
 }
 
 .input-with-prefix.compact .prefix {
-  padding: 0.35rem 0.5rem;
+  padding: 0.3rem 0.4rem;
   background: transparent;
   color: var(--text-light);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   border-right: none;
+  flex-shrink: 0;
 }
 
 .input-with-prefix.compact input {
   flex: 1;
-  min-width: 80px;
-  padding: 0.35rem 0.5rem;
+  min-width: 0;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
   border: none;
   background: transparent;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-align: right;
 }
 
@@ -1654,11 +1984,10 @@ tfoot td {
 
 .note-input {
   width: 100%;
-  min-width: 120px;
-  padding: 0.35rem 0.5rem;
+  padding: 0.3rem 0.4rem;
   border: 1px solid var(--border);
   border-radius: 4px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   background: var(--bg);
 }
 
@@ -2143,6 +2472,7 @@ tfoot td {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
+  gap: 1rem;
 }
 
 .setting-row:not(:last-child) {
@@ -2153,17 +2483,21 @@ tfoot td {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .setting-name {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text);
+  word-wrap: break-word;
 }
 
 .setting-hint {
   font-size: 0.75rem;
   color: var(--text-light);
+  word-wrap: break-word;
 }
 
 .setting-input {
@@ -2191,6 +2525,7 @@ tfoot td {
   align-items: center;
   gap: 0.75rem;
   min-width: 150px;
+  flex-shrink: 0;
 }
 
 .slider-input-group input[type="range"] {
@@ -2265,6 +2600,11 @@ tfoot td {
     flex-direction: column;
     gap: 0.75rem;
     text-align: center;
+  }
+
+  .advanced-toggle-label {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
   .toggle-hint {
@@ -2610,9 +2950,9 @@ tfoot td {
 }
 
 .rate-editor-table .rate-input {
-  width: 55px;
-  padding: 0.25rem;
-  text-align: center;
+  width: 60px;
+  padding: 0.25rem 0.35rem;
+  text-align: right;
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 0.8rem;
@@ -2776,4 +3116,231 @@ tfoot td {
 
 .rate-editor-table .action-btn:hover {
   background: var(--primary-dark);
+}
+
+/* ============================================
+   COLLAPSIBLE YEAR-BY-YEAR TABLE
+   ============================================ */
+
+.table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.table-header-row h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.toggle-details-btn {
+  padding: 0.4rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-details-btn:hover {
+  background: white;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Compact table styling */
+.year-breakdown-table--compact {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.year-breakdown-table--compact th,
+.year-breakdown-table--compact td {
+  padding: 0.6rem 0.75rem;
+  white-space: nowrap;
+}
+
+/* Expandable column headers */
+.col-expandable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s;
+}
+
+.col-expandable:hover {
+  background: #e0e7ff !important;
+}
+
+.expandable-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}
+
+/* Portfolio Value column styling (expandable) */
+.col-portfolio.col-expandable {
+  background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
+  border-left: 2px solid #8b5cf6;
+}
+
+/* Net Capital column styling */
+.col-net-capital {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-left: 2px solid var(--success);
+}
+
+.year-breakdown-table--compact tbody td:nth-child(3) {
+  font-weight: 500;
+}
+
+/* NOL Activity column styling */
+.col-nol-activity {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-left: 2px solid var(--primary);
+}
+
+/* Detail columns (shown when expanded) */
+.col-detail {
+  font-size: 0.7rem;
+  background: var(--bg);
+  border-left: 1px dashed var(--border);
+}
+
+.col-detail.collateral-col {
+  background: #fffbeb;
+}
+
+.col-detail.qfaf-col {
+  background: #eff6ff;
+}
+
+/* NOL Activity cell styling */
+.nol-generated {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.nol-used {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* Year cell */
+.year-breakdown-table--compact .year-cell {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Savings column highlight */
+.col-savings {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-left: 2px solid var(--success);
+}
+
+/* Column width optimization */
+.year-breakdown-table--compact th,
+.year-breakdown-table--compact td {
+  padding: 0.5rem 0.625rem;
+  white-space: nowrap;
+}
+
+.year-breakdown-table--compact .col-year {
+  width: 45px;
+  min-width: 45px;
+  text-align: center;
+}
+
+.year-breakdown-table--compact .col-portfolio,
+.year-breakdown-table--compact .col-net-capital,
+.year-breakdown-table--compact .col-nol-activity {
+  min-width: 90px;
+}
+
+.year-breakdown-table--compact .col-detail {
+  min-width: 80px;
+  padding: 0.5rem 0.5rem;
+}
+
+.year-breakdown-table--compact .col-ordinary-loss {
+  min-width: 75px;
+}
+
+.year-breakdown-table--compact .col-savings {
+  min-width: 85px;
+}
+
+/* Compact header text */
+.year-breakdown-table--compact th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.year-breakdown-table--compact .expandable-header {
+  font-size: 0.7rem;
+}
+
+/* Sticky table header */
+.year-breakdown-table--compact thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* Override for special columns in sticky header */
+.year-breakdown-table--compact thead .col-net-capital,
+.year-breakdown-table--compact thead .col-nol-activity,
+.year-breakdown-table--compact thead .col-savings {
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* Hover effect for rows */
+.year-breakdown-table--compact tbody tr:hover {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.year-breakdown-table--compact tbody tr:hover td.collateral-col {
+  background: rgba(254, 243, 199, 0.5);
+}
+
+.year-breakdown-table--compact tbody tr:hover td.qfaf-col {
+  background: rgba(219, 234, 254, 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .table-header-row {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .toggle-details-btn {
+    align-self: flex-end;
+  }
+
+  .year-breakdown-table--compact th,
+  .year-breakdown-table--compact td {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .expand-icon {
+    width: 14px;
+    height: 14px;
+  }
 }

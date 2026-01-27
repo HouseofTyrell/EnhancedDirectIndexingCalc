@@ -20,7 +20,7 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const handleChange = (
     path: string,
-    value: number
+    value: number | boolean
   ) => {
     const keys = path.split('.');
     if (keys.length === 1) {
@@ -80,15 +80,34 @@ export function SettingsPanel({
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
+                QFAF Growth
+                <FieldInfoPopup contentKey="setting-qfaf-growth" />
+              </span>
+              <span className="setting-hint">Whether QFAF appreciates with market returns</span>
+            </div>
+            <label className={`toggle-switch ${!settings.qfafGrowthEnabled ? 'modified' : ''}`}>
+              <input
+                type="checkbox"
+                checked={settings.qfafGrowthEnabled}
+                onChange={e => handleChange('qfafGrowthEnabled', e.target.checked)}
+              />
+              <span className="toggle-slider"></span>
+              <span className="toggle-label">{settings.qfafGrowthEnabled ? 'Enabled' : 'Disabled'}</span>
+            </label>
+          </div>
+
+          <div className="setting-row">
+            <div className="setting-label">
+              <span className="setting-name">
                 Wash Sale Disallowance
                 <FieldInfoPopup contentKey="setting-wash-sale" />
               </span>
-              <span className="setting-hint">% of ST losses disallowed due to wash sales (5-15%)</span>
+              <span className="setting-hint">% of ST losses disallowed due to wash sales (0-15%)</span>
             </div>
             <div className="slider-input-group">
               <input
                 type="range"
-                min="0.05"
+                min="0"
                 max="0.15"
                 step="0.01"
                 value={settings.washSaleDisallowanceRate}

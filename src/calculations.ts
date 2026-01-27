@@ -187,28 +187,71 @@ function calculateYear(
   );
   const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
 
-  // Calculate taxes with ordinary loss benefit and NOL usage (using pre-calculated rates)
-  const { federalTax, stateTax, newStCarryforward, newLtCarryforward, nolUsed, capitalLossUsedAgainstIncome } =
-    calculateTaxes(
+  // Calculate carryforwards and NOL usage
+  const { newStCarryforward, newLtCarryforward, nolUsed, capitalLossUsedAgainstIncome } =
+    calculateCarryforwards(
       netStGainLoss,
       ltGainsRealized,
       usableOrdinaryLoss,
       stCarryforward - usedStCarryforward,
       ltCarryforward,
       nolCarryforward,
-      inputs,
-      taxRates
+      inputs
     );
 
   // Update NOL carryforward: add excess, subtract used
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
 
-  // Baseline: what if we just had passive investments taxed at LT rates (no optimization)?
-  const baselineTax = calculateBaselineTax(ltGainsRealized, taxRates);
+  // Calculate tax savings directly as sum of benefits minus costs
+  // This matches the Year 1 Tax Benefit breakdown in the UI
+  const { stRate, ltRate, stateRate } = taxRates;
+  const combinedStRate = stRate + stateRate;
+  const combinedLtRate = ltRate + stateRate;
+  const rateDifferential = stRate - ltRate;
+
+  // Benefits:
+  // 1. Ordinary loss reduces W2 income tax
+  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
+
+  // 2. ST→LT conversion: ST losses offset ST gains, converting tax treatment
+  //    The benefit is the rate differential on the amount of ST gains offset
+  const stGainsOffset = Math.min(stGainsGenerated, stLossesHarvested);
+  const stToLtConversionBenefit = safeNumber(stGainsOffset * rateDifferential);
+
+  // 3. Capital loss carryforward used against ordinary income ($3k/yr limit)
+  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
+
+  // 4. NOL used against taxable income
+  const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
+
+  // Costs:
+  // 1. LT gains are taxed at LT rates
+  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
+
+  // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates
+  const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
+
+  // Net tax savings
+  const taxSavings = safeNumber(
+    ordinaryLossBenefit +
+    stToLtConversionBenefit +
+    capitalLossBenefit +
+    nolUsageBenefit -
+    ltGainCost -
+    remainingStGainCost
+  );
+
+  // For display/debugging: calculate what taxes would be without benefits
+  const grossInvestmentTax = safeNumber(Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate);
+  const federalTax = safeNumber(Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) * (stRate / combinedStRate));
+  const stateTax = safeNumber(Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) * (stateRate / combinedStRate));
+  const baselineTax = ltGainsRealized * combinedLtRate;
 
   // Portfolio growth using configured annual return minus financing costs
   const netGrowthRate = settings.defaultAnnualReturn - strategy.financingCostRate;
-  const newQfafValue = safeNumber(qfafValue * (1 + netGrowthRate));
+  // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
+  const qfafGrowthRate = settings.qfafGrowthEnabled ? netGrowthRate : 0;
+  const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
   const newCollateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
 
   return {
@@ -227,7 +270,7 @@ function calculateYear(
     stateTax,
     totalTax: federalTax + stateTax,
     baselineTax,
-    taxSavings: Math.max(0, baselineTax - (federalTax + stateTax)),
+    taxSavings: Math.max(0, taxSavings),
     stLossCarryforward: newStCarryforward,
     ltLossCarryforward: newLtCarryforward,
     nolCarryforward: newNolCarryforward,
@@ -237,18 +280,19 @@ function calculateYear(
   };
 }
 
-function calculateTaxes(
+/**
+ * Calculate carryforward usage and updates.
+ * Returns updated carryforward balances and amounts used this year.
+ */
+function calculateCarryforwards(
   netStGainLoss: number,
   ltGains: number,
   usableOrdinaryLoss: number,
   remainingStCarryforward: number,
   remainingLtCarryforward: number,
   nolCarryforward: number,
-  inputs: CalculatorInputs,
-  taxRates: TaxRates
+  inputs: CalculatorInputs
 ): {
-  federalTax: number;
-  stateTax: number;
   newStCarryforward: number;
   newLtCarryforward: number;
   nolUsed: number;
@@ -324,46 +368,18 @@ function calculateTaxes(
     }
   }
 
-  // Use pre-calculated tax rates (013 - eliminates redundant lookups)
-  const { stRate, ltRate, stateRate } = taxRates;
-
-  // Ordinary loss benefit: reduces ordinary income tax
-  // At top bracket (~40.8%), this is the primary tax alpha driver
-  const ordinaryLossBenefit = usableOrdinaryLoss * stRate;
-
-  // Capital loss offset against income benefit
-  const capitalLossBenefit = capitalLossUsedAgainstIncome * stRate;
-
-  // Calculate NOL usage with 80% limitation
+  // Step 7: Calculate NOL usage with 80% limitation
   // NOL can offset up to 80% of taxable income
   const taxableIncomeBeforeNol = inputs.annualIncome + taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome;
   const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * NOL_OFFSET_PERCENTAGE;
   const nolUsed = Math.min(nolCarryforward, maxNolUsage);
-  const nolBenefit = nolUsed * stRate;
-
-  // Calculate taxes
-  // ST gains taxed at ordinary rates, LT gains at preferential rates
-  const grossFederalTax = safeNumber((taxableSt * stRate) + (taxableLt * ltRate));
-
-  // Apply benefits from ordinary losses, capital loss offset, and NOL
-  const federalTax = Math.max(0, grossFederalTax - ordinaryLossBenefit - capitalLossBenefit - nolBenefit);
-
-  // State tax (simplified: all investment income at state rate)
-  const stateTax = Math.max(0, safeNumber((taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome) * stateRate));
 
   return {
-    federalTax: safeNumber(federalTax),
-    stateTax: safeNumber(stateTax),
     newStCarryforward: safeNumber(stCarryforward),
     newLtCarryforward: safeNumber(ltCarryforward),
     nolUsed: safeNumber(nolUsed),
     capitalLossUsedAgainstIncome: safeNumber(capitalLossUsedAgainstIncome),
   };
-}
-
-function calculateBaselineTax(ltGains: number, taxRates: TaxRates): number {
-  // Baseline: LT gains taxed at LT rate (no optimization strategy)
-  return safeNumber(ltGains * (taxRates.ltRate + taxRates.stateRate));
 }
 
 function calculateSummary(years: YearResult[], sizing: CalculatedSizing) {

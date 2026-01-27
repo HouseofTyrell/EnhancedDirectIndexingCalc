@@ -176,6 +176,7 @@ export interface ComparisonResult {
 export interface AdvancedSettings {
   // QFAF mechanics
   qfafMultiplier: number;           // Default: 1.50 (150% ST gains and ordinary losses)
+  qfafGrowthEnabled: boolean;       // Default: true (QFAF appreciates with market)
 
   // Tax-loss harvesting adjustments
   washSaleDisallowanceRate: number; // Default: 0 (can increase if wash sales expected)
@@ -203,6 +204,7 @@ export interface AdvancedSettings {
 
 export const DEFAULT_SETTINGS: AdvancedSettings = {
   qfafMultiplier: 1.50,
+  qfafGrowthEnabled: true,
   washSaleDisallowanceRate: 0,
   section461Limits: {
     mfj: 512000,

@@ -1,5 +1,5 @@
 import { YearOverride, LiquidityParams, DEFAULT_LIQUIDITY } from '../types';
-import { FieldInfoPopup } from '../InfoPopup';
+import { InfoText } from '../InfoPopup';
 import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 
 interface YearByYearPlanningProps {
@@ -58,16 +58,14 @@ export function YearByYearPlanning({
         <table className="year-table">
           <thead>
             <tr>
-              <th>Year</th>
-              <th>
-                W-2 Income
-                <FieldInfoPopup contentKey="w2-income-override" />
+              <th className="col-year">Yr</th>
+              <th className="col-income">
+                <InfoText contentKey="w2-income-override">W-2 Income</InfoText>
               </th>
-              <th>
-                Cash Infusion
-                <FieldInfoPopup contentKey="cash-infusion" />
+              <th className="col-infusion">
+                <InfoText contentKey="cash-infusion">Cash Infusion</InfoText>
               </th>
-              <th>Notes</th>
+              <th className="col-notes">Notes</th>
             </tr>
           </thead>
           <tbody>

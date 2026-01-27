@@ -150,7 +150,9 @@ export function Calculator() {
         qfafValue={results.sizing.qfafValue}
         totalExposure={results.sizing.totalExposure}
         annualTaxSavings={results.years[0]?.taxSavings ?? 0}
+        year2TaxSavings={inputs.qfafEnabled && results.years.length > 1 ? results.years[1]?.taxSavings : undefined}
         isExpanded={isExpanded}
+        onOpenAdvanced={() => setIsAdvancedModalOpen(true)}
       />
 
       <header className="header">
@@ -541,6 +543,80 @@ export function Calculator() {
             </div>
           </div>
         </div>
+
+        {/* Year 2+ Tax Benefit Breakdown - shows how NOL starts being used */}
+        {results.years.length > 1 && inputs.qfafEnabled && (
+          <div className="tax-benefit-summary subsequent-year">
+            <h3>Year 2+ Tax Benefit <span className="year-note">(typical subsequent year)</span></h3>
+            <div className="nol-carryforward-note">
+              <span className="nol-label">NOL Carryforward from Year 1:</span>
+              <span className="nol-value">{formatCurrency(results.years[0]?.nolCarryforward ?? 0)}</span>
+              <span className="nol-explanation">→ Available to offset up to 80% of Year 2 taxable income</span>
+            </div>
+            <div className="benefit-cards">
+              <div className="benefit-card">
+                <span className="benefit-label">
+                  Ordinary Loss Benefit
+                  <FieldInfoPopup contentKey="ordinary-loss-benefit" />
+                </span>
+                <span className="benefit-value positive">
+                  +{formatCurrency(results.years[1]?.usableOrdinaryLoss * combinedStRate)}
+                </span>
+                <span className="benefit-formula">
+                  {formatCurrency(results.years[1]?.usableOrdinaryLoss)} × {formatPercent(combinedStRate)}
+                </span>
+              </div>
+              <div className="benefit-card">
+                <span className="benefit-label">
+                  ST→LT Conversion
+                  <FieldInfoPopup contentKey="st-lt-conversion-benefit" />
+                </span>
+                <span className="benefit-value positive">
+                  +{formatCurrency(results.years[1]?.stLossesHarvested * rateDifferential)}
+                </span>
+                <span className="benefit-formula">
+                  {formatCurrency(results.years[1]?.stLossesHarvested)} × {formatPercent(rateDifferential)}
+                </span>
+              </div>
+              <div className="benefit-card">
+                <span className="benefit-label">
+                  NOL Offset Benefit
+                  <FieldInfoPopup contentKey="nol-offset-benefit" />
+                </span>
+                <span className="benefit-value positive">
+                  +{formatCurrency((results.years[1]?.nolUsedThisYear ?? 0) * combinedStRate)}
+                </span>
+                <span className="benefit-formula">
+                  {formatCurrency(results.years[1]?.nolUsedThisYear ?? 0)} × {formatPercent(combinedStRate)}
+                </span>
+              </div>
+              <div className="benefit-card">
+                <span className="benefit-label">
+                  LT Gain Cost
+                  <FieldInfoPopup contentKey="lt-gain-cost" />
+                </span>
+                <span className="benefit-value negative">
+                  −{formatCurrency((results.years[1]?.ltGainsRealized ?? 0) * combinedLtRate)}
+                </span>
+                <span className="benefit-formula">
+                  {formatCurrency(results.years[1]?.ltGainsRealized ?? 0)} × {formatPercent(combinedLtRate)}
+                </span>
+              </div>
+              <div className="benefit-card highlight">
+                <span className="benefit-label">
+                  Net Year 2 Tax Savings
+                  <FieldInfoPopup contentKey="year2-tax-savings" />
+                </span>
+                <span className="benefit-value">
+                  {formatCurrency(results.years[1]?.taxSavings ?? 0)}
+                </span>
+                <span className="benefit-formula">
+                  {formatPercent((results.years[1]?.taxSavings ?? 0) / results.sizing.totalExposure)} of exposure
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Advanced Settings Button */}
@@ -703,7 +779,7 @@ export function Calculator() {
         </Suspense>
 
         {/* Table */}
-        <ResultsTable data={results.years} sizing={results.sizing} />
+        <ResultsTable data={results.years} sizing={results.sizing} qfafEnabled={inputs.qfafEnabled} />
 
         {/* Portfolio Value Chart */}
         <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
