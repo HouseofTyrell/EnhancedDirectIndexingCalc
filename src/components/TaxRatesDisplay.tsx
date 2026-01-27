@@ -1,12 +1,22 @@
 import React from 'react';
 import { InfoPopup, FieldInfoPopup, TaxRatesFormula } from '../InfoPopup';
 
+/**
+ * Props for the TaxRatesDisplay component.
+ * All rates are decimal values (e.g., 0.37 for 37%).
+ */
 interface TaxRatesDisplayProps {
+  /** Federal marginal rate for ordinary income and short-term gains */
   federalStRate: number;
+  /** Federal marginal rate for long-term capital gains */
   federalLtRate: number;
+  /** State income tax rate */
   stateRate: number;
+  /** Combined federal + state rate for ordinary income */
   combinedStRate: number;
+  /** Combined federal + state rate for long-term gains */
   combinedLtRate: number;
+  /** Difference between ST and LT rates (the tax arbitrage benefit) */
   rateDifferential: number;
 }
 

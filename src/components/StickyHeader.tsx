@@ -1,7 +1,10 @@
 import React from 'react';
 import { formatCurrency } from '../utils/formatters';
 
-// Settings gear icon
+/**
+ * Settings gear icon for the advanced settings button.
+ * @internal
+ */
 function SettingsIcon() {
   return (
     <svg
@@ -20,17 +23,45 @@ function SettingsIcon() {
   );
 }
 
+/**
+ * Props for the StickyHeader component.
+ */
 interface StickyHeaderProps {
+  /** Name of the selected strategy (e.g., "Core 145/45") */
   strategyName: string;
+  /** Collateral investment amount in dollars */
   collateral: number;
+  /** Auto-sized QFAF position value in dollars */
   qfafValue: number;
+  /** Total exposure (collateral + QFAF) in dollars */
   totalExposure: number;
+  /** Year 1 tax savings in dollars */
   annualTaxSavings: number;
+  /** Year 2+ tax savings (includes NOL usage), undefined if QFAF disabled */
   year2TaxSavings?: number;
+  /** Whether the header is in expanded state (shows additional details) */
   isExpanded: boolean;
+  /** Callback when advanced settings button is clicked */
   onOpenAdvanced?: () => void;
 }
 
+/**
+ * Sticky header that displays key metrics as the user scrolls.
+ * Expands to show additional details (leverage ratio, subtexts) when scrolled past the sentinel.
+ *
+ * @example
+ * ```tsx
+ * <StickyHeader
+ *   strategyName="Core 145/45"
+ *   collateral={1000000}
+ *   qfafValue={86667}
+ *   totalExposure={1086667}
+ *   annualTaxSavings={45000}
+ *   isExpanded={true}
+ *   onOpenAdvanced={() => setModalOpen(true)}
+ * />
+ * ```
+ */
 export const StickyHeader = React.memo(function StickyHeader({
   strategyName,
   collateral,

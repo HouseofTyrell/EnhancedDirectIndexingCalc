@@ -244,7 +244,7 @@ describe('calculate - MFS filing status', () => {
     expect(result.years[0].capitalLossUsedAgainstIncome).toBeLessThanOrEqual(1500);
   });
 
-  it('uses $313,000 Section 461(l) limit for MFS filers', () => {
+  it('uses $256,000 Section 461(l) limit for MFS filers', () => {
     const inputs = createInputs({
       filingStatus: 'mfs',
       collateralAmount: 5000000,

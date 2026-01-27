@@ -2,13 +2,30 @@ import React from 'react';
 import { FieldInfoPopup } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
+/**
+ * Props for the ResultsSummary component.
+ */
 interface ResultsSummaryProps {
+  /** Cumulative tax savings over the 10-year projection period */
   totalTaxSavings: number;
+  /** Portfolio value at the end of Year 10 */
   finalPortfolioValue: number;
+  /** Annualized tax alpha (tax savings as % of portfolio per year) */
   effectiveTaxAlpha: number;
+  /** Total NOL generated from Section 461(l) excess losses */
   totalNolGenerated: number;
 }
 
+/**
+ * Displays the key results summary cards showing 10-year projections.
+ * This is the first section users see, providing high-level benefits.
+ *
+ * Cards displayed:
+ * - Total Tax Savings (cumulative over 10 years)
+ * - Final Portfolio Value (Year 10)
+ * - Annualized Tax Alpha (percentage)
+ * - Total NOL Generated (from excess ordinary losses)
+ */
 export const ResultsSummary = React.memo(function ResultsSummary({
   totalTaxSavings,
   finalPortfolioValue,

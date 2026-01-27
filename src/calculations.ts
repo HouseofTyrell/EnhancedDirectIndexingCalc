@@ -108,11 +108,15 @@ export function calculate(
   }
 
   // Pre-calculate tax rates once before the loop (013 - redundant lookups)
+  // Use settings section461Limits if provided, otherwise fall back to defaults
+  const section461Limit =
+    settings.section461Limits[inputs.filingStatus] ?? SECTION_461L_LIMITS[inputs.filingStatus];
+
   const taxRates: TaxRates = {
     stRate: getFederalStRate(inputs.annualIncome, inputs.filingStatus),
     ltRate: getFederalLtRate(inputs.annualIncome, inputs.filingStatus),
     stateRate: inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode),
-    section461Limit: SECTION_461L_LIMITS[inputs.filingStatus],
+    section461Limit,
   };
 
   const years: YearResult[] = [];
@@ -164,10 +168,11 @@ function calculateYear(
   taxRates: TaxRates,
   settings: AdvancedSettings
 ): YearResult {
-  // QFAF generates ST gains and ordinary losses (150% of MV each)
+  // QFAF generates ST gains and ordinary losses at qfafMultiplier rate (default 150% of MV each)
   // Use safeNumber to prevent NaN/Infinity propagation (004)
-  const stGainsGenerated = safeNumber(qfafValue * QFAF_ST_GAIN_RATE);
-  const ordinaryLossesGenerated = safeNumber(qfafValue * QFAF_ORDINARY_LOSS_RATE);
+  const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
+  const stGainsGenerated = safeNumber(qfafValue * qfafMultiplier);
+  const ordinaryLossesGenerated = safeNumber(qfafValue * qfafMultiplier);
 
   // Collateral generates ST losses and LT gains per strategy rates
   // Uses custom rates if set, otherwise applies 7% annual decay
@@ -206,7 +211,8 @@ function calculateYear(
       stCarryforward - usedStCarryforward,
       ltCarryforward,
       nolCarryforward,
-      inputs
+      inputs,
+      settings
     );
 
   // Update NOL carryforward: add excess, subtract used
@@ -309,7 +315,8 @@ function calculateCarryforwards(
   remainingStCarryforward: number,
   remainingLtCarryforward: number,
   nolCarryforward: number,
-  inputs: CalculatorInputs
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings
 ): {
   newStCarryforward: number;
   newLtCarryforward: number;
@@ -386,11 +393,12 @@ function calculateCarryforwards(
     }
   }
 
-  // Step 7: Calculate NOL usage with 80% limitation
-  // NOL can offset up to 80% of taxable income
+  // Step 7: Calculate NOL usage with configurable limit (default 80%)
+  // NOL can offset up to nolOffsetLimit of taxable income
   const taxableIncomeBeforeNol =
     inputs.annualIncome + taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome;
-  const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * NOL_OFFSET_PERCENTAGE;
+  const nolOffsetLimit = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
+  const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * nolOffsetLimit;
   const nolUsed = Math.min(nolCarryforward, maxNolUsage);
 
   return {
