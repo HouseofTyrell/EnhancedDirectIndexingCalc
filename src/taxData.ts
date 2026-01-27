@@ -98,4 +98,7 @@ export const DEFAULTS: CalculatorInputs = {
   existingStLossCarryforward: 0,
   existingLtLossCarryforward: 0,
   existingNolCarryforward: 0,
+
+  // QFAF toggle (enabled by default)
+  qfafEnabled: true,
 };

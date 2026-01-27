@@ -1,5 +1,6 @@
 import { AdvancedSettings, DEFAULT_SETTINGS } from '../types';
 import { FieldInfoPopup } from '../InfoPopup';
+import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 
 interface SettingsPanelProps {
   settings: AdvancedSettings;
@@ -7,23 +8,9 @@ interface SettingsPanelProps {
   onReset: () => void;
 }
 
-// Format number for display
-const formatNumber = (value: number, decimals: number = 0) => {
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-};
-
-// Format percentage
+// Format percentage with 1 decimal place
 const formatPercent = (value: number) => {
   return `${(value * 100).toFixed(1)}%`;
-};
-
-// Parse number from string
-const parseNumber = (value: string) => {
-  const parsed = Number(value.replace(/,/g, ''));
-  return isNaN(parsed) ? 0 : parsed;
 };
 
 export function SettingsPanel({
@@ -89,6 +76,28 @@ export function SettingsPanel({
               }}
             />
           </div>
+
+          <div className="setting-row">
+            <div className="setting-label">
+              <span className="setting-name">
+                Wash Sale Disallowance
+                <FieldInfoPopup contentKey="setting-wash-sale" />
+              </span>
+              <span className="setting-hint">% of ST losses disallowed due to wash sales (5-15%)</span>
+            </div>
+            <div className="slider-input-group">
+              <input
+                type="range"
+                min="0.05"
+                max="0.15"
+                step="0.01"
+                value={settings.washSaleDisallowanceRate}
+                onChange={e => handleChange('washSaleDisallowanceRate', parseFloat(e.target.value))}
+                className={settings.washSaleDisallowanceRate !== DEFAULT_SETTINGS.washSaleDisallowanceRate ? 'modified' : ''}
+              />
+              <span className="slider-value">{formatPercent(settings.washSaleDisallowanceRate)}</span>
+            </div>
+          </div>
         </div>
 
         {/* Section 461(l) Limits */}
@@ -105,8 +114,8 @@ export function SettingsPanel({
             <input
               type="text"
               className={`setting-input ${settings.section461Limits.mfj !== DEFAULT_SETTINGS.section461Limits.mfj ? 'modified' : ''}`}
-              value={`$${formatNumber(settings.section461Limits.mfj)}`}
-              onChange={e => handleChange('section461Limits.mfj', parseNumber(e.target.value.replace('$', '')))}
+              value={`$${formatWithCommas(settings.section461Limits.mfj)}`}
+              onChange={e => handleChange('section461Limits.mfj', parseFormattedNumber(e.target.value.replace('$', '')))}
             />
           </div>
 
@@ -117,8 +126,8 @@ export function SettingsPanel({
             <input
               type="text"
               className={`setting-input ${settings.section461Limits.single !== DEFAULT_SETTINGS.section461Limits.single ? 'modified' : ''}`}
-              value={`$${formatNumber(settings.section461Limits.single)}`}
-              onChange={e => handleChange('section461Limits.single', parseNumber(e.target.value.replace('$', '')))}
+              value={`$${formatWithCommas(settings.section461Limits.single)}`}
+              onChange={e => handleChange('section461Limits.single', parseFormattedNumber(e.target.value.replace('$', '')))}
             />
           </div>
 
@@ -129,8 +138,8 @@ export function SettingsPanel({
             <input
               type="text"
               className={`setting-input ${settings.section461Limits.mfs !== DEFAULT_SETTINGS.section461Limits.mfs ? 'modified' : ''}`}
-              value={`$${formatNumber(settings.section461Limits.mfs)}`}
-              onChange={e => handleChange('section461Limits.mfs', parseNumber(e.target.value.replace('$', '')))}
+              value={`$${formatWithCommas(settings.section461Limits.mfs)}`}
+              onChange={e => handleChange('section461Limits.mfs', parseFormattedNumber(e.target.value.replace('$', '')))}
             />
           </div>
 
@@ -141,8 +150,8 @@ export function SettingsPanel({
             <input
               type="text"
               className={`setting-input ${settings.section461Limits.hoh !== DEFAULT_SETTINGS.section461Limits.hoh ? 'modified' : ''}`}
-              value={`$${formatNumber(settings.section461Limits.hoh)}`}
-              onChange={e => handleChange('section461Limits.hoh', parseNumber(e.target.value.replace('$', '')))}
+              value={`$${formatWithCommas(settings.section461Limits.hoh)}`}
+              onChange={e => handleChange('section461Limits.hoh', parseFormattedNumber(e.target.value.replace('$', '')))}
             />
           </div>
         </div>

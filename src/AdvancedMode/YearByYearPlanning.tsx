@@ -1,29 +1,23 @@
-import { YearOverride } from '../types';
+import { YearOverride, LiquidityParams, DEFAULT_LIQUIDITY } from '../types';
 import { FieldInfoPopup } from '../InfoPopup';
+import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 
 interface YearByYearPlanningProps {
   baseIncome: number;
   overrides: YearOverride[];
   onChange: (overrides: YearOverride[]) => void;
   onReset: () => void;
+  liquidityParams?: LiquidityParams;
+  onLiquidityChange?: (params: LiquidityParams) => void;
 }
-
-// Format number with commas for display
-const formatWithCommas = (value: number) => {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
-};
-
-// Parse comma-formatted string back to number
-const parseFormattedNumber = (value: string) => {
-  const parsed = Number(value.replace(/,/g, ''));
-  return isNaN(parsed) ? 0 : parsed;
-};
 
 export function YearByYearPlanning({
   baseIncome,
   overrides,
   onChange,
   onReset,
+  liquidityParams = DEFAULT_LIQUIDITY,
+  onLiquidityChange,
 }: YearByYearPlanningProps) {
   const handleChange = (
     year: number,
@@ -140,6 +134,78 @@ export function YearByYearPlanning({
             Changes will be applied to projections
           </span>
         )}
+      </div>
+
+      {/* Liquidity Constraints */}
+      <div className="liquidity-section">
+        <h4>Liquidity Constraints</h4>
+        <p className="section-description">
+          QFAF investments typically have lock-up periods and early redemption penalties.
+          Consider these constraints when planning withdrawals.
+        </p>
+
+        <div className="liquidity-grid">
+          <div className="liquidity-item">
+            <label>QFAF Lock-up Period</label>
+            <div className="liquidity-input-group">
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={liquidityParams.qfafLockupYears}
+                onChange={e => onLiquidityChange?.({
+                  ...liquidityParams,
+                  qfafLockupYears: parseInt(e.target.value) || 0,
+                })}
+              />
+              <span className="input-suffix">years</span>
+            </div>
+            <span className="liquidity-hint">Capital locked for initial period</span>
+          </div>
+
+          <div className="liquidity-item">
+            <label>Early Redemption Penalty</label>
+            <div className="liquidity-input-group">
+              <input
+                type="number"
+                min={0}
+                max={20}
+                step={0.5}
+                value={(liquidityParams.qfafRedemptionPenalty * 100).toFixed(1)}
+                onChange={e => onLiquidityChange?.({
+                  ...liquidityParams,
+                  qfafRedemptionPenalty: parseFloat(e.target.value) / 100 || 0,
+                })}
+              />
+              <span className="input-suffix">%</span>
+            </div>
+            <span className="liquidity-hint">Penalty for early withdrawal</span>
+          </div>
+
+          <div className="liquidity-item">
+            <label>Emergency Fund Target</label>
+            <div className="liquidity-input-group">
+              <input
+                type="number"
+                min={0}
+                max={24}
+                value={liquidityParams.emergencyFundTarget}
+                onChange={e => onLiquidityChange?.({
+                  ...liquidityParams,
+                  emergencyFundTarget: parseInt(e.target.value) || 0,
+                })}
+              />
+              <span className="input-suffix">months</span>
+            </div>
+            <span className="liquidity-hint">Recommended liquid reserves</span>
+          </div>
+        </div>
+
+        <div className="liquidity-warning">
+          <strong>Important:</strong> Years 1-{liquidityParams.qfafLockupYears} of QFAF
+          investment are locked. Early redemption incurs a {(liquidityParams.qfafRedemptionPenalty * 100).toFixed(0)}% penalty.
+          Maintain {liquidityParams.emergencyFundTarget} months of income in liquid assets.
+        </div>
       </div>
     </div>
   );

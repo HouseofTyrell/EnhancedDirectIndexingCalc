@@ -1,10 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { calculate } from './calculations';
-import { TaxSavingsChart, PortfolioValueChart } from './WealthChart';
+
+// Lazy load chart components to reduce initial bundle size (~400KB savings)
+const TaxSavingsChart = lazy(() => import('./WealthChart').then(m => ({ default: m.TaxSavingsChart })));
+const PortfolioValueChart = lazy(() => import('./WealthChart').then(m => ({ default: m.PortfolioValueChart })));
 import { ResultsTable } from './ResultsTable';
 import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
-import { CalculatorInputs, YearOverride, AdvancedSettings, DEFAULT_SETTINGS, SensitivityParams, DEFAULT_SENSITIVITY } from './types';
+import { CalculatorInputs, YearOverride, AdvancedSettings, DEFAULT_SETTINGS, SensitivityParams, DEFAULT_SENSITIVITY, FILING_STATUSES, FilingStatus } from './types';
 import {
   InfoPopup,
   FieldInfoPopup,
@@ -14,23 +17,28 @@ import {
   ProjectionFormula,
 } from './InfoPopup';
 import { useAdvancedMode } from './hooks/useAdvancedMode';
+import { useScrollHeader } from './hooks/useScrollHeader';
+import { useQualifiedPurchaser } from './hooks/useQualifiedPurchaser';
+import { StickyHeader } from './components/StickyHeader';
+import { ResultsSummary } from './components/ResultsSummary';
+import { AdvancedModal } from './components/AdvancedModal';
+import { QualifiedPurchaserModal } from './components/QualifiedPurchaserModal';
 import { AdvancedModeToggle } from './AdvancedMode/AdvancedModeToggle';
 import { CollapsibleSection } from './AdvancedMode/CollapsibleSection';
 import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
 import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
+import { ScenarioAnalysis } from './AdvancedMode/ScenarioAnalysis';
 import { StrategyComparison } from './AdvancedMode/StrategyComparison';
 import { SettingsPanel } from './AdvancedMode/SettingsPanel';
-
-// Format number with commas for display
-const formatWithCommas = (value: number) => {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
-};
-
-// Parse comma-formatted string back to number
-const parseFormattedNumber = (value: string) => {
-  const parsed = Number(value.replace(/,/g, ''));
-  return isNaN(parsed) ? 0 : parsed;
-};
+import { SettingsIcon } from './components/Icons';
+import { StrategyRateEditor } from './AdvancedMode/StrategyRateEditor';
+import {
+  formatWithCommas,
+  parseFormattedNumber,
+  formatCurrency,
+  formatPercent,
+  parseStateRate,
+} from './utils/formatters';
 
 // Generate default year overrides for 10 years
 const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
@@ -45,6 +53,8 @@ const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
 export function Calculator() {
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULTS);
   const advancedMode = useAdvancedMode();
+  const { isExpanded } = useScrollHeader('scroll-sentinel');
+  const qualifiedPurchaser = useQualifiedPurchaser();
 
   // Year-by-Year Planning state
   const [yearOverrides, setYearOverrides] = useState<YearOverride[]>(() =>
@@ -63,73 +73,114 @@ export function Calculator() {
     'core-130-30',
   ]);
 
-  const results = useMemo(() => calculate(inputs), [inputs]);
+  // Advanced modal state
+  const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 
-  const updateInput = <K extends keyof CalculatorInputs>(
+  // Rate editor modal state
+  const [isRateEditorOpen, setIsRateEditorOpen] = useState(false);
+
+  // Rate version - increments when custom rates are saved to trigger recalculation
+  const [rateVersion, setRateVersion] = useState(0);
+
+  const results = useMemo(() => calculate(inputs, advancedSettings), [inputs, advancedSettings, rateVersion]);
+
+  // Memoize tax rate calculations - only recalculates when dependencies change
+  const taxRates = useMemo(() => {
+    const federalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
+    const federalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+    const stateRate = inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+    return {
+      federalStRate,
+      federalLtRate,
+      stateRate,
+      combinedStRate: federalStRate + stateRate,
+      combinedLtRate: federalLtRate + stateRate,
+      rateDifferential: federalStRate - federalLtRate,
+    };
+  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
+
+  const { federalStRate, federalLtRate, stateRate, combinedStRate, combinedLtRate, rateDifferential } = taxRates;
+
+  const updateInput = useCallback(<K extends keyof CalculatorInputs>(
     key: K,
     value: CalculatorInputs[K]
   ) => {
-    setInputs(prev => ({ ...prev, [key]: value }));
-
-    // If income changes, update year overrides to use new base income
-    if (key === 'annualIncome' && typeof value === 'number') {
-      setYearOverrides(prev =>
-        prev.map(override => ({
-          ...override,
-          w2Income: override.w2Income === inputs.annualIncome ? value : override.w2Income,
-        }))
-      );
-    }
-  };
+    setInputs(prev => {
+      const newInputs = { ...prev, [key]: value };
+      // If income changes, update year overrides to use new base income
+      if (key === 'annualIncome' && typeof value === 'number') {
+        setYearOverrides(prevOverrides =>
+          prevOverrides.map(override => ({
+            ...override,
+            w2Income: override.w2Income === prev.annualIncome ? value : override.w2Income,
+          }))
+        );
+      }
+      return newInputs;
+    });
+  }, []);
 
   // Reset year overrides to defaults
-  const resetYearOverrides = () => {
+  const resetYearOverrides = useCallback(() => {
     setYearOverrides(generateDefaultOverrides(inputs.annualIncome));
-  };
+  }, [inputs.annualIncome]);
 
   // Reset advanced settings to defaults
-  const resetAdvancedSettings = () => {
+  const resetAdvancedSettings = useCallback(() => {
     setAdvancedSettings(DEFAULT_SETTINGS);
-  };
+  }, []);
 
   // Reset sensitivity params to defaults
-  const resetSensitivityParams = () => {
+  const resetSensitivityParams = useCallback(() => {
     setSensitivityParams(DEFAULT_SENSITIVITY);
-  };
-
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  };
-
-  const formatPercent = (value: number) => {
-    return `${(value * 100).toFixed(2)}%`;
-  };
+  }, []);
 
   const currentStrategy = getStrategy(inputs.strategyId);
 
-  // Calculate marginal tax rates
-  const federalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
-  const federalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
-  const stateRate = inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
-  const combinedStRate = federalStRate + stateRate;
-  const combinedLtRate = federalLtRate + stateRate;
-  const rateDifferential = combinedStRate - combinedLtRate;
+  // Show QP acknowledgment modal if user hasn't acknowledged
+  if (!qualifiedPurchaser.isAcknowledged) {
+    return <QualifiedPurchaserModal onAcknowledge={qualifiedPurchaser.acknowledge} />;
+  }
 
   return (
     <div className="calculator">
+      <StickyHeader
+        strategyName={currentStrategy?.name ?? ''}
+        collateral={inputs.collateralAmount}
+        qfafValue={results.sizing.qfafValue}
+        totalExposure={results.sizing.totalExposure}
+        annualTaxSavings={results.years[0]?.taxSavings ?? 0}
+        isExpanded={isExpanded}
+      />
+
       <header className="header">
         <h1>Tax Optimization Calculator</h1>
         <p className="subtitle">QFAF + Collateral Strategy</p>
       </header>
 
-      {/* Input Form */}
+      {/* Results Summary - Step 1: Your Projected Benefit */}
+      <ResultsSummary
+        totalTaxSavings={results.summary.totalTaxSavings}
+        finalPortfolioValue={results.summary.finalPortfolioValue}
+        effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
+        totalNolGenerated={results.summary.totalNolGenerated}
+      />
+
+      {/* Scroll sentinel - triggers sticky header expansion when scrolled past */}
+      <div id="scroll-sentinel" />
+
+      {/* Input Form - Step 2: Your Situation */}
       <section className="inputs-section">
+        <div className="section-number" data-step="2">Your Situation</div>
         <div className="section-header">
           <h2>Client Profile</h2>
           <InfoPopup title="Strategy Selection">
             <StrategyRatesFormula />
           </InfoPopup>
         </div>
+        <p className="section-guidance">
+          Tell us about your client's investment and tax profile. These inputs determine the strategy sizing and tax impact.
+        </p>
         <div className="input-grid">
           <div className="input-group">
             <label htmlFor="strategy">Collateral Strategy</label>
@@ -141,14 +192,14 @@ export function Calculator() {
               <optgroup label="Core (Cash Funded)">
                 {STRATEGIES.filter(s => s.type === 'core').map(s => (
                   <option key={s.id} value={s.id}>
-                    {s.name} - {s.label} (-{(s.stLossRate * 100).toFixed(0)}% ST / +{(s.ltGainRate * 100).toFixed(1)}% LT)
+                    {s.name}
                   </option>
                 ))}
               </optgroup>
               <optgroup label="Overlay (Appreciated Stock)">
                 {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
                   <option key={s.id} value={s.id}>
-                    {s.name} - {s.label} (-{(s.stLossRate * 100).toFixed(0)}% ST / +{(s.ltGainRate * 100).toFixed(1)}% LT)
+                    {s.name}
                   </option>
                 ))}
               </optgroup>
@@ -157,6 +208,55 @@ export function Calculator() {
               {currentStrategy?.type === 'core'
                 ? 'Cash invested in direct indexing'
                 : 'Existing appreciated stock used as collateral'}
+            </span>
+          </div>
+
+          {/* Strategy Rate Info - shows Year 1 effective rates (includes custom overrides) */}
+          {currentStrategy && results.years[0] && (
+            <div className="strategy-rates-info">
+              <div className="strategy-rate">
+                <span className="rate-label">ST Loss Rate (Y1):</span>
+                <span className="rate-value positive">{formatPercent(results.years[0].effectiveStLossRate)}</span>
+              </div>
+              <div className="strategy-rate">
+                <span className="rate-label">LT Gain Rate:</span>
+                <span className="rate-value negative">{formatPercent(currentStrategy.ltGainRate)}</span>
+              </div>
+              <div className="strategy-rate">
+                <span className="rate-label">Net Capital Loss (Y1):</span>
+                <span className="rate-value highlight">{formatPercent(results.years[0].effectiveStLossRate - currentStrategy.ltGainRate)}</span>
+              </div>
+              <button
+                className="rate-editor-trigger"
+                onClick={() => setIsRateEditorOpen(true)}
+              >
+                Edit Rates by Year
+              </button>
+            </div>
+          )}
+
+          {/* Strategy Rate Editor Modal */}
+          <StrategyRateEditor
+            isOpen={isRateEditorOpen}
+            onClose={() => setIsRateEditorOpen(false)}
+            onRatesChanged={() => setRateVersion(v => v + 1)}
+          />
+
+          {/* QFAF Toggle */}
+          <div className="input-group toggle-group">
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={inputs.qfafEnabled}
+                onChange={e => updateInput('qfafEnabled', e.target.checked)}
+              />
+              <span className="toggle-switch"></span>
+              Enable QFAF Overlay
+            </label>
+            <span className="input-hint">
+              {inputs.qfafEnabled
+                ? 'QFAF generates ST gains + ordinary losses'
+                : 'Collateral-only mode (no QFAF)'}
             </span>
           </div>
 
@@ -193,12 +293,13 @@ export function Calculator() {
             <select
               id="filing"
               value={inputs.filingStatus}
-              onChange={e => updateInput('filingStatus', e.target.value as CalculatorInputs['filingStatus'])}
+              onChange={e => updateInput('filingStatus', e.target.value as FilingStatus)}
             >
-              <option value="single">Single</option>
-              <option value="mfj">Married Filing Jointly</option>
-              <option value="mfs">Married Filing Separately</option>
-              <option value="hoh">Head of Household</option>
+              {FILING_STATUSES.map(status => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -226,7 +327,7 @@ export function Calculator() {
                   min={0}
                   max={15}
                   value={(inputs.stateRate * 100).toFixed(1)}
-                  onChange={e => updateInput('stateRate', Number(e.target.value) / 100)}
+                  onChange={e => updateInput('stateRate', parseStateRate(e.target.value))}
                 />
                 <span className="suffix">%</span>
               </div>
@@ -235,14 +336,18 @@ export function Calculator() {
         </div>
       </section>
 
-      {/* Marginal Tax Rates */}
+      {/* Marginal Tax Rates - Step 3: Tax Rate Analysis */}
       <section className="tax-rates-section">
+        <div className="section-number" data-step="3">Tax Rate Analysis</div>
         <div className="section-header">
           <h2>Marginal Tax Rates</h2>
           <InfoPopup title="Tax Rate Calculations">
             <TaxRatesFormula />
           </InfoPopup>
         </div>
+        <p className="section-guidance">
+          These marginal rates determine the value of each tax event. Higher ST→LT benefit means more savings from the strategy.
+        </p>
         <div className="tax-rates-grid">
           <div className="tax-rate-item">
             <span className="rate-label">
@@ -289,14 +394,18 @@ export function Calculator() {
         </div>
       </section>
 
-      {/* Strategy Sizing */}
+      {/* Strategy Sizing - Step 4: Optimized Strategy */}
       <section className="sizing-section">
+        <div className="section-number" data-step="4">Optimized Strategy</div>
         <div className="section-header">
           <h2>Strategy Sizing</h2>
           <InfoPopup title="QFAF Auto-Sizing">
             <QfafSizingFormula />
           </InfoPopup>
         </div>
+        <p className="section-guidance">
+          We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits.
+        </p>
         <div className="sizing-cards">
           <div className="sizing-card">
             <span className="sizing-label">
@@ -377,173 +486,229 @@ export function Calculator() {
             </div>
           )}
         </div>
-      </section>
 
-      {/* Advanced Settings */}
-      <details className="advanced-section">
-        <summary>Advanced Settings</summary>
-        <div className="input-grid">
-          <div className="input-group">
-            <label htmlFor="stCarry">Existing ST Loss Carryforward</label>
-            <div className="input-with-prefix">
-              <span className="prefix">$</span>
-              <input
-                id="stCarry"
-                type="text"
-                inputMode="numeric"
-                value={formatWithCommas(inputs.existingStLossCarryforward)}
-                onChange={e => updateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))}
-              />
+        {/* Year 1 Tax Benefit Breakdown */}
+        <div className="tax-benefit-summary">
+          <h3>Year 1 Tax Benefit</h3>
+          <div className="benefit-cards">
+            <div className="benefit-card">
+              <span className="benefit-label">
+                Ordinary Loss Benefit
+                <FieldInfoPopup contentKey="ordinary-loss-benefit" currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss * combinedStRate)} />
+              </span>
+              <span className="benefit-value positive">
+                +{formatCurrency(results.sizing.year1UsableOrdinaryLoss * combinedStRate)}
+              </span>
+              <span className="benefit-formula">
+                {formatCurrency(results.sizing.year1UsableOrdinaryLoss)} × {formatPercent(combinedStRate)}
+              </span>
             </div>
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="ltCarry">Existing LT Loss Carryforward</label>
-            <div className="input-with-prefix">
-              <span className="prefix">$</span>
-              <input
-                id="ltCarry"
-                type="text"
-                inputMode="numeric"
-                value={formatWithCommas(inputs.existingLtLossCarryforward)}
-                onChange={e => updateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))}
-              />
+            <div className="benefit-card">
+              <span className="benefit-label">
+                ST→LT Conversion
+                <FieldInfoPopup contentKey="st-lt-conversion-benefit" currentValue={formatCurrency(results.sizing.year1StLosses * rateDifferential)} />
+              </span>
+              <span className="benefit-value positive">
+                +{formatCurrency(results.sizing.year1StLosses * rateDifferential)}
+              </span>
+              <span className="benefit-formula">
+                {formatCurrency(results.sizing.year1StLosses)} × {formatPercent(rateDifferential)}
+              </span>
             </div>
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="nolCarry">Existing NOL Carryforward</label>
-            <div className="input-with-prefix">
-              <span className="prefix">$</span>
-              <input
-                id="nolCarry"
-                type="text"
-                inputMode="numeric"
-                value={formatWithCommas(inputs.existingNolCarryforward)}
-                onChange={e => updateInput('existingNolCarryforward', parseFormattedNumber(e.target.value))}
-              />
+            <div className="benefit-card">
+              <span className="benefit-label">
+                LT Gain Cost
+                <FieldInfoPopup contentKey="lt-gain-cost" currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)} />
+              </span>
+              <span className="benefit-value negative">
+                −{formatCurrency((results.years[0]?.ltGainsRealized ?? 0) * combinedLtRate)}
+              </span>
+              <span className="benefit-formula">
+                {formatCurrency(results.years[0]?.ltGainsRealized ?? 0)} × {formatPercent(combinedLtRate)}
+              </span>
             </div>
-            <span className="input-hint">Can offset 80% of future taxable income</span>
+            <div className="benefit-card highlight">
+              <span className="benefit-label">
+                Net Year 1 Tax Savings
+                <FieldInfoPopup contentKey="year1-tax-savings" currentValue={formatCurrency(results.years[0]?.taxSavings ?? 0)} />
+              </span>
+              <span className="benefit-value">
+                {formatCurrency(results.years[0]?.taxSavings ?? 0)}
+              </span>
+              <span className="benefit-formula">
+                {formatPercent((results.years[0]?.taxSavings ?? 0) / results.sizing.totalExposure)} of exposure
+              </span>
+            </div>
           </div>
         </div>
-      </details>
-
-      {/* Advanced Mode */}
-      <section className="advanced-mode-container">
-        <AdvancedModeToggle
-          enabled={advancedMode.state.enabled}
-          onToggle={advancedMode.toggleEnabled}
-        />
-
-        {advancedMode.state.enabled && (
-          <div className="advanced-sections">
-            <CollapsibleSection
-              title="Year-by-Year Planning"
-              expanded={advancedMode.state.sections.yearByYear}
-              onToggle={() => advancedMode.toggleSection('yearByYear')}
-              hint="Model income changes and cash infusions"
-            >
-              <YearByYearPlanning
-                baseIncome={inputs.annualIncome}
-                overrides={yearOverrides}
-                onChange={setYearOverrides}
-                onReset={resetYearOverrides}
-              />
-            </CollapsibleSection>
-
-            <CollapsibleSection
-              title="Sensitivity Analysis"
-              expanded={advancedMode.state.sections.sensitivity}
-              onToggle={() => advancedMode.toggleSection('sensitivity')}
-              hint="Stress-test assumptions"
-            >
-              <SensitivityAnalysis
-                params={sensitivityParams}
-                onChange={setSensitivityParams}
-                onReset={resetSensitivityParams}
-              />
-            </CollapsibleSection>
-
-            <CollapsibleSection
-              title="Strategy Comparison"
-              expanded={advancedMode.state.sections.comparison}
-              onToggle={() => advancedMode.toggleSection('comparison')}
-              hint="Compare 2-3 strategies"
-            >
-              <StrategyComparison
-                baseInputs={inputs}
-                selectedStrategies={comparisonStrategies}
-                onChange={setComparisonStrategies}
-              />
-            </CollapsibleSection>
-
-            <CollapsibleSection
-              title="Advanced Settings"
-              expanded={advancedMode.state.sections.settings}
-              onToggle={() => advancedMode.toggleSection('settings')}
-              hint="Override formula constants"
-            >
-              <SettingsPanel
-                settings={advancedSettings}
-                onChange={setAdvancedSettings}
-                onReset={resetAdvancedSettings}
-              />
-            </CollapsibleSection>
-          </div>
-        )}
       </section>
 
-      {/* Results Summary */}
+      {/* Advanced Settings Button */}
+      <button
+        className="advanced-settings-btn"
+        onClick={() => setIsAdvancedModalOpen(true)}
+      >
+        <SettingsIcon />
+        Advanced Settings
+      </button>
+
+      {/* Advanced Settings Modal */}
+      <AdvancedModal
+        isOpen={isAdvancedModalOpen}
+        onClose={() => setIsAdvancedModalOpen(false)}
+      >
+        {/* Existing Carryforwards */}
+        <div className="advanced-modal__section">
+          <h3 className="advanced-modal__section-title">Existing Carryforwards</h3>
+          <div className="input-grid">
+            <div className="input-group">
+              <label htmlFor="stCarry">Existing ST Loss Carryforward</label>
+              <div className="input-with-prefix">
+                <span className="prefix">$</span>
+                <input
+                  id="stCarry"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(inputs.existingStLossCarryforward)}
+                  onChange={e => updateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="ltCarry">Existing LT Loss Carryforward</label>
+              <div className="input-with-prefix">
+                <span className="prefix">$</span>
+                <input
+                  id="ltCarry"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(inputs.existingLtLossCarryforward)}
+                  onChange={e => updateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="nolCarry">Existing NOL Carryforward</label>
+              <div className="input-with-prefix">
+                <span className="prefix">$</span>
+                <input
+                  id="nolCarry"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(inputs.existingNolCarryforward)}
+                  onChange={e => updateInput('existingNolCarryforward', parseFormattedNumber(e.target.value))}
+                />
+              </div>
+              <span className="input-hint">Can offset 80% of future taxable income</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Advanced Mode Toggle */}
+        <div className="advanced-modal__section">
+          <AdvancedModeToggle
+            enabled={advancedMode.state.enabled}
+            onToggle={advancedMode.toggleEnabled}
+          />
+
+          {advancedMode.state.enabled && (
+            <div className="advanced-sections">
+              <CollapsibleSection
+                title="Year-by-Year Planning"
+                expanded={advancedMode.state.sections.yearByYear}
+                onToggle={() => advancedMode.toggleSection('yearByYear')}
+                hint="Model income changes and cash infusions"
+              >
+                <YearByYearPlanning
+                  baseIncome={inputs.annualIncome}
+                  overrides={yearOverrides}
+                  onChange={setYearOverrides}
+                  onReset={resetYearOverrides}
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Sensitivity Analysis"
+                expanded={advancedMode.state.sections.sensitivity}
+                onToggle={() => advancedMode.toggleSection('sensitivity')}
+                hint="Stress-test assumptions"
+              >
+                <SensitivityAnalysis
+                  params={sensitivityParams}
+                  onChange={setSensitivityParams}
+                  onReset={resetSensitivityParams}
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Scenario Analysis"
+                expanded={advancedMode.state.sections.scenarios}
+                onToggle={() => advancedMode.toggleSection('scenarios')}
+                hint="Bull/Base/Bear outcomes"
+              >
+                <ScenarioAnalysis
+                  inputs={inputs}
+                  settings={advancedSettings}
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Strategy Comparison"
+                expanded={advancedMode.state.sections.comparison}
+                onToggle={() => advancedMode.toggleSection('comparison')}
+                hint="Compare 2-3 strategies"
+              >
+                <StrategyComparison
+                  baseInputs={inputs}
+                  selectedStrategies={comparisonStrategies}
+                  onChange={setComparisonStrategies}
+                />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="Formula Constants"
+                expanded={advancedMode.state.sections.settings}
+                onToggle={() => advancedMode.toggleSection('settings')}
+                hint="Override formula constants"
+              >
+                <SettingsPanel
+                  settings={advancedSettings}
+                  onChange={setAdvancedSettings}
+                  onReset={resetAdvancedSettings}
+                />
+              </CollapsibleSection>
+            </div>
+          )}
+        </div>
+      </AdvancedModal>
+
+      {/* Detailed Results - Step 5: Year-by-Year Breakdown */}
       <section className="results-section">
+        <div className="section-number" data-step="5">Year-by-Year Breakdown</div>
         <div className="section-header">
-          <h2>10-Year Projection Results</h2>
+          <h2>Detailed Projections</h2>
           <InfoPopup title="Projection Methodology">
             <ProjectionFormula />
           </InfoPopup>
         </div>
-        <div className="summary-cards">
-          <div className="card primary">
-            <h3>
-              Total Tax Savings
-              <FieldInfoPopup contentKey="total-tax-savings" currentValue={formatCurrency(results.summary.totalTaxSavings)} />
-            </h3>
-            <p className="big-number">{formatCurrency(results.summary.totalTaxSavings)}</p>
-            <p className="subtext">Over 10 years</p>
-          </div>
-          <div className="card">
-            <h3>
-              Final Portfolio Value
-              <FieldInfoPopup contentKey="final-portfolio-value" currentValue={formatCurrency(results.summary.finalPortfolioValue)} />
-            </h3>
-            <p className="big-number">{formatCurrency(results.summary.finalPortfolioValue)}</p>
-            <p className="subtext">Year 10</p>
-          </div>
-          <div className="card">
-            <h3>
-              Annualized Tax Alpha
-              <FieldInfoPopup contentKey="effective-tax-alpha" currentValue={formatPercent(results.summary.effectiveTaxAlpha)} />
-            </h3>
-            <p className="big-number">{formatPercent(results.summary.effectiveTaxAlpha)}</p>
-            <p className="subtext">Per year</p>
-          </div>
-          <div className="card">
-            <h3>
-              Total NOL Generated
-              <FieldInfoPopup contentKey="total-nol-generated" currentValue={formatCurrency(results.summary.totalNolGenerated)} />
-            </h3>
-            <p className="big-number">{formatCurrency(results.summary.totalNolGenerated)}</p>
-            <p className="subtext">Cumulative excess</p>
-          </div>
-        </div>
+        <p className="section-guidance">
+          Year-by-year breakdown showing how tax benefits compound over the 10-year projection.
+        </p>
 
         {/* Tax Benefits Chart */}
-        <TaxSavingsChart data={results.years} />
+        <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
+          <TaxSavingsChart data={results.years} />
+        </Suspense>
 
         {/* Table */}
-        <ResultsTable data={results.years} />
+        <ResultsTable data={results.years} sizing={results.sizing} />
 
         {/* Portfolio Value Chart */}
-        <PortfolioValueChart data={results.years} />
+        <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
+          <PortfolioValueChart data={results.years} trackingError={currentStrategy?.trackingError} />
+        </Suspense>
       </section>
 
       {/* Actions */}
@@ -555,12 +720,55 @@ export function Calculator() {
 
       {/* Disclaimer */}
       <footer className="disclaimer">
-        <p>
-          <strong>Disclaimer:</strong> This calculator provides estimates for illustrative purposes only.
-          Actual tax outcomes depend on individual circumstances, tax law changes, and market conditions.
-          The projections assume consistent returns and do not account for market volatility.
-          Section 461(l) limits and NOL rules may change with future tax legislation.
-          Consult a qualified tax advisor before making investment decisions.
+        <div className="disclaimer-header">
+          <strong>Important Disclosures</strong>
+        </div>
+
+        <div className="disclaimer-grid">
+          <div className="disclaimer-section">
+            <h4>Projection Limitations</h4>
+            <ul>
+              <li>Projections assume constant annual returns; actual markets are volatile</li>
+              <li>Tax-loss harvesting effectiveness decays over time as easy losses are exhausted</li>
+              <li>Wash sale disallowance (5-15% of losses) reduces actual tax benefits</li>
+              <li>Financing costs for leveraged positions reduce net returns</li>
+            </ul>
+          </div>
+
+          <div className="disclaimer-section">
+            <h4>Tax &amp; Regulatory Risks</h4>
+            <ul>
+              <li>Section 461(l) limits are inflation-adjusted annually and may change</li>
+              <li>NOL rules (80% offset limit) could be modified by future legislation</li>
+              <li>State tax treatment varies; some states do not conform to federal rules</li>
+              <li>QFAF tax treatment depends on ongoing IRS guidance</li>
+            </ul>
+          </div>
+
+          <div className="disclaimer-section">
+            <h4>Investment Risks</h4>
+            <ul>
+              <li>Leveraged strategies amplify both gains and losses</li>
+              <li>Margin calls may force liquidation at unfavorable times</li>
+              <li>Tracking error means returns may deviate significantly from benchmarks</li>
+              <li>Lock-up periods may restrict access to capital</li>
+            </ul>
+          </div>
+
+          <div className="disclaimer-section">
+            <h4>Suitability</h4>
+            <ul>
+              <li>QFAF strategies are designed for Qualified Purchasers ($5M+ investments)</li>
+              <li>Not suitable for investors who cannot tolerate significant volatility</li>
+              <li>This calculator is for educational purposes only</li>
+              <li>Consult qualified tax, legal, and investment advisors before investing</li>
+            </ul>
+          </div>
+        </div>
+
+        <p className="disclaimer-footer">
+          This calculator provides estimates for illustrative purposes only and does not constitute
+          investment, tax, or legal advice. Past performance does not guarantee future results.
         </p>
       </footer>
     </div>

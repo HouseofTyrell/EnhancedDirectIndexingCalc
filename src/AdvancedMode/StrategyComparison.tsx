@@ -3,18 +3,13 @@ import { STRATEGIES, getStrategy } from '../strategyData';
 import { calculate } from '../calculations';
 import { CalculatorInputs, ComparisonResult } from '../types';
 import { FieldInfoPopup } from '../InfoPopup';
+import { formatCurrency, formatPercent } from '../utils/formatters';
 
 interface StrategyComparisonProps {
   baseInputs: CalculatorInputs;
   selectedStrategies: string[];
   onChange: (strategies: string[]) => void;
 }
-
-const formatCurrency = (value: number) =>
-  `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-
-const formatPercent = (value: number) =>
-  `${(value * 100).toFixed(2)}%`;
 
 export function StrategyComparison({
   baseInputs,
@@ -42,7 +37,7 @@ export function StrategyComparison({
         year1TaxSavings: results.years[0]?.taxSavings || 0,
         tenYearTaxSavings: results.summary.totalTaxSavings,
         taxAlpha: results.summary.effectiveTaxAlpha,
-        trackingError: strategy.trackingError,
+        trackingErrorDisplay: strategy.trackingErrorDisplay,
       };
     }).filter((r): r is ComparisonResult => r !== null);
   }, [baseInputs, selectedStrategies]);
@@ -230,7 +225,7 @@ export function StrategyComparison({
                 </td>
                 {comparisonResults.map(result => (
                   <td key={result.strategyId}>
-                    {result.trackingError}
+                    {result.trackingErrorDisplay}
                   </td>
                 ))}
               </tr>

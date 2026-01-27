@@ -1,6 +1,16 @@
+// Filing Status type and constants
+export const FILING_STATUSES = [
+  { value: 'single', label: 'Single' },
+  { value: 'mfj', label: 'Married Filing Jointly' },
+  { value: 'mfs', label: 'Married Filing Separately' },
+  { value: 'hoh', label: 'Head of Household' },
+] as const;
+
+export type FilingStatus = typeof FILING_STATUSES[number]['value'];
+
 export interface CalculatorInputs {
   // Client profile
-  filingStatus: 'single' | 'mfj' | 'mfs' | 'hoh';
+  filingStatus: FilingStatus;
   stateCode: string;
   stateRate: number;
   annualIncome: number;
@@ -16,6 +26,9 @@ export interface CalculatorInputs {
 
   // Advanced: QFAF override (optional)
   qfafOverride?: number;
+
+  // Toggle QFAF on/off (for testing collateral-only scenarios)
+  qfafEnabled: boolean;
 }
 
 export interface CalculatedSizing {
@@ -70,6 +83,10 @@ export interface YearResult {
   ltLossCarryforward: number;
   nolCarryforward: number;         // Cumulative NOL
   nolUsedThisYear: number;         // NOL applied this year
+  capitalLossUsedAgainstIncome: number; // Up to $3,000 per §1211(b)
+
+  // Effective rates (for debugging/display)
+  effectiveStLossRate: number;     // Actual ST loss rate used (may be custom)
 }
 
 export interface CalculationResult {
@@ -95,10 +112,18 @@ export interface YearOverride {
   note: string;          // User note (e.g., "Retirement", "Bonus")
 }
 
-export interface YearByYearInputs {
-  enabled: boolean;
-  overrides: YearOverride[];
+// Liquidity Planning
+export interface LiquidityParams {
+  qfafLockupYears: number;        // Number of years QFAF is locked (default: 3)
+  qfafRedemptionPenalty: number;  // Early redemption penalty (default: 0.05 = 5%)
+  emergencyFundTarget: number;    // Target emergency fund as months of income
 }
+
+export const DEFAULT_LIQUIDITY: LiquidityParams = {
+  qfafLockupYears: 3,
+  qfafRedemptionPenalty: 0.05,
+  emergencyFundTarget: 6,
+};
 
 // Sensitivity Analysis
 export interface SensitivityParams {
@@ -119,6 +144,21 @@ export const DEFAULT_SENSITIVITY: SensitivityParams = {
   ltGainRateVariance: 0,
 };
 
+// Scenario Analysis (Bull/Base/Bear)
+export type ScenarioType = 'bull' | 'base' | 'bear';
+
+export interface ScenarioParams {
+  return: number;
+  probability: number;
+  label: string;
+}
+
+export const DEFAULT_SCENARIOS: Record<ScenarioType, ScenarioParams> = {
+  bull: { return: 0.12, probability: 0.25, label: 'Bull Market' },
+  base: { return: 0.07, probability: 0.50, label: 'Base Case' },
+  bear: { return: 0.02, probability: 0.25, label: 'Bear Market' },
+};
+
 // Strategy Comparison
 export interface ComparisonResult {
   strategyId: string;
@@ -129,7 +169,7 @@ export interface ComparisonResult {
   year1TaxSavings: number;
   tenYearTaxSavings: number;
   taxAlpha: number;
-  trackingError: string;
+  trackingErrorDisplay: string;
 }
 
 // Advanced Settings (Hardcoded Formula Constants)
@@ -137,9 +177,12 @@ export interface AdvancedSettings {
   // QFAF mechanics
   qfafMultiplier: number;           // Default: 1.50 (150% ST gains and ordinary losses)
 
+  // Tax-loss harvesting adjustments
+  washSaleDisallowanceRate: number; // Default: 0 (can increase if wash sales expected)
+
   // Section 461(l) limits by filing status
   section461Limits: {
-    mfj: number;                    // Default: 512000 (2024)
+    mfj: number;                    // Default: 512000 (2026)
     single: number;                 // Default: 256000
     mfs: number;                    // Default: 256000
     hoh: number;                    // Default: 256000
@@ -160,6 +203,7 @@ export interface AdvancedSettings {
 
 export const DEFAULT_SETTINGS: AdvancedSettings = {
   qfafMultiplier: 1.50,
+  washSaleDisallowanceRate: 0,
   section461Limits: {
     mfj: 512000,
     single: 256000,
