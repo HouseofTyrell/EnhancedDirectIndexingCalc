@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
-import { calculate, calculateWithOverrides } from './calculations';
+import { calculate, calculateWithOverrides, calculateWithSensitivity } from './calculations';
 
 // Lazy load chart components to reduce initial bundle size (~400KB savings)
 const TaxSavingsChart = lazy(() =>
@@ -105,13 +105,36 @@ export function Calculator() {
     [yearOverrides, inputs.annualIncome]
   );
 
-  const results = useMemo(
+  // Check if sensitivity params differ from defaults
+  const hasActiveSensitivity = useMemo(
     () =>
-      hasActiveOverrides
-        ? calculateWithOverrides(inputs, advancedSettings, yearOverrides)
-        : calculate(inputs, advancedSettings),
-    [inputs, advancedSettings, rateVersion, hasActiveOverrides, yearOverrides]
+      sensitivityParams.federalRateChange !== 0 ||
+      sensitivityParams.stateRateChange !== 0 ||
+      sensitivityParams.annualReturn !== DEFAULT_SENSITIVITY.annualReturn ||
+      sensitivityParams.stLossRateVariance !== 0 ||
+      sensitivityParams.ltGainRateVariance !== 0,
+    [sensitivityParams]
   );
+
+  const results = useMemo(() => {
+    // Priority: Year overrides > Sensitivity > Base calculation
+    // Note: Year overrides and sensitivity don't combine (would need a combined function)
+    if (hasActiveOverrides) {
+      return calculateWithOverrides(inputs, advancedSettings, yearOverrides);
+    }
+    if (hasActiveSensitivity) {
+      return calculateWithSensitivity(inputs, advancedSettings, sensitivityParams);
+    }
+    return calculate(inputs, advancedSettings);
+  }, [
+    inputs,
+    advancedSettings,
+    rateVersion,
+    hasActiveOverrides,
+    yearOverrides,
+    hasActiveSensitivity,
+    sensitivityParams,
+  ]);
 
   // Memoize tax rate calculations - only recalculates when dependencies change
   const taxRates = useMemo(() => {
