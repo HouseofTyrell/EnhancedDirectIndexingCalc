@@ -48,10 +48,7 @@ export function AdvancedModal({ isOpen, onClose, children }: AdvancedModalProps)
   return (
     <>
       {/* Overlay - clicks close the panel */}
-      <div
-        className={`slideout-overlay ${isOpen ? 'open' : ''}`}
-        onClick={onClose}
-      />
+      <div className={`slideout-overlay ${isOpen ? 'open' : ''}`} onClick={onClose} />
 
       {/* Slide-out panel from right */}
       <div
@@ -75,9 +72,7 @@ export function AdvancedModal({ isOpen, onClose, children }: AdvancedModalProps)
             ×
           </button>
         </div>
-        <div className="slideout-panel__content">
-          {children}
-        </div>
+        <div className="slideout-panel__content">{children}</div>
       </div>
     </>
   );

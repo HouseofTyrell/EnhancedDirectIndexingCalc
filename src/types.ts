@@ -6,7 +6,7 @@ export const FILING_STATUSES = [
   { value: 'hoh', label: 'Head of Household' },
 ] as const;
 
-export type FilingStatus = typeof FILING_STATUSES[number]['value'];
+export type FilingStatus = (typeof FILING_STATUSES)[number]['value'];
 
 export interface CalculatorInputs {
   // Client profile
@@ -36,15 +36,15 @@ export interface CalculatedSizing {
   strategyName: string;
   strategyType: 'core' | 'overlay';
   collateralValue: number;
-  qfafValue: number;              // Auto-calculated
-  qfafMaxValue: number;           // Same as qfafValue (for display)
+  qfafValue: number; // Auto-calculated
+  qfafMaxValue: number; // Same as qfafValue (for display)
   totalExposure: number;
-  qfafRatio: number;              // qfafValue / collateralValue
-  year1StLosses: number;          // Collateral ST losses
-  year1StGains: number;           // QFAF ST gains (always equals year1StLosses)
-  year1OrdinaryLosses: number;    // QFAF ordinary losses
+  qfafRatio: number; // qfafValue / collateralValue
+  year1StLosses: number; // Collateral ST losses
+  year1StGains: number; // QFAF ST gains (always equals year1StLosses)
+  year1OrdinaryLosses: number; // QFAF ordinary losses
   year1UsableOrdinaryLoss: number; // Capped by 461(l)
-  year1ExcessToNol: number;       // Excess ordinary loss → NOL
+  year1ExcessToNol: number; // Excess ordinary loss → NOL
   section461Limit: number;
 }
 
@@ -57,17 +57,17 @@ export interface YearResult {
   totalValue: number;
 
   // QFAF tax events
-  stGainsGenerated: number;        // 150% of QFAF MV
+  stGainsGenerated: number; // 150% of QFAF MV
   ordinaryLossesGenerated: number; // 150% of QFAF MV
-  usableOrdinaryLoss: number;      // Capped by 461(l)
-  excessToNol: number;             // Ordinary losses above limit
+  usableOrdinaryLoss: number; // Capped by 461(l)
+  excessToNol: number; // Ordinary losses above limit
 
   // Collateral tax events
-  stLossesHarvested: number;       // Strategy rate × collateral
-  ltGainsRealized: number;         // Strategy rate × collateral
+  stLossesHarvested: number; // Strategy rate × collateral
+  ltGainsRealized: number; // Strategy rate × collateral
 
   // Net positions
-  netStGainLoss: number;           // Should be ~0 with auto-sizing
+  netStGainLoss: number; // Should be ~0 with auto-sizing
 
   // Taxes
   federalTax: number;
@@ -81,12 +81,16 @@ export interface YearResult {
   // Carryforwards
   stLossCarryforward: number;
   ltLossCarryforward: number;
-  nolCarryforward: number;         // Cumulative NOL
-  nolUsedThisYear: number;         // NOL applied this year
+  nolCarryforward: number; // Cumulative NOL
+  nolUsedThisYear: number; // NOL applied this year
   capitalLossUsedAgainstIncome: number; // Up to $3,000 per §1211(b)
 
   // Effective rates (for debugging/display)
-  effectiveStLossRate: number;     // Actual ST loss rate used (may be custom)
+  effectiveStLossRate: number; // Actual ST loss rate used (may be custom)
+
+  // Income offset tracking
+  incomeOffsetAmount: number; // Total income offset: ordinary loss + NOL used + capital loss used
+  maxIncomeOffsetCapacity: number; // Max income that could be offset (useful for option exercise planning)
 }
 
 export interface CalculationResult {
@@ -107,16 +111,16 @@ export interface CalculationResult {
 // Year-by-Year Planning
 export interface YearOverride {
   year: number;
-  w2Income: number;      // Override annual income for this year
-  cashInfusion: number;  // Additional capital added at year start
-  note: string;          // User note (e.g., "Retirement", "Bonus")
+  w2Income: number; // Override annual income for this year
+  cashInfusion: number; // Additional capital added at year start
+  note: string; // User note (e.g., "Retirement", "Bonus")
 }
 
 // Liquidity Planning
 export interface LiquidityParams {
-  qfafLockupYears: number;        // Number of years QFAF is locked (default: 3)
-  qfafRedemptionPenalty: number;  // Early redemption penalty (default: 0.05 = 5%)
-  emergencyFundTarget: number;    // Target emergency fund as months of income
+  qfafLockupYears: number; // Number of years QFAF is locked (default: 3)
+  qfafRedemptionPenalty: number; // Early redemption penalty (default: 0.05 = 5%)
+  emergencyFundTarget: number; // Target emergency fund as months of income
 }
 
 export const DEFAULT_LIQUIDITY: LiquidityParams = {
@@ -127,12 +131,12 @@ export const DEFAULT_LIQUIDITY: LiquidityParams = {
 
 // Sensitivity Analysis
 export interface SensitivityParams {
-  federalRateChange: number;      // -0.05 to +0.05 (percentage points)
-  stateRateChange: number;        // -0.05 to +0.05
-  annualReturn: number;           // -0.20 to +0.20 (replaces 7% default)
+  federalRateChange: number; // -0.05 to +0.05 (percentage points)
+  stateRateChange: number; // -0.05 to +0.05
+  annualReturn: number; // -0.20 to +0.20 (replaces 7% default)
   trackingErrorMultiplier: number; // 0 to 2 (multiplier on variance)
-  stLossRateVariance: number;     // -0.50 to +0.50 (percentage change)
-  ltGainRateVariance: number;     // -0.50 to +0.50 (percentage change)
+  stLossRateVariance: number; // -0.50 to +0.50 (percentage change)
+  ltGainRateVariance: number; // -0.50 to +0.50 (percentage change)
 }
 
 export const DEFAULT_SENSITIVITY: SensitivityParams = {
@@ -155,7 +159,7 @@ export interface ScenarioParams {
 
 export const DEFAULT_SCENARIOS: Record<ScenarioType, ScenarioParams> = {
   bull: { return: 0.12, probability: 0.25, label: 'Bull Market' },
-  base: { return: 0.07, probability: 0.50, label: 'Base Case' },
+  base: { return: 0.07, probability: 0.5, label: 'Base Case' },
   bear: { return: 0.02, probability: 0.25, label: 'Bear Market' },
 };
 
@@ -175,35 +179,35 @@ export interface ComparisonResult {
 // Advanced Settings (Hardcoded Formula Constants)
 export interface AdvancedSettings {
   // QFAF mechanics
-  qfafMultiplier: number;           // Default: 1.50 (150% ST gains and ordinary losses)
-  qfafGrowthEnabled: boolean;       // Default: true (QFAF appreciates with market)
+  qfafMultiplier: number; // Default: 1.50 (150% ST gains and ordinary losses)
+  qfafGrowthEnabled: boolean; // Default: true (QFAF appreciates with market)
 
   // Tax-loss harvesting adjustments
   washSaleDisallowanceRate: number; // Default: 0 (can increase if wash sales expected)
 
   // Section 461(l) limits by filing status
   section461Limits: {
-    mfj: number;                    // Default: 512000 (2026)
-    single: number;                 // Default: 256000
-    mfs: number;                    // Default: 256000
-    hoh: number;                    // Default: 256000
+    mfj: number; // Default: 512000 (2026)
+    single: number; // Default: 256000
+    mfs: number; // Default: 256000
+    hoh: number; // Default: 256000
   };
 
   // NOL rules
-  nolOffsetLimit: number;           // Default: 0.80 (80% of taxable income)
+  nolOffsetLimit: number; // Default: 0.80 (80% of taxable income)
 
   // Portfolio assumptions
-  defaultAnnualReturn: number;      // Default: 0.07 (7%)
-  projectionYears: number;          // Default: 10
+  defaultAnnualReturn: number; // Default: 0.07 (7%)
+  projectionYears: number; // Default: 10
 
   // Tax rate assumptions
-  niitRate: number;                 // Default: 0.038 (3.8% Net Investment Income Tax)
-  ltcgRate: number;                 // Default: 0.20 (20% LTCG rate)
-  stcgRate: number;                 // Default: 0.37 (37% ordinary income rate)
+  niitRate: number; // Default: 0.038 (3.8% Net Investment Income Tax)
+  ltcgRate: number; // Default: 0.20 (20% LTCG rate)
+  stcgRate: number; // Default: 0.37 (37% ordinary income rate)
 }
 
 export const DEFAULT_SETTINGS: AdvancedSettings = {
-  qfafMultiplier: 1.50,
+  qfafMultiplier: 1.5,
   qfafGrowthEnabled: true,
   washSaleDisallowanceRate: 0,
   section461Limits: {
@@ -212,10 +216,10 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
     mfs: 256000,
     hoh: 256000,
   },
-  nolOffsetLimit: 0.80,
+  nolOffsetLimit: 0.8,
   defaultAnnualReturn: 0.07,
   projectionYears: 10,
   niitRate: 0.038,
-  ltcgRate: 0.20,
+  ltcgRate: 0.2,
   stcgRate: 0.37,
 };

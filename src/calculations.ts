@@ -1,4 +1,14 @@
-import { CalculatorInputs, YearResult, CalculationResult, CalculatedSizing, AdvancedSettings, DEFAULT_SETTINGS } from './types';
+import {
+  CalculatorInputs,
+  YearResult,
+  CalculationResult,
+  CalculatedSizing,
+  AdvancedSettings,
+  DEFAULT_SETTINGS,
+  YearOverride,
+  SensitivityParams,
+  DEFAULT_SENSITIVITY,
+} from './types';
 import { getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import {
   getStrategy,
@@ -59,7 +69,7 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
 
   if (inputs.qfafEnabled !== false) {
     // Auto-size QFAF so ST gains = ST losses (or use override)
-    qfafValue = inputs.qfafOverride ?? (year1StLosses / QFAF_ST_GAIN_RATE);
+    qfafValue = inputs.qfafOverride ?? year1StLosses / QFAF_ST_GAIN_RATE;
     // QFAF generates ST gains and ordinary losses at 150% of MV
     year1StGains = qfafValue * QFAF_ST_GAIN_RATE;
     year1OrdinaryLosses = qfafValue * QFAF_ORDINARY_LOSS_RATE;
@@ -88,7 +98,10 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
   };
 }
 
-export function calculate(inputs: CalculatorInputs, settings: AdvancedSettings = DEFAULT_SETTINGS): CalculationResult {
+export function calculate(
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings = DEFAULT_SETTINGS
+): CalculationResult {
   const sizing = calculateSizing(inputs);
   const strategy = getStrategy(inputs.strategyId);
 
@@ -98,11 +111,28 @@ export function calculate(inputs: CalculatorInputs, settings: AdvancedSettings =
   }
 
   // Pre-calculate tax rates once before the loop (013 - redundant lookups)
+  // Use settings section461Limits if provided, otherwise fall back to defaults
+  const section461Limit =
+    settings.section461Limits[inputs.filingStatus] ?? SECTION_461L_LIMITS[inputs.filingStatus];
+
+  // Determine tax rates: use custom settings if different from defaults, otherwise use bracket lookup
+  const useCustomRates =
+    settings.stcgRate !== DEFAULT_SETTINGS.stcgRate ||
+    settings.ltcgRate !== DEFAULT_SETTINGS.ltcgRate ||
+    settings.niitRate !== DEFAULT_SETTINGS.niitRate;
+
+  const bracketStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
+  const bracketLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+  const stateRate =
+    inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+
+  // When using custom rates, apply them directly; otherwise use bracket-based rates
+  // NIIT is added on top of LT rate when applicable (income > $250k MFJ, $200k single)
   const taxRates: TaxRates = {
-    stRate: getFederalStRate(inputs.annualIncome, inputs.filingStatus),
-    ltRate: getFederalLtRate(inputs.annualIncome, inputs.filingStatus),
-    stateRate: inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode),
-    section461Limit: SECTION_461L_LIMITS[inputs.filingStatus],
+    stRate: useCustomRates ? settings.stcgRate : bracketStRate,
+    ltRate: useCustomRates ? settings.ltcgRate + settings.niitRate : bracketLtRate,
+    stateRate,
+    section461Limit,
   };
 
   const years: YearResult[] = [];
@@ -113,7 +143,10 @@ export function calculate(inputs: CalculatorInputs, settings: AdvancedSettings =
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
 
-  for (let year = 1; year <= 10; year++) {
+  // Use projectionYears from settings (defaults to 10)
+  const projectionYears = settings.projectionYears ?? 10;
+
+  for (let year = 1; year <= projectionYears; year++) {
     const result = calculateYear(
       year,
       qfafValue,
@@ -152,12 +185,16 @@ function calculateYear(
   inputs: CalculatorInputs,
   strategy: StrategyRates,
   taxRates: TaxRates,
-  settings: AdvancedSettings
+  settings: AdvancedSettings,
+  yearIncome?: number // Optional income override for this year
 ): YearResult {
-  // QFAF generates ST gains and ordinary losses (150% of MV each)
+  // Use year income override if provided, otherwise use base annual income
+  const effectiveIncome = yearIncome ?? inputs.annualIncome;
+  // QFAF generates ST gains and ordinary losses at qfafMultiplier rate (default 150% of MV each)
   // Use safeNumber to prevent NaN/Infinity propagation (004)
-  const stGainsGenerated = safeNumber(qfafValue * QFAF_ST_GAIN_RATE);
-  const ordinaryLossesGenerated = safeNumber(qfafValue * QFAF_ORDINARY_LOSS_RATE);
+  const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
+  const stGainsGenerated = safeNumber(qfafValue * qfafMultiplier);
+  const ordinaryLossesGenerated = safeNumber(qfafValue * qfafMultiplier);
 
   // Collateral generates ST losses and LT gains per strategy rates
   // Uses custom rates if set, otherwise applies 7% annual decay
@@ -183,7 +220,7 @@ function calculateYear(
   const usableOrdinaryLoss = Math.min(
     ordinaryLossesGenerated,
     taxRates.section461Limit,
-    inputs.annualIncome
+    effectiveIncome
   );
   const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
 
@@ -196,7 +233,9 @@ function calculateYear(
       stCarryforward - usedStCarryforward,
       ltCarryforward,
       nolCarryforward,
-      inputs
+      inputs,
+      settings,
+      effectiveIncome
     );
 
   // Update NOL carryforward: add excess, subtract used
@@ -234,17 +273,25 @@ function calculateYear(
   // Net tax savings
   const taxSavings = safeNumber(
     ordinaryLossBenefit +
-    stToLtConversionBenefit +
-    capitalLossBenefit +
-    nolUsageBenefit -
-    ltGainCost -
-    remainingStGainCost
+      stToLtConversionBenefit +
+      capitalLossBenefit +
+      nolUsageBenefit -
+      ltGainCost -
+      remainingStGainCost
   );
 
   // For display/debugging: calculate what taxes would be without benefits
-  const grossInvestmentTax = safeNumber(Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate);
-  const federalTax = safeNumber(Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) * (stRate / combinedStRate));
-  const stateTax = safeNumber(Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) * (stateRate / combinedStRate));
+  const grossInvestmentTax = safeNumber(
+    Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
+  );
+  const federalTax = safeNumber(
+    Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
+      (stRate / combinedStRate)
+  );
+  const stateTax = safeNumber(
+    Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
+      (stateRate / combinedStRate)
+  );
   const baselineTax = ltGainsRealized * combinedLtRate;
 
   // Portfolio growth using configured annual return minus financing costs
@@ -253,6 +300,26 @@ function calculateYear(
   const qfafGrowthRate = settings.qfafGrowthEnabled ? netGrowthRate : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
   const newCollateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
+
+  // Calculate total income offset for this year
+  // This is the sum of all deductions that reduce taxable income
+  const incomeOffsetAmount = safeNumber(
+    usableOrdinaryLoss + nolUsed + capitalLossUsedAgainstIncome
+  );
+
+  // Calculate maximum income offset capacity for this year
+  // This shows how much income COULD be offset if the taxpayer had additional income
+  // (useful for planning stock option exercises or vesting)
+  // Components:
+  // 1. Ordinary loss (up to 461(l) limit)
+  // 2. NOL carryforward (can offset 80% of additional taxable income)
+  // 3. Capital loss carryforward (up to $3k or remaining carryforward)
+  const capitalLossLimit = CAPITAL_LOSS_LIMITS[inputs.filingStatus];
+  const remainingCapitalLoss = newStCarryforward + newLtCarryforward;
+  const maxCapitalLossOffset = Math.min(capitalLossLimit, remainingCapitalLoss);
+  const maxIncomeOffsetCapacity = safeNumber(
+    usableOrdinaryLoss + newNolCarryforward + maxCapitalLossOffset
+  );
 
   return {
     year,
@@ -277,6 +344,8 @@ function calculateYear(
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
     effectiveStLossRate,
+    incomeOffsetAmount,
+    maxIncomeOffsetCapacity,
   };
 }
 
@@ -291,7 +360,9 @@ function calculateCarryforwards(
   remainingStCarryforward: number,
   remainingLtCarryforward: number,
   nolCarryforward: number,
-  inputs: CalculatorInputs
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings,
+  effectiveIncome?: number // Optional income override
 ): {
   newStCarryforward: number;
   newLtCarryforward: number;
@@ -368,10 +439,13 @@ function calculateCarryforwards(
     }
   }
 
-  // Step 7: Calculate NOL usage with 80% limitation
-  // NOL can offset up to 80% of taxable income
-  const taxableIncomeBeforeNol = inputs.annualIncome + taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome;
-  const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * NOL_OFFSET_PERCENTAGE;
+  // Step 7: Calculate NOL usage with configurable limit (default 80%)
+  // NOL can offset up to nolOffsetLimit of taxable income
+  const yearIncome = effectiveIncome ?? inputs.annualIncome;
+  const taxableIncomeBeforeNol =
+    yearIncome + taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome;
+  const nolOffsetLimit = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
+  const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * nolOffsetLimit;
   const nolUsed = Math.min(nolCarryforward, maxNolUsage);
 
   return {
@@ -388,9 +462,405 @@ function calculateSummary(years: YearResult[], sizing: CalculatedSizing) {
   // Safe array access (005 - fix unchecked array access)
   const lastYear = years.length > 0 ? years[years.length - 1] : undefined;
   const finalPortfolioValue = lastYear?.totalValue ?? 0;
-  const effectiveTaxAlpha = sizing.totalExposure > 0
-    ? totalTaxSavings / sizing.totalExposure / 10
-    : 0;
+  // Annualize tax alpha using actual number of projection years
+  const numYears = years.length || 1; // Avoid division by zero
+  const effectiveTaxAlpha =
+    sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / numYears : 0;
 
   return { totalTaxSavings, finalPortfolioValue, effectiveTaxAlpha, totalNolGenerated };
+}
+
+/**
+ * Calculate with year-by-year overrides for income and cash infusions.
+ *
+ * This function extends the base calculate() function to support:
+ * - Income overrides: Change W-2 income for specific years (affects 461(l) limits and NOL usage)
+ * - Cash infusions: Add/remove capital in specific years (affects collateral and QFAF sizing)
+ */
+export function calculateWithOverrides(
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings = DEFAULT_SETTINGS,
+  overrides: YearOverride[]
+): CalculationResult {
+  const strategy = getStrategy(inputs.strategyId);
+
+  // Validate strategy exists
+  if (!strategy) {
+    throw new Error(`Invalid strategy ID: ${inputs.strategyId}`);
+  }
+
+  // Build a map of overrides by year for quick lookup
+  const overrideMap = new Map<number, YearOverride>();
+  for (const override of overrides) {
+    overrideMap.set(override.year, override);
+  }
+
+  // Calculate initial sizing (will be adjusted for infusions)
+  const baseSizing = calculateSizing(inputs);
+
+  // Pre-calculate base tax rates
+  const baseStateRate =
+    inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+
+  const years: YearResult[] = [];
+
+  let qfafValue = baseSizing.qfafValue;
+  let collateralValue = baseSizing.collateralValue;
+  let stCarryforward = inputs.existingStLossCarryforward;
+  let ltCarryforward = inputs.existingLtLossCarryforward;
+  let nolCarryforward = inputs.existingNolCarryforward;
+
+  // Track cumulative infusions for sizing recalculation
+  let cumulativeInfusion = 0;
+
+  // Use projectionYears from settings (defaults to 10)
+  const projectionYears = settings.projectionYears ?? 10;
+
+  for (let year = 1; year <= projectionYears; year++) {
+    const override = overrideMap.get(year);
+
+    // Get effective income for this year
+    const yearIncome = override?.w2Income ?? inputs.annualIncome;
+
+    // Apply cash infusion at the start of the year
+    const cashInfusion = override?.cashInfusion ?? 0;
+    if (cashInfusion !== 0) {
+      // Add/subtract from collateral
+      collateralValue += cashInfusion;
+      cumulativeInfusion += cashInfusion;
+
+      // Resize QFAF to match new collateral ST loss capacity (if QFAF is enabled)
+      if (inputs.qfafEnabled !== false) {
+        const newStLossCapacity = collateralValue * strategy.stLossRate;
+        qfafValue = newStLossCapacity / QFAF_ST_GAIN_RATE;
+      }
+    }
+
+    // Calculate tax rates for this year's income
+    // (Tax brackets may differ based on income level)
+    const yearTaxRates: TaxRates = {
+      stRate: getFederalStRate(yearIncome, inputs.filingStatus),
+      ltRate: getFederalLtRate(yearIncome, inputs.filingStatus),
+      stateRate: baseStateRate,
+      section461Limit:
+        settings.section461Limits[inputs.filingStatus] ??
+        SECTION_461L_LIMITS[inputs.filingStatus],
+    };
+
+    const result = calculateYear(
+      year,
+      qfafValue,
+      collateralValue,
+      stCarryforward,
+      ltCarryforward,
+      nolCarryforward,
+      inputs,
+      strategy,
+      yearTaxRates,
+      settings,
+      yearIncome // Pass the year-specific income
+    );
+
+    years.push(result);
+
+    // Update state for next year
+    qfafValue = result.qfafValue;
+    collateralValue = result.collateralValue;
+    stCarryforward = result.stLossCarryforward;
+    ltCarryforward = result.ltLossCarryforward;
+    nolCarryforward = result.nolCarryforward;
+  }
+
+  // Recalculate sizing to reflect any infusions
+  // (The sizing should reflect the initial state plus any year-1 infusion)
+  const adjustedSizing: CalculatedSizing = {
+    ...baseSizing,
+    collateralValue: baseSizing.collateralValue + (overrideMap.get(1)?.cashInfusion ?? 0),
+    totalExposure:
+      baseSizing.totalExposure +
+      cumulativeInfusion +
+      (inputs.qfafEnabled !== false
+        ? (cumulativeInfusion * strategy.stLossRate) / QFAF_ST_GAIN_RATE
+        : 0),
+  };
+
+  return {
+    sizing: adjustedSizing,
+    years,
+    summary: calculateSummary(years, adjustedSizing),
+  };
+}
+
+/**
+ * Calculate with sensitivity analysis adjustments.
+ *
+ * This function extends the base calculate() function to support stress-testing:
+ * - Federal rate changes: Adjust federal tax rates up/down
+ * - State rate changes: Adjust state tax rates up/down
+ * - Annual return: Override portfolio growth rate
+ * - ST loss rate variance: Adjust strategy ST loss rates
+ * - LT gain rate variance: Adjust strategy LT gain rates
+ */
+export function calculateWithSensitivity(
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings = DEFAULT_SETTINGS,
+  sensitivity: SensitivityParams = DEFAULT_SENSITIVITY
+): CalculationResult {
+  const strategy = getStrategy(inputs.strategyId);
+
+  // Validate strategy exists
+  if (!strategy) {
+    throw new Error(`Invalid strategy ID: ${inputs.strategyId}`);
+  }
+
+  // Calculate initial sizing
+  const sizing = calculateSizing(inputs);
+
+  // Get base state rate
+  const baseStateRate =
+    inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+
+  // Apply sensitivity adjustments to rates
+  const adjustedStateRate = Math.max(0, baseStateRate + sensitivity.stateRateChange);
+
+  // Apply ST loss and LT gain variance to strategy rates
+  const adjustedStLossRate = strategy.stLossRate * (1 + sensitivity.stLossRateVariance);
+  const adjustedLtGainRate = strategy.ltGainRate * (1 + sensitivity.ltGainRateVariance);
+
+  // Create adjusted strategy with modified rates
+  const adjustedStrategy: StrategyRates = {
+    stLossRate: adjustedStLossRate,
+    ltGainRate: adjustedLtGainRate,
+    financingCostRate: strategy.financingCostRate,
+  };
+
+  // Use sensitivity annual return if different from default
+  const effectiveAnnualReturn =
+    sensitivity.annualReturn !== DEFAULT_SENSITIVITY.annualReturn
+      ? sensitivity.annualReturn
+      : settings.defaultAnnualReturn;
+
+  // Create adjusted settings with sensitivity return
+  const adjustedSettings: AdvancedSettings = {
+    ...settings,
+    defaultAnnualReturn: effectiveAnnualReturn,
+  };
+
+  const years: YearResult[] = [];
+
+  let qfafValue = sizing.qfafValue;
+  let collateralValue = sizing.collateralValue;
+  let stCarryforward = inputs.existingStLossCarryforward;
+  let ltCarryforward = inputs.existingLtLossCarryforward;
+  let nolCarryforward = inputs.existingNolCarryforward;
+
+  // Use projectionYears from settings (defaults to 10)
+  const projectionYears = settings.projectionYears ?? 10;
+
+  for (let year = 1; year <= projectionYears; year++) {
+    // Calculate tax rates with sensitivity adjustments
+    const baseFederalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
+    const baseFederalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+
+    // Apply federal rate change (affects both ST and LT rates proportionally)
+    const adjustedFederalStRate = Math.max(0, baseFederalStRate + sensitivity.federalRateChange);
+    const adjustedFederalLtRate = Math.max(0, baseFederalLtRate + sensitivity.federalRateChange);
+
+    // Use settings section461Limits if provided
+    const section461Limit =
+      settings.section461Limits[inputs.filingStatus] ?? SECTION_461L_LIMITS[inputs.filingStatus];
+
+    const yearTaxRates: TaxRates = {
+      stRate: adjustedFederalStRate,
+      ltRate: adjustedFederalLtRate,
+      stateRate: adjustedStateRate,
+      section461Limit,
+    };
+
+    const result = calculateYearWithSensitivity(
+      year,
+      qfafValue,
+      collateralValue,
+      stCarryforward,
+      ltCarryforward,
+      nolCarryforward,
+      inputs,
+      adjustedStrategy,
+      yearTaxRates,
+      adjustedSettings,
+      sensitivity.stLossRateVariance,
+      sensitivity.ltGainRateVariance
+    );
+
+    years.push(result);
+
+    // Update state for next year
+    qfafValue = result.qfafValue;
+    collateralValue = result.collateralValue;
+    stCarryforward = result.stLossCarryforward;
+    ltCarryforward = result.ltLossCarryforward;
+    nolCarryforward = result.nolCarryforward;
+  }
+
+  return {
+    sizing,
+    years,
+    summary: calculateSummary(years, sizing),
+  };
+}
+
+/**
+ * Calculate a single year with sensitivity-adjusted rates.
+ * Applies the same decay logic as base calculation, but with variance-adjusted base rates.
+ */
+function calculateYearWithSensitivity(
+  year: number,
+  qfafValue: number,
+  collateralValue: number,
+  stCarryforward: number,
+  ltCarryforward: number,
+  nolCarryforward: number,
+  inputs: CalculatorInputs,
+  strategy: StrategyRates,
+  taxRates: TaxRates,
+  settings: AdvancedSettings,
+  stLossVariance: number,
+  ltGainVariance: number
+): YearResult {
+  // QFAF generates ST gains and ordinary losses at qfafMultiplier rate
+  const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
+  const stGainsGenerated = safeNumber(qfafValue * qfafMultiplier);
+  const ordinaryLossesGenerated = safeNumber(qfafValue * qfafMultiplier);
+
+  // Get base rates with decay (same as normal calculation)
+  const baseStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
+  // Apply variance to the decayed rate
+  const adjustedStLossRate = baseStLossRate * (1 + stLossVariance);
+  const adjustedLtGainRate = strategy.ltGainRate * (1 + ltGainVariance);
+
+  const grossStLosses = collateralValue * adjustedStLossRate;
+  const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
+  const ltGainsRealized = safeNumber(collateralValue * adjustedLtGainRate);
+
+  // Net ST position
+  const grossNetSt = stGainsGenerated - stLossesHarvested;
+
+  // Apply ST carryforward to offset any remaining ST gains
+  let netStGainLoss = grossNetSt;
+  let usedStCarryforward = 0;
+  if (netStGainLoss > 0 && stCarryforward > 0) {
+    usedStCarryforward = Math.min(stCarryforward, netStGainLoss);
+    netStGainLoss -= usedStCarryforward;
+  }
+
+  // Section 461(l) limitation on ordinary losses
+  const usableOrdinaryLoss = Math.min(
+    ordinaryLossesGenerated,
+    taxRates.section461Limit,
+    inputs.annualIncome
+  );
+  const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
+
+  // Calculate carryforwards and NOL usage
+  const { newStCarryforward, newLtCarryforward, nolUsed, capitalLossUsedAgainstIncome } =
+    calculateCarryforwards(
+      netStGainLoss,
+      ltGainsRealized,
+      usableOrdinaryLoss,
+      stCarryforward - usedStCarryforward,
+      ltCarryforward,
+      nolCarryforward,
+      inputs,
+      settings
+    );
+
+  // Update NOL carryforward
+  const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
+
+  // Calculate tax savings
+  const { stRate, ltRate, stateRate } = taxRates;
+  const combinedStRate = stRate + stateRate;
+  const combinedLtRate = ltRate + stateRate;
+  const rateDifferential = stRate - ltRate;
+
+  // Benefits
+  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
+  const stGainsOffset = Math.min(stGainsGenerated, stLossesHarvested);
+  const stToLtConversionBenefit = safeNumber(stGainsOffset * rateDifferential);
+  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
+  const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
+
+  // Costs
+  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
+  const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
+
+  // Net tax savings
+  const taxSavings = safeNumber(
+    ordinaryLossBenefit +
+      stToLtConversionBenefit +
+      capitalLossBenefit +
+      nolUsageBenefit -
+      ltGainCost -
+      remainingStGainCost
+  );
+
+  // Tax breakdown for display
+  const grossInvestmentTax = safeNumber(
+    Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
+  );
+  const federalTax = safeNumber(
+    Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
+      (stRate / combinedStRate)
+  );
+  const stateTax = safeNumber(
+    Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
+      (stateRate / combinedStRate)
+  );
+  const baselineTax = ltGainsRealized * combinedLtRate;
+
+  // Portfolio growth using sensitivity-adjusted return
+  const netGrowthRate = settings.defaultAnnualReturn - strategy.financingCostRate;
+  const qfafGrowthRate = settings.qfafGrowthEnabled ? netGrowthRate : 0;
+  const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
+  const newCollateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
+
+  // Calculate total income offset for this year
+  const incomeOffsetAmount = safeNumber(
+    usableOrdinaryLoss + nolUsed + capitalLossUsedAgainstIncome
+  );
+
+  // Calculate maximum income offset capacity for this year
+  const capitalLossLimit = CAPITAL_LOSS_LIMITS[inputs.filingStatus];
+  const remainingCapitalLoss = newStCarryforward + newLtCarryforward;
+  const maxCapitalLossOffset = Math.min(capitalLossLimit, remainingCapitalLoss);
+  const maxIncomeOffsetCapacity = safeNumber(
+    usableOrdinaryLoss + newNolCarryforward + maxCapitalLossOffset
+  );
+
+  return {
+    year,
+    qfafValue: newQfafValue,
+    collateralValue: newCollateralValue,
+    totalValue: newQfafValue + newCollateralValue,
+    stGainsGenerated,
+    ordinaryLossesGenerated,
+    usableOrdinaryLoss,
+    excessToNol,
+    stLossesHarvested,
+    ltGainsRealized,
+    netStGainLoss: Math.max(0, netStGainLoss),
+    federalTax,
+    stateTax,
+    totalTax: federalTax + stateTax,
+    baselineTax,
+    taxSavings: Math.max(0, taxSavings),
+    stLossCarryforward: newStCarryforward,
+    ltLossCarryforward: newLtCarryforward,
+    nolCarryforward: newNolCarryforward,
+    nolUsedThisYear: nolUsed,
+    capitalLossUsedAgainstIncome,
+    effectiveStLossRate: adjustedStLossRate,
+    incomeOffsetAmount,
+    maxIncomeOffsetCapacity,
+  };
 }

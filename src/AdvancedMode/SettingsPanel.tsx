@@ -13,15 +13,8 @@ const formatPercent = (value: number) => {
   return `${(value * 100).toFixed(1)}%`;
 };
 
-export function SettingsPanel({
-  settings,
-  onChange,
-  onReset,
-}: SettingsPanelProps) {
-  const handleChange = (
-    path: string,
-    value: number | boolean
-  ) => {
+export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProps) {
+  const handleChange = (path: string, value: number | boolean) => {
     const keys = path.split('.');
     if (keys.length === 1) {
       onChange({ ...settings, [keys[0]]: value });
@@ -44,8 +37,8 @@ export function SettingsPanel({
       <div className="settings-warning">
         <span className="settings-warning-icon">&#9888;</span>
         <span>
-          These settings control core calculation parameters. Changes affect all projections.
-          Only modify if you understand the tax implications.
+          These settings control core calculation parameters. Changes affect all projections. Only
+          modify if you understand the tax implications.
         </span>
       </div>
 
@@ -92,7 +85,9 @@ export function SettingsPanel({
                 onChange={e => handleChange('qfafGrowthEnabled', e.target.checked)}
               />
               <span className="toggle-slider"></span>
-              <span className="toggle-label">{settings.qfafGrowthEnabled ? 'Enabled' : 'Disabled'}</span>
+              <span className="toggle-label">
+                {settings.qfafGrowthEnabled ? 'Enabled' : 'Disabled'}
+              </span>
             </label>
           </div>
 
@@ -102,7 +97,9 @@ export function SettingsPanel({
                 Wash Sale Disallowance
                 <FieldInfoPopup contentKey="setting-wash-sale" />
               </span>
-              <span className="setting-hint">% of ST losses disallowed due to wash sales (0-15%)</span>
+              <span className="setting-hint">
+                % of ST losses disallowed due to wash sales (0-15%)
+              </span>
             </div>
             <div className="slider-input-group">
               <input
@@ -112,9 +109,15 @@ export function SettingsPanel({
                 step="0.01"
                 value={settings.washSaleDisallowanceRate}
                 onChange={e => handleChange('washSaleDisallowanceRate', parseFloat(e.target.value))}
-                className={settings.washSaleDisallowanceRate !== DEFAULT_SETTINGS.washSaleDisallowanceRate ? 'modified' : ''}
+                className={
+                  settings.washSaleDisallowanceRate !== DEFAULT_SETTINGS.washSaleDisallowanceRate
+                    ? 'modified'
+                    : ''
+                }
               />
-              <span className="slider-value">{formatPercent(settings.washSaleDisallowanceRate)}</span>
+              <span className="slider-value">
+                {formatPercent(settings.washSaleDisallowanceRate)}
+              </span>
             </div>
           </div>
         </div>
@@ -134,7 +137,12 @@ export function SettingsPanel({
               type="text"
               className={`setting-input ${settings.section461Limits.mfj !== DEFAULT_SETTINGS.section461Limits.mfj ? 'modified' : ''}`}
               value={`$${formatWithCommas(settings.section461Limits.mfj)}`}
-              onChange={e => handleChange('section461Limits.mfj', parseFormattedNumber(e.target.value.replace('$', '')))}
+              onChange={e =>
+                handleChange(
+                  'section461Limits.mfj',
+                  parseFormattedNumber(e.target.value.replace('$', ''))
+                )
+              }
             />
           </div>
 
@@ -146,7 +154,12 @@ export function SettingsPanel({
               type="text"
               className={`setting-input ${settings.section461Limits.single !== DEFAULT_SETTINGS.section461Limits.single ? 'modified' : ''}`}
               value={`$${formatWithCommas(settings.section461Limits.single)}`}
-              onChange={e => handleChange('section461Limits.single', parseFormattedNumber(e.target.value.replace('$', '')))}
+              onChange={e =>
+                handleChange(
+                  'section461Limits.single',
+                  parseFormattedNumber(e.target.value.replace('$', ''))
+                )
+              }
             />
           </div>
 
@@ -158,7 +171,12 @@ export function SettingsPanel({
               type="text"
               className={`setting-input ${settings.section461Limits.mfs !== DEFAULT_SETTINGS.section461Limits.mfs ? 'modified' : ''}`}
               value={`$${formatWithCommas(settings.section461Limits.mfs)}`}
-              onChange={e => handleChange('section461Limits.mfs', parseFormattedNumber(e.target.value.replace('$', '')))}
+              onChange={e =>
+                handleChange(
+                  'section461Limits.mfs',
+                  parseFormattedNumber(e.target.value.replace('$', ''))
+                )
+              }
             />
           </div>
 
@@ -170,7 +188,12 @@ export function SettingsPanel({
               type="text"
               className={`setting-input ${settings.section461Limits.hoh !== DEFAULT_SETTINGS.section461Limits.hoh ? 'modified' : ''}`}
               value={`$${formatWithCommas(settings.section461Limits.hoh)}`}
-              onChange={e => handleChange('section461Limits.hoh', parseFormattedNumber(e.target.value.replace('$', '')))}
+              onChange={e =>
+                handleChange(
+                  'section461Limits.hoh',
+                  parseFormattedNumber(e.target.value.replace('$', ''))
+                )
+              }
             />
           </div>
         </div>
@@ -293,19 +316,10 @@ export function SettingsPanel({
       </div>
 
       <div className="settings-actions">
-        <button
-          type="button"
-          onClick={onReset}
-          className="btn-secondary"
-          disabled={!hasChanges}
-        >
+        <button type="button" onClick={onReset} className="btn-secondary" disabled={!hasChanges}>
           Reset to Defaults
         </button>
-        {hasChanges && (
-          <span className="changes-indicator">
-            Custom settings active
-          </span>
-        )}
+        {hasChanges && <span className="changes-indicator">Custom settings active</span>}
       </div>
     </div>
   );

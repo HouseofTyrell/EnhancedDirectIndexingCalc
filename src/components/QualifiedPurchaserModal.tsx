@@ -14,22 +14,26 @@ const ACKNOWLEDGMENTS: Acknowledgment[] = [
   {
     id: 'accredited',
     label: 'Accredited Investor',
-    description: 'I am an accredited investor as defined by SEC Rule 501 (net worth > $1M excluding primary residence, or income > $200K individual / $300K joint).',
+    description:
+      'I am an accredited investor as defined by SEC Rule 501 (net worth > $1M excluding primary residence, or income > $200K individual / $300K joint).',
   },
   {
     id: 'qualified',
     label: 'Qualified Purchaser',
-    description: 'I am a qualified purchaser with at least $5 million in investments, or I am evaluating this calculator on behalf of a qualified purchaser.',
+    description:
+      'I am a qualified purchaser with at least $5 million in investments, or I am evaluating this calculator on behalf of a qualified purchaser.',
   },
   {
     id: 'leverage',
     label: 'Leverage Risk Understanding',
-    description: 'I understand that leveraged strategies can amplify both gains and losses, and that I could lose more than my initial investment.',
+    description:
+      'I understand that leveraged strategies can amplify both gains and losses, and that I could lose more than my initial investment.',
   },
   {
     id: 'notAdvice',
     label: 'Not Investment Advice',
-    description: 'I understand this calculator is for educational and illustrative purposes only and does not constitute investment, tax, or legal advice.',
+    description:
+      'I understand this calculator is for educational and illustrative purposes only and does not constitute investment, tax, or legal advice.',
   },
 ];
 
@@ -54,8 +58,8 @@ export function QualifiedPurchaserModal({ onAcknowledge }: QualifiedPurchaserMod
         <div className="qp-modal-header">
           <h2>Important Acknowledgments</h2>
           <p>
-            This calculator models sophisticated tax optimization strategies involving
-            leveraged investments. Please confirm the following before proceeding.
+            This calculator models sophisticated tax optimization strategies involving leveraged
+            investments. Please confirm the following before proceeding.
           </p>
         </div>
 
@@ -85,7 +89,8 @@ export function QualifiedPurchaserModal({ onAcknowledge }: QualifiedPurchaserMod
             I Acknowledge and Wish to Proceed
           </button>
           <p className="qp-footer-note">
-            Your acknowledgment will be saved locally. You won't need to confirm again on this device.
+            Your acknowledgment will be saved locally. You won't need to confirm again on this
+            device.
           </p>
         </div>
       </div>

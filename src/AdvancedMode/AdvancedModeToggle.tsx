@@ -19,9 +19,7 @@ export function AdvancedModeToggle({ enabled, onToggle }: AdvancedModeToggleProp
         </div>
       </label>
       <span id="advanced-mode-hint" className="toggle-hint">
-        {enabled
-          ? 'Showing advanced analysis tools'
-          : 'Enable for planning and analysis'}
+        {enabled ? 'Showing advanced analysis tools' : 'Enable for planning and analysis'}
       </span>
     </div>
   );

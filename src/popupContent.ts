@@ -15,14 +15,17 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'federal-st-rate': {
     title: 'Federal Ordinary/ST Rate',
-    definition: 'Your marginal federal tax rate on ordinary income and short-term capital gains (assets held less than 1 year).',
+    definition:
+      'Your marginal federal tax rate on ordinary income and short-term capital gains (assets held less than 1 year).',
     formula: 'Tax Bracket Rate (10-37%) + NIIT (3.8% if AGI > $250K MFJ or $200K Single)',
-    impact: 'Higher ordinary rates increase the value of ST→LT conversion and ordinary loss deductions.',
+    impact:
+      'Higher ordinary rates increase the value of ST→LT conversion and ordinary loss deductions.',
   },
 
   'federal-lt-rate': {
     title: 'Federal LT Capital Gains Rate',
-    definition: 'Your marginal federal tax rate on long-term capital gains (assets held more than 1 year).',
+    definition:
+      'Your marginal federal tax rate on long-term capital gains (assets held more than 1 year).',
     formula: '0%/15%/20% based on income + NIIT (3.8% if applicable)',
     impact: 'Lower than ordinary rates - this differential creates the tax arbitrage opportunity.',
   },
@@ -31,7 +34,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     title: 'State Tax Rate',
     definition: 'Your state income tax rate. Most states tax capital gains as ordinary income.',
     formula: 'Varies by state (0% in TX, FL, WA; up to 13.3% in CA)',
-    impact: 'Higher state rates increase overall tax burden but also increase savings from the strategy.',
+    impact:
+      'Higher state rates increase overall tax burden but also increase savings from the strategy.',
   },
 
   'combined-st-rate': {
@@ -52,7 +56,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     title: 'ST→LT Conversion Benefit',
     definition: 'Tax savings per dollar when converting short-term gains to long-term treatment.',
     formula: 'Combined Ordinary Rate - Combined LT Rate',
-    impact: 'This differential drives the core value of matching QFAF ST gains with collateral ST losses.',
+    impact:
+      'This differential drives the core value of matching QFAF ST gains with collateral ST losses.',
   },
 
   // ============================================
@@ -61,22 +66,27 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'collateral-value': {
     title: 'Collateral Value',
-    definition: 'The amount invested in the direct indexing (Core) or pledged as collateral (Overlay) strategy.',
-    impact: 'Larger collateral generates more ST losses, enabling larger QFAF allocation and greater tax benefits.',
+    definition:
+      'The amount invested in the direct indexing (Core) or pledged as collateral (Overlay) strategy.',
+    impact:
+      'Larger collateral generates more ST losses, enabling larger QFAF allocation and greater tax benefits.',
   },
 
   'auto-sized-qfaf': {
     title: 'Auto-Sized QFAF',
-    definition: 'Qualified Family Agricultural Fund allocation, automatically sized to match collateral ST loss capacity.',
+    definition:
+      'Qualified Family Agricultural Fund allocation, automatically sized to match collateral ST loss capacity.',
     formula: '(Collateral × Strategy ST Loss Rate) ÷ 150%',
-    impact: 'QFAF generates 150% ST gains and 150% ordinary losses annually. Proper sizing ensures ST gains are fully offset.',
+    impact:
+      'QFAF generates 150% ST gains and 150% ordinary losses annually. Proper sizing ensures ST gains are fully offset.',
   },
 
   'total-exposure': {
     title: 'Total Exposure',
     definition: 'Combined value of collateral and QFAF investments.',
     formula: 'Collateral Value + QFAF Value',
-    impact: 'Total capital deployed in the strategy. Tax alpha is measured relative to this amount.',
+    impact:
+      'Total capital deployed in the strategy. Tax alpha is measured relative to this amount.',
   },
 
   'qfaf-ratio': {
@@ -88,8 +98,10 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'section-461-limit': {
     title: 'Section 461(l) Limit',
-    definition: 'Annual cap on excess business losses that can offset non-business income (W-2, interest, etc.).',
-    formula: '$512,000 (MFJ) or $256,000 (Single/MFS/HOH) for 2026. Also limited by taxable income.',
+    definition:
+      'Annual cap on excess business losses that can offset non-business income (W-2, interest, etc.).',
+    formula:
+      '$512,000 (MFJ) or $256,000 (Single/MFS/HOH) for 2026. Also limited by taxable income.',
     impact: 'Ordinary losses above this limit (or taxable income) become NOL carryforward.',
   },
 
@@ -132,7 +144,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     title: 'Excess → NOL Carryforward',
     definition: 'Ordinary losses exceeding the §461(l) limit that become Net Operating Loss.',
     formula: 'QFAF Ordinary Losses - Usable Ordinary Loss',
-    impact: 'NOL can offset up to 80% of taxable income in future years, carried forward indefinitely.',
+    impact:
+      'NOL can offset up to 80% of taxable income in future years, carried forward indefinitely.',
   },
 
   // ============================================
@@ -148,14 +161,17 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'st-lt-conversion-benefit': {
     title: 'ST→LT Conversion Benefit',
-    definition: 'Tax savings from converting short-term gains (taxed at ordinary rates) to long-term treatment.',
+    definition:
+      'Tax savings from converting short-term gains (taxed at ordinary rates) to long-term treatment.',
     formula: 'Matched ST Amount × (Ordinary Rate - LT Rate)',
-    impact: 'By matching QFAF ST gains with collateral ST losses, gains are effectively taxed at LT rates.',
+    impact:
+      'By matching QFAF ST gains with collateral ST losses, gains are effectively taxed at LT rates.',
   },
 
   'lt-gain-cost': {
     title: 'LT Gain Tax Cost',
-    definition: 'Tax paid on long-term capital gains realized from collateral strategy rebalancing.',
+    definition:
+      'Tax paid on long-term capital gains realized from collateral strategy rebalancing.',
     formula: 'LT Gains Realized × Combined LT Rate',
     impact: 'A necessary cost of the strategy, but taxed at favorable long-term rates.',
   },
@@ -169,16 +185,20 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'nol-offset-benefit': {
     title: 'NOL Offset Benefit',
-    definition: 'Tax savings from using accumulated Net Operating Loss (NOL) carryforward to offset current year taxable income.',
+    definition:
+      'Tax savings from using accumulated Net Operating Loss (NOL) carryforward to offset current year taxable income.',
     formula: 'NOL Used This Year × Combined Ordinary Rate',
-    impact: 'Starting in Year 2, accumulated NOL from prior years can offset up to 80% of taxable income, providing additional tax savings beyond the current year\'s ordinary loss deduction.',
+    impact:
+      "Starting in Year 2, accumulated NOL from prior years can offset up to 80% of taxable income, providing additional tax savings beyond the current year's ordinary loss deduction.",
   },
 
   'year2-tax-savings': {
     title: 'Net Year 2 Tax Savings',
-    definition: 'Total tax benefit in Year 2 after accounting for all tax events including NOL usage.',
+    definition:
+      'Total tax benefit in Year 2 after accounting for all tax events including NOL usage.',
     formula: 'Ordinary Loss Benefit + ST→LT Benefit + NOL Offset Benefit - LT Gain Cost',
-    impact: 'Year 2+ benefits include NOL carryforward usage, which can significantly increase tax savings compared to Year 1.',
+    impact:
+      'Year 2+ benefits include NOL carryforward usage, which can significantly increase tax savings compared to Year 1.',
   },
 
   // ============================================
@@ -203,7 +223,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     title: 'Annualized Tax Alpha',
     definition: 'Average annual tax savings as a percentage of total exposure.',
     formula: 'Total Tax Savings ÷ Total Exposure ÷ 10 years',
-    impact: 'Measures strategy efficiency - higher alpha means more tax benefit per dollar invested.',
+    impact:
+      'Measures strategy efficiency - higher alpha means more tax benefit per dollar invested.',
   },
 
   'total-nol-generated': {
@@ -232,9 +253,11 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'col-portfolio-value': {
     title: 'Total Portfolio Value',
-    definition: 'Combined value of collateral and QFAF positions. Click to expand and see individual components.',
+    definition:
+      'Combined value of collateral and QFAF positions. Click to expand and see individual components.',
     formula: 'Collateral Value + QFAF Value',
-    impact: 'The total market value of all strategy assets. Growth comes from market returns on both positions.',
+    impact:
+      'The total market value of all strategy assets. Growth comes from market returns on both positions.',
   },
 
   'col-qfaf-value': {
@@ -295,7 +318,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'col-cap-loss-income': {
     title: 'Capital Loss vs Income',
-    definition: 'Unused capital loss carryforward applied against ordinary income per IRC §1211(b).',
+    definition:
+      'Unused capital loss carryforward applied against ordinary income per IRC §1211(b).',
     formula: 'min(Remaining Capital Loss Carryforward, $3,000)',
     impact: 'Reduces ordinary income by up to $3,000/year, saving taxes at your marginal rate.',
   },
@@ -323,7 +347,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'col-eff-rate': {
     title: 'Effective ST Loss Rate',
-    definition: 'The actual ST loss rate used for this year (includes decay and any custom overrides).',
+    definition:
+      'The actual ST loss rate used for this year (includes decay and any custom overrides).',
     formula: 'Custom Rate OR (Base Rate × 0.93^(year-1))',
     impact: 'Edit rates using the "Edit Rates by Year" button. Changes affect ST losses harvested.',
   },
@@ -344,16 +369,20 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'col-net-capital': {
     title: 'Net Capital Activity',
-    definition: 'The net result of all capital gains and losses for the year. Click to expand and see component details (ST Losses, LT Gains, ST Gains).',
+    definition:
+      'The net result of all capital gains and losses for the year. Click to expand and see component details (ST Losses, LT Gains, ST Gains).',
     formula: 'QFAF ST Gains - Collateral ST Losses + Collateral LT Gains',
-    impact: 'With proper auto-sizing, net capital ≈ LT gains only (ST gains and losses offset). This is what flows to your tax return.',
+    impact:
+      'With proper auto-sizing, net capital ≈ LT gains only (ST gains and losses offset). This is what flows to your tax return.',
   },
 
   'col-nol-activity': {
     title: 'NOL Activity',
-    definition: 'Net change in NOL for the year. Shows whether NOL is building (+) or being used (−). Click to expand for details.',
+    definition:
+      'Net change in NOL for the year. Shows whether NOL is building (+) or being used (−). Click to expand for details.',
     formula: 'NOL Generated (Excess Ordinary Loss) - NOL Used This Year',
-    impact: 'Positive values mean NOL is accumulating faster than it can be used. NOL usage is limited to 80% of taxable income per year.',
+    impact:
+      'Positive values mean NOL is accumulating faster than it can be used. NOL usage is limited to 80% of taxable income per year.',
   },
 
   // ============================================
@@ -441,7 +470,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'setting-qfaf-multiplier': {
     title: 'QFAF Multiplier',
-    definition: 'The rate at which QFAF generates both ST gains and ordinary losses relative to its market value.',
+    definition:
+      'The rate at which QFAF generates both ST gains and ordinary losses relative to its market value.',
     formula: 'Default: 150% (1.50x)',
     impact: 'Changing this affects auto-sizing and all tax event calculations.',
   },
@@ -450,19 +480,23 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     title: 'QFAF Growth',
     definition: 'Controls whether the QFAF position appreciates with market returns over time.',
     formula: 'Enabled: QFAF grows at (Annual Return - Financing Cost). Disabled: QFAF stays flat.',
-    impact: 'Disabling models scenarios where QFAF returns are eaten by fees, hedging costs, or manager underperformance. This reduces final portfolio value but does not affect annual tax benefits.',
+    impact:
+      'Disabling models scenarios where QFAF returns are eaten by fees, hedging costs, or manager underperformance. This reduces final portfolio value but does not affect annual tax benefits.',
   },
 
   'setting-wash-sale': {
     title: 'Wash Sale Disallowance',
-    definition: 'Percentage of ST losses disallowed due to wash sale rule violations when repurchasing substantially identical securities within 30 days.',
+    definition:
+      'Percentage of ST losses disallowed due to wash sale rule violations when repurchasing substantially identical securities within 30 days.',
     formula: 'Effective ST Losses = Gross ST Losses × (1 - Wash Sale Rate)',
-    impact: 'Typically 5-15% of losses are disallowed. Higher rates reduce ST offset capacity and overall tax benefits.',
+    impact:
+      'Typically 5-15% of losses are disallowed. Higher rates reduce ST offset capacity and overall tax benefits.',
   },
 
   'setting-nol-offset': {
     title: 'NOL Offset Limit',
-    definition: 'Maximum percentage of taxable income that can be offset by NOL carryforward in any given year.',
+    definition:
+      'Maximum percentage of taxable income that can be offset by NOL carryforward in any given year.',
     formula: 'Default: 80% (per TCJA post-2017 rules)',
     impact: 'Lower limits extend NOL usage over more years; higher limits accelerate utilization.',
   },
@@ -476,7 +510,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'setting-niit': {
     title: 'NIIT Rate',
-    definition: 'Net Investment Income Tax on investment income above thresholds ($250K MFJ, $200K Single).',
+    definition:
+      'Net Investment Income Tax on investment income above thresholds ($250K MFJ, $200K Single).',
     formula: 'Default: 3.8%',
     impact: 'Added to capital gains rates for high earners.',
   },

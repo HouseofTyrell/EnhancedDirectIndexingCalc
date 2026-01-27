@@ -43,7 +43,11 @@ function isAdvancedModeState(value: unknown): value is AdvancedModeState {
   }
 
   // Check 'sections' property
-  if (!hasOwnProperty.call(obj, 'sections') || typeof obj.sections !== 'object' || obj.sections === null) {
+  if (
+    !hasOwnProperty.call(obj, 'sections') ||
+    typeof obj.sections !== 'object' ||
+    obj.sections === null
+  ) {
     return false;
   }
 
@@ -72,7 +76,7 @@ export function useAdvancedMode() {
         // Invalid structure - clear corrupted data
         localStorage.removeItem(STORAGE_KEY);
       }
-    } catch (e) {
+    } catch {
       // localStorage not available or invalid JSON
     }
     return DEFAULT_STATE;
@@ -81,7 +85,7 @@ export function useAdvancedMode() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
+    } catch {
       // localStorage not available
     }
   }, [state]);

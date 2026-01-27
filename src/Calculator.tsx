@@ -1,17 +1,29 @@
 import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
-import { calculate } from './calculations';
+import { calculate, calculateWithOverrides, calculateWithSensitivity } from './calculations';
 
 // Lazy load chart components to reduce initial bundle size (~400KB savings)
-const TaxSavingsChart = lazy(() => import('./WealthChart').then(m => ({ default: m.TaxSavingsChart })));
-const PortfolioValueChart = lazy(() => import('./WealthChart').then(m => ({ default: m.PortfolioValueChart })));
+const TaxSavingsChart = lazy(() =>
+  import('./WealthChart').then(m => ({ default: m.TaxSavingsChart }))
+);
+const PortfolioValueChart = lazy(() =>
+  import('./WealthChart').then(m => ({ default: m.PortfolioValueChart }))
+);
 import { ResultsTable } from './ResultsTable';
 import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
-import { CalculatorInputs, YearOverride, AdvancedSettings, DEFAULT_SETTINGS, SensitivityParams, DEFAULT_SENSITIVITY, FILING_STATUSES, FilingStatus } from './types';
+import {
+  CalculatorInputs,
+  YearOverride,
+  AdvancedSettings,
+  DEFAULT_SETTINGS,
+  SensitivityParams,
+  DEFAULT_SENSITIVITY,
+  FILING_STATUSES,
+  FilingStatus,
+} from './types';
 import {
   InfoPopup,
   FieldInfoPopup,
-  TaxRatesFormula,
   QfafSizingFormula,
   StrategyRatesFormula,
   ProjectionFormula,
@@ -21,6 +33,7 @@ import { useScrollHeader } from './hooks/useScrollHeader';
 import { useQualifiedPurchaser } from './hooks/useQualifiedPurchaser';
 import { StickyHeader } from './components/StickyHeader';
 import { ResultsSummary } from './components/ResultsSummary';
+import { TaxRatesDisplay } from './components/TaxRatesDisplay';
 import { AdvancedModal } from './components/AdvancedModal';
 import { QualifiedPurchaserModal } from './components/QualifiedPurchaserModal';
 import { AdvancedModeToggle } from './AdvancedMode/AdvancedModeToggle';
@@ -65,7 +78,8 @@ export function Calculator() {
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(DEFAULT_SETTINGS);
 
   // Sensitivity Analysis state
-  const [sensitivityParams, setSensitivityParams] = useState<SensitivityParams>(DEFAULT_SENSITIVITY);
+  const [sensitivityParams, setSensitivityParams] =
+    useState<SensitivityParams>(DEFAULT_SENSITIVITY);
 
   // Strategy Comparison state (default to current strategy + one other)
   const [comparisonStrategies, setComparisonStrategies] = useState<string[]>([
@@ -82,13 +96,52 @@ export function Calculator() {
   // Rate version - increments when custom rates are saved to trigger recalculation
   const [rateVersion, setRateVersion] = useState(0);
 
-  const results = useMemo(() => calculate(inputs, advancedSettings), [inputs, advancedSettings, rateVersion]);
+  // Check if any year overrides differ from defaults
+  const hasActiveOverrides = useMemo(
+    () =>
+      yearOverrides.some(
+        o => o.w2Income !== inputs.annualIncome || o.cashInfusion !== 0
+      ),
+    [yearOverrides, inputs.annualIncome]
+  );
+
+  // Check if sensitivity params differ from defaults
+  const hasActiveSensitivity = useMemo(
+    () =>
+      sensitivityParams.federalRateChange !== 0 ||
+      sensitivityParams.stateRateChange !== 0 ||
+      sensitivityParams.annualReturn !== DEFAULT_SENSITIVITY.annualReturn ||
+      sensitivityParams.stLossRateVariance !== 0 ||
+      sensitivityParams.ltGainRateVariance !== 0,
+    [sensitivityParams]
+  );
+
+  const results = useMemo(() => {
+    // Priority: Year overrides > Sensitivity > Base calculation
+    // Note: Year overrides and sensitivity don't combine (would need a combined function)
+    if (hasActiveOverrides) {
+      return calculateWithOverrides(inputs, advancedSettings, yearOverrides);
+    }
+    if (hasActiveSensitivity) {
+      return calculateWithSensitivity(inputs, advancedSettings, sensitivityParams);
+    }
+    return calculate(inputs, advancedSettings);
+  }, [
+    inputs,
+    advancedSettings,
+    rateVersion,
+    hasActiveOverrides,
+    yearOverrides,
+    hasActiveSensitivity,
+    sensitivityParams,
+  ]);
 
   // Memoize tax rate calculations - only recalculates when dependencies change
   const taxRates = useMemo(() => {
     const federalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const federalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
-    const stateRate = inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+    const stateRate =
+      inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
     return {
       federalStRate,
       federalLtRate,
@@ -99,26 +152,33 @@ export function Calculator() {
     };
   }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
 
-  const { federalStRate, federalLtRate, stateRate, combinedStRate, combinedLtRate, rateDifferential } = taxRates;
+  const {
+    federalStRate,
+    federalLtRate,
+    stateRate,
+    combinedStRate,
+    combinedLtRate,
+    rateDifferential,
+  } = taxRates;
 
-  const updateInput = useCallback(<K extends keyof CalculatorInputs>(
-    key: K,
-    value: CalculatorInputs[K]
-  ) => {
-    setInputs(prev => {
-      const newInputs = { ...prev, [key]: value };
-      // If income changes, update year overrides to use new base income
-      if (key === 'annualIncome' && typeof value === 'number') {
-        setYearOverrides(prevOverrides =>
-          prevOverrides.map(override => ({
-            ...override,
-            w2Income: override.w2Income === prev.annualIncome ? value : override.w2Income,
-          }))
-        );
-      }
-      return newInputs;
-    });
-  }, []);
+  const updateInput = useCallback(
+    <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => {
+      setInputs(prev => {
+        const newInputs = { ...prev, [key]: value };
+        // If income changes, update year overrides to use new base income
+        if (key === 'annualIncome' && typeof value === 'number') {
+          setYearOverrides(prevOverrides =>
+            prevOverrides.map(override => ({
+              ...override,
+              w2Income: override.w2Income === prev.annualIncome ? value : override.w2Income,
+            }))
+          );
+        }
+        return newInputs;
+      });
+    },
+    []
+  );
 
   // Reset year overrides to defaults
   const resetYearOverrides = useCallback(() => {
@@ -150,7 +210,9 @@ export function Calculator() {
         qfafValue={results.sizing.qfafValue}
         totalExposure={results.sizing.totalExposure}
         annualTaxSavings={results.years[0]?.taxSavings ?? 0}
-        year2TaxSavings={inputs.qfafEnabled && results.years.length > 1 ? results.years[1]?.taxSavings : undefined}
+        year2TaxSavings={
+          inputs.qfafEnabled && results.years.length > 1 ? results.years[1]?.taxSavings : undefined
+        }
         isExpanded={isExpanded}
         onOpenAdvanced={() => setIsAdvancedModalOpen(true)}
       />
@@ -166,6 +228,7 @@ export function Calculator() {
         finalPortfolioValue={results.summary.finalPortfolioValue}
         effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
         totalNolGenerated={results.summary.totalNolGenerated}
+        projectionYears={advancedSettings.projectionYears}
       />
 
       {/* Scroll sentinel - triggers sticky header expansion when scrolled past */}
@@ -173,7 +236,9 @@ export function Calculator() {
 
       {/* Input Form - Step 2: Your Situation */}
       <section className="inputs-section">
-        <div className="section-number" data-step="2">Your Situation</div>
+        <div className="section-number" data-step="2">
+          Your Situation
+        </div>
         <div className="section-header">
           <h2>Client Profile</h2>
           <InfoPopup title="Strategy Selection">
@@ -181,7 +246,8 @@ export function Calculator() {
           </InfoPopup>
         </div>
         <p className="section-guidance">
-          Tell us about your client's investment and tax profile. These inputs determine the strategy sizing and tax impact.
+          Tell us about your client's investment and tax profile. These inputs determine the
+          strategy sizing and tax impact.
         </p>
         <div className="input-grid">
           <div className="input-group">
@@ -218,20 +284,23 @@ export function Calculator() {
             <div className="strategy-rates-info">
               <div className="strategy-rate">
                 <span className="rate-label">ST Loss Rate (Y1):</span>
-                <span className="rate-value positive">{formatPercent(results.years[0].effectiveStLossRate)}</span>
+                <span className="rate-value positive">
+                  {formatPercent(results.years[0].effectiveStLossRate)}
+                </span>
               </div>
               <div className="strategy-rate">
                 <span className="rate-label">LT Gain Rate:</span>
-                <span className="rate-value negative">{formatPercent(currentStrategy.ltGainRate)}</span>
+                <span className="rate-value negative">
+                  {formatPercent(currentStrategy.ltGainRate)}
+                </span>
               </div>
               <div className="strategy-rate">
                 <span className="rate-label">Net Capital Loss (Y1):</span>
-                <span className="rate-value highlight">{formatPercent(results.years[0].effectiveStLossRate - currentStrategy.ltGainRate)}</span>
+                <span className="rate-value highlight">
+                  {formatPercent(results.years[0].effectiveStLossRate - currentStrategy.ltGainRate)}
+                </span>
               </div>
-              <button
-                className="rate-editor-trigger"
-                onClick={() => setIsRateEditorOpen(true)}
-              >
+              <button className="rate-editor-trigger" onClick={() => setIsRateEditorOpen(true)}>
                 Edit Rates by Year
               </button>
             </div>
@@ -271,7 +340,9 @@ export function Calculator() {
                 type="text"
                 inputMode="numeric"
                 value={formatWithCommas(inputs.collateralAmount)}
-                onChange={e => updateInput('collateralAmount', parseFormattedNumber(e.target.value))}
+                onChange={e =>
+                  updateInput('collateralAmount', parseFormattedNumber(e.target.value))
+                }
               />
             </div>
           </div>
@@ -313,7 +384,9 @@ export function Calculator() {
               onChange={e => updateInput('stateCode', e.target.value)}
             >
               {STATES.map(s => (
-                <option key={s.code} value={s.code}>{s.name}</option>
+                <option key={s.code} value={s.code}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </div>
@@ -339,66 +412,20 @@ export function Calculator() {
       </section>
 
       {/* Marginal Tax Rates - Step 3: Tax Rate Analysis */}
-      <section className="tax-rates-section">
-        <div className="section-number" data-step="3">Tax Rate Analysis</div>
-        <div className="section-header">
-          <h2>Marginal Tax Rates</h2>
-          <InfoPopup title="Tax Rate Calculations">
-            <TaxRatesFormula />
-          </InfoPopup>
-        </div>
-        <p className="section-guidance">
-          These marginal rates determine the value of each tax event. Higher ST→LT benefit means more savings from the strategy.
-        </p>
-        <div className="tax-rates-grid">
-          <div className="tax-rate-item">
-            <span className="rate-label">
-              Federal Ordinary/ST
-              <FieldInfoPopup contentKey="federal-st-rate" currentValue={`${(federalStRate * 100).toFixed(1)}%`} />
-            </span>
-            <span className="rate-value">{(federalStRate * 100).toFixed(1)}%</span>
-          </div>
-          <div className="tax-rate-item">
-            <span className="rate-label">
-              Federal LT Cap Gains
-              <FieldInfoPopup contentKey="federal-lt-rate" currentValue={`${(federalLtRate * 100).toFixed(1)}%`} />
-            </span>
-            <span className="rate-value">{(federalLtRate * 100).toFixed(1)}%</span>
-          </div>
-          <div className="tax-rate-item">
-            <span className="rate-label">
-              State
-              <FieldInfoPopup contentKey="state-rate" currentValue={`${(stateRate * 100).toFixed(1)}%`} />
-            </span>
-            <span className="rate-value">{(stateRate * 100).toFixed(1)}%</span>
-          </div>
-          <div className="tax-rate-item highlight">
-            <span className="rate-label">
-              Combined Ordinary
-              <FieldInfoPopup contentKey="combined-st-rate" currentValue={`${(combinedStRate * 100).toFixed(1)}%`} />
-            </span>
-            <span className="rate-value">{(combinedStRate * 100).toFixed(1)}%</span>
-          </div>
-          <div className="tax-rate-item highlight">
-            <span className="rate-label">
-              Combined LT
-              <FieldInfoPopup contentKey="combined-lt-rate" currentValue={`${(combinedLtRate * 100).toFixed(1)}%`} />
-            </span>
-            <span className="rate-value">{(combinedLtRate * 100).toFixed(1)}%</span>
-          </div>
-          <div className="tax-rate-item accent">
-            <span className="rate-label">
-              ST→LT Benefit
-              <FieldInfoPopup contentKey="st-lt-benefit" currentValue={`${(rateDifferential * 100).toFixed(1)}%`} />
-            </span>
-            <span className="rate-value">{(rateDifferential * 100).toFixed(1)}%</span>
-          </div>
-        </div>
-      </section>
+      <TaxRatesDisplay
+        federalStRate={federalStRate}
+        federalLtRate={federalLtRate}
+        stateRate={stateRate}
+        combinedStRate={combinedStRate}
+        combinedLtRate={combinedLtRate}
+        rateDifferential={rateDifferential}
+      />
 
       {/* Strategy Sizing - Step 4: Optimized Strategy */}
       <section className="sizing-section">
-        <div className="section-number" data-step="4">Optimized Strategy</div>
+        <div className="section-number" data-step="4">
+          Optimized Strategy
+        </div>
         <div className="section-header">
           <h2>Strategy Sizing</h2>
           <InfoPopup title="QFAF Auto-Sizing">
@@ -406,13 +433,17 @@ export function Calculator() {
           </InfoPopup>
         </div>
         <p className="section-guidance">
-          We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits.
+          We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within
+          IRS limits.
         </p>
         <div className="sizing-cards">
           <div className="sizing-card">
             <span className="sizing-label">
               Collateral
-              <FieldInfoPopup contentKey="collateral-value" currentValue={formatCurrency(results.sizing.collateralValue)} />
+              <FieldInfoPopup
+                contentKey="collateral-value"
+                currentValue={formatCurrency(results.sizing.collateralValue)}
+              />
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.collateralValue)}</span>
             <span className="sizing-sublabel">{results.sizing.strategyName}</span>
@@ -420,25 +451,38 @@ export function Calculator() {
           <div className="sizing-card">
             <span className="sizing-label">
               Auto-Sized QFAF
-              <FieldInfoPopup contentKey="auto-sized-qfaf" currentValue={formatCurrency(results.sizing.qfafValue)} />
+              <FieldInfoPopup
+                contentKey="auto-sized-qfaf"
+                currentValue={formatCurrency(results.sizing.qfafValue)}
+              />
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.qfafValue)}</span>
-            <span className="sizing-sublabel">{formatPercent(results.sizing.qfafRatio)} of collateral</span>
+            <span className="sizing-sublabel">
+              {formatPercent(results.sizing.qfafRatio)} of collateral
+            </span>
           </div>
           <div className="sizing-card highlight">
             <span className="sizing-label">
               Total Exposure
-              <FieldInfoPopup contentKey="total-exposure" currentValue={formatCurrency(results.sizing.totalExposure)} />
+              <FieldInfoPopup
+                contentKey="total-exposure"
+                currentValue={formatCurrency(results.sizing.totalExposure)}
+              />
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.totalExposure)}</span>
           </div>
           <div className="sizing-card">
             <span className="sizing-label">
               §461(l) Limit
-              <FieldInfoPopup contentKey="section-461-limit" currentValue={formatCurrency(results.sizing.section461Limit)} />
+              <FieldInfoPopup
+                contentKey="section-461-limit"
+                currentValue={formatCurrency(results.sizing.section461Limit)}
+              />
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.section461Limit)}</span>
-            <span className="sizing-sublabel">{inputs.filingStatus === 'mfj' ? 'MFJ' : 'Single/Other'}</span>
+            <span className="sizing-sublabel">
+              {inputs.filingStatus === 'mfj' ? 'MFJ' : 'Single/Other'}
+            </span>
           </div>
         </div>
 
@@ -446,14 +490,20 @@ export function Calculator() {
           <div className="offset-row">
             <span>
               Year 1 ST Losses (Collateral)
-              <FieldInfoPopup contentKey="year1-st-losses" currentValue={formatCurrency(results.sizing.year1StLosses)} />
+              <FieldInfoPopup
+                contentKey="year1-st-losses"
+                currentValue={formatCurrency(results.sizing.year1StLosses)}
+              />
             </span>
             <span className="positive">{formatCurrency(results.sizing.year1StLosses)}</span>
           </div>
           <div className="offset-row">
             <span>
               Year 1 ST Gains (QFAF)
-              <FieldInfoPopup contentKey="year1-st-gains" currentValue={formatCurrency(results.sizing.year1StGains)} />
+              <FieldInfoPopup
+                contentKey="year1-st-gains"
+                currentValue={formatCurrency(results.sizing.year1StGains)}
+              />
             </span>
             <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
           </div>
@@ -467,22 +517,33 @@ export function Calculator() {
           <div className="offset-row">
             <span>
               Year 1 Ordinary Loss (QFAF)
-              <FieldInfoPopup contentKey="year1-ordinary-losses" currentValue={formatCurrency(results.sizing.year1OrdinaryLosses)} />
+              <FieldInfoPopup
+                contentKey="year1-ordinary-losses"
+                currentValue={formatCurrency(results.sizing.year1OrdinaryLosses)}
+              />
             </span>
             <span className="positive">{formatCurrency(results.sizing.year1OrdinaryLosses)}</span>
           </div>
           <div className="offset-row">
             <span>
               Usable Ordinary Loss
-              <FieldInfoPopup contentKey="usable-ordinary-loss" currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss)} />
+              <FieldInfoPopup
+                contentKey="usable-ordinary-loss"
+                currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
+              />
             </span>
-            <span className="positive">{formatCurrency(results.sizing.year1UsableOrdinaryLoss)}</span>
+            <span className="positive">
+              {formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
+            </span>
           </div>
           {results.sizing.year1ExcessToNol > 0 && (
             <div className="offset-row">
               <span>
                 Excess → NOL Carryforward
-                <FieldInfoPopup contentKey="excess-to-nol" currentValue={formatCurrency(results.sizing.year1ExcessToNol)} />
+                <FieldInfoPopup
+                  contentKey="excess-to-nol"
+                  currentValue={formatCurrency(results.sizing.year1ExcessToNol)}
+                />
               </span>
               <span>{formatCurrency(results.sizing.year1ExcessToNol)}</span>
             </div>
@@ -496,19 +557,28 @@ export function Calculator() {
             <div className="benefit-card">
               <span className="benefit-label">
                 Ordinary Loss Benefit
-                <FieldInfoPopup contentKey="ordinary-loss-benefit" currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss * combinedStRate)} />
+                <FieldInfoPopup
+                  contentKey="ordinary-loss-benefit"
+                  currentValue={formatCurrency(
+                    results.sizing.year1UsableOrdinaryLoss * combinedStRate
+                  )}
+                />
               </span>
               <span className="benefit-value positive">
                 +{formatCurrency(results.sizing.year1UsableOrdinaryLoss * combinedStRate)}
               </span>
               <span className="benefit-formula">
-                {formatCurrency(results.sizing.year1UsableOrdinaryLoss)} × {formatPercent(combinedStRate)}
+                {formatCurrency(results.sizing.year1UsableOrdinaryLoss)} ×{' '}
+                {formatPercent(combinedStRate)}
               </span>
             </div>
             <div className="benefit-card">
               <span className="benefit-label">
                 ST→LT Conversion
-                <FieldInfoPopup contentKey="st-lt-conversion-benefit" currentValue={formatCurrency(results.sizing.year1StLosses * rateDifferential)} />
+                <FieldInfoPopup
+                  contentKey="st-lt-conversion-benefit"
+                  currentValue={formatCurrency(results.sizing.year1StLosses * rateDifferential)}
+                />
               </span>
               <span className="benefit-value positive">
                 +{formatCurrency(results.sizing.year1StLosses * rateDifferential)}
@@ -520,25 +590,33 @@ export function Calculator() {
             <div className="benefit-card">
               <span className="benefit-label">
                 LT Gain Cost
-                <FieldInfoPopup contentKey="lt-gain-cost" currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)} />
+                <FieldInfoPopup
+                  contentKey="lt-gain-cost"
+                  currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)}
+                />
               </span>
               <span className="benefit-value negative">
                 −{formatCurrency((results.years[0]?.ltGainsRealized ?? 0) * combinedLtRate)}
               </span>
               <span className="benefit-formula">
-                {formatCurrency(results.years[0]?.ltGainsRealized ?? 0)} × {formatPercent(combinedLtRate)}
+                {formatCurrency(results.years[0]?.ltGainsRealized ?? 0)} ×{' '}
+                {formatPercent(combinedLtRate)}
               </span>
             </div>
             <div className="benefit-card highlight">
               <span className="benefit-label">
                 Net Year 1 Tax Savings
-                <FieldInfoPopup contentKey="year1-tax-savings" currentValue={formatCurrency(results.years[0]?.taxSavings ?? 0)} />
+                <FieldInfoPopup
+                  contentKey="year1-tax-savings"
+                  currentValue={formatCurrency(results.years[0]?.taxSavings ?? 0)}
+                />
               </span>
               <span className="benefit-value">
                 {formatCurrency(results.years[0]?.taxSavings ?? 0)}
               </span>
               <span className="benefit-formula">
-                {formatPercent((results.years[0]?.taxSavings ?? 0) / results.sizing.totalExposure)} of exposure
+                {formatPercent((results.years[0]?.taxSavings ?? 0) / results.sizing.totalExposure)}{' '}
+                of exposure
               </span>
             </div>
           </div>
@@ -547,11 +625,17 @@ export function Calculator() {
         {/* Year 2+ Tax Benefit Breakdown - shows how NOL starts being used */}
         {results.years.length > 1 && inputs.qfafEnabled && (
           <div className="tax-benefit-summary subsequent-year">
-            <h3>Year 2+ Tax Benefit <span className="year-note">(typical subsequent year)</span></h3>
+            <h3>
+              Year 2+ Tax Benefit <span className="year-note">(typical subsequent year)</span>
+            </h3>
             <div className="nol-carryforward-note">
               <span className="nol-label">NOL Carryforward from Year 1:</span>
-              <span className="nol-value">{formatCurrency(results.years[0]?.nolCarryforward ?? 0)}</span>
-              <span className="nol-explanation">→ Available to offset up to 80% of Year 2 taxable income</span>
+              <span className="nol-value">
+                {formatCurrency(results.years[0]?.nolCarryforward ?? 0)}
+              </span>
+              <span className="nol-explanation">
+                → Available to offset up to 80% of Year 2 taxable income
+              </span>
             </div>
             <div className="benefit-cards">
               <div className="benefit-card">
@@ -563,7 +647,8 @@ export function Calculator() {
                   +{formatCurrency(results.years[1]?.usableOrdinaryLoss * combinedStRate)}
                 </span>
                 <span className="benefit-formula">
-                  {formatCurrency(results.years[1]?.usableOrdinaryLoss)} × {formatPercent(combinedStRate)}
+                  {formatCurrency(results.years[1]?.usableOrdinaryLoss)} ×{' '}
+                  {formatPercent(combinedStRate)}
                 </span>
               </div>
               <div className="benefit-card">
@@ -575,7 +660,8 @@ export function Calculator() {
                   +{formatCurrency(results.years[1]?.stLossesHarvested * rateDifferential)}
                 </span>
                 <span className="benefit-formula">
-                  {formatCurrency(results.years[1]?.stLossesHarvested)} × {formatPercent(rateDifferential)}
+                  {formatCurrency(results.years[1]?.stLossesHarvested)} ×{' '}
+                  {formatPercent(rateDifferential)}
                 </span>
               </div>
               <div className="benefit-card">
@@ -587,7 +673,8 @@ export function Calculator() {
                   +{formatCurrency((results.years[1]?.nolUsedThisYear ?? 0) * combinedStRate)}
                 </span>
                 <span className="benefit-formula">
-                  {formatCurrency(results.years[1]?.nolUsedThisYear ?? 0)} × {formatPercent(combinedStRate)}
+                  {formatCurrency(results.years[1]?.nolUsedThisYear ?? 0)} ×{' '}
+                  {formatPercent(combinedStRate)}
                 </span>
               </div>
               <div className="benefit-card">
@@ -599,7 +686,8 @@ export function Calculator() {
                   −{formatCurrency((results.years[1]?.ltGainsRealized ?? 0) * combinedLtRate)}
                 </span>
                 <span className="benefit-formula">
-                  {formatCurrency(results.years[1]?.ltGainsRealized ?? 0)} × {formatPercent(combinedLtRate)}
+                  {formatCurrency(results.years[1]?.ltGainsRealized ?? 0)} ×{' '}
+                  {formatPercent(combinedLtRate)}
                 </span>
               </div>
               <div className="benefit-card highlight">
@@ -611,7 +699,10 @@ export function Calculator() {
                   {formatCurrency(results.years[1]?.taxSavings ?? 0)}
                 </span>
                 <span className="benefit-formula">
-                  {formatPercent((results.years[1]?.taxSavings ?? 0) / results.sizing.totalExposure)} of exposure
+                  {formatPercent(
+                    (results.years[1]?.taxSavings ?? 0) / results.sizing.totalExposure
+                  )}{' '}
+                  of exposure
                 </span>
               </div>
             </div>
@@ -620,19 +711,13 @@ export function Calculator() {
       </section>
 
       {/* Advanced Settings Button */}
-      <button
-        className="advanced-settings-btn"
-        onClick={() => setIsAdvancedModalOpen(true)}
-      >
+      <button className="advanced-settings-btn" onClick={() => setIsAdvancedModalOpen(true)}>
         <SettingsIcon />
         Advanced Settings
       </button>
 
       {/* Advanced Settings Modal */}
-      <AdvancedModal
-        isOpen={isAdvancedModalOpen}
-        onClose={() => setIsAdvancedModalOpen(false)}
-      >
+      <AdvancedModal isOpen={isAdvancedModalOpen} onClose={() => setIsAdvancedModalOpen(false)}>
         {/* Existing Carryforwards */}
         <div className="advanced-modal__section">
           <h3 className="advanced-modal__section-title">Existing Carryforwards</h3>
@@ -646,7 +731,9 @@ export function Calculator() {
                   type="text"
                   inputMode="numeric"
                   value={formatWithCommas(inputs.existingStLossCarryforward)}
-                  onChange={e => updateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))}
+                  onChange={e =>
+                    updateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))
+                  }
                 />
               </div>
             </div>
@@ -660,7 +747,9 @@ export function Calculator() {
                   type="text"
                   inputMode="numeric"
                   value={formatWithCommas(inputs.existingLtLossCarryforward)}
-                  onChange={e => updateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))}
+                  onChange={e =>
+                    updateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
+                  }
                 />
               </div>
             </div>
@@ -674,7 +763,9 @@ export function Calculator() {
                   type="text"
                   inputMode="numeric"
                   value={formatWithCommas(inputs.existingNolCarryforward)}
-                  onChange={e => updateInput('existingNolCarryforward', parseFormattedNumber(e.target.value))}
+                  onChange={e =>
+                    updateInput('existingNolCarryforward', parseFormattedNumber(e.target.value))
+                  }
                 />
               </div>
               <span className="input-hint">Can offset 80% of future taxable income</span>
@@ -724,10 +815,7 @@ export function Calculator() {
                 onToggle={() => advancedMode.toggleSection('scenarios')}
                 hint="Bull/Base/Bear outcomes"
               >
-                <ScenarioAnalysis
-                  inputs={inputs}
-                  settings={advancedSettings}
-                />
+                <ScenarioAnalysis inputs={inputs} settings={advancedSettings} />
               </CollapsibleSection>
 
               <CollapsibleSection
@@ -762,7 +850,9 @@ export function Calculator() {
 
       {/* Detailed Results - Step 5: Year-by-Year Breakdown */}
       <section className="results-section">
-        <div className="section-number" data-step="5">Year-by-Year Breakdown</div>
+        <div className="section-number" data-step="5">
+          Year-by-Year Breakdown
+        </div>
         <div className="section-header">
           <h2>Detailed Projections</h2>
           <InfoPopup title="Projection Methodology">
@@ -770,7 +860,8 @@ export function Calculator() {
           </InfoPopup>
         </div>
         <p className="section-guidance">
-          Year-by-year breakdown showing how tax benefits compound over the 10-year projection.
+          Year-by-year breakdown showing how tax benefits compound over the{' '}
+          {advancedSettings.projectionYears}-year projection.
         </p>
 
         {/* Tax Benefits Chart */}
@@ -779,11 +870,19 @@ export function Calculator() {
         </Suspense>
 
         {/* Table */}
-        <ResultsTable data={results.years} sizing={results.sizing} qfafEnabled={inputs.qfafEnabled} />
+        <ResultsTable
+          data={results.years}
+          sizing={results.sizing}
+          qfafEnabled={inputs.qfafEnabled}
+          projectionYears={advancedSettings.projectionYears}
+        />
 
         {/* Portfolio Value Chart */}
         <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
-          <PortfolioValueChart data={results.years} trackingError={currentStrategy?.trackingError} />
+          <PortfolioValueChart
+            data={results.years}
+            trackingError={currentStrategy?.trackingError}
+          />
         </Suspense>
       </section>
 
@@ -805,7 +904,9 @@ export function Calculator() {
             <h4>Projection Limitations</h4>
             <ul>
               <li>Projections assume constant annual returns; actual markets are volatile</li>
-              <li>Tax-loss harvesting effectiveness decays over time as easy losses are exhausted</li>
+              <li>
+                Tax-loss harvesting effectiveness decays over time as easy losses are exhausted
+              </li>
               <li>Wash sale disallowance (5-15% of losses) reduces actual tax benefits</li>
               <li>Financing costs for leveraged positions reduce net returns</li>
             </ul>
