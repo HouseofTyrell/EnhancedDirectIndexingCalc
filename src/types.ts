@@ -87,6 +87,10 @@ export interface YearResult {
 
   // Effective rates (for debugging/display)
   effectiveStLossRate: number; // Actual ST loss rate used (may be custom)
+
+  // Income offset tracking
+  incomeOffsetAmount: number; // Total income offset: ordinary loss + NOL used + capital loss used
+  maxIncomeOffsetCapacity: number; // Max income that could be offset (useful for option exercise planning)
 }
 
 export interface CalculationResult {

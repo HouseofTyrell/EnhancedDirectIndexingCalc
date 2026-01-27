@@ -7,6 +7,7 @@ interface ResultsTableProps {
   data: YearResult[];
   sizing: CalculatedSizing;
   qfafEnabled: boolean;
+  projectionYears?: number;
 }
 
 // Chevron icons for expand/collapse
@@ -36,7 +37,12 @@ const ChevronRight = () => (
   </svg>
 );
 
-export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
+export function ResultsTable({
+  data,
+  sizing,
+  qfafEnabled,
+  projectionYears = 10,
+}: ResultsTableProps) {
   const [expandPortfolio, setExpandPortfolio] = useState(false);
   const [expandCapital, setExpandCapital] = useState(false);
   const [expandNOL, setExpandNOL] = useState(false);
@@ -68,7 +74,7 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
     if (expandCapital) cols += 3; // ST Losses, LT Gains, ST Gains
     if (qfafEnabled) {
       cols += 2; // Ordinary Loss, NOL Activity
-      if (expandNOL) cols += 2; // NOL Used, NOL C/F
+      if (expandNOL) cols += 3; // NOL Used, NOL C/F, Max Offset
     }
     return cols;
   };
@@ -178,6 +184,9 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
                       <th className="col-detail qfaf-col">
                         <InfoText contentKey="col-nol-carryforward">Carryover</InfoText>
                       </th>
+                      <th className="col-detail qfaf-col">
+                        <InfoText contentKey="col-max-offset">Max Offset</InfoText>
+                      </th>
                     </>
                   )}
                 </>
@@ -218,6 +227,7 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
                   <td className="starting-note">—</td>
                   {expandNOL && (
                     <>
+                      <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
                     </>
@@ -292,6 +302,9 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
                             {formatCurrency(year.nolUsedThisYear)}
                           </td>
                           <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
+                          <td className="qfaf-col highlight">
+                            {formatCurrency(year.maxIncomeOffsetCapacity)}
+                          </td>
                         </>
                       )}
                     </>
@@ -306,7 +319,7 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
           <tfoot>
             <tr>
               <td colSpan={getColSpan() - 1}>
-                <strong>Total 10-Year Tax Savings</strong>
+                <strong>Total {projectionYears}-Year Tax Savings</strong>
               </td>
               <td className="highlight">
                 <strong>{formatCurrency(cumulativeSavings)}</strong>
@@ -319,7 +332,7 @@ export function ResultsTable({ data, sizing, qfafEnabled }: ResultsTableProps) {
       {/* Carryforward Summary */}
       <div className="carryforward-note">
         <p>
-          <strong>Carryforward Summary (Year 10):</strong>
+          <strong>Carryforward Summary (Year {projectionYears}):</strong>
           <br />
           ST Capital Loss:{' '}
           {formatCurrency(data.length > 0 ? data[data.length - 1].stLossCarryforward : 0)} | LT

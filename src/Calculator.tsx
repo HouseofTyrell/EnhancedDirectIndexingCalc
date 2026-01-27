@@ -228,6 +228,7 @@ export function Calculator() {
         finalPortfolioValue={results.summary.finalPortfolioValue}
         effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
         totalNolGenerated={results.summary.totalNolGenerated}
+        projectionYears={advancedSettings.projectionYears}
       />
 
       {/* Scroll sentinel - triggers sticky header expansion when scrolled past */}
@@ -859,7 +860,8 @@ export function Calculator() {
           </InfoPopup>
         </div>
         <p className="section-guidance">
-          Year-by-year breakdown showing how tax benefits compound over the 10-year projection.
+          Year-by-year breakdown showing how tax benefits compound over the{' '}
+          {advancedSettings.projectionYears}-year projection.
         </p>
 
         {/* Tax Benefits Chart */}
@@ -872,6 +874,7 @@ export function Calculator() {
           data={results.years}
           sizing={results.sizing}
           qfafEnabled={inputs.qfafEnabled}
+          projectionYears={advancedSettings.projectionYears}
         />
 
         {/* Portfolio Value Chart */}

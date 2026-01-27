@@ -115,10 +115,23 @@ export function calculate(
   const section461Limit =
     settings.section461Limits[inputs.filingStatus] ?? SECTION_461L_LIMITS[inputs.filingStatus];
 
+  // Determine tax rates: use custom settings if different from defaults, otherwise use bracket lookup
+  const useCustomRates =
+    settings.stcgRate !== DEFAULT_SETTINGS.stcgRate ||
+    settings.ltcgRate !== DEFAULT_SETTINGS.ltcgRate ||
+    settings.niitRate !== DEFAULT_SETTINGS.niitRate;
+
+  const bracketStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
+  const bracketLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+  const stateRate =
+    inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+
+  // When using custom rates, apply them directly; otherwise use bracket-based rates
+  // NIIT is added on top of LT rate when applicable (income > $250k MFJ, $200k single)
   const taxRates: TaxRates = {
-    stRate: getFederalStRate(inputs.annualIncome, inputs.filingStatus),
-    ltRate: getFederalLtRate(inputs.annualIncome, inputs.filingStatus),
-    stateRate: inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode),
+    stRate: useCustomRates ? settings.stcgRate : bracketStRate,
+    ltRate: useCustomRates ? settings.ltcgRate + settings.niitRate : bracketLtRate,
+    stateRate,
     section461Limit,
   };
 
@@ -130,7 +143,10 @@ export function calculate(
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
 
-  for (let year = 1; year <= 10; year++) {
+  // Use projectionYears from settings (defaults to 10)
+  const projectionYears = settings.projectionYears ?? 10;
+
+  for (let year = 1; year <= projectionYears; year++) {
     const result = calculateYear(
       year,
       qfafValue,
@@ -285,6 +301,26 @@ function calculateYear(
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
   const newCollateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
 
+  // Calculate total income offset for this year
+  // This is the sum of all deductions that reduce taxable income
+  const incomeOffsetAmount = safeNumber(
+    usableOrdinaryLoss + nolUsed + capitalLossUsedAgainstIncome
+  );
+
+  // Calculate maximum income offset capacity for this year
+  // This shows how much income COULD be offset if the taxpayer had additional income
+  // (useful for planning stock option exercises or vesting)
+  // Components:
+  // 1. Ordinary loss (up to 461(l) limit)
+  // 2. NOL carryforward (can offset 80% of additional taxable income)
+  // 3. Capital loss carryforward (up to $3k or remaining carryforward)
+  const capitalLossLimit = CAPITAL_LOSS_LIMITS[inputs.filingStatus];
+  const remainingCapitalLoss = newStCarryforward + newLtCarryforward;
+  const maxCapitalLossOffset = Math.min(capitalLossLimit, remainingCapitalLoss);
+  const maxIncomeOffsetCapacity = safeNumber(
+    usableOrdinaryLoss + newNolCarryforward + maxCapitalLossOffset
+  );
+
   return {
     year,
     qfafValue: newQfafValue,
@@ -308,6 +344,8 @@ function calculateYear(
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
     effectiveStLossRate,
+    incomeOffsetAmount,
+    maxIncomeOffsetCapacity,
   };
 }
 
@@ -424,8 +462,10 @@ function calculateSummary(years: YearResult[], sizing: CalculatedSizing) {
   // Safe array access (005 - fix unchecked array access)
   const lastYear = years.length > 0 ? years[years.length - 1] : undefined;
   const finalPortfolioValue = lastYear?.totalValue ?? 0;
+  // Annualize tax alpha using actual number of projection years
+  const numYears = years.length || 1; // Avoid division by zero
   const effectiveTaxAlpha =
-    sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / 10 : 0;
+    sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / numYears : 0;
 
   return { totalTaxSavings, finalPortfolioValue, effectiveTaxAlpha, totalNolGenerated };
 }
@@ -473,7 +513,10 @@ export function calculateWithOverrides(
   // Track cumulative infusions for sizing recalculation
   let cumulativeInfusion = 0;
 
-  for (let year = 1; year <= 10; year++) {
+  // Use projectionYears from settings (defaults to 10)
+  const projectionYears = settings.projectionYears ?? 10;
+
+  for (let year = 1; year <= projectionYears; year++) {
     const override = overrideMap.get(year);
 
     // Get effective income for this year
@@ -611,7 +654,10 @@ export function calculateWithSensitivity(
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
 
-  for (let year = 1; year <= 10; year++) {
+  // Use projectionYears from settings (defaults to 10)
+  const projectionYears = settings.projectionYears ?? 10;
+
+  for (let year = 1; year <= projectionYears; year++) {
     // Calculate tax rates with sensitivity adjustments
     const baseFederalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const baseFederalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
@@ -778,6 +824,19 @@ function calculateYearWithSensitivity(
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
   const newCollateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
 
+  // Calculate total income offset for this year
+  const incomeOffsetAmount = safeNumber(
+    usableOrdinaryLoss + nolUsed + capitalLossUsedAgainstIncome
+  );
+
+  // Calculate maximum income offset capacity for this year
+  const capitalLossLimit = CAPITAL_LOSS_LIMITS[inputs.filingStatus];
+  const remainingCapitalLoss = newStCarryforward + newLtCarryforward;
+  const maxCapitalLossOffset = Math.min(capitalLossLimit, remainingCapitalLoss);
+  const maxIncomeOffsetCapacity = safeNumber(
+    usableOrdinaryLoss + newNolCarryforward + maxCapitalLossOffset
+  );
+
   return {
     year,
     qfafValue: newQfafValue,
@@ -801,5 +860,7 @@ function calculateYearWithSensitivity(
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
     effectiveStLossRate: adjustedStLossRate,
+    incomeOffsetAmount,
+    maxIncomeOffsetCapacity,
   };
 }
