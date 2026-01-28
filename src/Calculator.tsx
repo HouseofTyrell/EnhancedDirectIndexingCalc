@@ -43,6 +43,7 @@ import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
 import { ScenarioAnalysis } from './AdvancedMode/ScenarioAnalysis';
 import { StrategyComparison } from './AdvancedMode/StrategyComparison';
 import { SettingsPanel } from './AdvancedMode/SettingsPanel';
+import { QfafTestByYear } from './AdvancedMode/QfafTestByYear';
 import { SettingsIcon } from './components/Icons';
 import { StrategyRateEditor } from './AdvancedMode/StrategyRateEditor';
 import {
@@ -842,6 +843,15 @@ export function Calculator() {
                   onChange={setAdvancedSettings}
                   onReset={resetAdvancedSettings}
                 />
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="QFAF Test (By Year)"
+                expanded={advancedMode.state.sections.qfafTest}
+                onToggle={() => advancedMode.toggleSection('qfafTest')}
+                hint="Model QFAF economics year-by-year"
+              >
+                <QfafTestByYear filingStatus={inputs.filingStatus} />
               </CollapsibleSection>
             </div>
           )}

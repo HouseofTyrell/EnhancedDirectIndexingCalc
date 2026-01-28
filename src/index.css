@@ -1465,7 +1465,7 @@ tfoot td {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1475,32 +1475,33 @@ tfoot td {
 
 .popup-content {
   background: white;
-  border-radius: 12px;
-  max-width: 600px;
-  max-height: 80vh;
+  border-radius: 10px;
+  max-width: 560px;
+  max-height: 75vh;
   width: 100%;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
 }
 
 .popup-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.5rem;
+  padding: 1rem 1.25rem;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 
 .popup-header h3 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 .popup-close {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   color: var(--text-light);
   cursor: pointer;
   padding: 0;
@@ -1512,9 +1513,14 @@ tfoot td {
 }
 
 .popup-body {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   overflow-y: auto;
-  max-height: calc(80vh - 60px);
+  overflow-x: hidden;
+  max-height: calc(75vh - 55px);
+}
+
+.popup-body * {
+  max-width: 100%;
 }
 
 /* Formula Documentation */
@@ -1603,16 +1609,20 @@ tfoot td {
 .field-popup {
   font-size: 0.9rem;
   line-height: 1.6;
+  word-break: break-word;
 }
 
 .field-popup .field-definition {
   margin: 0 0 1rem 0;
   color: var(--text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .field-popup .field-formula {
   background: var(--bg);
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   border-radius: 6px;
   margin-bottom: 1rem;
 }
@@ -1621,7 +1631,7 @@ tfoot td {
   display: block;
   margin-bottom: 0.25rem;
   color: var(--text-light);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
 }
 
@@ -1631,14 +1641,15 @@ tfoot td {
   font-size: 0.85rem;
   color: var(--primary);
   white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .field-popup .field-current-value {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
-  padding: 0.75rem;
+  padding: 0.625rem 0.875rem;
   border-radius: 6px;
-  margin-bottom: 1rem;
+  margin-bottom: 0.875rem;
 }
 
 .field-popup .field-current-value strong {
@@ -1647,11 +1658,14 @@ tfoot td {
 
 .field-popup .field-impact {
   margin: 0;
-  padding: 0.75rem;
+  padding: 0.75rem 1rem;
   background: #fef3c7;
   border-left: 3px solid #f59e0b;
   border-radius: 0 6px 6px 0;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .field-popup .field-impact strong {
@@ -2116,6 +2130,232 @@ tfoot td {
 @media (max-width: 768px) {
   .liquidity-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================
+   QFAF TEST BY YEAR
+   ============================================ */
+
+.qfaf-test-by-year {
+  padding-top: 0.5rem;
+}
+
+.qfaf-info-bar {
+  display: flex;
+  gap: 2rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.qfaf-info-bar .info-item {
+  color: var(--text);
+}
+
+.qfaf-info-bar .info-item strong {
+  color: var(--text-light);
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+.qfaf-table-container {
+  overflow-x: auto;
+  margin: 0 -0.5rem;
+}
+
+.qfaf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.qfaf-table th {
+  padding: 0.5rem 0.4rem;
+  text-align: left;
+  background: var(--bg);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+.qfaf-table th.highlight {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.qfaf-table .col-year {
+  width: 36px;
+  text-align: center;
+}
+
+.qfaf-table .col-infusion {
+  width: 110px;
+}
+
+.qfaf-table .col-rate {
+  width: 70px;
+}
+
+.qfaf-table .col-computed {
+  width: 90px;
+  text-align: right;
+}
+
+.qfaf-table td {
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.qfaf-table tbody tr:hover {
+  background: var(--bg);
+}
+
+.qfaf-table td.computed {
+  text-align: right;
+  color: var(--text-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.qfaf-table td.computed.highlight {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.qfaf-table td.computed.positive {
+  color: #059669;
+}
+
+.qfaf-table td.computed.negative {
+  color: #dc2626;
+}
+
+/* Summary row */
+.qfaf-table .summary-row {
+  background: var(--bg);
+  font-weight: 600;
+}
+
+.qfaf-table .summary-row td {
+  padding: 0.6rem 0.4rem;
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+}
+
+.qfaf-table .summary-row .summary-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.qfaf-table .summary-row .summary-value.highlight {
+  color: var(--text);
+}
+
+.qfaf-table .summary-row .summary-value.positive {
+  color: #059669;
+}
+
+.qfaf-table .summary-row .summary-value.negative {
+  color: #dc2626;
+}
+
+/* Input with suffix (for percentages and multipliers) */
+.input-with-suffix.compact {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.input-with-suffix.compact input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: none;
+  background: transparent;
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.input-with-suffix.compact input:focus {
+  outline: none;
+  background: white;
+}
+
+.input-with-suffix.compact .suffix {
+  padding: 0.3rem 0.4rem;
+  background: transparent;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.rate-input {
+  width: 50px;
+}
+
+/* QFAF Notes section */
+.qfaf-notes {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.qfaf-notes h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.5rem 0;
+}
+
+.qfaf-notes ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+.qfaf-notes li {
+  margin-bottom: 0.35rem;
+}
+
+.qfaf-notes li strong {
+  color: var(--text);
+}
+
+@media (max-width: 768px) {
+  .qfaf-info-bar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .qfaf-table-container {
+    margin: 0 -1rem;
+    padding: 0 0.5rem;
+  }
+
+  .qfaf-table {
+    font-size: 0.7rem;
+  }
+
+  .qfaf-table th,
+  .qfaf-table td {
+    padding: 0.3rem;
+  }
+
+  .input-with-suffix.compact input {
+    min-width: 40px;
   }
 }
 

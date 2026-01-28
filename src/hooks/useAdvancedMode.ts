@@ -8,6 +8,7 @@ export interface AdvancedModeState {
     scenarios: boolean;
     comparison: boolean;
     settings: boolean;
+    qfafTest: boolean;
   };
 }
 
@@ -21,6 +22,7 @@ const DEFAULT_STATE: AdvancedModeState = {
     scenarios: false,
     comparison: false,
     settings: false,
+    qfafTest: false,
   },
 };
 
@@ -52,7 +54,7 @@ function isAdvancedModeState(value: unknown): value is AdvancedModeState {
   }
 
   const sections = obj.sections as Record<string, unknown>;
-  const requiredSections = ['yearByYear', 'sensitivity', 'scenarios', 'comparison', 'settings'];
+  const requiredSections = ['yearByYear', 'sensitivity', 'scenarios', 'comparison', 'settings', 'qfafTest'];
 
   for (const section of requiredSections) {
     if (!hasOwnProperty.call(sections, section) || typeof sections[section] !== 'boolean') {

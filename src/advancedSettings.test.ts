@@ -147,12 +147,10 @@ describe('Projection Years Setting', () => {
 
       const result = calculate(highCollateral, settings);
 
-      // Verify NOL is being used over time (should decrease after initial buildup)
-      const nolYear5 = result.years[4].nolCarryforward;
-      const nolYear20 = result.years[19].nolCarryforward;
-
-      // NOL should be utilized over the extended period
+      // Verify NOL is being generated over extended period
       expect(result.summary.totalNolGenerated).toBeGreaterThan(0);
+      // Verify we have 20 years of results
+      expect(result.years).toHaveLength(20);
     });
   });
 });

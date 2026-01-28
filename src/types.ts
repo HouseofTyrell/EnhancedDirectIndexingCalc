@@ -223,3 +223,65 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
   ltcgRate: 0.2,
   stcgRate: 0.37,
 };
+
+// ============================================
+// QFAF TEST (BY YEAR) TYPES
+// ============================================
+
+// Editable input fields for a single year
+export interface QfafTestYearInput {
+  readonly year: number;
+  cashInfusion: number; // New capital invested this year
+  subscriptionPct: number; // % of infusion allocated to QFAF (0-1)
+  lossRate: number; // Expected ordinary loss rate (default 1.5 = 150%)
+  marginalTaxRate: number; // Combined federal + state marginal rate (0-1)
+  managementFeeRate: number; // Annual management fee (default 0.01 = 1%)
+  qfafFeeRate: number; // QFAF fee rate (default 0.015 = 1.5%)
+  section461Limit: number; // §461(l) limit for this year
+}
+
+// Computed result fields extending input (readonly to prevent mutation)
+export interface QfafTestYearResult extends QfafTestYearInput {
+  readonly subscriptionSize: number; // cashInfusion × subscriptionPct
+  readonly estimatedOrdinaryLoss: number; // subscriptionSize × lossRate
+  readonly carryForwardPrior: number; // Carryforward from previous year
+  readonly lossAvailable: number; // estimatedOrdinaryLoss + carryForwardPrior
+  readonly allowedLoss: number; // min(lossAvailable, section461Limit)
+  readonly carryForwardNext: number; // lossAvailable - allowedLoss
+  readonly taxSavings: number; // allowedLoss × marginalTaxRate
+  readonly managementFee: number; // subscriptionSize × managementFeeRate
+  readonly qfafFee: number; // subscriptionSize × qfafFeeRate
+  readonly totalFees: number; // managementFee + qfafFee
+  readonly netSavingsNoAlpha: number; // taxSavings - totalFees
+}
+
+// Default values for QFAF Test inputs
+export const DEFAULT_QFAF_TEST_YEAR: Omit<QfafTestYearInput, 'year'> = {
+  cashInfusion: 0,
+  subscriptionPct: 1.0, // 100% to QFAF by default
+  lossRate: 1.5, // 150% ordinary loss generation
+  marginalTaxRate: 0.45, // ~45% combined federal + state
+  managementFeeRate: 0.01, // 1% management fee
+  qfafFeeRate: 0.015, // 1.5% QFAF fee
+  section461Limit: 640000, // 2026 projected MFJ limit
+};
+
+// Section 461(l) limits by filing status for 2026 (projected)
+export const SECTION_461_LIMITS_2026: Record<FilingStatus, number> = {
+  single: 320000,
+  mfj: 640000,
+  mfs: 320000,
+  hoh: 320000,
+};
+
+// Summary totals for the QFAF Test table
+export interface QfafTestSummary {
+  readonly totalCashInfusion: number;
+  readonly totalSubscriptionSize: number;
+  readonly totalEstimatedOrdinaryLoss: number;
+  readonly totalAllowedLoss: number;
+  readonly totalTaxSavings: number;
+  readonly totalFees: number;
+  readonly totalNetSavingsNoAlpha: number;
+  readonly finalCarryForward: number;
+}
