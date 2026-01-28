@@ -1,5 +1,5 @@
 import { SensitivityParams, DEFAULT_SENSITIVITY } from '../types';
-import { FieldInfoPopup } from '../InfoPopup';
+import { InfoText } from '../InfoPopup';
 
 interface SensitivityAnalysisProps {
   params: SensitivityParams;
@@ -78,8 +78,9 @@ export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAn
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              Federal Rate Change
-              <FieldInfoPopup contentKey="sens-federal-rate" />
+              <InfoText contentKey="sens-federal-rate">
+                Federal Rate Change
+              </InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('federalRateChange', params.federalRateChange)}`}
@@ -102,8 +103,9 @@ export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAn
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              State Rate Change
-              <FieldInfoPopup contentKey="sens-state-rate" />
+              <InfoText contentKey="sens-state-rate">
+                State Rate Change
+              </InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('stateRateChange', params.stateRateChange)}`}
@@ -127,8 +129,9 @@ export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAn
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              Annual Return
-              <FieldInfoPopup contentKey="sens-annual-return" />
+              <InfoText contentKey="sens-annual-return">
+                Annual Return
+              </InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('annualReturn', params.annualReturn)}`}
@@ -151,8 +154,9 @@ export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAn
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              Tracking Error Impact
-              <FieldInfoPopup contentKey="sens-tracking-error" />
+              <InfoText contentKey="sens-tracking-error">
+                Tracking Error Impact
+              </InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('trackingErrorMultiplier', params.trackingErrorMultiplier)}`}
@@ -178,8 +182,9 @@ export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAn
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              ST Loss Rate Variance
-              <FieldInfoPopup contentKey="sens-st-loss-variance" />
+              <InfoText contentKey="sens-st-loss-variance">
+                ST Loss Rate Variance
+              </InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('stLossRateVariance', params.stLossRateVariance)}`}
@@ -202,8 +207,9 @@ export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAn
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              LT Gain Rate Variance
-              <FieldInfoPopup contentKey="sens-lt-gain-variance" />
+              <InfoText contentKey="sens-lt-gain-variance">
+                LT Gain Rate Variance
+              </InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('ltGainRateVariance', params.ltGainRateVariance)}`}

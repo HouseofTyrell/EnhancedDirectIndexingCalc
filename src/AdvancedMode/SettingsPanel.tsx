@@ -1,5 +1,5 @@
 import { AdvancedSettings, DEFAULT_SETTINGS } from '../types';
-import { FieldInfoPopup } from '../InfoPopup';
+import { InfoText } from '../InfoPopup';
 import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 
 interface SettingsPanelProps {
@@ -54,8 +54,9 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
-                QFAF Multiplier
-                <FieldInfoPopup contentKey="setting-qfaf-multiplier" />
+                <InfoText contentKey="setting-qfaf-multiplier">
+                  QFAF Multiplier
+                </InfoText>
               </span>
               <span className="setting-hint">ST gains & ordinary losses as % of QFAF MV</span>
             </div>
@@ -73,8 +74,9 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
-                QFAF Growth
-                <FieldInfoPopup contentKey="setting-qfaf-growth" />
+                <InfoText contentKey="setting-qfaf-growth">
+                  QFAF Growth
+                </InfoText>
               </span>
               <span className="setting-hint">Whether QFAF appreciates with market returns</span>
             </div>
@@ -94,8 +96,9 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
-                Wash Sale Disallowance
-                <FieldInfoPopup contentKey="setting-wash-sale" />
+                <InfoText contentKey="setting-wash-sale">
+                  Wash Sale Disallowance
+                </InfoText>
               </span>
               <span className="setting-hint">
                 % of ST losses disallowed due to wash sales (0-15%)
@@ -125,8 +128,9 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
         {/* Section 461(l) Limits */}
         <div className="settings-section">
           <h4>
-            Section 461(l) Limits
-            <FieldInfoPopup contentKey="section-461-limit" />
+            <InfoText contentKey="section-461-limit">
+              Section 461(l) Limits
+            </InfoText>
           </h4>
 
           <div className="setting-row">
@@ -201,8 +205,9 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
         {/* NOL Rules */}
         <div className="settings-section">
           <h4>
-            NOL Rules
-            <FieldInfoPopup contentKey="nol-carryforward" />
+            <InfoText contentKey="nol-carryforward">
+              NOL Rules
+            </InfoText>
           </h4>
 
           <div className="setting-row">
@@ -261,8 +266,9 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
         {/* Tax Rate Assumptions */}
         <div className="settings-section">
           <h4>
-            Tax Rate Assumptions
-            <FieldInfoPopup contentKey="federal-st-rate" />
+            <InfoText contentKey="federal-st-rate">
+              Tax Rate Assumptions
+            </InfoText>
           </h4>
 
           <div className="setting-row">

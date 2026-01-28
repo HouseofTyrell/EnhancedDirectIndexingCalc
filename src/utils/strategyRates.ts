@@ -1,4 +1,4 @@
-import { STRATEGIES, LOSS_RATE_DECAY_FACTOR, LOSS_RATE_FLOOR } from '../strategyData';
+import { STRATEGIES, getStLossRateForYear } from '../strategyData';
 
 const STORAGE_KEY = 'strategy-rate-overrides';
 
@@ -7,16 +7,17 @@ const STORAGE_KEY = 'strategy-rate-overrides';
 export type StrategyRateOverrides = Record<string, number>;
 
 /**
- * Calculate the default net capital loss rate for a strategy/year (with decay)
- * This is ST Loss Rate - LT Gain Rate, with 7% annual decay
+ * Calculate the default net capital loss rate for a strategy/year
+ * Uses the year-by-year ST loss rates from strategy data
+ * Net Capital Loss Rate = ST Loss Rate - LT Gain Rate
  */
 export function getDefaultNetCapitalLossRate(strategyId: string, year: number): number {
   const strategy = STRATEGIES.find(s => s.id === strategyId);
   if (!strategy) return 0;
 
-  const baseNetRate = strategy.stLossRate - strategy.ltGainRate;
-  const decayedRate = baseNetRate * Math.pow(LOSS_RATE_DECAY_FACTOR, year - 1);
-  return Math.max(decayedRate, baseNetRate * LOSS_RATE_FLOOR);
+  // Use year-specific ST loss rate from the strategy data
+  const stLossRate = getStLossRateForYear(strategy, year);
+  return stLossRate - strategy.ltGainRate;
 }
 
 /**

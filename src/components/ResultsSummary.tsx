@@ -1,5 +1,5 @@
 import React from 'react';
-import { FieldInfoPopup } from '../InfoPopup';
+import { InfoText } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
 /**
@@ -49,44 +49,36 @@ export const ResultsSummary = React.memo(function ResultsSummary({
       <div className="summary-cards">
         <div className="card primary">
           <h3>
-            Total Tax Savings
-            <FieldInfoPopup
-              contentKey="total-tax-savings"
-              currentValue={formatCurrency(totalTaxSavings)}
-            />
+            <InfoText contentKey="total-tax-savings" currentValue={formatCurrency(totalTaxSavings)}>
+              Total Tax Savings
+            </InfoText>
           </h3>
           <p className="big-number">{formatCurrency(totalTaxSavings)}</p>
           <p className="subtext">Over {projectionYears} years</p>
         </div>
         <div className="card">
           <h3>
-            Final Portfolio Value
-            <FieldInfoPopup
-              contentKey="final-portfolio-value"
-              currentValue={formatCurrency(finalPortfolioValue)}
-            />
+            <InfoText contentKey="final-portfolio-value" currentValue={formatCurrency(finalPortfolioValue)}>
+              Final Portfolio Value
+            </InfoText>
           </h3>
           <p className="big-number">{formatCurrency(finalPortfolioValue)}</p>
           <p className="subtext">Year {projectionYears}</p>
         </div>
         <div className="card">
           <h3>
-            Annualized Tax Alpha
-            <FieldInfoPopup
-              contentKey="effective-tax-alpha"
-              currentValue={formatPercent(effectiveTaxAlpha)}
-            />
+            <InfoText contentKey="effective-tax-alpha" currentValue={formatPercent(effectiveTaxAlpha)}>
+              Annualized Tax Alpha
+            </InfoText>
           </h3>
           <p className="big-number">{formatPercent(effectiveTaxAlpha)}</p>
           <p className="subtext">Per year</p>
         </div>
         <div className="card">
           <h3>
-            Total NOL Generated
-            <FieldInfoPopup
-              contentKey="total-nol-generated"
-              currentValue={formatCurrency(totalNolGenerated)}
-            />
+            <InfoText contentKey="total-nol-generated" currentValue={formatCurrency(totalNolGenerated)}>
+              Total NOL Generated
+            </InfoText>
           </h3>
           <p className="big-number">{formatCurrency(totalNolGenerated)}</p>
           <p className="subtext">Cumulative excess</p>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { InfoPopup, FieldInfoPopup, TaxRatesFormula } from '../InfoPopup';
+import { InfoPopup, InfoText, TaxRatesFormula } from '../InfoPopup';
 
 /**
  * Props for the TaxRatesDisplay component.
@@ -52,52 +52,49 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
       <div className="tax-rates-grid">
         <div className="tax-rate-item">
           <span className="rate-label">
-            Federal Ordinary/ST
-            <FieldInfoPopup contentKey="federal-st-rate" currentValue={formatRate(federalStRate)} />
+            <InfoText contentKey="federal-st-rate" currentValue={formatRate(federalStRate)}>
+              Federal Ordinary/ST
+            </InfoText>
           </span>
           <span className="rate-value">{formatRate(federalStRate)}</span>
         </div>
         <div className="tax-rate-item">
           <span className="rate-label">
-            Federal LT Cap Gains
-            <FieldInfoPopup contentKey="federal-lt-rate" currentValue={formatRate(federalLtRate)} />
+            <InfoText contentKey="federal-lt-rate" currentValue={formatRate(federalLtRate)}>
+              Federal LT Cap Gains
+            </InfoText>
           </span>
           <span className="rate-value">{formatRate(federalLtRate)}</span>
         </div>
         <div className="tax-rate-item">
           <span className="rate-label">
-            State
-            <FieldInfoPopup contentKey="state-rate" currentValue={formatRate(stateRate)} />
+            <InfoText contentKey="state-rate" currentValue={formatRate(stateRate)}>
+              State
+            </InfoText>
           </span>
           <span className="rate-value">{formatRate(stateRate)}</span>
         </div>
         <div className="tax-rate-item highlight">
           <span className="rate-label">
-            Combined Ordinary
-            <FieldInfoPopup
-              contentKey="combined-st-rate"
-              currentValue={formatRate(combinedStRate)}
-            />
+            <InfoText contentKey="combined-st-rate" currentValue={formatRate(combinedStRate)}>
+              Combined Ordinary
+            </InfoText>
           </span>
           <span className="rate-value">{formatRate(combinedStRate)}</span>
         </div>
         <div className="tax-rate-item highlight">
           <span className="rate-label">
-            Combined LT
-            <FieldInfoPopup
-              contentKey="combined-lt-rate"
-              currentValue={formatRate(combinedLtRate)}
-            />
+            <InfoText contentKey="combined-lt-rate" currentValue={formatRate(combinedLtRate)}>
+              Combined LT
+            </InfoText>
           </span>
           <span className="rate-value">{formatRate(combinedLtRate)}</span>
         </div>
         <div className="tax-rate-item accent">
           <span className="rate-label">
-            ST→LT Benefit
-            <FieldInfoPopup
-              contentKey="st-lt-benefit"
-              currentValue={formatRate(rateDifferential)}
-            />
+            <InfoText contentKey="st-lt-benefit" currentValue={formatRate(rateDifferential)}>
+              ST→LT Benefit
+            </InfoText>
           </span>
           <span className="rate-value">{formatRate(rateDifferential)}</span>
         </div>

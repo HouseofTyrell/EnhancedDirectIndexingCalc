@@ -31,6 +31,172 @@ body {
   line-height: 1.5;
 }
 
+/* ============================================
+   APP NAVIGATION
+   ============================================ */
+
+.app-nav {
+  background: white;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  gap: 0;
+}
+
+.nav-tab {
+  padding: 1rem 1.5rem;
+  border: none;
+  background: transparent;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-light);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.nav-tab:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.nav-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.app-content {
+  min-height: calc(100vh - 60px);
+}
+
+/* ============================================
+   QFAF TEST PAGE
+   ============================================ */
+
+.qfaf-test-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.75rem;
+  color: var(--text);
+}
+
+.page-description {
+  margin: 0;
+  color: var(--text-light);
+  font-size: 1rem;
+}
+
+.page-controls {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.5rem;
+}
+
+.page-controls .control-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.page-controls label {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.page-controls select {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background: white;
+  min-width: 200px;
+}
+
+.page-controls select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.page-content {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.5rem;
+}
+
+.page-disclaimer {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-top: 2rem;
+}
+
+.page-disclaimer h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  color: #854d0e;
+}
+
+.page-disclaimer ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.85rem;
+  color: #a16207;
+}
+
+.page-disclaimer li {
+  margin-bottom: 0.35rem;
+}
+
+@media (max-width: 768px) {
+  .nav-container {
+    padding: 0 1rem;
+  }
+
+  .nav-tab {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .qfaf-test-page {
+    padding: 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .page-controls .control-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-controls select {
+    width: 100%;
+  }
+}
+
 /* Calculator container */
 .calculator {
   max-width: 1200px;
@@ -1469,7 +1635,7 @@ tfoot td {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 9999; /* Higher than sticky header to ensure popup appears on top */
   padding: 1rem;
 }
 
@@ -1481,6 +1647,7 @@ tfoot td {
   width: 100%;
   overflow: hidden;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  text-transform: none; /* Reset inherited uppercase from parent elements */
 }
 
 .popup-header {
@@ -2134,7 +2301,7 @@ tfoot td {
 }
 
 /* ============================================
-   QFAF TEST BY YEAR
+   QFAF TEST BY YEAR (TRANSPOSED)
    ============================================ */
 
 .qfaf-test-by-year {
@@ -2166,102 +2333,131 @@ tfoot td {
   margin: 0 -0.5rem;
 }
 
-.qfaf-table {
-  width: 100%;
+/* Transposed table styles */
+.qfaf-table.transposed {
+  width: auto;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
 }
 
-.qfaf-table th {
-  padding: 0.5rem 0.4rem;
-  text-align: left;
+.qfaf-table.transposed th {
+  padding: 0.5rem 0.6rem;
+  text-align: center;
   background: var(--bg);
   font-weight: 600;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: var(--text-light);
   white-space: nowrap;
+  border-bottom: 2px solid var(--border);
 }
 
-.qfaf-table th.highlight {
-  background: #ecfdf5;
-  color: #059669;
+.qfaf-table.transposed th.col-label {
+  text-align: left;
+  min-width: 120px;
+  position: sticky;
+  left: 0;
+  background: var(--bg);
+  z-index: 1;
 }
 
-.qfaf-table .col-year {
-  width: 36px;
+.qfaf-table.transposed th.col-year {
+  min-width: 90px;
+}
+
+.qfaf-table.transposed th.col-total {
+  min-width: 100px;
+  background: #f0f9ff;
+  color: var(--primary);
+  border-left: 2px solid var(--border);
+}
+
+.qfaf-table.transposed td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
   text-align: center;
 }
 
-.qfaf-table .col-infusion {
-  width: 110px;
+.qfaf-table.transposed .row-label {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 1;
 }
 
-.qfaf-table .col-rate {
-  width: 70px;
+.qfaf-table.transposed .editable-row {
+  background: #fefce8;
 }
 
-.qfaf-table .col-computed {
-  width: 90px;
-  text-align: right;
+.qfaf-table.transposed .editable-row .row-label {
+  background: #fefce8;
 }
 
-.qfaf-table td {
-  padding: 0.3rem 0.4rem;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-
-.qfaf-table tbody tr:hover {
+.qfaf-table.transposed .computed-row:hover {
   background: var(--bg);
 }
 
-.qfaf-table td.computed {
-  text-align: right;
-  color: var(--text-light);
+.qfaf-table.transposed .computed-row:hover .row-label {
+  background: var(--bg);
+}
+
+.qfaf-table.transposed .input-cell {
+  padding: 0.25rem 0.3rem;
+}
+
+.qfaf-table.transposed .computed-cell {
   font-variant-numeric: tabular-nums;
 }
 
-.qfaf-table td.computed.highlight {
+.qfaf-table.transposed .total-cell {
+  background: #f0f9ff;
+  border-left: 2px solid var(--border);
+  font-weight: 600;
+}
+
+.qfaf-table.transposed .editable-row .total-cell {
+  background: #fef9c3;
+}
+
+/* Computed value styles */
+.qfaf-table.transposed .computed {
+  color: var(--text-light);
+}
+
+.qfaf-table.transposed .computed.highlight {
   color: var(--text);
   font-weight: 500;
 }
 
-.qfaf-table td.computed.positive {
+.qfaf-table.transposed .computed.positive {
   color: #059669;
 }
 
-.qfaf-table td.computed.negative {
+.qfaf-table.transposed .computed.negative {
   color: #dc2626;
 }
 
-/* Summary row */
-.qfaf-table .summary-row {
-  background: var(--bg);
-  font-weight: 600;
-}
-
-.qfaf-table .summary-row td {
-  padding: 0.6rem 0.4rem;
-  border-top: 2px solid var(--border);
-  border-bottom: none;
-}
-
-.qfaf-table .summary-row .summary-value {
-  text-align: right;
+/* Summary value styles */
+.qfaf-table.transposed .summary-value {
   font-variant-numeric: tabular-nums;
 }
 
-.qfaf-table .summary-row .summary-value.highlight {
+.qfaf-table.transposed .summary-value.highlight {
   color: var(--text);
 }
 
-.qfaf-table .summary-row .summary-value.positive {
+.qfaf-table.transposed .summary-value.positive {
   color: #059669;
 }
 
-.qfaf-table .summary-row .summary-value.negative {
+.qfaf-table.transposed .summary-value.negative {
   color: #dc2626;
 }
 
@@ -2269,18 +2465,19 @@ tfoot td {
 .input-with-suffix.compact {
   display: flex;
   align-items: center;
-  background: var(--bg);
+  background: white;
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
   width: 100%;
+  min-width: 70px;
 }
 
 .input-with-suffix.compact input {
   flex: 1;
   min-width: 0;
   width: 100%;
-  padding: 0.3rem 0.4rem;
+  padding: 0.3rem 0.3rem;
   border: none;
   background: transparent;
   font-size: 0.8rem;
@@ -2289,19 +2486,28 @@ tfoot td {
 
 .input-with-suffix.compact input:focus {
   outline: none;
-  background: white;
+  background: #fffbeb;
 }
 
 .input-with-suffix.compact .suffix {
-  padding: 0.3rem 0.4rem;
+  padding: 0.3rem 0.3rem;
   background: transparent;
   color: var(--text-light);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   flex-shrink: 0;
 }
 
+.input-with-prefix.compact {
+  min-width: 80px;
+  background: white;
+}
+
+.input-with-prefix.compact input:focus {
+  background: #fffbeb;
+}
+
 .rate-input {
-  width: 50px;
+  width: 45px;
 }
 
 /* QFAF Notes section */
@@ -3423,6 +3629,45 @@ tfoot td {
   background: white;
   border-color: var(--primary);
   color: var(--primary);
+}
+
+/* Table controls container */
+.table-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* View mode selector */
+.view-mode-selector {
+  display: flex;
+  gap: 0;
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid var(--border);
+}
+
+.view-mode-btn {
+  padding: 0.35rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.view-mode-btn:hover {
+  color: var(--text);
+}
+
+.view-mode-btn.active {
+  background: white;
+  color: var(--primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Compact table styling */

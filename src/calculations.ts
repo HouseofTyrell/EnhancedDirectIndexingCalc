@@ -280,6 +280,12 @@ function calculateYear(
       remainingStGainCost
   );
 
+  // Component-specific benefits for view mode breakdown
+  // QFAF benefit: ordinary loss offset + NOL usage + ST→LT conversion (what QFAF enables)
+  const qfafTaxBenefit = safeNumber(ordinaryLossBenefit + nolUsageBenefit + stToLtConversionBenefit);
+  // Collateral benefit: capital loss offset - LT gain cost - any remaining ST gain cost
+  const collateralTaxBenefit = safeNumber(capitalLossBenefit - ltGainCost - remainingStGainCost);
+
   // For display/debugging: calculate what taxes would be without benefits
   const grossInvestmentTax = safeNumber(
     Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
@@ -346,6 +352,8 @@ function calculateYear(
     effectiveStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
+    qfafTaxBenefit,
+    collateralTaxBenefit,
   };
 }
 
@@ -804,6 +812,10 @@ function calculateYearWithSensitivity(
       remainingStGainCost
   );
 
+  // Component-specific benefits for view mode breakdown
+  const qfafTaxBenefit = safeNumber(ordinaryLossBenefit + nolUsageBenefit + stToLtConversionBenefit);
+  const collateralTaxBenefit = safeNumber(capitalLossBenefit - ltGainCost - remainingStGainCost);
+
   // Tax breakdown for display
   const grossInvestmentTax = safeNumber(
     Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
@@ -862,5 +874,7 @@ function calculateYearWithSensitivity(
     effectiveStLossRate: adjustedStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
+    qfafTaxBenefit,
+    collateralTaxBenefit,
   };
 }

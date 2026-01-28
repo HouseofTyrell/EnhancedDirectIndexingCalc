@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { STRATEGIES, getStrategy } from '../strategyData';
 import { calculate } from '../calculations';
 import { CalculatorInputs, ComparisonResult } from '../types';
-import { FieldInfoPopup } from '../InfoPopup';
+import { InfoText } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
 interface StrategyComparisonProps {
@@ -151,8 +151,9 @@ export function StrategyComparison({
             <tbody>
               <tr className={getBest('qfafRequired') ? 'has-winner' : ''}>
                 <td>
-                  QFAF Required
-                  <FieldInfoPopup contentKey="comp-qfaf-required" />
+                  <InfoText contentKey="comp-qfaf-required">
+                    QFAF Required
+                  </InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -166,8 +167,9 @@ export function StrategyComparison({
 
               <tr>
                 <td>
-                  Total Exposure
-                  <FieldInfoPopup contentKey="total-exposure" />
+                  <InfoText contentKey="total-exposure">
+                    Total Exposure
+                  </InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -181,8 +183,9 @@ export function StrategyComparison({
 
               <tr>
                 <td>
-                  Year 1 Tax Savings
-                  <FieldInfoPopup contentKey="col-tax-savings" />
+                  <InfoText contentKey="col-tax-savings">
+                    Year 1 Tax Savings
+                  </InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -196,8 +199,9 @@ export function StrategyComparison({
 
               <tr>
                 <td>
-                  10-Year Tax Savings
-                  <FieldInfoPopup contentKey="total-tax-savings" />
+                  <InfoText contentKey="total-tax-savings">
+                    10-Year Tax Savings
+                  </InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -211,8 +215,9 @@ export function StrategyComparison({
 
               <tr>
                 <td>
-                  Tax Alpha
-                  <FieldInfoPopup contentKey="effective-tax-alpha" />
+                  <InfoText contentKey="effective-tax-alpha">
+                    Tax Alpha
+                  </InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -226,8 +231,9 @@ export function StrategyComparison({
 
               <tr>
                 <td>
-                  Tracking Error
-                  <FieldInfoPopup contentKey="comp-tracking-error" />
+                  <InfoText contentKey="comp-tracking-error">
+                    Tracking Error
+                  </InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td key={result.strategyId}>{result.trackingErrorDisplay}</td>

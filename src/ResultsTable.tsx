@@ -3,6 +3,8 @@ import { YearResult, CalculatedSizing } from './types';
 import { InfoText } from './InfoPopup';
 import { formatCurrency } from './utils/formatters';
 
+type ViewMode = 'combined' | 'qfaf-only' | 'collateral-only';
+
 interface ResultsTableProps {
   data: YearResult[];
   sizing: CalculatedSizing;
@@ -47,6 +49,7 @@ export function ResultsTable({
   const [expandCapital, setExpandCapital] = useState(false);
   const [expandNOL, setExpandNOL] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('combined');
 
   // Calculate cumulative tax savings
   let cumulativeSavings = 0;
@@ -60,6 +63,10 @@ export function ResultsTable({
     setExpandNOL(newState);
   };
 
+  // View mode helpers
+  const showQfaf = viewMode === 'combined' || viewMode === 'qfaf-only';
+  const showCollateral = viewMode === 'combined' || viewMode === 'collateral-only';
+
   // Calculate net capital for a year (what actually hits the return)
   const getNetCapital = (year: YearResult) => {
     // Net = ST Gains (QFAF) - ST Losses (collateral) + LT Gains (collateral)
@@ -69,13 +76,28 @@ export function ResultsTable({
 
   // Column count for footer span
   const getColSpan = () => {
-    let cols = 4; // Year, Portfolio, Net Capital, Tax Savings (base)
-    if (expandPortfolio && qfafEnabled) cols += 2; // Collateral, QFAF
-    if (expandCapital) cols += 3; // ST Losses, LT Gains, ST Gains
-    if (qfafEnabled) {
-      cols += 2; // Ordinary Loss, NOL Activity
+    let cols = 2; // Year, Portfolio (always shown)
+
+    // Net Capital column - only in combined and collateral-only
+    if (showCollateral) cols += 1;
+
+    // Expanded Portfolio Details - only in combined mode
+    if (expandPortfolio && qfafEnabled && viewMode === 'combined') cols += 2;
+
+    // Expanded Capital Details - ST Losses, LT Gains (collateral)
+    if (expandCapital && showCollateral) cols += 2;
+
+    // QFAF ST Gains column
+    if (viewMode === 'qfaf-only') cols += 1;
+    if (expandCapital && viewMode === 'combined' && qfafEnabled) cols += 1;
+
+    // QFAF columns - Ordinary Loss, NOL Activity
+    if (showQfaf && qfafEnabled) {
+      cols += 2;
       if (expandNOL) cols += 3; // NOL Used, NOL C/F, Max Offset
     }
+
+    cols += 1; // Tax Savings column
     return cols;
   };
 
@@ -83,9 +105,33 @@ export function ResultsTable({
     <div className="table-container">
       <div className="table-header-row">
         <h3>Year-by-Year Breakdown</h3>
-        <button className="toggle-details-btn" onClick={handleToggleAll}>
-          {showAllDetails ? 'Collapse All' : 'Expand All'}
-        </button>
+        <div className="table-controls">
+          {qfafEnabled && (
+            <div className="view-mode-selector">
+              <button
+                className={`view-mode-btn ${viewMode === 'combined' ? 'active' : ''}`}
+                onClick={() => setViewMode('combined')}
+              >
+                Combined
+              </button>
+              <button
+                className={`view-mode-btn ${viewMode === 'qfaf-only' ? 'active' : ''}`}
+                onClick={() => setViewMode('qfaf-only')}
+              >
+                QFAF Only
+              </button>
+              <button
+                className={`view-mode-btn ${viewMode === 'collateral-only' ? 'active' : ''}`}
+                onClick={() => setViewMode('collateral-only')}
+              >
+                Collateral Only
+              </button>
+            </div>
+          )}
+          <button className="toggle-details-btn" onClick={handleToggleAll}>
+            {showAllDetails ? 'Collapse All' : 'Expand All'}
+          </button>
+        </div>
       </div>
 
       <div className="table-scroll">
@@ -94,8 +140,8 @@ export function ResultsTable({
             <tr>
               <th className="col-year">Year</th>
 
-              {/* Portfolio Value - Collapsible when QFAF enabled */}
-              {qfafEnabled ? (
+              {/* Portfolio Value - show based on view mode */}
+              {viewMode === 'combined' && qfafEnabled ? (
                 <th
                   className="col-expandable col-portfolio"
                   onClick={() => setExpandPortfolio(!expandPortfolio)}
@@ -107,14 +153,22 @@ export function ResultsTable({
                     <InfoText contentKey="col-portfolio-value">Portfolio</InfoText>
                   </span>
                 </th>
+              ) : viewMode === 'qfaf-only' ? (
+                <th className="col-portfolio qfaf-col">
+                  <InfoText contentKey="col-qfaf-value">QFAF Value</InfoText>
+                </th>
+              ) : viewMode === 'collateral-only' ? (
+                <th className="col-portfolio collateral-col">
+                  <InfoText contentKey="col-collateral-value">Collateral Value</InfoText>
+                </th>
               ) : (
                 <th className="col-portfolio">
                   <InfoText contentKey="col-portfolio-value">Portfolio</InfoText>
                 </th>
               )}
 
-              {/* Expanded Portfolio Details */}
-              {expandPortfolio && qfafEnabled && (
+              {/* Expanded Portfolio Details - only in combined mode */}
+              {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
                 <>
                   <th className="col-detail collateral-col">
                     <InfoText contentKey="col-collateral-value">Collateral</InfoText>
@@ -125,21 +179,25 @@ export function ResultsTable({
                 </>
               )}
 
-              {/* Capital Gains - Collapsible */}
-              <th
-                className="col-expandable col-net-capital"
-                onClick={() => setExpandCapital(!expandCapital)}
-              >
-                <span className="expandable-header">
-                  <span className="expand-icon">
-                    {expandCapital ? <ChevronDown /> : <ChevronRight />}
+              {/* Capital Gains - Collapsible (show in combined and collateral-only) */}
+              {showCollateral && (
+                <th
+                  className={`col-expandable col-net-capital ${viewMode === 'collateral-only' ? 'collateral-col' : ''}`}
+                  onClick={() => setExpandCapital(!expandCapital)}
+                >
+                  <span className="expandable-header">
+                    <span className="expand-icon">
+                      {expandCapital ? <ChevronDown /> : <ChevronRight />}
+                    </span>
+                    <InfoText contentKey="col-net-capital">
+                      {viewMode === 'collateral-only' ? 'Net Capital' : 'Cap Gains'}
+                    </InfoText>
                   </span>
-                  <InfoText contentKey="col-net-capital">Cap Gains</InfoText>
-                </span>
-              </th>
+                </th>
+              )}
 
-              {/* Expanded Capital Details */}
-              {expandCapital && (
+              {/* Expanded Capital Details - Collateral items */}
+              {expandCapital && showCollateral && (
                 <>
                   <th className="col-detail collateral-col">
                     <InfoText contentKey="col-st-losses">ST Loss</InfoText>
@@ -147,24 +205,31 @@ export function ResultsTable({
                   <th className="col-detail collateral-col">
                     <InfoText contentKey="col-lt-gains">LT Gain</InfoText>
                   </th>
-                  {qfafEnabled && (
-                    <th className="col-detail qfaf-col">
-                      <InfoText contentKey="col-st-gains">ST Gain</InfoText>
-                    </th>
-                  )}
                 </>
               )}
 
-              {/* QFAF columns */}
-              {qfafEnabled && (
+              {/* QFAF ST Gains - show in combined (expanded) and qfaf-only */}
+              {viewMode === 'qfaf-only' && (
+                <th className="col-detail qfaf-col">
+                  <InfoText contentKey="col-st-gains">ST Gain</InfoText>
+                </th>
+              )}
+              {expandCapital && viewMode === 'combined' && qfafEnabled && (
+                <th className="col-detail qfaf-col">
+                  <InfoText contentKey="col-st-gains">ST Gain</InfoText>
+                </th>
+              )}
+
+              {/* QFAF columns - show in combined and qfaf-only */}
+              {showQfaf && qfafEnabled && (
                 <>
-                  <th className="col-ordinary-loss">
+                  <th className={`col-ordinary-loss ${viewMode === 'qfaf-only' ? 'qfaf-col' : ''}`}>
                     <InfoText contentKey="col-usable-loss">Ord. Loss</InfoText>
                   </th>
 
                   {/* NOL - Collapsible */}
                   <th
-                    className="col-expandable col-nol-activity"
+                    className={`col-expandable col-nol-activity ${viewMode === 'qfaf-only' ? 'qfaf-col' : ''}`}
                     onClick={() => setExpandNOL(!expandNOL)}
                   >
                     <span className="expandable-header">
@@ -193,7 +258,9 @@ export function ResultsTable({
               )}
 
               <th className="col-savings">
-                <InfoText contentKey="col-tax-savings">Savings</InfoText>
+                <InfoText contentKey="col-tax-savings">
+                  {viewMode === 'qfaf-only' ? 'QFAF Benefit' : viewMode === 'collateral-only' ? 'Coll. Benefit' : 'Savings'}
+                </InfoText>
               </th>
             </tr>
           </thead>
@@ -203,9 +270,13 @@ export function ResultsTable({
             <tr className="starting-row">
               <td>Start</td>
               <td>
-                {formatCurrency(sizing.collateralValue + (qfafEnabled ? sizing.qfafValue : 0))}
+                {viewMode === 'qfaf-only'
+                  ? formatCurrency(sizing.qfafValue)
+                  : viewMode === 'collateral-only'
+                    ? formatCurrency(sizing.collateralValue)
+                    : formatCurrency(sizing.collateralValue + (qfafEnabled ? sizing.qfafValue : 0))}
               </td>
-              {expandPortfolio && qfafEnabled && (
+              {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
                 <>
                   <td className="starting-note collateral-col">
                     {formatCurrency(sizing.collateralValue)}
@@ -213,15 +284,18 @@ export function ResultsTable({
                   <td className="starting-note qfaf-col">{formatCurrency(sizing.qfafValue)}</td>
                 </>
               )}
-              <td className="starting-note">—</td>
-              {expandCapital && (
+              {showCollateral && <td className="starting-note">—</td>}
+              {expandCapital && showCollateral && (
                 <>
                   <td className="starting-note collateral-col">—</td>
                   <td className="starting-note collateral-col">—</td>
-                  {qfafEnabled && <td className="starting-note qfaf-col">—</td>}
                 </>
               )}
-              {qfafEnabled && (
+              {viewMode === 'qfaf-only' && <td className="starting-note qfaf-col">—</td>}
+              {expandCapital && viewMode === 'combined' && qfafEnabled && (
+                <td className="starting-note qfaf-col">—</td>
+              )}
+              {showQfaf && qfafEnabled && (
                 <>
                   <td className="starting-note">—</td>
                   <td className="starting-note">—</td>
@@ -238,7 +312,15 @@ export function ResultsTable({
             </tr>
 
             {data.map(year => {
-              cumulativeSavings += year.taxSavings;
+              // Get the appropriate benefit based on view mode
+              const displayedBenefit =
+                viewMode === 'qfaf-only'
+                  ? year.qfafTaxBenefit
+                  : viewMode === 'collateral-only'
+                    ? year.collateralTaxBenefit
+                    : year.taxSavings;
+
+              cumulativeSavings += displayedBenefit;
               const netCapital = getNetCapital(year);
 
               // NOL Activity summary: show net change or current balance
@@ -246,43 +328,60 @@ export function ResultsTable({
               const nolUsed = year.nolUsedThisYear;
               const nolNet = nolGenerated - nolUsed;
 
+              // Get portfolio value based on view mode
+              const portfolioValue =
+                viewMode === 'qfaf-only'
+                  ? year.qfafValue
+                  : viewMode === 'collateral-only'
+                    ? year.collateralValue
+                    : year.totalValue;
+
               return (
                 <tr key={year.year}>
                   <td className="year-cell">{year.year}</td>
-                  <td>{formatCurrency(year.totalValue)}</td>
+                  <td>{formatCurrency(portfolioValue)}</td>
 
-                  {/* Expanded Portfolio Details */}
-                  {expandPortfolio && qfafEnabled && (
+                  {/* Expanded Portfolio Details - only in combined mode */}
+                  {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
                     <>
                       <td className="collateral-col">{formatCurrency(year.collateralValue)}</td>
                       <td className="qfaf-col">{formatCurrency(year.qfafValue)}</td>
                     </>
                   )}
 
-                  {/* Net Capital (collapsed view) */}
-                  <td className={netCapital >= 0 ? 'positive' : 'negative'}>
-                    {netCapital >= 0
-                      ? formatCurrency(netCapital)
-                      : `(${formatCurrency(Math.abs(netCapital))})`}
-                  </td>
+                  {/* Net Capital - show in combined and collateral-only */}
+                  {showCollateral && (
+                    <td className={netCapital >= 0 ? 'positive' : 'negative'}>
+                      {netCapital >= 0
+                        ? formatCurrency(netCapital)
+                        : `(${formatCurrency(Math.abs(netCapital))})`}
+                    </td>
+                  )}
 
-                  {/* Expanded Capital Details */}
-                  {expandCapital && (
+                  {/* Expanded Capital Details - Collateral items */}
+                  {expandCapital && showCollateral && (
                     <>
                       <td className="negative collateral-col">
                         ({formatCurrency(year.stLossesHarvested)})
                       </td>
                       <td className="collateral-col">{formatCurrency(year.ltGainsRealized)}</td>
-                      {qfafEnabled && (
-                        <td className="positive qfaf-col">
-                          {formatCurrency(year.stGainsGenerated)}
-                        </td>
-                      )}
                     </>
                   )}
 
-                  {/* QFAF columns */}
-                  {qfafEnabled && (
+                  {/* QFAF ST Gains - show in qfaf-only OR expanded in combined */}
+                  {viewMode === 'qfaf-only' && (
+                    <td className="positive qfaf-col">
+                      {formatCurrency(year.stGainsGenerated)}
+                    </td>
+                  )}
+                  {expandCapital && viewMode === 'combined' && qfafEnabled && (
+                    <td className="positive qfaf-col">
+                      {formatCurrency(year.stGainsGenerated)}
+                    </td>
+                  )}
+
+                  {/* QFAF columns - show in combined and qfaf-only */}
+                  {showQfaf && qfafEnabled && (
                     <>
                       <td className="positive">{formatCurrency(year.usableOrdinaryLoss)}</td>
 
@@ -310,7 +409,11 @@ export function ResultsTable({
                     </>
                   )}
 
-                  <td className="highlight">{formatCurrency(year.taxSavings)}</td>
+                  <td className={`highlight ${displayedBenefit < 0 ? 'negative' : ''}`}>
+                    {displayedBenefit < 0
+                      ? `(${formatCurrency(Math.abs(displayedBenefit))})`
+                      : formatCurrency(displayedBenefit)}
+                  </td>
                 </tr>
               );
             })}

@@ -1,207 +1,260 @@
-import { useReducer, useCallback, useMemo, memo } from 'react';
-import {
-  QfafTestYearInput,
-  QfafTestYearResult,
-  QfafTestSummary,
-  FilingStatus,
-  SECTION_461_LIMITS_2026,
-} from '../types';
-import {
-  computeQfafTestYears,
-  computeQfafTestSummary,
-  createDefaultQfafTestInputs,
-  updateQfafTestInput,
-  updateSection461LimitsForFilingStatus,
-  isEditableField,
-} from '../qfafTestCalculations';
+import { useReducer, useCallback, useMemo } from 'react';
+import { FilingStatus } from '../types';
+import { STRATEGIES, getStLossRateForYear, SECTION_461L_LIMITS } from '../strategyData';
 import { formatWithCommas, parseFormattedNumber, formatCurrency } from '../utils/formatters';
+import './QfafTestByYear.css';
 
 // Number of years to show in the table
 const NUM_YEARS = 10;
+const START_YEAR = 2026;
+
+// Alpha rate constants
+const QFAF_ALPHA_RATE = 0.0557; // 5.57%
+const QUANTINNO_ALPHA_RATE = 0.0117; // 1.17%
+
+// Fee rates (derived from Excel - percentage of Deals Collateral)
+const ADVISOR_MGMT_FEE_RATE = 0.0057; // ~0.57%
+const QFAF_FINANCING_FEE_RATE = 0.00536; // ~0.54%
+
+// Loss rate multiplier (QFAF generates 150% ordinary losses)
+const QFAF_LOSS_RATE = 1.5;
 
 interface QfafTestByYearProps {
   filingStatus: FilingStatus;
 }
 
-// State machine for managing inputs and preventing race conditions
+// Get overlay and core strategies from strategy data
+const OVERLAY_STRATEGIES = STRATEGIES.filter(s => s.type === 'overlay');
+const CORE_STRATEGIES = STRATEGIES.filter(s => s.type === 'core');
+
+// Assumptions state - editable inputs
+interface Assumptions {
+  initialQfafInvestment: number;
+  initialDealsInvestment: number; // Overlay collateral
+  overlayStrategyId: string; // e.g., 'overlay-45-45'
+  coreStrategyId: string; // e.g., 'core-145-45'
+  marginalTaxRate: number; // Combined federal + state
+}
+
+// Year-by-year computed results
+interface YearResult {
+  year: number;
+  calendarYear: number;
+  dealsCollateralValue: number;
+  qfafSubscriptionSize: number;
+  annualEstOrdinaryLosses: number;
+  section461Limit: number;
+  carryForwardPrior: number;
+  carryForwardNext: number;
+  writeOffAmount: number;
+  taxSavings: number;
+  advisorManagementFee: number;
+  quantinnoFees: number;
+  totalFees: number;
+  netTaxBenefit: number;
+  qfafAlpha: number;
+  quantinnoAlpha: number;
+  totalAlpha: number;
+}
+
 type State = {
-  inputs: QfafTestYearInput[];
-  pendingUpdate: { year: number; field: string; value: number } | null;
+  assumptions: Assumptions;
 };
 
 type Action =
-  | { type: 'UPDATE_FIELD'; year: number; field: string; value: number }
-  | { type: 'UPDATE_FILING_STATUS'; filingStatus: FilingStatus }
+  | { type: 'UPDATE_ASSUMPTION'; field: keyof Assumptions; value: number | string }
   | { type: 'RESET' };
+
+// Defaults matching the Excel screenshot
+const DEFAULT_ASSUMPTIONS: Assumptions = {
+  initialQfafInvestment: 1000000,
+  initialDealsInvestment: 4700000,
+  overlayStrategyId: 'overlay-45-45',
+  coreStrategyId: 'core-145-45',
+  marginalTaxRate: 0.541, // 54.1%
+};
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'UPDATE_FIELD': {
-      if (!isEditableField(action.field)) {
-        return state;
-      }
-      const newInputs = updateQfafTestInput(
-        state.inputs,
-        action.year,
-        action.field,
-        action.value
-      );
-      return { ...state, inputs: newInputs, pendingUpdate: null };
-    }
-    case 'UPDATE_FILING_STATUS': {
-      const newInputs = updateSection461LimitsForFilingStatus(state.inputs, action.filingStatus);
-      return { ...state, inputs: newInputs };
+    case 'UPDATE_ASSUMPTION': {
+      return {
+        ...state,
+        assumptions: {
+          ...state.assumptions,
+          [action.field]: action.value,
+        },
+      };
     }
     case 'RESET': {
-      return {
-        inputs: createDefaultQfafTestInputs(NUM_YEARS),
-        pendingUpdate: null,
-      };
+      return { assumptions: { ...DEFAULT_ASSUMPTIONS } };
     }
     default:
       return state;
   }
 }
 
-// Memoized row component to prevent unnecessary re-renders
-interface YearRowProps {
-  result: QfafTestYearResult;
-  onFieldChange: (year: number, field: string, value: number) => void;
+// Compute year-by-year results from assumptions
+function computeYearResults(
+  assumptions: Assumptions,
+  filingStatus: FilingStatus,
+  numYears: number
+): YearResult[] {
+  const results: YearResult[] = [];
+  let carryForward = 0;
+
+  // Get selected strategies
+  const overlayStrategy = STRATEGIES.find(s => s.id === assumptions.overlayStrategyId);
+  const coreStrategy = STRATEGIES.find(s => s.id === assumptions.coreStrategyId);
+
+  if (!overlayStrategy || !coreStrategy) {
+    return results;
+  }
+
+  // Get §461(l) limit for filing status
+  const section461Limit = SECTION_461L_LIMITS[filingStatus] || SECTION_461L_LIMITS.single;
+
+  // Base values for calculations
+  const initialQfafBase = assumptions.initialQfafInvestment;
+  const initialDealsBase = assumptions.initialDealsInvestment;
+
+  for (let i = 0; i < numYears; i++) {
+    const year = i + 1;
+    const calendarYear = START_YEAR + i;
+
+    // Get year-specific ST loss rates from strategy data
+    const overlayStLossRate = getStLossRateForYear(overlayStrategy, year);
+    const coreStLossRate = getStLossRateForYear(coreStrategy, year);
+
+    // QFAF Subscription Size calculation:
+    // Year 1: Initial QFAF × 1.049 (small growth factor)
+    // Subsequent years: Decays as QFAF generates losses
+    let qfafSubscriptionSize: number;
+    if (i === 0) {
+      qfafSubscriptionSize = initialQfafBase * 1.049;
+    } else {
+      // QFAF decreases over time as it generates losses
+      // Using decay factor derived from Excel: ~0.9231 per year after Year 1
+      const priorQfaf = results[i - 1].qfafSubscriptionSize;
+      qfafSubscriptionSize = priorQfaf * 0.9231;
+    }
+
+    // Annual estimated ordinary losses = QFAF × 150%
+    const annualEstOrdinaryLosses = qfafSubscriptionSize * QFAF_LOSS_RATE;
+
+    // Deals Collateral Value calculation:
+    // The collateral is sized so ST losses = QFAF ST gains (for tax efficiency)
+    // Total ST losses needed = annualEstOrdinaryLosses (since QFAF ST gains = ordinary losses)
+    // Overlay generates: initialDeals × overlayStLossRate
+    // Core makes up the difference
+
+    // ST losses from overlay portion (grows with Quantinno alpha)
+    const overlayCollateral = initialDealsBase * Math.pow(1 + QUANTINNO_ALPHA_RATE, i);
+    const overlayStLosses = overlayCollateral * overlayStLossRate;
+
+    // Additional core collateral needed to match QFAF ST gains
+    const stLossesNeeded = annualEstOrdinaryLosses; // ST gains = ordinary losses for QFAF
+    const coreStLossesNeeded = Math.max(0, stLossesNeeded - overlayStLosses);
+    const coreCollateral = coreStLossRate > 0 ? coreStLossesNeeded / coreStLossRate : 0;
+
+    // Total Deals Collateral = Overlay + Core
+    const dealsCollateralValue = overlayCollateral + coreCollateral;
+
+    // §461(l) limitation and carryforward logic
+    // New losses that can be written off this year (capped by §461(l))
+    const newLossWriteOff = Math.min(annualEstOrdinaryLosses, section461Limit);
+
+    // Total write-off = new loss write-off + all prior carryforward
+    const writeOffAmount = newLossWriteOff + carryForward;
+
+    // Carryforward to next year = new losses that exceed §461(l) limit
+    const carryForwardNext = annualEstOrdinaryLosses - newLossWriteOff;
+
+    // Tax savings = write-off × marginal tax rate
+    const taxSavings = writeOffAmount * assumptions.marginalTaxRate;
+
+    // Fees (based on Deals Collateral Value)
+    const advisorManagementFee = dealsCollateralValue * ADVISOR_MGMT_FEE_RATE;
+    const quantinnoFees = dealsCollateralValue * QFAF_FINANCING_FEE_RATE;
+    const totalFees = advisorManagementFee + quantinnoFees;
+
+    // Net tax benefit = tax savings - fees
+    const netTaxBenefit = taxSavings - totalFees;
+
+    // Alpha calculations
+    const qfafAlpha = qfafSubscriptionSize * QFAF_ALPHA_RATE;
+    const quantinnoAlpha = dealsCollateralValue * QUANTINNO_ALPHA_RATE;
+    const totalAlpha = qfafAlpha + quantinnoAlpha;
+
+    results.push({
+      year,
+      calendarYear,
+      dealsCollateralValue,
+      qfafSubscriptionSize,
+      annualEstOrdinaryLosses,
+      section461Limit,
+      carryForwardPrior: carryForward,
+      carryForwardNext,
+      writeOffAmount,
+      taxSavings,
+      advisorManagementFee,
+      quantinnoFees,
+      totalFees,
+      netTaxBenefit,
+      qfafAlpha,
+      quantinnoAlpha,
+      totalAlpha,
+    });
+
+    // Update carryforward for next year
+    carryForward = carryForwardNext;
+  }
+
+  return results;
 }
 
-const YearRow = memo(function YearRow({ result, onFieldChange }: YearRowProps) {
-  const handleCurrencyChange = useCallback(
-    (field: string, inputValue: string) => {
-      const numericValue = parseFormattedNumber(inputValue);
-      onFieldChange(result.year, field, numericValue);
-    },
-    [result.year, onFieldChange]
-  );
-
-  const handlePercentChange = useCallback(
-    (field: string, inputValue: string) => {
-      const parsed = parseFloat(inputValue);
-      if (!Number.isFinite(parsed)) return;
-      // Convert percentage to decimal (e.g., 45 → 0.45)
-      const decimal = parsed / 100;
-      onFieldChange(result.year, field, decimal);
-    },
-    [result.year, onFieldChange]
-  );
-
-  const handleRateChange = useCallback(
-    (field: string, inputValue: string) => {
-      const parsed = parseFloat(inputValue);
-      if (!Number.isFinite(parsed)) return;
-      onFieldChange(result.year, field, parsed);
-    },
-    [result.year, onFieldChange]
-  );
-
-  return (
-    <tr>
-      <td className="year-cell">{result.year}</td>
-      {/* Editable: Cash Infusion */}
-      <td>
-        <div className="input-with-prefix compact">
-          <span className="prefix">$</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={formatWithCommas(result.cashInfusion)}
-            onChange={e => handleCurrencyChange('cashInfusion', e.target.value)}
-            className={result.cashInfusion > 0 ? 'modified' : ''}
-          />
-        </div>
-      </td>
-      {/* Editable: Marginal Tax Rate */}
-      <td>
-        <div className="input-with-suffix compact">
-          <input
-            type="number"
-            min={0}
-            max={60}
-            step={0.1}
-            value={(result.marginalTaxRate * 100).toFixed(1)}
-            onChange={e => handlePercentChange('marginalTaxRate', e.target.value)}
-            className="rate-input"
-          />
-          <span className="suffix">%</span>
-        </div>
-      </td>
-      {/* Editable: Loss Rate */}
-      <td>
-        <div className="input-with-suffix compact">
-          <input
-            type="number"
-            min={0}
-            max={3}
-            step={0.1}
-            value={result.lossRate.toFixed(1)}
-            onChange={e => handleRateChange('lossRate', e.target.value)}
-            className="rate-input"
-          />
-          <span className="suffix">x</span>
-        </div>
-      </td>
-      {/* Computed: Subscription Size */}
-      <td className="computed">{formatCurrency(result.subscriptionSize)}</td>
-      {/* Computed: Estimated Loss */}
-      <td className="computed">{formatCurrency(result.estimatedOrdinaryLoss)}</td>
-      {/* Computed: Allowed Loss (capped by §461(l)) */}
-      <td className="computed highlight">{formatCurrency(result.allowedLoss)}</td>
-      {/* Computed: Carryforward */}
-      <td className="computed">{formatCurrency(result.carryForwardNext)}</td>
-      {/* Computed: Tax Savings */}
-      <td className="computed highlight positive">{formatCurrency(result.taxSavings)}</td>
-      {/* Computed: Total Fees */}
-      <td className="computed negative">{formatCurrency(result.totalFees)}</td>
-      {/* Computed: Net Savings */}
-      <td className={`computed ${result.netSavingsNoAlpha >= 0 ? 'positive' : 'negative'}`}>
-        {formatCurrency(result.netSavingsNoAlpha)}
-      </td>
-    </tr>
-  );
-});
-
-// Summary row component
-interface SummaryRowProps {
-  summary: QfafTestSummary;
+// Row definitions for the summary table
+interface RowDef {
+  key: string;
+  label: string;
+  field: keyof YearResult;
+  format: 'currency' | 'currency-highlight' | 'currency-positive' | 'currency-negative';
 }
 
-function SummaryRow({ summary }: SummaryRowProps) {
-  return (
-    <tr className="summary-row">
-      <td className="year-cell">Total</td>
-      <td className="summary-value">{formatCurrency(summary.totalCashInfusion)}</td>
-      <td className="summary-value">-</td>
-      <td className="summary-value">-</td>
-      <td className="summary-value">{formatCurrency(summary.totalSubscriptionSize)}</td>
-      <td className="summary-value">{formatCurrency(summary.totalEstimatedOrdinaryLoss)}</td>
-      <td className="summary-value highlight">{formatCurrency(summary.totalAllowedLoss)}</td>
-      <td className="summary-value">{formatCurrency(summary.finalCarryForward)}</td>
-      <td className="summary-value highlight positive">{formatCurrency(summary.totalTaxSavings)}</td>
-      <td className="summary-value negative">{formatCurrency(summary.totalFees)}</td>
-      <td className={`summary-value ${summary.totalNetSavingsNoAlpha >= 0 ? 'positive' : 'negative'}`}>
-        {formatCurrency(summary.totalNetSavingsNoAlpha)}
-      </td>
-    </tr>
-  );
-}
+const ROW_DEFINITIONS: RowDef[] = [
+  { key: 'dealsCollateralValue', label: 'Deals Collateral Value', field: 'dealsCollateralValue', format: 'currency' },
+  { key: 'qfafSubscriptionSize', label: 'QFAF Subscription Size', field: 'qfafSubscriptionSize', format: 'currency' },
+  { key: 'annualEstOrdinaryLosses', label: 'Annual Est. Ordinary Losses', field: 'annualEstOrdinaryLosses', format: 'currency' },
+  { key: 'section461Limit', label: 'Annual limitation TCJA Section 461(l)', field: 'section461Limit', format: 'currency' },
+  { key: 'carryForwardPrior', label: 'Carry Forward Prior Year', field: 'carryForwardPrior', format: 'currency' },
+  { key: 'carryForwardNext', label: 'Carry Forward to Next Year', field: 'carryForwardNext', format: 'currency' },
+  { key: 'writeOffAmount', label: 'Write Off Amount', field: 'writeOffAmount', format: 'currency-highlight' },
+  { key: 'taxSavings', label: 'Tax Savings', field: 'taxSavings', format: 'currency-positive' },
+  { key: 'advisorManagementFee', label: 'Advisor Management Fee (Quantinno Only)', field: 'advisorManagementFee', format: 'currency-negative' },
+  { key: 'quantinnoFees', label: 'Quantinno/QFAF/Financing Fees', field: 'quantinnoFees', format: 'currency-negative' },
+  { key: 'totalFees', label: 'Total', field: 'totalFees', format: 'currency-negative' },
+  { key: 'netTaxBenefit', label: 'Net Tax Benefit', field: 'netTaxBenefit', format: 'currency-highlight' },
+  { key: 'qfafAlpha', label: `Historical Strategy Alpha QFAF (${(QFAF_ALPHA_RATE * 100).toFixed(2)}%)`, field: 'qfafAlpha', format: 'currency-positive' },
+  { key: 'quantinnoAlpha', label: `Historical Strategy Alpha Quantinno (${(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%)`, field: 'quantinnoAlpha', format: 'currency-positive' },
+  { key: 'totalAlpha', label: 'Total', field: 'totalAlpha', format: 'currency-positive' },
+];
 
 export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
   const [state, dispatch] = useReducer(reducer, null, () => ({
-    inputs: createDefaultQfafTestInputs(NUM_YEARS, filingStatus),
-    pendingUpdate: null,
+    assumptions: { ...DEFAULT_ASSUMPTIONS },
   }));
 
-  // Compute results from inputs (memoized)
-  const results = useMemo(() => computeQfafTestYears(state.inputs), [state.inputs]);
-  const summary = useMemo(() => computeQfafTestSummary(results), [results]);
+  // Compute results from assumptions (memoized)
+  const results = useMemo(
+    () => computeYearResults(state.assumptions, filingStatus, NUM_YEARS),
+    [state.assumptions, filingStatus]
+  );
 
-  // Debounced field change handler
-  const handleFieldChange = useCallback((year: number, field: string, value: number) => {
-    dispatch({ type: 'UPDATE_FIELD', year, field, value });
+  // Get §461(l) limit for display
+  const section461Limit = SECTION_461L_LIMITS[filingStatus] || SECTION_461L_LIMITS.single;
+
+  // Assumption change handler
+  const handleAssumptionChange = useCallback((field: keyof Assumptions, value: number | string) => {
+    dispatch({ type: 'UPDATE_ASSUMPTION', field, value });
   }, []);
 
   // Reset handler
@@ -209,83 +262,207 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
     dispatch({ type: 'RESET' });
   }, []);
 
-  // Check if any changes have been made
-  const hasChanges = state.inputs.some(input => input.cashInfusion > 0);
+  // Format cell value based on row definition
+  const formatCellValue = (rowDef: RowDef, value: number) => {
+    const formatted = formatCurrency(value);
+    switch (rowDef.format) {
+      case 'currency-highlight':
+        return <span className="cell-highlight">{formatted}</span>;
+      case 'currency-positive':
+        return <span className="cell-positive">{formatted}</span>;
+      case 'currency-negative':
+        return <span className="cell-negative">{formatted}</span>;
+      default:
+        return formatted;
+    }
+  };
 
-  // Get the current §461(l) limit for display
-  const section461Limit = SECTION_461_LIMITS_2026[filingStatus];
+  // Compute totals
+  const totals = useMemo(() => {
+    const sum = (field: keyof YearResult) =>
+      results.reduce((acc, r) => acc + (r[field] as number), 0);
+
+    return {
+      dealsCollateralValue: results[results.length - 1]?.dealsCollateralValue || 0,
+      qfafSubscriptionSize: sum('qfafSubscriptionSize'),
+      annualEstOrdinaryLosses: sum('annualEstOrdinaryLosses'),
+      section461Limit: section461Limit,
+      carryForwardPrior: 0,
+      carryForwardNext: results[results.length - 1]?.carryForwardNext || 0,
+      writeOffAmount: sum('writeOffAmount'),
+      taxSavings: sum('taxSavings'),
+      advisorManagementFee: sum('advisorManagementFee'),
+      quantinnoFees: sum('quantinnoFees'),
+      totalFees: sum('totalFees'),
+      netTaxBenefit: sum('netTaxBenefit'),
+      qfafAlpha: sum('qfafAlpha'),
+      quantinnoAlpha: sum('quantinnoAlpha'),
+      totalAlpha: sum('totalAlpha'),
+    };
+  }, [results, section461Limit]);
+
+  // Get strategy display name
+  const getStrategyLabel = (strategyId: string) => {
+    const strategy = STRATEGIES.find(s => s.id === strategyId);
+    return strategy ? strategy.name.split(' ')[1] : strategyId; // e.g., "145/45"
+  };
 
   return (
-    <div className="qfaf-test-by-year">
-      <p className="section-description">
-        Model QFAF economics year-by-year. Enter annual cash infusions to see estimated
-        tax savings, §461(l) limitations, and carryforward projections.
-      </p>
-
-      <div className="qfaf-info-bar">
-        <span className="info-item">
-          <strong>Filing Status:</strong> {filingStatus.toUpperCase()}
-        </span>
-        <span className="info-item">
-          <strong>§461(l) Limit:</strong> {formatCurrency(section461Limit)}/year
-        </span>
-      </div>
-
-      <div className="year-table-container qfaf-table-container">
-        <table className="year-table qfaf-table">
-          <thead>
-            <tr>
-              <th className="col-year">Yr</th>
-              <th className="col-infusion">Cash Infusion</th>
-              <th className="col-rate">Tax Rate</th>
-              <th className="col-rate">Loss Rate</th>
-              <th className="col-computed">Subscription</th>
-              <th className="col-computed">Est. Loss</th>
-              <th className="col-computed highlight">Allowed</th>
-              <th className="col-computed">Carryforward</th>
-              <th className="col-computed highlight">Tax Savings</th>
-              <th className="col-computed">Fees</th>
-              <th className="col-computed">Net Savings</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map(result => (
-              <YearRow
-                key={result.year}
-                result={result}
-                onFieldChange={handleFieldChange}
+    <div className="qfaf-test-excel">
+      {/* Assumptions Section */}
+      <div className="assumptions-section">
+        <h3>Assumptions: Adjust the cells in orange</h3>
+        <div className="assumptions-grid">
+          <div className="assumption-row">
+            <label>Initial QFAF Investment</label>
+            <div className="input-with-prefix editable-cell">
+              <span className="prefix">$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatWithCommas(state.assumptions.initialQfafInvestment)}
+                onChange={e => {
+                  handleAssumptionChange('initialQfafInvestment', parseFormattedNumber(e.target.value));
+                }}
               />
-            ))}
-            <SummaryRow summary={summary} />
-          </tbody>
-        </table>
-      </div>
+            </div>
+          </div>
 
-      <div className="year-actions">
-        <button type="button" onClick={handleReset} className="btn-secondary" disabled={!hasChanges}>
-          Reset to Default
-        </button>
-        {hasChanges && (
-          <span className="changes-indicator">
-            Projections updated based on your inputs
+          <div className="assumption-row">
+            <label>Initial Deals Investment (Overlay)</label>
+            <div className="input-with-prefix editable-cell">
+              <span className="prefix">$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatWithCommas(state.assumptions.initialDealsInvestment)}
+                onChange={e => {
+                  handleAssumptionChange('initialDealsInvestment', parseFormattedNumber(e.target.value));
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="assumption-row">
+            <label>Initial Leverage (Overlay)</label>
+            <div className="editable-cell select-cell">
+              <select
+                value={state.assumptions.overlayStrategyId}
+                onChange={e => handleAssumptionChange('overlayStrategyId', e.target.value)}
+              >
+                {OVERLAY_STRATEGIES.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name.split(' ')[1]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="assumption-row">
+            <label>New Cash Leverage (Core)</label>
+            <div className="editable-cell select-cell">
+              <select
+                value={state.assumptions.coreStrategyId}
+                onChange={e => handleAssumptionChange('coreStrategyId', e.target.value)}
+              >
+                {CORE_STRATEGIES.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name.split(' ')[1]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="assumption-row">
+            <label>Marginal Tax Rate</label>
+            <div className="input-with-suffix editable-cell">
+              <input
+                type="number"
+                min={0}
+                max={65}
+                step={0.1}
+                value={(state.assumptions.marginalTaxRate * 100).toFixed(2)}
+                onChange={e => {
+                  const parsed = parseFloat(e.target.value);
+                  if (Number.isFinite(parsed)) {
+                    handleAssumptionChange('marginalTaxRate', parsed / 100);
+                  }
+                }}
+              />
+              <span className="suffix">%</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="assumptions-footer">
+          <button type="button" onClick={handleReset} className="btn-reset">
+            Reset to Defaults
+          </button>
+          <span className="filing-status-note">
+            Filing Status: {filingStatus.toUpperCase()} | §461(l) Limit: {formatCurrency(section461Limit)}
           </span>
-        )}
+        </div>
       </div>
 
+      {/* Summary Table */}
+      <div className="summary-section">
+        <h3>Summary</h3>
+        <div className="summary-table-container">
+          <table className="summary-table">
+            <thead>
+              <tr>
+                <th className="col-label"></th>
+                {results.map(r => (
+                  <th key={r.year} className="col-year">{r.calendarYear}</th>
+                ))}
+                <th className="col-total">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROW_DEFINITIONS.map((rowDef) => (
+                <tr key={rowDef.key} className={`row-${rowDef.format}`}>
+                  <td className="row-label">
+                    {rowDef.key === 'dealsCollateralValue'
+                      ? `Deals Collateral Value (${getStrategyLabel(state.assumptions.coreStrategyId)})`
+                      : rowDef.label}
+                  </td>
+                  {results.map(result => (
+                    <td key={result.year} className="cell-value">
+                      {formatCellValue(rowDef, result[rowDef.field] as number)}
+                    </td>
+                  ))}
+                  <td className="cell-total">
+                    {rowDef.key === 'carryForwardPrior' || rowDef.key === 'section461Limit'
+                      ? '-'
+                      : formatCellValue(rowDef, totals[rowDef.field as keyof typeof totals])}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Notes */}
       <div className="qfaf-notes">
-        <h4>Notes</h4>
+        <h4>Calculation Notes</h4>
         <ul>
           <li>
-            <strong>Loss Rate:</strong> Multiplier for ordinary loss generation (1.5x = 150% of subscription)
+            <strong>QFAF Subscription:</strong> Sized based on initial investment with Year 1 adjustment factor (1.049×), then decays ~7.7% annually.
           </li>
           <li>
-            <strong>Allowed Loss:</strong> Capped by §461(l) excess business loss limitation
+            <strong>Deals Collateral:</strong> Calculated so total ST losses = QFAF ST gains. Combines Overlay (growing at {(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%) + Core collateral.
           </li>
           <li>
-            <strong>Carryforward:</strong> Excess losses above §461(l) limit carry to future years as NOL
+            <strong>Ordinary Losses:</strong> QFAF generates {(QFAF_LOSS_RATE * 100).toFixed(0)}% of subscription as ordinary losses.
           </li>
           <li>
-            <strong>Net Savings:</strong> Tax savings minus management and QFAF fees (excludes alpha)
+            <strong>§461(l) Limit:</strong> {formatCurrency(section461Limit)} for {filingStatus.toUpperCase()} filers. Excess carries forward as NOL.
+          </li>
+          <li>
+            <strong>Carryforward Usage:</strong> Prior year carryforward is fully used in addition to the annual §461(l) limit.
           </li>
         </ul>
       </div>

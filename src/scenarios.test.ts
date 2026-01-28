@@ -41,12 +41,12 @@ describe('Financial Advisor Scenarios', () => {
     it('should correctly size QFAF for $1M collateral', () => {
       const sizing = calculateSizing(client);
 
-      // Core 145/45 has 13% ST loss rate
-      // QFAF = (1M * 13%) / 150% = 130K / 1.5 = $86,667
-      expect(sizing.qfafValue).toBeCloseTo(86667, -2);
-      expect(sizing.year1StLosses).toBeCloseTo(130000, 0);
-      expect(sizing.year1StGains).toBeCloseTo(130000, 0); // Should match ST losses
-      expect(sizing.totalExposure).toBeCloseTo(1086667, -2);
+      // Core 145/45 has 28.5% Year 1 ST loss rate
+      // QFAF = (1M * 28.5%) / 150% = 285K / 1.5 = $190,000
+      expect(sizing.qfafValue).toBeCloseTo(190000, -2);
+      expect(sizing.year1StLosses).toBeCloseTo(285000, 0);
+      expect(sizing.year1StGains).toBeCloseTo(285000, 0); // Should match ST losses
+      expect(sizing.totalExposure).toBeCloseTo(1190000, -2);
     });
 
     it('should calculate correct tax rates for CA MFJ $500K income', () => {
@@ -176,13 +176,13 @@ describe('Financial Advisor Scenarios', () => {
     it('should show loss rate decay over 10 years', () => {
       const result = calculate(client, DEFAULT_SETTINGS);
 
-      // Year 1 effective ST loss rate should be ~13%
-      expect(result.years[0].effectiveStLossRate).toBeCloseTo(0.13, 2);
+      // Year 1 effective ST loss rate for Core 145/45 is 28.5%
+      expect(result.years[0].effectiveStLossRate).toBeCloseTo(0.285, 2);
 
-      // Year 10 should be lower due to TLH exhaustion (7% annual decay, 30% floor)
-      // After 9 years of decay: 0.13 * 0.93^9 ≈ 0.068
+      // Year 10 should be lower (4.5% floor for 145/45 strategy)
+      // Uses year-by-year rates from strategyData
       expect(result.years[9].effectiveStLossRate).toBeLessThan(result.years[0].effectiveStLossRate);
-      expect(result.years[9].effectiveStLossRate).toBeGreaterThan(0.039); // 30% of 13%
+      expect(result.years[9].effectiveStLossRate).toBeCloseTo(0.045, 2);
     });
   });
 

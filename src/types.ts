@@ -91,6 +91,10 @@ export interface YearResult {
   // Income offset tracking
   incomeOffsetAmount: number; // Total income offset: ordinary loss + NOL used + capital loss used
   maxIncomeOffsetCapacity: number; // Max income that could be offset (useful for option exercise planning)
+
+  // Component-specific tax benefits (for view mode breakdown)
+  qfafTaxBenefit: number; // Ordinary loss + NOL usage + ST→LT conversion benefit
+  collateralTaxBenefit: number; // Capital loss benefit - LT gain cost - remaining ST cost
 }
 
 export interface CalculationResult {

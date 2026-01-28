@@ -23,7 +23,7 @@ import {
 } from './types';
 import {
   InfoPopup,
-  FieldInfoPopup,
+  InfoText,
   QfafSizingFormula,
   StrategyRatesFormula,
   ProjectionFormula,
@@ -44,7 +44,6 @@ import { ScenarioAnalysis } from './AdvancedMode/ScenarioAnalysis';
 import { StrategyComparison } from './AdvancedMode/StrategyComparison';
 import { SettingsPanel } from './AdvancedMode/SettingsPanel';
 import { QfafTestByYear } from './AdvancedMode/QfafTestByYear';
-import { SettingsIcon } from './components/Icons';
 import { StrategyRateEditor } from './AdvancedMode/StrategyRateEditor';
 import {
   formatWithCommas,
@@ -440,22 +439,24 @@ export function Calculator() {
         <div className="sizing-cards">
           <div className="sizing-card">
             <span className="sizing-label">
-              Collateral
-              <FieldInfoPopup
+              <InfoText
                 contentKey="collateral-value"
                 currentValue={formatCurrency(results.sizing.collateralValue)}
-              />
+              >
+                Collateral
+              </InfoText>
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.collateralValue)}</span>
             <span className="sizing-sublabel">{results.sizing.strategyName}</span>
           </div>
           <div className="sizing-card">
             <span className="sizing-label">
-              Auto-Sized QFAF
-              <FieldInfoPopup
+              <InfoText
                 contentKey="auto-sized-qfaf"
                 currentValue={formatCurrency(results.sizing.qfafValue)}
-              />
+              >
+                Auto-Sized QFAF
+              </InfoText>
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.qfafValue)}</span>
             <span className="sizing-sublabel">
@@ -464,21 +465,23 @@ export function Calculator() {
           </div>
           <div className="sizing-card highlight">
             <span className="sizing-label">
-              Total Exposure
-              <FieldInfoPopup
+              <InfoText
                 contentKey="total-exposure"
                 currentValue={formatCurrency(results.sizing.totalExposure)}
-              />
+              >
+                Total Exposure
+              </InfoText>
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.totalExposure)}</span>
           </div>
           <div className="sizing-card">
             <span className="sizing-label">
-              §461(l) Limit
-              <FieldInfoPopup
+              <InfoText
                 contentKey="section-461-limit"
                 currentValue={formatCurrency(results.sizing.section461Limit)}
-              />
+              >
+                §461(l) Limit
+              </InfoText>
             </span>
             <span className="sizing-value">{formatCurrency(results.sizing.section461Limit)}</span>
             <span className="sizing-sublabel">
@@ -490,48 +493,53 @@ export function Calculator() {
         <div className="offset-status">
           <div className="offset-row">
             <span>
-              Year 1 ST Losses (Collateral)
-              <FieldInfoPopup
+              <InfoText
                 contentKey="year1-st-losses"
                 currentValue={formatCurrency(results.sizing.year1StLosses)}
-              />
+              >
+                Year 1 ST Losses (Collateral)
+              </InfoText>
             </span>
             <span className="positive">{formatCurrency(results.sizing.year1StLosses)}</span>
           </div>
           <div className="offset-row">
             <span>
-              Year 1 ST Gains (QFAF)
-              <FieldInfoPopup
+              <InfoText
                 contentKey="year1-st-gains"
                 currentValue={formatCurrency(results.sizing.year1StGains)}
-              />
+              >
+                Year 1 ST Gains (QFAF)
+              </InfoText>
             </span>
             <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
           </div>
           <div className="offset-row result success">
             <span>
-              Net ST Position
-              <FieldInfoPopup contentKey="net-st-position" currentValue="$0 (Fully Matched)" />
+              <InfoText contentKey="net-st-position" currentValue="$0 (Fully Matched)">
+                Net ST Position
+              </InfoText>
             </span>
             <span>Fully Matched</span>
           </div>
           <div className="offset-row">
             <span>
-              Year 1 Ordinary Loss (QFAF)
-              <FieldInfoPopup
+              <InfoText
                 contentKey="year1-ordinary-losses"
                 currentValue={formatCurrency(results.sizing.year1OrdinaryLosses)}
-              />
+              >
+                Year 1 Ordinary Loss (QFAF)
+              </InfoText>
             </span>
             <span className="positive">{formatCurrency(results.sizing.year1OrdinaryLosses)}</span>
           </div>
           <div className="offset-row">
             <span>
-              Usable Ordinary Loss
-              <FieldInfoPopup
+              <InfoText
                 contentKey="usable-ordinary-loss"
                 currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
-              />
+              >
+                Usable Ordinary Loss
+              </InfoText>
             </span>
             <span className="positive">
               {formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
@@ -540,11 +548,12 @@ export function Calculator() {
           {results.sizing.year1ExcessToNol > 0 && (
             <div className="offset-row">
               <span>
-                Excess → NOL Carryforward
-                <FieldInfoPopup
+                <InfoText
                   contentKey="excess-to-nol"
                   currentValue={formatCurrency(results.sizing.year1ExcessToNol)}
-                />
+                >
+                  Excess → NOL Carryforward
+                </InfoText>
               </span>
               <span>{formatCurrency(results.sizing.year1ExcessToNol)}</span>
             </div>
@@ -557,13 +566,14 @@ export function Calculator() {
           <div className="benefit-cards">
             <div className="benefit-card">
               <span className="benefit-label">
-                Ordinary Loss Benefit
-                <FieldInfoPopup
+                <InfoText
                   contentKey="ordinary-loss-benefit"
                   currentValue={formatCurrency(
                     results.sizing.year1UsableOrdinaryLoss * combinedStRate
                   )}
-                />
+                >
+                  Ordinary Loss Benefit
+                </InfoText>
               </span>
               <span className="benefit-value positive">
                 +{formatCurrency(results.sizing.year1UsableOrdinaryLoss * combinedStRate)}
@@ -575,11 +585,12 @@ export function Calculator() {
             </div>
             <div className="benefit-card">
               <span className="benefit-label">
-                ST→LT Conversion
-                <FieldInfoPopup
+                <InfoText
                   contentKey="st-lt-conversion-benefit"
                   currentValue={formatCurrency(results.sizing.year1StLosses * rateDifferential)}
-                />
+                >
+                  ST→LT Conversion
+                </InfoText>
               </span>
               <span className="benefit-value positive">
                 +{formatCurrency(results.sizing.year1StLosses * rateDifferential)}
@@ -590,11 +601,12 @@ export function Calculator() {
             </div>
             <div className="benefit-card">
               <span className="benefit-label">
-                LT Gain Cost
-                <FieldInfoPopup
+                <InfoText
                   contentKey="lt-gain-cost"
                   currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)}
-                />
+                >
+                  LT Gain Cost
+                </InfoText>
               </span>
               <span className="benefit-value negative">
                 −{formatCurrency((results.years[0]?.ltGainsRealized ?? 0) * combinedLtRate)}
@@ -606,11 +618,12 @@ export function Calculator() {
             </div>
             <div className="benefit-card highlight">
               <span className="benefit-label">
-                Net Year 1 Tax Savings
-                <FieldInfoPopup
+                <InfoText
                   contentKey="year1-tax-savings"
                   currentValue={formatCurrency(results.years[0]?.taxSavings ?? 0)}
-                />
+                >
+                  Net Year 1 Tax Savings
+                </InfoText>
               </span>
               <span className="benefit-value">
                 {formatCurrency(results.years[0]?.taxSavings ?? 0)}
@@ -641,8 +654,9 @@ export function Calculator() {
             <div className="benefit-cards">
               <div className="benefit-card">
                 <span className="benefit-label">
-                  Ordinary Loss Benefit
-                  <FieldInfoPopup contentKey="ordinary-loss-benefit" />
+                  <InfoText contentKey="ordinary-loss-benefit">
+                    Ordinary Loss Benefit
+                  </InfoText>
                 </span>
                 <span className="benefit-value positive">
                   +{formatCurrency(results.years[1]?.usableOrdinaryLoss * combinedStRate)}
@@ -654,8 +668,9 @@ export function Calculator() {
               </div>
               <div className="benefit-card">
                 <span className="benefit-label">
-                  ST→LT Conversion
-                  <FieldInfoPopup contentKey="st-lt-conversion-benefit" />
+                  <InfoText contentKey="st-lt-conversion-benefit">
+                    ST→LT Conversion
+                  </InfoText>
                 </span>
                 <span className="benefit-value positive">
                   +{formatCurrency(results.years[1]?.stLossesHarvested * rateDifferential)}
@@ -667,8 +682,9 @@ export function Calculator() {
               </div>
               <div className="benefit-card">
                 <span className="benefit-label">
-                  NOL Offset Benefit
-                  <FieldInfoPopup contentKey="nol-offset-benefit" />
+                  <InfoText contentKey="nol-offset-benefit">
+                    NOL Offset Benefit
+                  </InfoText>
                 </span>
                 <span className="benefit-value positive">
                   +{formatCurrency((results.years[1]?.nolUsedThisYear ?? 0) * combinedStRate)}
@@ -680,8 +696,9 @@ export function Calculator() {
               </div>
               <div className="benefit-card">
                 <span className="benefit-label">
-                  LT Gain Cost
-                  <FieldInfoPopup contentKey="lt-gain-cost" />
+                  <InfoText contentKey="lt-gain-cost">
+                    LT Gain Cost
+                  </InfoText>
                 </span>
                 <span className="benefit-value negative">
                   −{formatCurrency((results.years[1]?.ltGainsRealized ?? 0) * combinedLtRate)}
@@ -693,8 +710,9 @@ export function Calculator() {
               </div>
               <div className="benefit-card highlight">
                 <span className="benefit-label">
-                  Net Year 2 Tax Savings
-                  <FieldInfoPopup contentKey="year2-tax-savings" />
+                  <InfoText contentKey="year2-tax-savings">
+                    Net Year 2 Tax Savings
+                  </InfoText>
                 </span>
                 <span className="benefit-value">
                   {formatCurrency(results.years[1]?.taxSavings ?? 0)}
@@ -710,12 +728,6 @@ export function Calculator() {
           </div>
         )}
       </section>
-
-      {/* Advanced Settings Button */}
-      <button className="advanced-settings-btn" onClick={() => setIsAdvancedModalOpen(true)}>
-        <SettingsIcon />
-        Advanced Settings
-      </button>
 
       {/* Advanced Settings Modal */}
       <AdvancedModal isOpen={isAdvancedModalOpen} onClose={() => setIsAdvancedModalOpen(false)}>

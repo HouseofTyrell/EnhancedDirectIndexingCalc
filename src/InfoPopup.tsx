@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getPopupContent } from './popupContent';
 
 interface InfoPopupProps {
@@ -22,7 +23,7 @@ export function InfoPopup({ title, children }: InfoPopupProps) {
         </svg>
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div className="popup-overlay" onClick={() => setIsOpen(false)}>
           <div className="popup-content" onClick={e => e.stopPropagation()}>
             <div className="popup-header">
@@ -38,7 +39,8 @@ export function InfoPopup({ title, children }: InfoPopupProps) {
             </div>
             <div className="popup-body">{children}</div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -111,7 +113,7 @@ export function InfoText({ contentKey, children, currentValue }: InfoTextProps) 
         {children}
       </span>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div className="popup-overlay" onClick={() => setIsOpen(false)}>
           <div className="popup-content" onClick={e => e.stopPropagation()}>
             <div className="popup-header">
@@ -145,7 +147,8 @@ export function InfoText({ contentKey, children, currentValue }: InfoTextProps) 
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

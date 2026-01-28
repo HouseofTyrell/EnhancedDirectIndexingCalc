@@ -40,12 +40,12 @@ describe('calculateSizing', () => {
     const inputs = createInputs();
     const sizing = calculateSizing(inputs);
 
-    // Core-130-30: 10% ST loss rate, 2.4% LT gain rate
+    // Core-130-30: 23% Year 1 ST loss rate, 2.4% LT gain rate
     expect(sizing.collateralValue).toBe(1000000);
-    expect(sizing.year1StLosses).toBe(100000); // 1M × 10%
-    expect(sizing.qfafValue).toBeCloseTo(66666.67, 0); // 100K / 150%
-    expect(sizing.year1StGains).toBeCloseTo(100000, 0); // QFAF × 150%
-    expect(sizing.year1OrdinaryLosses).toBeCloseTo(100000, 0); // QFAF × 150%
+    expect(sizing.year1StLosses).toBe(230000); // 1M × 23%
+    expect(sizing.qfafValue).toBeCloseTo(153333.33, 0); // 230K / 150%
+    expect(sizing.year1StGains).toBeCloseTo(230000, 0); // QFAF × 150%
+    expect(sizing.year1OrdinaryLosses).toBeCloseTo(230000, 0); // QFAF × 150%
   });
 
   it('applies Section 461(l) limit to ordinary losses', () => {
@@ -268,18 +268,18 @@ describe('calculate - loss rate decay', () => {
     expect(year1Rate).toBeGreaterThan(year10Rate);
   });
 
-  it('respects 30% floor on loss rate decay', () => {
+  it('uses year-by-year rates from strategy data', () => {
     const result = calculate(createInputs());
 
-    // After 10 years, decay is 0.93^9 ≈ 0.52, but floor is 0.30
-    // Year 10 rate should be at least 30% of Year 1 rate
+    // Core-130-30 has year-by-year rates that stabilize at Year 6
+    // Year 1: 23%, Year 10: 3%
     const year1Rate = result.years[0].stLossesHarvested / result.years[0].collateralValue;
     const year10Rate = result.years[9].stLossesHarvested / result.years[9].collateralValue;
 
-    // Check the rate didn't collapse below floor
-    // For core-130-30: base = 10%, floor = 3%
-    expect(year10Rate).toBeGreaterThan(0.03);
-    expect(year10Rate / year1Rate).toBeGreaterThan(0.3);
+    // Check rates follow the expected pattern
+    // Year 1 should be significantly higher than Year 10
+    expect(year1Rate).toBeGreaterThan(0.20); // ~23%
+    expect(year10Rate).toBeLessThan(0.05); // ~3%
   });
 });
 
@@ -287,10 +287,10 @@ describe('calculate - wash sale adjustment', () => {
   it('default has no wash sale disallowance', () => {
     const result = calculate(createInputs());
 
-    // Core-130-30 has 10% ST loss rate
+    // Core-130-30 has 23% Year 1 ST loss rate
     // Default wash sale rate is 0, so all losses are harvested
-    // Gross losses = collateral × stLossRate = 1M × 10% = 100K
-    const grossLosses = 1000000 * 0.1;
+    // Gross losses = collateral × stLossRate = 1M × 23% = 230K
+    const grossLosses = 1000000 * 0.23;
     const expectedHarvested = grossLosses; // No reduction with 0% wash sale
 
     expect(result.years[0].stLossesHarvested).toBeCloseTo(expectedHarvested, 0);
@@ -303,9 +303,9 @@ describe('calculate - wash sale adjustment', () => {
     };
     const result = calculate(createInputs(), customSettings);
 
-    // Core-130-30 has 10% ST loss rate
+    // Core-130-30 has 23% Year 1 ST loss rate
     // With 10% wash sale, harvested = 90% of gross
-    const grossLosses = 1000000 * 0.1;
+    const grossLosses = 1000000 * 0.23;
     const expectedHarvested = grossLosses * 0.9;
 
     expect(result.years[0].stLossesHarvested).toBeCloseTo(expectedHarvested, 0);
