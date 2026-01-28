@@ -1222,6 +1222,20 @@ input[type='range']::-webkit-slider-thumb {
   font-size: 1.1rem;
 }
 
+/* Charts responsive - reduce margins on mobile */
+@media (max-width: 480px) {
+  .chart-container {
+    margin-bottom: 1.5rem;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+  }
+
+  .chart-container h3 {
+    font-size: 1rem;
+    margin-left: 0.5rem;
+  }
+}
+
 /* Table */
 .table-container {
   overflow-x: auto;
@@ -3861,5 +3875,730 @@ tfoot td {
   .expand-icon {
     width: 14px;
     height: 14px;
+  }
+}
+
+/* ============================================
+   ENHANCED MOBILE RESPONSIVE STYLES
+   iPhone and small screen optimizations
+   ============================================ */
+
+/* Small phones (iPhone SE, older iPhones, small Android) */
+@media (max-width: 480px) {
+  /* Navigation - more compact */
+  .nav-container {
+    padding: 0 0.75rem;
+  }
+
+  .nav-tab {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  /* Calculator container - less padding */
+  .calculator {
+    padding: 0.75rem;
+  }
+
+  /* Header - smaller title */
+  .header h1 {
+    font-size: 1.25rem;
+  }
+
+  .header .subtitle {
+    font-size: 0.9rem;
+  }
+
+  /* Sticky header - optimized for small screens */
+  .sticky-header {
+    margin: 0 -0.75rem 1rem -0.75rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .sticky-header__content {
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .sticky-header__metric {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 80px;
+  }
+
+  .sticky-header__label {
+    font-size: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sticky-header__value {
+    font-size: 0.75rem;
+  }
+
+  .sticky-header__advanced-btn {
+    padding: 0.35rem;
+  }
+
+  .sticky-header__advanced-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Section styling */
+  section,
+  details {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+  }
+
+  section h2 {
+    font-size: 1.1rem;
+  }
+
+  .section-number {
+    font-size: 0.65rem;
+  }
+
+  .section-number::before {
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.65rem;
+  }
+
+  .section-guidance {
+    font-size: 0.8rem;
+  }
+
+  /* Input grid - single column on very small screens */
+  .input-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* Strategy rates info - stack vertically */
+  .strategy-rates-info {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .strategy-rate {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .strategy-rate .rate-value {
+    font-size: 1rem;
+  }
+
+  .rate-editor-trigger {
+    width: 100%;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
+
+  /* Sizing cards - smaller on mobile */
+  .sizing-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .sizing-card {
+    padding: 0.75rem;
+  }
+
+  .sizing-label {
+    font-size: 0.65rem;
+  }
+
+  .sizing-value {
+    font-size: 1rem;
+  }
+
+  .sizing-sublabel {
+    font-size: 0.6rem;
+  }
+
+  /* Benefit cards - 2 columns on small screens */
+  .benefit-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .benefit-card {
+    padding: 0.75rem;
+  }
+
+  .benefit-label {
+    font-size: 0.65rem;
+  }
+
+  .benefit-value {
+    font-size: 1rem;
+  }
+
+  .benefit-formula {
+    font-size: 0.6rem;
+  }
+
+  /* Summary cards - single column */
+  .summary-cards {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .card h3 {
+    font-size: 0.75rem;
+  }
+
+  .card .big-number {
+    font-size: 1.5rem;
+  }
+
+  /* Tax rates grid - 3 columns instead of auto-fit */
+  .tax-rates-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .tax-rate-item {
+    padding: 0.5rem;
+  }
+
+  .tax-rate-item .rate-label {
+    font-size: 0.55rem;
+  }
+
+  .tax-rate-item .rate-value {
+    font-size: 0.95rem;
+  }
+
+  /* Offset status - more compact */
+  .offset-status {
+    padding: 0.75rem;
+  }
+
+  .offset-row {
+    padding: 0.4rem 0;
+    font-size: 0.8rem;
+  }
+
+  /* NOL carryforward note */
+  .nol-carryforward-note {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .nol-carryforward-note .nol-value {
+    font-size: 0.9rem;
+  }
+
+  .nol-carryforward-note .nol-explanation {
+    font-size: 0.7rem;
+  }
+
+  /* Table controls - stack on small screens */
+  .table-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .table-header-row {
+    gap: 0.75rem;
+  }
+
+  .table-header-row h3 {
+    font-size: 1rem;
+  }
+
+  /* Table view mode selector - scrollable buttons */
+  .view-mode-selector {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .view-mode-btn {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    flex: 1;
+    text-align: center;
+  }
+
+  .toggle-details-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    width: 100%;
+  }
+
+  /* Tables - smaller text, scroll hints */
+  .table-scroll {
+    margin: 0 -1rem;
+    padding: 0 0.5rem;
+    position: relative;
+  }
+
+  /* Add scroll shadow indicator */
+  .table-scroll::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.9));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.2s;
+  }
+
+  table {
+    font-size: 0.7rem;
+  }
+
+  th,
+  td {
+    padding: 0.4rem;
+  }
+
+  .year-breakdown-table--compact th,
+  .year-breakdown-table--compact td {
+    padding: 0.3rem 0.4rem;
+    font-size: 0.65rem;
+  }
+
+  .year-breakdown-table--compact .expandable-header {
+    font-size: 0.6rem;
+  }
+
+  .expand-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Carryforward note */
+  .carryforward-note {
+    padding: 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .carryforward-explanation {
+    font-size: 0.7rem;
+  }
+
+  /* Print button - full width */
+  .print-btn {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+  }
+
+  /* Disclaimer - single column, smaller text */
+  .disclaimer {
+    padding: 1rem;
+    font-size: 0.7rem;
+  }
+
+  .disclaimer-header {
+    font-size: 0.8rem;
+  }
+
+  .disclaimer-grid {
+    gap: 1rem;
+  }
+
+  .disclaimer-section h4 {
+    font-size: 0.75rem;
+  }
+
+  .disclaimer-section ul {
+    padding-left: 1rem;
+  }
+
+  /* Slide-out panel adjustments */
+  .slideout-panel__header {
+    padding: 0.75rem 1rem;
+  }
+
+  .slideout-panel__header h2 {
+    font-size: 1.1rem;
+  }
+
+  .slideout-panel__content {
+    padding: 0.75rem;
+  }
+
+  /* Advanced modal sections */
+  .advanced-modal__section-title {
+    font-size: 0.8rem;
+  }
+
+  /* Collapsible sections */
+  .collapsible-section .section-toggle {
+    padding: 0.75rem;
+  }
+
+  .collapsible-section .section-content {
+    padding: 0.75rem;
+  }
+
+  /* Year-by-year planning table */
+  .year-table-container {
+    margin: 0 -0.75rem;
+    padding: 0 0.25rem;
+  }
+
+  .year-table {
+    font-size: 0.7rem;
+  }
+
+  .year-table th,
+  .year-table td {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .input-with-prefix.compact input {
+    min-width: 50px;
+    padding: 0.35rem;
+    font-size: 0.8rem;
+  }
+
+  .input-with-prefix.compact .prefix {
+    padding: 0 0.35rem;
+    font-size: 0.75rem;
+  }
+
+  /* Settings grid */
+  .settings-grid {
+    gap: 0.75rem;
+  }
+
+  .settings-group {
+    padding: 0.75rem;
+  }
+
+  .settings-group h4 {
+    font-size: 0.75rem;
+  }
+
+  .slider-input-group label {
+    font-size: 0.75rem;
+    min-width: 120px;
+  }
+
+  .slider-input-group .slider-value {
+    font-size: 0.75rem;
+  }
+
+  /* Sensitivity grid */
+  .sensitivity-grid {
+    gap: 0.75rem;
+  }
+
+  .sensitivity-group label {
+    font-size: 0.75rem;
+  }
+
+  /* Scenario cards */
+  .scenario-cards {
+    grid-template-columns: 1fr;
+  }
+
+  /* QFAF Test Page */
+  .qfaf-test-page {
+    padding: 0.75rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .page-description {
+    font-size: 0.85rem;
+  }
+
+  .page-controls {
+    padding: 1rem;
+  }
+
+  .page-content {
+    padding: 1rem;
+  }
+
+  /* QP Modal - smaller padding */
+  .qp-modal {
+    max-height: 95vh;
+  }
+
+  .qp-modal-header {
+    padding: 1rem;
+  }
+
+  .qp-modal-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .qp-modal-body {
+    padding: 0.75rem 1rem;
+  }
+
+  .qp-checkbox-item {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .qp-checkbox-label {
+    font-size: 0.85rem;
+  }
+
+  .qp-checkbox-description {
+    font-size: 0.75rem;
+  }
+
+  .qp-modal-footer {
+    padding: 0.75rem 1rem 1rem;
+  }
+
+  .qp-submit-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  /* Rate editor modal - full screen on mobile */
+  .rate-editor-overlay {
+    padding: 0.5rem;
+  }
+
+  .rate-editor-modal {
+    max-height: 95vh;
+    border-radius: 8px;
+  }
+
+  .rate-editor-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .rate-editor-header h2 {
+    font-size: 1rem;
+  }
+
+  .rate-editor-description {
+    padding: 0.75rem 1rem;
+  }
+
+  .rate-editor-description p {
+    font-size: 0.8rem;
+  }
+
+  .rate-editor-tabs {
+    padding: 0.5rem 0.75rem 0;
+    gap: 0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rate-editor-tabs .tab-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .rate-editor-table-container {
+    padding: 0 0.75rem;
+  }
+
+  .rate-editor-table {
+    font-size: 0.75rem;
+  }
+
+  .rate-editor-table th,
+  .rate-editor-table td {
+    padding: 0.35rem;
+  }
+
+  /* Info popup adjustments */
+  .info-popup {
+    max-width: calc(100vw - 2rem);
+  }
+
+  /* Toggle switch - slightly larger touch target */
+  .toggle-label > .toggle-switch {
+    width: 48px;
+    height: 26px;
+  }
+
+  .toggle-label > .toggle-switch::after {
+    width: 22px;
+    height: 22px;
+  }
+
+  .toggle-label input:checked + .toggle-switch::after {
+    transform: translateX(22px);
+  }
+}
+
+/* Very small phones (iPhone SE 1st gen, older devices - 320px) */
+@media (max-width: 360px) {
+  .calculator {
+    padding: 0.5rem;
+  }
+
+  .header h1 {
+    font-size: 1.1rem;
+  }
+
+  .header .subtitle {
+    font-size: 0.8rem;
+  }
+
+  .sticky-header__metric {
+    max-width: 65px;
+  }
+
+  .sticky-header__label {
+    font-size: 0.45rem;
+  }
+
+  .sticky-header__value {
+    font-size: 0.65rem;
+  }
+
+  section,
+  details {
+    padding: 0.75rem;
+  }
+
+  section h2 {
+    font-size: 1rem;
+  }
+
+  .sizing-cards,
+  .benefit-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .sizing-value,
+  .benefit-value {
+    font-size: 1.1rem;
+  }
+
+  .tax-rates-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  table {
+    font-size: 0.65rem;
+  }
+
+  th,
+  td {
+    padding: 0.3rem;
+  }
+
+  .view-mode-btn {
+    padding: 0.35rem 0.4rem;
+    font-size: 0.65rem;
+  }
+}
+
+/* Touch-friendly improvements for all mobile devices */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets for buttons */
+  button,
+  .nav-tab,
+  .toggle-label,
+  .collapsible-section .section-toggle {
+    min-height: 44px;
+  }
+
+  /* Better tap targets for expandable table headers */
+  .col-expandable {
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  /* Larger checkbox tap area */
+  .qp-checkbox-item {
+    min-height: 60px;
+  }
+
+  .qp-checkbox-item input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Better scrolling on touch devices */
+  .table-scroll,
+  .slideout-panel__content,
+  .rate-editor-table-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Prevent double-tap zoom on interactive elements */
+  button,
+  input,
+  select,
+  .toggle-label {
+    touch-action: manipulation;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: #333;
+    --text-light: #444;
+  }
+
+  .sizing-card,
+  .benefit-card,
+  .card {
+    border: 1px solid var(--border);
+  }
+}
+
+/* Landscape phone adjustments */
+@media (max-height: 480px) and (orientation: landscape) {
+  .sticky-header {
+    padding: 0.25rem 0.75rem;
+  }
+
+  .sticky-header__metric {
+    max-width: 100px;
+  }
+
+  .sticky-header__label {
+    font-size: 0.55rem;
+  }
+
+  .sticky-header__value {
+    font-size: 0.8rem;
+  }
+
+  .qp-modal {
+    max-height: 98vh;
+    overflow-y: auto;
+  }
+
+  .qp-modal-body {
+    max-height: 50vh;
+    overflow-y: auto;
   }
 }
