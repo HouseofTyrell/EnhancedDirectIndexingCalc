@@ -8,7 +8,11 @@
 :root {
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
+  --primary-light: #3b82f6;
   --success: #16a34a;
+  --success-light: #22c55e;
+  --warning: #f59e0b;
+  --negative: #dc2626;
   --text: #1f2937;
   --text-light: #6b7280;
   --bg: #f9fafb;
@@ -21,6 +25,75 @@
   --z-sticky: 100;
   --z-popup-overlay: 999;
   --z-popup: 1000;
+  /* Gradient backgrounds (light mode) */
+  --gradient-blue: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  --gradient-purple: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  --gradient-amber: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  /* Table column colors */
+  --collateral-bg: #fffbeb;
+  --collateral-bg-light: rgba(254, 243, 199, 0.3);
+  --collateral-bg-hover: rgba(254, 243, 199, 0.6);
+  --qfaf-bg: #eff6ff;
+  --qfaf-bg-light: rgba(219, 234, 254, 0.3);
+  --qfaf-bg-hover: rgba(219, 234, 254, 0.6);
+}
+
+/* Dark mode theme */
+[data-theme='dark'] {
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --primary-light: #60a5fa;
+  --success: #22c55e;
+  --success-light: #4ade80;
+  --warning: #fbbf24;
+  --negative: #ef4444;
+  --text: #f3f4f6;
+  --text-light: #9ca3af;
+  --bg: #111827;
+  --card-bg: #1f2937;
+  --border: #374151;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.4);
+  /* Gradient backgrounds (dark mode) */
+  --gradient-blue: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+  --gradient-purple: linear-gradient(135deg, #2e1065 0%, #4c1d95 100%);
+  --gradient-amber: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+  /* Table column colors */
+  --collateral-bg: #422006;
+  --collateral-bg-light: rgba(120, 53, 15, 0.3);
+  --collateral-bg-hover: rgba(120, 53, 15, 0.5);
+  --qfaf-bg: #1e3a5f;
+  --qfaf-bg-light: rgba(30, 64, 175, 0.3);
+  --qfaf-bg-hover: rgba(30, 64, 175, 0.5);
+}
+
+/* Respect system preference when no explicit theme set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --primary: #3b82f6;
+    --primary-dark: #2563eb;
+    --primary-light: #60a5fa;
+    --success: #22c55e;
+    --success-light: #4ade80;
+    --warning: #fbbf24;
+    --negative: #ef4444;
+    --text: #f3f4f6;
+    --text-light: #9ca3af;
+    --bg: #111827;
+    --card-bg: #1f2937;
+    --border: #374151;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --gradient-blue: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+    --gradient-purple: linear-gradient(135deg, #2e1065 0%, #4c1d95 100%);
+    --gradient-amber: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+    --collateral-bg: #422006;
+    --collateral-bg-light: rgba(120, 53, 15, 0.3);
+    --collateral-bg-hover: rgba(120, 53, 15, 0.5);
+    --qfaf-bg: #1e3a5f;
+    --qfaf-bg-light: rgba(30, 64, 175, 0.3);
+    --qfaf-bg-hover: rgba(30, 64, 175, 0.5);
+  }
 }
 
 body {
@@ -36,7 +109,7 @@ body {
    ============================================ */
 
 .app-nav {
-  background: white;
+  background: var(--card-bg);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -48,7 +121,60 @@ body {
   margin: 0 auto;
   padding: 0 2rem;
   display: flex;
+  align-items: center;
   gap: 0;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  margin-left: auto;
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  transition: all 0.2s;
+}
+
+.theme-toggle:hover {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--text-light);
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Hide the icon that doesn't match current theme */
+.theme-toggle .icon-sun {
+  display: none;
+}
+
+.theme-toggle .icon-moon {
+  display: block;
+}
+
+[data-theme='dark'] .theme-toggle .icon-sun {
+  display: block;
+}
+
+[data-theme='dark'] .theme-toggle .icon-moon {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .theme-toggle .icon-sun {
+    display: block;
+  }
+  :root:not([data-theme='light']) .theme-toggle .icon-moon {
+    display: none;
+  }
 }
 
 .nav-tab {
@@ -1220,6 +1346,20 @@ input[type='range']::-webkit-slider-thumb {
 .chart-container h3 {
   margin: 0 0 1rem;
   font-size: 1.1rem;
+}
+
+/* Charts responsive - reduce margins on mobile */
+@media (max-width: 480px) {
+  .chart-container {
+    margin-bottom: 1.5rem;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+  }
+
+  .chart-container h3 {
+    font-size: 1rem;
+    margin-left: 0.5rem;
+  }
 }
 
 /* Table */
@@ -3861,5 +4001,1118 @@ tfoot td {
   .expand-icon {
     width: 14px;
     height: 14px;
+  }
+}
+
+/* ============================================
+   ENHANCED MOBILE RESPONSIVE STYLES
+   iPhone and small screen optimizations
+   ============================================ */
+
+/* Small phones (iPhone SE, older iPhones, small Android) */
+@media (max-width: 480px) {
+  /* Navigation - more compact */
+  .nav-container {
+    padding: 0 0.75rem;
+  }
+
+  .nav-tab {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  /* Theme toggle - slightly smaller on mobile */
+  .theme-toggle {
+    padding: 0.4rem;
+  }
+
+  .theme-toggle svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Calculator container - less padding */
+  .calculator {
+    padding: 0.75rem;
+  }
+
+  /* Header - smaller title */
+  .header h1 {
+    font-size: 1.25rem;
+  }
+
+  .header .subtitle {
+    font-size: 0.9rem;
+  }
+
+  /* Sticky header - optimized for small screens */
+  .sticky-header {
+    margin: 0 -0.75rem 1rem -0.75rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .sticky-header__content {
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .sticky-header__metric {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 80px;
+  }
+
+  .sticky-header__label {
+    font-size: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sticky-header__value {
+    font-size: 0.75rem;
+  }
+
+  .sticky-header__advanced-btn {
+    padding: 0.35rem;
+  }
+
+  .sticky-header__advanced-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Section styling */
+  section,
+  details {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+  }
+
+  section h2 {
+    font-size: 1.1rem;
+  }
+
+  .section-number {
+    font-size: 0.65rem;
+  }
+
+  .section-number::before {
+    width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.65rem;
+  }
+
+  .section-guidance {
+    font-size: 0.8rem;
+  }
+
+  /* Input grid - single column on very small screens */
+  .input-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  /* Strategy rates info - stack vertically */
+  .strategy-rates-info {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .strategy-rate {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .strategy-rate .rate-value {
+    font-size: 1rem;
+  }
+
+  .rate-editor-trigger {
+    width: 100%;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
+
+  /* Sizing cards - smaller on mobile */
+  .sizing-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .sizing-card {
+    padding: 0.75rem;
+  }
+
+  .sizing-label {
+    font-size: 0.65rem;
+  }
+
+  .sizing-value {
+    font-size: 1rem;
+  }
+
+  .sizing-sublabel {
+    font-size: 0.6rem;
+  }
+
+  /* Benefit cards - 2 columns on small screens */
+  .benefit-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+
+  .benefit-card {
+    padding: 0.75rem;
+  }
+
+  .benefit-label {
+    font-size: 0.65rem;
+  }
+
+  .benefit-value {
+    font-size: 1rem;
+  }
+
+  .benefit-formula {
+    font-size: 0.6rem;
+  }
+
+  /* Summary cards - single column */
+  .summary-cards {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .card h3 {
+    font-size: 0.75rem;
+  }
+
+  .card .big-number {
+    font-size: 1.5rem;
+  }
+
+  /* Tax rates grid - 3 columns instead of auto-fit */
+  .tax-rates-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .tax-rate-item {
+    padding: 0.5rem;
+  }
+
+  .tax-rate-item .rate-label {
+    font-size: 0.55rem;
+  }
+
+  .tax-rate-item .rate-value {
+    font-size: 0.95rem;
+  }
+
+  /* Offset status - more compact */
+  .offset-status {
+    padding: 0.75rem;
+  }
+
+  .offset-row {
+    padding: 0.4rem 0;
+    font-size: 0.8rem;
+  }
+
+  /* NOL carryforward note */
+  .nol-carryforward-note {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .nol-carryforward-note .nol-value {
+    font-size: 0.9rem;
+  }
+
+  .nol-carryforward-note .nol-explanation {
+    font-size: 0.7rem;
+  }
+
+  /* Table controls - stack on small screens */
+  .table-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .table-header-row {
+    gap: 0.75rem;
+  }
+
+  .table-header-row h3 {
+    font-size: 1rem;
+  }
+
+  /* Table view mode selector - scrollable buttons */
+  .view-mode-selector {
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .view-mode-btn {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    flex: 1;
+    text-align: center;
+  }
+
+  .toggle-details-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    width: 100%;
+  }
+
+  /* Tables - smaller text, scroll hints */
+  .table-scroll {
+    margin: 0 -1rem;
+    padding: 0 0.5rem;
+    position: relative;
+  }
+
+  /* Add scroll shadow indicator */
+  .table-scroll::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.9));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.2s;
+  }
+
+  table {
+    font-size: 0.7rem;
+  }
+
+  th,
+  td {
+    padding: 0.4rem;
+  }
+
+  .year-breakdown-table--compact th,
+  .year-breakdown-table--compact td {
+    padding: 0.3rem 0.4rem;
+    font-size: 0.65rem;
+  }
+
+  .year-breakdown-table--compact .expandable-header {
+    font-size: 0.6rem;
+  }
+
+  .expand-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Carryforward note */
+  .carryforward-note {
+    padding: 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .carryforward-explanation {
+    font-size: 0.7rem;
+  }
+
+  /* Print button - full width */
+  .print-btn {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+  }
+
+  /* Disclaimer - single column, smaller text */
+  .disclaimer {
+    padding: 1rem;
+    font-size: 0.7rem;
+  }
+
+  .disclaimer-header {
+    font-size: 0.8rem;
+  }
+
+  .disclaimer-grid {
+    gap: 1rem;
+  }
+
+  .disclaimer-section h4 {
+    font-size: 0.75rem;
+  }
+
+  .disclaimer-section ul {
+    padding-left: 1rem;
+  }
+
+  /* Slide-out panel adjustments */
+  .slideout-panel__header {
+    padding: 0.75rem 1rem;
+  }
+
+  .slideout-panel__header h2 {
+    font-size: 1.1rem;
+  }
+
+  .slideout-panel__content {
+    padding: 0.75rem;
+  }
+
+  /* Advanced modal sections */
+  .advanced-modal__section-title {
+    font-size: 0.8rem;
+  }
+
+  /* Collapsible sections */
+  .collapsible-section .section-toggle {
+    padding: 0.75rem;
+  }
+
+  .collapsible-section .section-content {
+    padding: 0.75rem;
+  }
+
+  /* Year-by-year planning table */
+  .year-table-container {
+    margin: 0 -0.75rem;
+    padding: 0 0.25rem;
+  }
+
+  .year-table {
+    font-size: 0.7rem;
+  }
+
+  .year-table th,
+  .year-table td {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .input-with-prefix.compact input {
+    min-width: 50px;
+    padding: 0.35rem;
+    font-size: 0.8rem;
+  }
+
+  .input-with-prefix.compact .prefix {
+    padding: 0 0.35rem;
+    font-size: 0.75rem;
+  }
+
+  /* Settings grid */
+  .settings-grid {
+    gap: 0.75rem;
+  }
+
+  .settings-group {
+    padding: 0.75rem;
+  }
+
+  .settings-group h4 {
+    font-size: 0.75rem;
+  }
+
+  .slider-input-group label {
+    font-size: 0.75rem;
+    min-width: 120px;
+  }
+
+  .slider-input-group .slider-value {
+    font-size: 0.75rem;
+  }
+
+  /* Sensitivity grid */
+  .sensitivity-grid {
+    gap: 0.75rem;
+  }
+
+  .sensitivity-group label {
+    font-size: 0.75rem;
+  }
+
+  /* Scenario cards */
+  .scenario-cards {
+    grid-template-columns: 1fr;
+  }
+
+  /* QFAF Test Page */
+  .qfaf-test-page {
+    padding: 0.75rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .page-description {
+    font-size: 0.85rem;
+  }
+
+  .page-controls {
+    padding: 1rem;
+  }
+
+  .page-content {
+    padding: 1rem;
+  }
+
+  /* QP Modal - smaller padding */
+  .qp-modal {
+    max-height: 95vh;
+  }
+
+  .qp-modal-header {
+    padding: 1rem;
+  }
+
+  .qp-modal-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .qp-modal-body {
+    padding: 0.75rem 1rem;
+  }
+
+  .qp-checkbox-item {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .qp-checkbox-label {
+    font-size: 0.85rem;
+  }
+
+  .qp-checkbox-description {
+    font-size: 0.75rem;
+  }
+
+  .qp-modal-footer {
+    padding: 0.75rem 1rem 1rem;
+  }
+
+  .qp-submit-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  /* Rate editor modal - full screen on mobile */
+  .rate-editor-overlay {
+    padding: 0.5rem;
+  }
+
+  .rate-editor-modal {
+    max-height: 95vh;
+    border-radius: 8px;
+  }
+
+  .rate-editor-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .rate-editor-header h2 {
+    font-size: 1rem;
+  }
+
+  .rate-editor-description {
+    padding: 0.75rem 1rem;
+  }
+
+  .rate-editor-description p {
+    font-size: 0.8rem;
+  }
+
+  .rate-editor-tabs {
+    padding: 0.5rem 0.75rem 0;
+    gap: 0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rate-editor-tabs .tab-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .rate-editor-table-container {
+    padding: 0 0.75rem;
+  }
+
+  .rate-editor-table {
+    font-size: 0.75rem;
+  }
+
+  .rate-editor-table th,
+  .rate-editor-table td {
+    padding: 0.35rem;
+  }
+
+  /* Info popup adjustments */
+  .info-popup {
+    max-width: calc(100vw - 2rem);
+  }
+
+  /* Toggle switch - slightly larger touch target */
+  .toggle-label > .toggle-switch {
+    width: 48px;
+    height: 26px;
+  }
+
+  .toggle-label > .toggle-switch::after {
+    width: 22px;
+    height: 22px;
+  }
+
+  .toggle-label input:checked + .toggle-switch::after {
+    transform: translateX(22px);
+  }
+}
+
+/* Very small phones (iPhone SE 1st gen, older devices - 320px) */
+@media (max-width: 360px) {
+  .calculator {
+    padding: 0.5rem;
+  }
+
+  .header h1 {
+    font-size: 1.1rem;
+  }
+
+  .header .subtitle {
+    font-size: 0.8rem;
+  }
+
+  .sticky-header__metric {
+    max-width: 65px;
+  }
+
+  .sticky-header__label {
+    font-size: 0.45rem;
+  }
+
+  .sticky-header__value {
+    font-size: 0.65rem;
+  }
+
+  section,
+  details {
+    padding: 0.75rem;
+  }
+
+  section h2 {
+    font-size: 1rem;
+  }
+
+  .sizing-cards,
+  .benefit-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .sizing-value,
+  .benefit-value {
+    font-size: 1.1rem;
+  }
+
+  .tax-rates-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  table {
+    font-size: 0.65rem;
+  }
+
+  th,
+  td {
+    padding: 0.3rem;
+  }
+
+  .view-mode-btn {
+    padding: 0.35rem 0.4rem;
+    font-size: 0.65rem;
+  }
+}
+
+/* Touch-friendly improvements for all mobile devices */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets for buttons */
+  button,
+  .nav-tab,
+  .toggle-label,
+  .collapsible-section .section-toggle {
+    min-height: 44px;
+  }
+
+  /* Better tap targets for expandable table headers */
+  .col-expandable {
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  /* Larger checkbox tap area */
+  .qp-checkbox-item {
+    min-height: 60px;
+  }
+
+  .qp-checkbox-item input[type='checkbox'] {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Better scrolling on touch devices */
+  .table-scroll,
+  .slideout-panel__content,
+  .rate-editor-table-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Prevent double-tap zoom on interactive elements */
+  button,
+  input,
+  select,
+  .toggle-label {
+    touch-action: manipulation;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: #333;
+    --text-light: #444;
+  }
+
+  .sizing-card,
+  .benefit-card,
+  .card {
+    border: 1px solid var(--border);
+  }
+}
+
+/* Landscape phone adjustments */
+@media (max-height: 480px) and (orientation: landscape) {
+  .sticky-header {
+    padding: 0.25rem 0.75rem;
+  }
+
+  .sticky-header__metric {
+    max-width: 100px;
+  }
+
+  .sticky-header__label {
+    font-size: 0.55rem;
+  }
+
+  .sticky-header__value {
+    font-size: 0.8rem;
+  }
+
+  .qp-modal {
+    max-height: 98vh;
+    overflow-y: auto;
+  }
+
+  .qp-modal-body {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+}
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+
+/* Dark mode specific styles */
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* System dark mode preference */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+  }
+}
+
+/* Section backgrounds */
+[data-theme='dark'] .results-summary-section,
+[data-theme='dark'] .sizing-section {
+  background: var(--gradient-blue);
+  border-color: #1e40af;
+}
+
+[data-theme='dark'] .tax-rates-section {
+  background: var(--gradient-purple);
+}
+
+[data-theme='dark'] .sizing-section.warning {
+  background: var(--gradient-amber);
+}
+
+/* Cards and containers */
+[data-theme='dark'] .sizing-card,
+[data-theme='dark'] .tax-rate-item,
+[data-theme='dark'] .benefit-card,
+[data-theme='dark'] .offset-status,
+[data-theme='dark'] .scenario-card {
+  background: var(--card-bg);
+}
+
+[data-theme='dark'] .sizing-card.highlight {
+  background: var(--primary);
+}
+
+[data-theme='dark'] .tax-rate-item.highlight {
+  background: #7c3aed;
+}
+
+[data-theme='dark'] .tax-rate-item.accent {
+  background: var(--success);
+}
+
+/* NOL carryforward note */
+[data-theme='dark'] .nol-carryforward-note {
+  background: var(--gradient-amber);
+  border-left-color: var(--warning);
+}
+
+[data-theme='dark'] .nol-carryforward-note .nol-label,
+[data-theme='dark'] .nol-carryforward-note .nol-value,
+[data-theme='dark'] .nol-carryforward-note .nol-explanation {
+  color: #fcd34d;
+}
+
+/* Strategy rates info */
+[data-theme='dark'] .strategy-rates-info {
+  background: var(--card-bg);
+}
+
+/* Starting row in tables */
+[data-theme='dark'] .starting-row {
+  background: var(--gradient-blue);
+}
+
+[data-theme='dark'] .starting-row td {
+  border-bottom-color: var(--primary);
+}
+
+/* Table column colors */
+[data-theme='dark'] .year-breakdown-table th.collateral-col {
+  background: var(--collateral-bg);
+}
+
+[data-theme='dark'] .year-breakdown-table td.collateral-col {
+  background: var(--collateral-bg-light);
+}
+
+[data-theme='dark'] .year-breakdown-table tbody tr:hover td.collateral-col {
+  background: var(--collateral-bg-hover);
+}
+
+[data-theme='dark'] .year-breakdown-table th.qfaf-col {
+  background: var(--qfaf-bg);
+}
+
+[data-theme='dark'] .year-breakdown-table td.qfaf-col {
+  background: var(--qfaf-bg-light);
+}
+
+[data-theme='dark'] .year-breakdown-table tbody tr:hover td.qfaf-col {
+  background: var(--qfaf-bg-hover);
+}
+
+/* Group headers */
+[data-theme='dark'] .year-breakdown-table .group-header.collateral-group {
+  background: var(--gradient-amber);
+  color: #fcd34d;
+  border-left-color: var(--warning);
+}
+
+[data-theme='dark'] .year-breakdown-table .group-header.qfaf-group {
+  background: var(--gradient-blue);
+  color: #93c5fd;
+  border-left-color: var(--primary);
+}
+
+/* Carryforward note */
+[data-theme='dark'] .carryforward-note {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+}
+
+/* Warning note */
+[data-theme='dark'] .warning-note {
+  background: #451a03;
+  border-left-color: var(--warning);
+  color: #fcd34d;
+}
+
+/* Settings warning */
+[data-theme='dark'] .settings-warning {
+  background: #451a03;
+  color: #fcd34d;
+}
+
+/* View mode buttons */
+[data-theme='dark'] .view-mode-btn.active {
+  background: var(--card-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Sticky header */
+[data-theme='dark'] .sticky-header {
+  background: linear-gradient(180deg, var(--card-bg) 0%, rgba(31, 41, 55, 0.95) 100%);
+  border-bottom-color: var(--border);
+}
+
+[data-theme='dark'] .sticky-header--expanded {
+  background: var(--card-bg);
+}
+
+/* Modals */
+[data-theme='dark'] .qp-modal,
+[data-theme='dark'] .rate-editor-modal,
+[data-theme='dark'] .slideout-panel {
+  background: var(--card-bg);
+}
+
+[data-theme='dark'] .qp-checkbox-item {
+  background: var(--bg);
+}
+
+[data-theme='dark'] .qp-checkbox-item:hover {
+  background: #374151;
+}
+
+/* Rate editor */
+[data-theme='dark'] .rate-editor-description {
+  background: var(--bg);
+}
+
+[data-theme='dark'] .rate-editor-tabs .tab-btn {
+  background: var(--bg);
+}
+
+[data-theme='dark'] .rate-editor-tabs .tab-btn.active {
+  background: var(--card-bg);
+}
+
+/* Editable cells in rate editor */
+[data-theme='dark'] .rate-editor-table .editable {
+  background: #78350f;
+}
+
+[data-theme='dark'] .rate-editor-table .editable:focus {
+  background: #92400e;
+}
+
+/* Inputs */
+[data-theme='dark'] .prefix,
+[data-theme='dark'] .suffix {
+  background: var(--bg);
+}
+
+[data-theme='dark'] input,
+[data-theme='dark'] select {
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+[data-theme='dark'] input:focus,
+[data-theme='dark'] select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Toggle switch */
+[data-theme='dark'] .toggle-label > .toggle-switch {
+  background: #4b5563;
+}
+
+[data-theme='dark'] .toggle-label input:checked + .toggle-switch {
+  background: var(--primary);
+}
+
+/* Advanced mode toggle */
+[data-theme='dark'] .advanced-mode-toggle {
+  background: var(--bg);
+}
+
+/* Collapsible sections */
+[data-theme='dark'] .collapsible-section {
+  border-color: var(--border);
+}
+
+[data-theme='dark'] .section-toggle:hover {
+  background: var(--bg);
+}
+
+/* Settings groups */
+[data-theme='dark'] .settings-group {
+  background: var(--bg);
+}
+
+/* Sensitivity groups */
+[data-theme='dark'] .sensitivity-group {
+  background: var(--bg);
+}
+
+/* Scenario cards */
+[data-theme='dark'] .scenario-card.positive {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  border-color: var(--success);
+}
+
+[data-theme='dark'] .scenario-card.neutral {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+  border-color: var(--primary);
+}
+
+[data-theme='dark'] .scenario-card.negative {
+  background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+  border-color: var(--negative);
+}
+
+[data-theme='dark'] .scenario-card.warning {
+  background: var(--gradient-amber);
+  border-color: var(--warning);
+}
+
+/* Year table */
+[data-theme='dark'] .year-table thead th {
+  background: var(--bg);
+}
+
+[data-theme='dark'] .year-table .editable {
+  background: #78350f;
+}
+
+[data-theme='dark'] .year-table .editable:focus {
+  background: #92400e;
+}
+
+/* Comparison table */
+[data-theme='dark'] .comparison-table thead th {
+  background: var(--bg);
+}
+
+[data-theme='dark'] .comparison-table .strategy-header {
+  background: var(--bg);
+}
+
+/* Info popup */
+[data-theme='dark'] .info-popup-content {
+  background: var(--card-bg);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme='dark'] .info-popup-content::before {
+  border-bottom-color: var(--card-bg);
+}
+
+/* Chart tooltip (inline styles in component, so we target the container) */
+[data-theme='dark'] .recharts-tooltip-wrapper {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Disclaimer */
+[data-theme='dark'] .disclaimer {
+  background: var(--card-bg);
+}
+
+/* Print button hover */
+[data-theme='dark'] .print-btn:hover {
+  background: var(--primary-dark);
+}
+
+/* Advanced settings button */
+[data-theme='dark'] .advanced-settings-btn:hover {
+  background: #1e3a5f;
+  border-color: var(--primary);
+}
+
+/* Scroll shadow for tables in dark mode */
+[data-theme='dark'] .table-scroll::after {
+  background: linear-gradient(to right, transparent, var(--card-bg));
+}
+
+/* QP modal overlay */
+[data-theme='dark'] .qp-modal-overlay,
+[data-theme='dark'] .rate-editor-overlay,
+[data-theme='dark'] .slideout-overlay {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* System dark mode preference (when no explicit theme set) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .results-summary-section,
+  :root:not([data-theme='light']) .sizing-section {
+    background: var(--gradient-blue);
+    border-color: #1e40af;
+  }
+
+  :root:not([data-theme='light']) .tax-rates-section {
+    background: var(--gradient-purple);
+  }
+
+  :root:not([data-theme='light']) .sizing-card,
+  :root:not([data-theme='light']) .tax-rate-item,
+  :root:not([data-theme='light']) .benefit-card,
+  :root:not([data-theme='light']) .offset-status {
+    background: var(--card-bg);
+  }
+
+  :root:not([data-theme='light']) .sizing-card.highlight {
+    background: var(--primary);
+  }
+
+  :root:not([data-theme='light']) .sticky-header {
+    background: linear-gradient(180deg, var(--card-bg) 0%, rgba(31, 41, 55, 0.95) 100%);
+  }
+
+  :root:not([data-theme='light']) input,
+  :root:not([data-theme='light']) select {
+    background: var(--card-bg);
+    color: var(--text);
+  }
+
+  :root:not([data-theme='light']) .prefix,
+  :root:not([data-theme='light']) .suffix {
+    background: var(--bg);
+  }
+
+  :root:not([data-theme='light']) .qp-modal,
+  :root:not([data-theme='light']) .rate-editor-modal,
+  :root:not([data-theme='light']) .slideout-panel {
+    background: var(--card-bg);
+  }
+
+  :root:not([data-theme='light']) .table-scroll::after {
+    background: linear-gradient(to right, transparent, var(--card-bg));
+  }
+
+  :root:not([data-theme='light']) .toggle-label > .toggle-switch {
+    background: #4b5563;
   }
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Calculator } from './Calculator';
 import { QfafTestPage } from './pages/QfafTestPage';
+import { ThemeToggle } from './components/ThemeToggle';
 
 type View = 'calculator' | 'qfaf-test';
 
@@ -23,6 +24,7 @@ export function App() {
           >
             QFAF Test
           </button>
+          <ThemeToggle />
         </div>
       </nav>
 
