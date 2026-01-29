@@ -1,0 +1,212 @@
+/* ============================================
+   YEAR-BY-YEAR PLANNING
+   ============================================ */
+
+.year-by-year-planning {
+  padding-top: 0.5rem;
+}
+
+.year-table-container {
+  overflow-x: auto;
+  margin: 0 -0.5rem;
+}
+
+.year-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.year-table th {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  background: var(--bg);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-light);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+/* Column widths for year-by-year table */
+.year-table .col-year {
+  width: 36px;
+  text-align: center;
+}
+.year-table .col-income {
+  width: 120px;
+}
+.year-table .col-infusion {
+  width: 120px;
+}
+.year-table .col-notes {
+  width: auto;
+}
+
+.year-table td {
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.year-table tbody tr:hover {
+  background: var(--bg);
+}
+
+.year-cell {
+  font-weight: 600;
+  color: var(--primary);
+  text-align: center;
+}
+
+/* Compact input for table cells */
+.input-with-prefix.compact {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.input-with-prefix.compact .prefix {
+  padding: 0.3rem 0.4rem;
+  background: transparent;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  border-right: none;
+  flex-shrink: 0;
+}
+
+.input-with-prefix.compact input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: none;
+  background: transparent;
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.input-with-prefix.compact input:focus {
+  outline: none;
+  background: var(--card-bg);
+}
+
+.input-with-prefix.compact input.modified {
+  background: #fef3c7;
+  font-weight: 500;
+}
+
+.note-input {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  background: var(--bg);
+}
+
+.note-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--card-bg);
+}
+
+.note-input::placeholder {
+  color: #9ca3af;
+}
+
+.year-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Liquidity Section */
+.liquidity-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.liquidity-section h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.5rem 0;
+}
+
+.liquidity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.liquidity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.liquidity-item label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.liquidity-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.liquidity-input-group input {
+  width: 70px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.liquidity-input-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.liquidity-input-group .input-suffix {
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+.liquidity-hint {
+  font-size: 0.7rem;
+  color: var(--text-light);
+}
+
+.liquidity-warning {
+  padding: 0.75rem;
+  background: #fef3c7;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #92400e;
+}
+
+.liquidity-warning strong {
+  color: #78350f;
+}
+
+@media (max-width: 768px) {
+  .liquidity-grid {
+    grid-template-columns: 1fr;
+  }
+}

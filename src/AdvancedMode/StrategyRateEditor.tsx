@@ -8,6 +8,7 @@ import {
   saveRateOverrides,
   clearRateOverrides,
 } from '../utils/strategyRates';
+import './StrategyRateEditor.css';
 
 /**
  * Props for the StrategyRateEditor component.

@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { CalculatorInputs, AdvancedSettings, DEFAULT_SCENARIOS, ScenarioType } from '../types';
 import { calculate } from '../calculations';
 import { formatCurrency, formatPercent } from '../utils/formatters';
+import './ScenarioAnalysis.css';
 
 /**
  * Props for the ScenarioAnalysis component.

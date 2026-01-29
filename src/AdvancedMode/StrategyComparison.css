@@ -1,0 +1,140 @@
+/* ============================================
+   STRATEGY COMPARISON
+   ============================================ */
+
+.strategy-comparison {
+  padding-top: 0.5rem;
+}
+
+.comparison-table-container {
+  overflow-x: auto;
+  margin: 0 -0.5rem;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.comparison-table th {
+  padding: 0.75rem;
+  text-align: left;
+  background: var(--bg);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-light);
+  border-bottom: 2px solid var(--border);
+}
+
+.comparison-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.comparison-table td:not(:first-child) {
+  text-align: right;
+}
+
+.comparison-table tbody tr:hover {
+  background: var(--bg);
+}
+
+.comparison-table .winner {
+  background: #dcfce7;
+}
+
+.comparison-table .winner td {
+  font-weight: 600;
+  color: var(--success);
+}
+
+.strategy-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.strategy-type {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  text-transform: capitalize;
+}
+
+/* Strategy Selector */
+.strategy-selector {
+  margin-bottom: 1.5rem;
+}
+
+.strategy-selector h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.strategy-group {
+  margin-bottom: 1rem;
+}
+
+.strategy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.strategy-chip {
+  padding: 0.5rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.strategy-chip:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--card-bg);
+}
+
+.strategy-chip.selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.strategy-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Winner highlighting */
+.comparison-table td.winner {
+  background: #dcfce7;
+  font-weight: 600;
+  color: var(--success);
+}
+
+.comparison-table th:not(:first-child) {
+  text-align: center;
+}
+
+/* Comparison Summary */
+.comparison-summary {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.comparison-summary p {
+  margin: 0 0 0.5rem 0;
+}
+
+.comparison-summary p:last-child {
+  margin-bottom: 0;
+}

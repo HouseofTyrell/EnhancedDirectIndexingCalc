@@ -1,6 +1,7 @@
 import { AdvancedSettings, DEFAULT_SETTINGS } from '../types';
 import { InfoText } from '../InfoPopup';
 import { formatWithCommas, parseFormattedNumber, formatPercent as formatPercentBase } from '../utils/formatters';
+import './SettingsPanel.css';
 
 interface SettingsPanelProps {
   settings: AdvancedSettings;

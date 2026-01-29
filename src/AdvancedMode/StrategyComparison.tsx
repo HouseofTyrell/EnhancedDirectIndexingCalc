@@ -4,6 +4,7 @@ import { calculate } from '../calculations';
 import { CalculatorInputs, ComparisonResult } from '../types';
 import { InfoText } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
+import './StrategyComparison.css';
 
 interface StrategyComparisonProps {
   baseInputs: CalculatorInputs;

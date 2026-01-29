@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { SensitivityParams, DEFAULT_SENSITIVITY } from '../types';
 import { InfoText } from '../InfoPopup';
+import './SensitivityAnalysis.css';
 
 /**
  * Props for the SensitivityAnalysis component.

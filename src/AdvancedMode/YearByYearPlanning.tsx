@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { YearOverride, LiquidityParams, DEFAULT_LIQUIDITY } from '../types';
 import { InfoText } from '../InfoPopup';
 import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
+import './YearByYearPlanning.css';
 
 /**
  * Props for the YearByYearPlanning component.
