@@ -228,7 +228,7 @@ export const DEFAULTS: CalculatorInputs = {
   annualIncome: 3000000,
 
   // Strategy selection
-  strategyId: 'core-145-45',
+  strategyId: 'overlay-45-45',
   collateralAmount: 10000000,
 
   // Carryforwards
