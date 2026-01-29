@@ -33,6 +33,9 @@ export interface CalculatorInputs {
   // QFAF sizing window: number of years to average collateral losses for sizing
   // 1 = Year 1 only (legacy), 10 = average across all projection years (default)
   qfafSizingYears: number;
+
+  // QFAF sizing cushion: reduces auto-sized QFAF by this percentage (0–0.10 = 0–10%)
+  qfafSizingCushion: number;
 }
 
 export interface CalculatedSizing {

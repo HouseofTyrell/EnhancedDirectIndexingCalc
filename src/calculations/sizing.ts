@@ -38,7 +38,10 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
 
   if (inputs.qfafEnabled !== false) {
     // Auto-size QFAF so ST gains = average ST losses (or use override)
-    qfafValue = inputs.qfafOverride ?? year1StLosses / QFAF_ST_GAIN_RATE;
+    // Apply sizing cushion to reduce QFAF by up to 10%
+    const cushion = inputs.qfafSizingCushion ?? 0;
+    const baseSizing = inputs.qfafOverride ?? year1StLosses / QFAF_ST_GAIN_RATE;
+    qfafValue = baseSizing * (1 - cushion);
     // QFAF generates ST gains and ordinary losses at 150% of MV
     year1StGains = qfafValue * QFAF_ST_GAIN_RATE;
     year1OrdinaryLosses = qfafValue * QFAF_ORDINARY_LOSS_RATE;

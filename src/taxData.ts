@@ -241,4 +241,7 @@ export const DEFAULTS: CalculatorInputs = {
 
   // QFAF sizing: average losses over 5 years by default
   qfafSizingYears: 5,
+
+  // QFAF sizing cushion: 0% reduction by default
+  qfafSizingCushion: 0,
 };
