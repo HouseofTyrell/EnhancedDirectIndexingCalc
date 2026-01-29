@@ -310,8 +310,10 @@ function calculateYear(
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 
-  // Portfolio growth using configured annual return
-  const growthRate = settings.defaultAnnualReturn;
+  // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
+  const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
+  const financingCost = settings.financingFeesEnabled ? strategy.financingCostRate : 0;
+  const growthRate = baseReturn - financingCost;
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
   const qfafGrowthRate = settings.qfafGrowthEnabled ? growthRate : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
@@ -653,15 +655,17 @@ export function calculateWithSensitivity(
   };
 
   // Use sensitivity annual return if different from default
-  const effectiveAnnualReturn =
-    sensitivity.annualReturn !== DEFAULT_SENSITIVITY.annualReturn
-      ? sensitivity.annualReturn
-      : settings.defaultAnnualReturn;
+  const sensitivityOverride = sensitivity.annualReturn !== DEFAULT_SENSITIVITY.annualReturn;
+  const effectiveAnnualReturn = sensitivityOverride
+    ? sensitivity.annualReturn
+    : settings.defaultAnnualReturn;
 
   // Create adjusted settings with sensitivity return
+  // If sensitivity overrides annual return, force growth enabled
   const adjustedSettings: AdvancedSettings = {
     ...settings,
     defaultAnnualReturn: effectiveAnnualReturn,
+    growthEnabled: sensitivityOverride ? true : settings.growthEnabled,
   };
 
   const years: YearResult[] = [];
@@ -840,8 +844,10 @@ function calculateYearWithSensitivity(
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 
-  // Portfolio growth using sensitivity-adjusted return
-  const growthRate = settings.defaultAnnualReturn;
+  // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
+  const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
+  const financingCost = settings.financingFeesEnabled ? strategy.financingCostRate : 0;
+  const growthRate = baseReturn - financingCost;
   const qfafGrowthRate = settings.qfafGrowthEnabled ? growthRate : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
   const newCollateralValue = safeNumber(collateralValue * (1 + growthRate));

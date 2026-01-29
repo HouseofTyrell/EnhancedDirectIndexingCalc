@@ -208,7 +208,9 @@ export interface AdvancedSettings {
   nolOffsetLimit: number; // Default: 0.80 (80% of taxable income)
 
   // Portfolio assumptions
-  defaultAnnualReturn: number; // Default: 0 (0% - no growth assumption)
+  growthEnabled: boolean; // Default: false (no growth assumption)
+  defaultAnnualReturn: number; // Default: 0.07 (7% when growth enabled)
+  financingFeesEnabled: boolean; // Default: false (subtract strategy financing costs from growth)
   projectionYears: number; // Default: 10
 
   // Tax rate assumptions
@@ -228,7 +230,9 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
     hoh: 256000,
   },
   nolOffsetLimit: 0.8,
-  defaultAnnualReturn: 0,
+  growthEnabled: false,
+  defaultAnnualReturn: 0.07,
+  financingFeesEnabled: false,
   projectionYears: 10,
   niitRate: 0.038,
   ltcgRate: 0.2,

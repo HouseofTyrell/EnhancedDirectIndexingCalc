@@ -109,7 +109,7 @@ describe('Advanced Features - Cash Infusion', () => {
     });
 
     it('should compound growth on infused capital', () => {
-      const growthSettings = { ...DEFAULT_SETTINGS, defaultAnnualReturn: 0.07 };
+      const growthSettings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.07 };
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $1M in year 1
       overrides[0].cashInfusion = 1000000;

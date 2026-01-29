@@ -436,27 +436,67 @@ export function Calculator() {
             </div>
           )}
 
-          <div className="input-group">
-            <label htmlFor="annualReturn">Annual Return Assumption</label>
-            <div className="input-with-suffix">
+          {/* Growth Assumption Toggle */}
+          <div className="input-group toggle-group">
+            <label className="toggle-label">
               <input
-                id="annualReturn"
-                type="number"
-                step={0.5}
-                min={-20}
-                max={30}
-                value={(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}
-                onChange={e => {
-                  const val = parseFloat(e.target.value) / 100;
-                  if (!isNaN(val)) {
-                    setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
-                  }
-                }}
+                type="checkbox"
+                checked={advancedSettings.growthEnabled}
+                onChange={e =>
+                  setAdvancedSettings(s => ({ ...s, growthEnabled: e.target.checked }))
+                }
               />
-              <span className="suffix">%</span>
-            </div>
+              <span className="toggle-switch"></span>
+              Portfolio Growth
+            </label>
             <span className="input-hint">
-              Expected annual portfolio growth rate (default: 0%)
+              {advancedSettings.growthEnabled
+                ? `${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}% annual return assumed`
+                : 'No growth assumption (0%)'}
+            </span>
+          </div>
+
+          {/* Growth Rate Slider (shown when growth enabled) */}
+          {advancedSettings.growthEnabled && (
+            <div className="input-group">
+              <label htmlFor="annualReturn">Annual Return</label>
+              <div className="input-with-suffix">
+                <input
+                  id="annualReturn"
+                  type="number"
+                  step={0.5}
+                  min={-20}
+                  max={30}
+                  value={(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}
+                  onChange={e => {
+                    const val = parseFloat(e.target.value) / 100;
+                    if (!isNaN(val)) {
+                      setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
+                    }
+                  }}
+                />
+                <span className="suffix">%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Financing Fees Toggle */}
+          <div className="input-group toggle-group">
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={advancedSettings.financingFeesEnabled}
+                onChange={e =>
+                  setAdvancedSettings(s => ({ ...s, financingFeesEnabled: e.target.checked }))
+                }
+              />
+              <span className="toggle-switch"></span>
+              Financing Fees
+            </label>
+            <span className="input-hint">
+              {advancedSettings.financingFeesEnabled
+                ? `Deducts strategy financing cost (${((currentStrategy?.financingCostRate ?? 0) * 100).toFixed(1)}%) from growth`
+                : 'No financing cost deduction'}
             </span>
           </div>
         </div>

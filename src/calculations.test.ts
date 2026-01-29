@@ -84,8 +84,8 @@ describe('calculate - basic behavior', () => {
     expect(result.years[9].year).toBe(10);
   });
 
-  it('grows portfolio value over time with positive annual return', () => {
-    const settings = { ...DEFAULT_SETTINGS, defaultAnnualReturn: 0.07 };
+  it('grows portfolio value over time with growth enabled', () => {
+    const settings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.07 };
     const result = calculate(createInputs(), settings);
     const year1 = result.years[0];
     const year10 = result.years[9];
@@ -93,12 +93,12 @@ describe('calculate - basic behavior', () => {
     expect(year10.totalValue).toBeGreaterThan(year1.totalValue);
   });
 
-  it('keeps portfolio flat with 0% annual return', () => {
+  it('keeps portfolio flat with growth disabled', () => {
     const result = calculate(createInputs());
     const year1 = result.years[0];
     const year10 = result.years[9];
 
-    // With 0% default return, portfolio values should stay constant
+    // With growth disabled (default), portfolio values should stay constant
     expect(year10.totalValue).toBeCloseTo(year1.totalValue, 0);
   });
 
