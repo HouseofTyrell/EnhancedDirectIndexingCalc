@@ -334,6 +334,30 @@ export function Calculator() {
             </span>
           </div>
 
+          {/* QFAF Sizing Window */}
+          {inputs.qfafEnabled && (
+            <div className="input-group">
+              <label htmlFor="sizingYears">
+                QFAF Sizing Window
+              </label>
+              <select
+                id="sizingYears"
+                value={inputs.qfafSizingYears}
+                onChange={e => updateInput('qfafSizingYears', parseInt(e.target.value, 10))}
+              >
+                {Array.from({ length: advancedSettings.projectionYears }, (_, i) => i + 1).map(y => (
+                  <option key={y} value={y}>
+                    {y === 1 ? 'Year 1 only' : `Average of Years 1–${y}`}
+                  </option>
+                ))}
+              </select>
+              <span className="input-hint">
+                Avg ST loss rate: {formatPercent(results.sizing.avgStLossRate)}
+                {inputs.qfafSizingYears === 1 ? ' (Year 1)' : ` (Yrs 1–${inputs.qfafSizingYears})`}
+              </span>
+            </div>
+          )}
+
           <div className="input-group">
             <label htmlFor="collateral">Collateral Amount</label>
             <div className="input-with-prefix">
@@ -508,7 +532,9 @@ export function Calculator() {
                 contentKey="year1-st-losses"
                 currentValue={formatCurrency(results.sizing.year1StLosses)}
               >
-                Year 1 ST Losses (Collateral)
+                {results.sizing.sizingYears === 1
+                  ? 'Year 1 ST Losses (Collateral)'
+                  : `Avg ST Losses, Yrs 1–${results.sizing.sizingYears} (Collateral)`}
               </InfoText>
             </span>
             <span className="positive">{formatCurrency(results.sizing.year1StLosses)}</span>
@@ -519,7 +545,9 @@ export function Calculator() {
                 contentKey="year1-st-gains"
                 currentValue={formatCurrency(results.sizing.year1StGains)}
               >
-                Year 1 ST Gains (QFAF)
+                {results.sizing.sizingYears === 1
+                  ? 'Year 1 ST Gains (QFAF)'
+                  : 'Matched ST Gains (QFAF)'}
               </InfoText>
             </span>
             <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
@@ -530,7 +558,7 @@ export function Calculator() {
                 Net ST Position
               </InfoText>
             </span>
-            <span>Fully Matched</span>
+            <span>Fully Matched{results.sizing.sizingYears > 1 ? ' (on avg)' : ''}</span>
           </div>
           <div className="offset-row">
             <span>

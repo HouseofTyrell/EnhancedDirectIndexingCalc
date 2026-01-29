@@ -21,6 +21,7 @@ const baseClient: CalculatorInputs = {
   existingLtLossCarryforward: 0,
   existingNolCarryforward: 0,
   qfafEnabled: true,
+  qfafSizingYears: 1,
 };
 
 // Generate default overrides (no changes)

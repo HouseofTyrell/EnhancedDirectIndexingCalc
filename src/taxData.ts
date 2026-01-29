@@ -216,4 +216,7 @@ export const DEFAULTS: CalculatorInputs = {
 
   // QFAF toggle (enabled by default)
   qfafEnabled: true,
+
+  // QFAF sizing: average losses over 5 years by default
+  qfafSizingYears: 5,
 };

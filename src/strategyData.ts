@@ -198,3 +198,22 @@ export function getStLossRateForYear(strategy: Strategy, year: number): number {
   const index = Math.min(year - 1, strategy.stLossRatesByYear.length - 1);
   return strategy.stLossRatesByYear[Math.max(0, index)];
 }
+
+/**
+ * Get the average ST loss rate across a range of years.
+ * Used for QFAF sizing based on average collateral losses.
+ * @param strategy - The strategy to get rates for
+ * @param fromYear - Start year (1-indexed, inclusive)
+ * @param toYear - End year (1-indexed, inclusive)
+ * @returns Average ST loss rate across the specified years
+ */
+export function getAverageStLossRate(strategy: Strategy, fromYear: number, toYear: number): number {
+  const clampedFrom = Math.max(1, fromYear);
+  const clampedTo = Math.max(clampedFrom, toYear);
+  let sum = 0;
+  const count = clampedTo - clampedFrom + 1;
+  for (let year = clampedFrom; year <= clampedTo; year++) {
+    sum += getStLossRateForYear(strategy, year);
+  }
+  return count > 0 ? sum / count : 0;
+}

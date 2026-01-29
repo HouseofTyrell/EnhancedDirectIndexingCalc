@@ -20,6 +20,7 @@ function createClientProfile(overrides: Partial<CalculatorInputs> = {}): Calcula
     stateCode: 'CA',
     stateRate: 0,
     qfafEnabled: true,
+    qfafSizingYears: 1, // Year 1 only for backwards-compatible test assertions
     existingStLossCarryforward: 0,
     existingLtLossCarryforward: 0,
     existingNolCarryforward: 0,
