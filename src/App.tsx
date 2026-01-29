@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Calculator } from './Calculator';
 import { QfafTestPage } from './pages/QfafTestPage';
 import { ThemeToggle } from './components/ThemeToggle';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 type View = 'calculator' | 'qfaf-test';
 
@@ -29,8 +30,10 @@ export function App() {
       </nav>
 
       <main className="app-content">
-        {activeView === 'calculator' && <Calculator />}
-        {activeView === 'qfaf-test' && <QfafTestPage />}
+        <ErrorBoundary>
+          {activeView === 'calculator' && <Calculator />}
+          {activeView === 'qfaf-test' && <QfafTestPage />}
+        </ErrorBoundary>
       </main>
     </div>
   );

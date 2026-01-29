@@ -5622,3 +5622,38 @@ tfoot td {
     border-color: var(--card-bg);
   }
 }
+
+/* Error Boundary */
+.error-boundary {
+  max-width: 600px;
+  margin: 4rem auto;
+  padding: 2rem;
+  text-align: center;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.error-boundary h2 {
+  color: var(--negative);
+  margin-bottom: 0.5rem;
+}
+
+.error-boundary p {
+  color: var(--text-light);
+  margin-bottom: 1.5rem;
+}
+
+.error-boundary details {
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.error-boundary pre {
+  background: var(--bg);
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  color: var(--negative);
+}

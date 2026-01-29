@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
 type Theme = 'light' | 'dark' | 'system';
 
-const STORAGE_KEY = 'theme-preference';
+const STORAGE_KEY = STORAGE_KEYS.THEME;
 
 /**
  * Hook for managing dark mode with localStorage persistence

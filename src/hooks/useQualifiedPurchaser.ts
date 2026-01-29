@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
-const STORAGE_KEY = 'taxCalc_qpAcknowledged';
+const STORAGE_KEY = STORAGE_KEYS.QP_ACKNOWLEDGED;
 
 export interface QualifiedPurchaserState {
   acknowledged: boolean;

@@ -1,6 +1,7 @@
 import { STRATEGIES, getStLossRateForYear } from '../strategyData';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
-const STORAGE_KEY = 'strategy-rate-overrides';
+const STORAGE_KEY = STORAGE_KEYS.RATE_OVERRIDES;
 
 // Type for year-by-year rate overrides
 // Key format: `${strategyId}-${year}` -> net capital loss rate value

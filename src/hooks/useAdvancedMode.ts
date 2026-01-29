@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
 export interface AdvancedModeState {
   enabled: boolean;
@@ -12,7 +13,7 @@ export interface AdvancedModeState {
   };
 }
 
-const STORAGE_KEY = 'taxCalc_advancedMode';
+const STORAGE_KEY = STORAGE_KEYS.ADVANCED_MODE;
 
 const DEFAULT_STATE: AdvancedModeState = {
   enabled: false,

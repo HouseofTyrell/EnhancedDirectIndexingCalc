@@ -1,6 +1,6 @@
 import { AdvancedSettings, DEFAULT_SETTINGS } from '../types';
 import { InfoText } from '../InfoPopup';
-import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
+import { formatWithCommas, parseFormattedNumber, formatPercent as formatPercentBase } from '../utils/formatters';
 
 interface SettingsPanelProps {
   settings: AdvancedSettings;
@@ -8,10 +8,8 @@ interface SettingsPanelProps {
   onReset: () => void;
 }
 
-// Format percentage with 1 decimal place
-const formatPercent = (value: number) => {
-  return `${(value * 100).toFixed(1)}%`;
-};
+// Settings panel displays percentages with 1 decimal place
+const formatPercent = (value: number) => formatPercentBase(value, 1);
 
 export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProps) {
   const handleChange = (path: string, value: number | boolean) => {
@@ -30,7 +28,22 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
   };
 
   // Check if any setting has changed from defaults
-  const hasChanges = JSON.stringify(settings) !== JSON.stringify(DEFAULT_SETTINGS);
+  const hasChanges =
+    settings.qfafMultiplier !== DEFAULT_SETTINGS.qfafMultiplier ||
+    settings.qfafGrowthEnabled !== DEFAULT_SETTINGS.qfafGrowthEnabled ||
+    settings.washSaleDisallowanceRate !== DEFAULT_SETTINGS.washSaleDisallowanceRate ||
+    settings.nolOffsetLimit !== DEFAULT_SETTINGS.nolOffsetLimit ||
+    settings.growthEnabled !== DEFAULT_SETTINGS.growthEnabled ||
+    settings.defaultAnnualReturn !== DEFAULT_SETTINGS.defaultAnnualReturn ||
+    settings.financingFeesEnabled !== DEFAULT_SETTINGS.financingFeesEnabled ||
+    settings.projectionYears !== DEFAULT_SETTINGS.projectionYears ||
+    settings.niitRate !== DEFAULT_SETTINGS.niitRate ||
+    settings.ltcgRate !== DEFAULT_SETTINGS.ltcgRate ||
+    settings.stcgRate !== DEFAULT_SETTINGS.stcgRate ||
+    settings.section461Limits.mfj !== DEFAULT_SETTINGS.section461Limits.mfj ||
+    settings.section461Limits.single !== DEFAULT_SETTINGS.section461Limits.single ||
+    settings.section461Limits.mfs !== DEFAULT_SETTINGS.section461Limits.mfs ||
+    settings.section461Limits.hoh !== DEFAULT_SETTINGS.section461Limits.hoh;
 
   return (
     <div className="settings-panel">
