@@ -375,19 +375,22 @@ export function Calculator() {
             <>
               <div className="input-group">
                 <label htmlFor="sizingYears">
-                  QFAF Sizing Window
+                  QFAF Sizing Window: {inputs.qfafSizingYears === 1 ? 'Year 1 only' : `Average of Years 1–${inputs.qfafSizingYears}`}
                 </label>
-                <select
+                <input
                   id="sizingYears"
+                  type="range"
+                  min={1}
+                  max={advancedSettings.projectionYears}
+                  step={1}
                   value={inputs.qfafSizingYears}
                   onChange={e => updateInput('qfafSizingYears', parseInt(e.target.value, 10))}
-                >
-                  {Array.from({ length: advancedSettings.projectionYears }, (_, i) => i + 1).map(y => (
-                    <option key={y} value={y}>
-                      {y === 1 ? 'Year 1 only' : `Average of Years 1–${y}`}
-                    </option>
-                  ))}
-                </select>
+                />
+                <div className="allocation-labels">
+                  <span>1 yr</span>
+                  <span>{Math.ceil(advancedSettings.projectionYears / 2)} yrs</span>
+                  <span>{advancedSettings.projectionYears} yrs</span>
+                </div>
                 <span className="input-hint">
                   Avg ST loss rate: {formatPercent(results.sizing.avgStLossRate)}
                   {inputs.qfafSizingYears === 1 ? ' (Year 1)' : ` (Yrs 1–${inputs.qfafSizingYears})`}
