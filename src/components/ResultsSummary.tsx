@@ -16,16 +16,20 @@ interface ResultsSummaryProps {
   totalNolGenerated: number;
   /** Number of years in the projection (default: 10) */
   projectionYears?: number;
+  /** Collateral-only tax savings for incremental benefit comparison */
+  collateralOnlyTaxSavings?: number;
+  /** Total collateral amount for context */
+  collateralAmount?: number;
 }
 
 /**
  * Displays the key results summary cards showing projected benefits.
- * This is the first section users see, providing high-level benefits.
+ * Provides headline metrics, interpretation text, and disclosure notes.
  *
  * Cards displayed:
- * - Total Tax Savings (cumulative over projection period)
- * - Final Portfolio Value (end of projection)
- * - Annualized Tax Alpha (percentage)
+ * - Estimated Tax Savings (cumulative over projection period)
+ * - Incremental Benefit vs Standard Direct Indexing
+ * - Annualized Estimated Tax Alpha (percentage)
  * - Total NOL Generated (from excess ordinary losses)
  */
 export const ResultsSummary = React.memo(function ResultsSummary({
@@ -34,32 +38,61 @@ export const ResultsSummary = React.memo(function ResultsSummary({
   effectiveTaxAlpha,
   totalNolGenerated,
   projectionYears = 10,
+  collateralOnlyTaxSavings = 0,
+  collateralAmount = 0,
 }: ResultsSummaryProps) {
+  const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
+  const avgAnnualSavings = totalTaxSavings / projectionYears;
+
   return (
     <section className="results-summary-section">
       <div className="section-number" data-step="1">
-        Your Projected Benefit
+        Estimated Results
       </div>
       <div className="section-header">
-        <h2>{projectionYears}-Year Tax Savings</h2>
+        <h2>Estimated {projectionYears}-Year Tax Savings</h2>
       </div>
       <p className="section-guidance">
-        Based on inputs below. Adjust values to see updated projections.
+        Based on the inputs and assumptions below. Adjust values to see updated projections.
       </p>
-      <div className="summary-cards">
-        <div className="card primary">
+
+      {/* Headline metrics - visually prominent */}
+      <div className="headline-metrics">
+        <div className="headline-metric primary">
           <h3>
             <InfoText contentKey="total-tax-savings" currentValue={formatCurrency(totalTaxSavings)}>
-              Total Tax Savings
+              Estimated Tax Savings
             </InfoText>
           </h3>
-          <p className="big-number">{formatCurrency(totalTaxSavings)}</p>
+          <p className="headline-number">{formatCurrency(totalTaxSavings)}</p>
           <p className="subtext">Over {projectionYears} years</p>
         </div>
+        <div className="headline-metric">
+          <h3>
+            <InfoText contentKey="incremental-benefit" currentValue={formatCurrency(incrementalBenefit)}>
+              Est. Incremental Benefit
+            </InfoText>
+          </h3>
+          <p className="headline-number">{formatCurrency(incrementalBenefit)}</p>
+          <p className="subtext">vs. standard direct indexing</p>
+        </div>
+        <div className="headline-metric">
+          <h3>
+            <InfoText contentKey="effective-tax-alpha" currentValue={formatPercent(effectiveTaxAlpha)}>
+              Est. Annualized Tax Alpha
+            </InfoText>
+          </h3>
+          <p className="headline-number">{formatPercent(effectiveTaxAlpha)}</p>
+          <p className="subtext">Per year</p>
+        </div>
+      </div>
+
+      {/* Supporting detail cards */}
+      <div className="summary-cards">
         <div className="card">
           <h3>
             <InfoText contentKey="final-portfolio-value" currentValue={formatCurrency(finalPortfolioValue)}>
-              Final Portfolio Value
+              Est. Final Portfolio Value
             </InfoText>
           </h3>
           <p className="big-number">{formatCurrency(finalPortfolioValue)}</p>
@@ -67,22 +100,45 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         </div>
         <div className="card">
           <h3>
-            <InfoText contentKey="effective-tax-alpha" currentValue={formatPercent(effectiveTaxAlpha)}>
-              Annualized Tax Alpha
-            </InfoText>
-          </h3>
-          <p className="big-number">{formatPercent(effectiveTaxAlpha)}</p>
-          <p className="subtext">Per year</p>
-        </div>
-        <div className="card">
-          <h3>
             <InfoText contentKey="total-nol-generated" currentValue={formatCurrency(totalNolGenerated)}>
-              Total NOL Generated
+              Est. Total NOL Generated
             </InfoText>
           </h3>
           <p className="big-number">{formatCurrency(totalNolGenerated)}</p>
           <p className="subtext">Cumulative excess</p>
         </div>
+        <div className="card">
+          <h3>Est. Avg. Annual Savings</h3>
+          <p className="big-number">{formatCurrency(avgAnnualSavings)}</p>
+          <p className="subtext">Per year avg.</p>
+        </div>
+      </div>
+
+      {/* Interpretation text */}
+      <div className="interpretation-text">
+        <strong>What this means:</strong>{' '}
+        {collateralAmount > 0 ? (
+          <>
+            Based on a {formatCurrency(collateralAmount)} portfolio, this strategy is estimated to
+            generate approximately {formatCurrency(totalTaxSavings)} in cumulative tax savings
+            over {projectionYears} years, or roughly {formatCurrency(avgAnnualSavings)} per year.
+            {incrementalBenefit > 0 && (
+              <> The enhanced strategy adds an estimated {formatCurrency(incrementalBenefit)} beyond
+              what standard direct indexing alone would achieve.</>
+            )}
+          </>
+        ) : (
+          <>
+            Enter a collateral amount and income details above to see estimated tax savings projections.
+          </>
+        )}
+      </div>
+
+      {/* Exclusion disclosure */}
+      <div className="results-disclosure">
+        <strong>Note:</strong> Estimates do not reflect advisory fees, financing costs, tracking error
+        impacts, transaction costs, or behavioral effects. Actual results will vary. See full
+        disclosures below.
       </div>
     </section>
   );
