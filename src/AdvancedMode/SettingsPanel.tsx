@@ -233,22 +233,6 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
 
           <div className="setting-row">
             <div className="setting-label">
-              <span className="setting-name">Default Annual Return</span>
-              <span className="setting-hint">Expected annual portfolio growth</span>
-            </div>
-            <input
-              type="text"
-              className={`setting-input ${settings.defaultAnnualReturn !== DEFAULT_SETTINGS.defaultAnnualReturn ? 'modified' : ''}`}
-              value={formatPercent(settings.defaultAnnualReturn)}
-              onChange={e => {
-                const val = parseFloat(e.target.value.replace('%', '')) / 100;
-                if (!isNaN(val)) handleChange('defaultAnnualReturn', val);
-              }}
-            />
-          </div>
-
-          <div className="setting-row">
-            <div className="setting-label">
               <span className="setting-name">Projection Years</span>
               <span className="setting-hint">Number of years to project</span>
             </div>

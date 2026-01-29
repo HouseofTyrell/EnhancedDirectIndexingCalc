@@ -145,18 +145,18 @@ describe('Sensitivity Analysis', () => {
       );
     });
 
-    it('should decrease final portfolio value with lower returns', () => {
+    it('should decrease final portfolio value with negative returns', () => {
       const baseResult = calculate(baseClient, DEFAULT_SETTINGS);
 
-      // Model bear market (2% return)
+      // Model bear market (-5% return vs 0% default)
       const bearMarket: SensitivityParams = {
         ...DEFAULT_SENSITIVITY,
-        annualReturn: 0.02, // 2% return
+        annualReturn: -0.05, // -5% return
       };
 
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, bearMarket);
 
-      // Lower returns = smaller final portfolio
+      // Negative returns = smaller final portfolio
       expect(result.summary.finalPortfolioValue).toBeLessThan(
         baseResult.summary.finalPortfolioValue
       );
