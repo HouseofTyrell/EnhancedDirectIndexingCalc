@@ -2,9 +2,16 @@ import { memo } from 'react';
 import { SensitivityParams, DEFAULT_SENSITIVITY } from '../types';
 import { InfoText } from '../InfoPopup';
 
+/**
+ * Props for the SensitivityAnalysis component.
+ * Allows stress-testing projections by adjusting tax rates, returns, and strategy performance.
+ */
 interface SensitivityAnalysisProps {
+  /** Current sensitivity parameter values for all adjustable sliders */
   params: SensitivityParams;
+  /** Callback fired when any sensitivity parameter is changed */
   onChange: (params: SensitivityParams) => void;
+  /** Callback to reset all sensitivity parameters to their default values */
   onReset: () => void;
 }
 

@@ -9,9 +9,16 @@ import {
   clearRateOverrides,
 } from '../utils/strategyRates';
 
+/**
+ * Props for the StrategyRateEditor component.
+ * Provides a modal editor for customizing net capital loss rates per strategy and year.
+ */
 interface StrategyRateEditorProps {
+  /** Whether the rate editor modal is currently visible */
   isOpen: boolean;
+  /** Callback to close the modal (triggered by overlay click or close button) */
   onClose: () => void;
+  /** Optional callback fired after rates are saved or reset, to trigger recalculation */
   onRatesChanged?: () => void;
 }
 

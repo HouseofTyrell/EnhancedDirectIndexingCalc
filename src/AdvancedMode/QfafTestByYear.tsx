@@ -67,13 +67,13 @@ type Action =
   | { type: 'UPDATE_ASSUMPTION'; field: keyof Assumptions; value: number | string }
   | { type: 'RESET' };
 
-// Defaults matching the Excel screenshot
+// Defaults matching the Excel screenshot (validation-specific, not shared with main calculator)
 const DEFAULT_ASSUMPTIONS: Assumptions = {
   initialQfafInvestment: 1000000,
   initialDealsInvestment: 4700000,
-  overlayStrategyId: 'overlay-45-45',
-  coreStrategyId: 'core-145-45',
-  marginalTaxRate: 0.541, // 54.1%
+  overlayStrategyId: OVERLAY_STRATEGIES[1]?.id ?? 'overlay-45-45', // Overlay 45/45
+  coreStrategyId: CORE_STRATEGIES[1]?.id ?? 'core-145-45', // Core 145/45
+  marginalTaxRate: 0.541, // 54.1% combined federal + state
 };
 
 function reducer(state: State, action: Action): State {

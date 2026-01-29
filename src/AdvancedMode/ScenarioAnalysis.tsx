@@ -3,19 +3,36 @@ import { CalculatorInputs, AdvancedSettings, DEFAULT_SCENARIOS, ScenarioType } f
 import { calculate } from '../calculations';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 
+/**
+ * Props for the ScenarioAnalysis component.
+ * Compares strategy outcomes across bull, base, and bear market conditions.
+ */
 interface ScenarioAnalysisProps {
+  /** Calculator input values used as the basis for each scenario run */
   inputs: CalculatorInputs;
+  /** Advanced settings including default annual return and strategy configuration */
   settings: AdvancedSettings;
 }
 
+/**
+ * Computed result for a single market scenario (bull, base, or bear).
+ */
 interface ScenarioResult {
+  /** Scenario identifier (e.g., 'bull', 'base', 'bear') */
   type: ScenarioType;
+  /** Human-readable scenario name displayed in the table header */
   label: string;
+  /** Probability weight for expected-value calculations (decimal, e.g., 0.25) */
   probability: number;
+  /** Annual return rate assumed for this scenario (decimal) */
   returnRate: number;
+  /** Total cumulative tax savings over the projection period */
   totalTaxSavings: number;
+  /** Portfolio value at the end of the projection period */
   finalPortfolioValue: number;
+  /** Annualized tax alpha (additional return from tax optimization) */
   effectiveTaxAlpha: number;
+  /** Total net operating losses generated over the projection period */
   totalNolGenerated: number;
 }
 
