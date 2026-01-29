@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { STRATEGIES, LOSS_RATE_DECAY_FACTOR, LOSS_RATE_FLOOR } from '../strategyData';
 import {
   StrategyRateOverrides,
@@ -34,7 +34,7 @@ function getAverageRate(rates: StrategyRateOverrides, strategyId: string): numbe
   return sum / 10;
 }
 
-export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: StrategyRateEditorProps) {
+export const StrategyRateEditor = memo(function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: StrategyRateEditorProps) {
   const [rates, setRates] = useState<StrategyRateOverrides>(() => {
     const defaults = getDefaultRates();
     const overrides = loadRateOverrides();
@@ -286,4 +286,4 @@ export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: Strategy
       </div>
     </div>
   );
-}
+});

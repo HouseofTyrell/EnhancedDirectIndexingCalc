@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { CalculatorInputs, AdvancedSettings, DEFAULT_SCENARIOS, ScenarioType } from '../types';
 import { calculate } from '../calculations';
 import { formatCurrency, formatPercent } from '../utils/formatters';
@@ -19,7 +19,7 @@ interface ScenarioResult {
   totalNolGenerated: number;
 }
 
-export function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
+export const ScenarioAnalysis = memo(function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
   const scenarios = useMemo(() => {
     const results: ScenarioResult[] = [];
 
@@ -130,4 +130,4 @@ export function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
       </div>
     </div>
   );
-}
+});

@@ -27,8 +27,8 @@ export function useQualifiedPurchaser() {
           return parsed;
         }
       }
-    } catch {
-      // localStorage not available or invalid data
+    } catch (e) {
+      console.warn('Failed to load QP acknowledgment state:', e);
     }
     return DEFAULT_STATE;
   });
@@ -36,8 +36,8 @@ export function useQualifiedPurchaser() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // localStorage not available
+    } catch (e) {
+      console.warn('Failed to save QP acknowledgment state:', e);
     }
   }, [state]);
 
@@ -52,8 +52,8 @@ export function useQualifiedPurchaser() {
     setState(DEFAULT_STATE);
     try {
       localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // localStorage not available
+    } catch (e) {
+      console.warn('Failed to clear QP acknowledgment:', e);
     }
   };
 

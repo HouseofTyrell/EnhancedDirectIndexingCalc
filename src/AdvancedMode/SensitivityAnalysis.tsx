@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { SensitivityParams, DEFAULT_SENSITIVITY } from '../types';
 import { InfoText } from '../InfoPopup';
 
@@ -55,7 +56,7 @@ const getValueClass = (key: keyof SensitivityParams, value: number): string => {
   }
 };
 
-export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAnalysisProps) {
+export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAnalysisProps) {
   const handleChange = (key: keyof SensitivityParams, value: number) => {
     onChange({ ...params, [key]: value });
   };
@@ -238,4 +239,4 @@ export function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAn
       </div>
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { memo, ReactNode } from 'react';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -8,7 +8,7 @@ interface CollapsibleSectionProps {
   hint?: string;
 }
 
-export function CollapsibleSection({
+export const CollapsibleSection = memo(function CollapsibleSection({
   title,
   expanded,
   onToggle,
@@ -25,4 +25,4 @@ export function CollapsibleSection({
       {expanded && <div className="section-content">{children}</div>}
     </div>
   );
-}
+});

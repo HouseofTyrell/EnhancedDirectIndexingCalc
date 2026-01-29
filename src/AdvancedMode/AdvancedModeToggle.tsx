@@ -1,9 +1,11 @@
+import { memo } from 'react';
+
 interface AdvancedModeToggleProps {
   enabled: boolean;
   onToggle: () => void;
 }
 
-export function AdvancedModeToggle({ enabled, onToggle }: AdvancedModeToggleProps) {
+export const AdvancedModeToggle = memo(function AdvancedModeToggle({ enabled, onToggle }: AdvancedModeToggleProps) {
   return (
     <div className="advanced-mode-toggle">
       <label className="advanced-toggle-label">
@@ -23,4 +25,4 @@ export function AdvancedModeToggle({ enabled, onToggle }: AdvancedModeToggleProp
       </span>
     </div>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { YearOverride, LiquidityParams, DEFAULT_LIQUIDITY } from '../types';
 import { InfoText } from '../InfoPopup';
 import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
@@ -11,7 +12,7 @@ interface YearByYearPlanningProps {
   onLiquidityChange?: (params: LiquidityParams) => void;
 }
 
-export function YearByYearPlanning({
+export const YearByYearPlanning = memo(function YearByYearPlanning({
   baseIncome,
   overrides,
   onChange,
@@ -201,4 +202,4 @@ export function YearByYearPlanning({
       </div>
     </div>
   );
-}
+});

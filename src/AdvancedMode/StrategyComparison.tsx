@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { STRATEGIES, getStrategy } from '../strategyData';
 import { calculate } from '../calculations';
 import { CalculatorInputs, ComparisonResult } from '../types';
@@ -11,7 +11,7 @@ interface StrategyComparisonProps {
   onChange: (strategies: string[]) => void;
 }
 
-export function StrategyComparison({
+export const StrategyComparison = memo(function StrategyComparison({
   baseInputs,
   selectedStrategies,
   onChange,
@@ -258,4 +258,4 @@ export function StrategyComparison({
       )}
     </div>
   );
-}
+});
