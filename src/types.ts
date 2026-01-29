@@ -144,7 +144,7 @@ export const DEFAULT_LIQUIDITY: LiquidityParams = {
 export interface SensitivityParams {
   federalRateChange: number; // -0.05 to +0.05 (percentage points)
   stateRateChange: number; // -0.05 to +0.05
-  annualReturn: number; // -0.20 to +0.20 (replaces 7% default)
+  annualReturn: number; // -0.20 to +0.20 (replaces 0% default)
   trackingErrorMultiplier: number; // 0 to 2 (multiplier on variance)
   stLossRateVariance: number; // -0.50 to +0.50 (percentage change)
   ltGainRateVariance: number; // -0.50 to +0.50 (percentage change)
@@ -153,7 +153,7 @@ export interface SensitivityParams {
 export const DEFAULT_SENSITIVITY: SensitivityParams = {
   federalRateChange: 0,
   stateRateChange: 0,
-  annualReturn: 0.07,
+  annualReturn: 0,
   trackingErrorMultiplier: 1.0,
   stLossRateVariance: 0,
   ltGainRateVariance: 0,
@@ -208,7 +208,7 @@ export interface AdvancedSettings {
   nolOffsetLimit: number; // Default: 0.80 (80% of taxable income)
 
   // Portfolio assumptions
-  defaultAnnualReturn: number; // Default: 0.07 (7%)
+  defaultAnnualReturn: number; // Default: 0 (0% - no growth assumption)
   projectionYears: number; // Default: 10
 
   // Tax rate assumptions
@@ -228,7 +228,7 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
     hoh: 256000,
   },
   nolOffsetLimit: 0.8,
-  defaultAnnualReturn: 0.07,
+  defaultAnnualReturn: 0,
   projectionYears: 10,
   niitRate: 0.038,
   ltcgRate: 0.2,

@@ -310,12 +310,12 @@ function calculateYear(
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 
-  // Portfolio growth using configured annual return minus financing costs
-  const netGrowthRate = settings.defaultAnnualReturn - strategy.financingCostRate;
+  // Portfolio growth using configured annual return
+  const growthRate = settings.defaultAnnualReturn;
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
-  const qfafGrowthRate = settings.qfafGrowthEnabled ? netGrowthRate : 0;
+  const qfafGrowthRate = settings.qfafGrowthEnabled ? growthRate : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
-  const newCollateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
+  const newCollateralValue = safeNumber(collateralValue * (1 + growthRate));
 
   // Calculate total income offset for this year
   // This is the sum of all deductions that reduce taxable income
@@ -841,10 +841,10 @@ function calculateYearWithSensitivity(
   const baselineTax = ltGainsRealized * combinedLtRate;
 
   // Portfolio growth using sensitivity-adjusted return
-  const netGrowthRate = settings.defaultAnnualReturn - strategy.financingCostRate;
-  const qfafGrowthRate = settings.qfafGrowthEnabled ? netGrowthRate : 0;
+  const growthRate = settings.defaultAnnualReturn;
+  const qfafGrowthRate = settings.qfafGrowthEnabled ? growthRate : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
-  const newCollateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
+  const newCollateralValue = safeNumber(collateralValue * (1 + growthRate));
 
   // Calculate total income offset for this year
   const incomeOffsetAmount = safeNumber(

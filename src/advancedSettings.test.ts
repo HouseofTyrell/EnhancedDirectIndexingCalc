@@ -60,10 +60,10 @@ describe('Projection Years Setting', () => {
       expect(result.years.length).toBe(20);
       expect(result.years[19].year).toBe(20);
 
-      // Verify portfolio growth continues properly over 20 years
+      // Verify portfolio values remain stable over 20 years (0% default return)
       const year10Value = result.years[9].totalValue;
       const year20Value = result.years[19].totalValue;
-      expect(year20Value).toBeGreaterThan(year10Value);
+      expect(year20Value).toBeCloseTo(year10Value, -2);
     });
 
     it('should calculate 1 year when projectionYears is 1', () => {

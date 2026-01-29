@@ -109,28 +109,27 @@ describe('Advanced Features - Cash Infusion', () => {
     });
 
     it('should compound growth on infused capital', () => {
+      const growthSettings = { ...DEFAULT_SETTINGS, defaultAnnualReturn: 0.07 };
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $1M in year 1
       overrides[0].cashInfusion = 1000000;
 
       const resultWithInfusion = calculateWithOverrides(
         baseClient,
-        DEFAULT_SETTINGS,
+        growthSettings,
         overrides
       );
 
       // By year 10, the $1M should have grown at 7% for 9 years
       // This affects total portfolio value
       const year10 = resultWithInfusion.years[9];
-      const year10Without = calculate(baseClient, DEFAULT_SETTINGS).years[9];
+      const year10Without = calculate(baseClient, growthSettings).years[9];
 
       // Total value should be higher
       expect(year10.totalValue).toBeGreaterThan(year10Without.totalValue);
 
       // The difference should show compounded growth
-      // $1M after 9 years of growth (accounting for financing costs reducing net return)
-      // Net return is ~4-5% after financing costs, so $1M * 1.045^9 ≈ $1.48M
-      // Plus corresponding QFAF increase brings it higher
+      // $1M after 9 years at 7% growth, plus QFAF increase
       const valueDiff = year10.totalValue - year10Without.totalValue;
       expect(valueDiff).toBeGreaterThan(1500000); // Conservatively expect $1.5M+ growth
     });
@@ -152,10 +151,10 @@ describe('Advanced Features - Cash Infusion', () => {
       const year3 = resultWithInfusions.years[2];
       const year6 = resultWithInfusions.years[5];
 
-      // Year 3 should show effect of year 2 infusion
+      // Year 3 should show effect of year 2 infusion (with 0% growth, infusion is the only increase)
+      expect(year3.totalValue).toBeGreaterThan(year1.totalValue);
       // Year 6 should show effect of both infusions
-      expect(year3.totalValue).toBeGreaterThan(year1.totalValue * 1.07 * 1.07);
-      expect(year6.totalValue).toBeGreaterThan(year3.totalValue * 1.07 * 1.07 * 1.07);
+      expect(year6.totalValue).toBeGreaterThan(year3.totalValue);
     });
 
     it('should increase tax savings with larger collateral', () => {
@@ -299,8 +298,9 @@ describe('Advanced Features - Income Overrides', () => {
       );
 
       // Year 5 should show larger portfolio from infusion
+      // Base is $5M collateral + QFAF, plus $3M infusion
       const year5 = result.years[4];
-      expect(year5.totalValue).toBeGreaterThan(10000000);
+      expect(year5.totalValue).toBeGreaterThan(8000000);
 
       // Year 6 should show limited ordinary loss usage
       const year6 = result.years[5];
@@ -364,9 +364,9 @@ describe('Advanced Features - Income Overrides', () => {
         overrides
       );
 
-      // Year 3 should show massive increase
+      // Year 3 should show massive increase (base $5M + $10M infusion = $15M)
       const year3 = result.years[2];
-      expect(year3.collateralValue).toBeGreaterThan(15000000);
+      expect(year3.collateralValue).toBeGreaterThan(14000000);
 
       // Year 3 should have full 461(l) usage due to high income
       expect(year3.usableOrdinaryLoss).toBe(512000); // MFJ limit

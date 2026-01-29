@@ -215,7 +215,7 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'final-portfolio-value': {
     title: 'Final Portfolio Value',
     definition: 'Projected total value of collateral + QFAF at the end of year 10.',
-    formula: 'Initial Investment × (1.07)^10 (assumes 7% annual growth)',
+    formula: 'Initial Investment × (1 + annual return)^10',
     impact: 'Shows the growth of your invested capital over the projection period.',
   },
 
@@ -247,7 +247,7 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'col-total-value': {
     title: 'Total Portfolio Value',
     definition: 'Combined value of QFAF and collateral investments.',
-    formula: 'QFAF Value + Collateral Value (after 7% annual growth)',
+    formula: 'QFAF Value + Collateral Value (after annual return growth)',
     impact: 'Growing portfolio base increases absolute tax benefits in later years.',
   },
 
@@ -263,14 +263,14 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'col-qfaf-value': {
     title: 'QFAF Value',
     definition: 'Market value of QFAF investment.',
-    formula: 'Prior Year QFAF × 1.07 (7% growth)',
+    formula: 'Prior Year QFAF × (1 + annual return)',
     impact: 'Higher QFAF value generates larger ST gains and ordinary losses.',
   },
 
   'col-collateral-value': {
     title: 'Collateral Value',
     definition: 'Market value of direct indexing or pledged stock.',
-    formula: 'Prior Year Collateral × 1.07 (7% growth)',
+    formula: 'Prior Year Collateral × (1 + annual return)',
     impact: 'Higher collateral generates more ST losses for offset capacity.',
   },
 
@@ -422,7 +422,7 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'sens-annual-return': {
     title: 'Annual Return',
     definition: 'Model different portfolio growth scenarios.',
-    formula: 'Replaces default 7% growth rate for projections',
+    formula: 'Replaces default 0% growth rate for projections',
     impact: 'Negative returns show how strategy performs in bear markets.',
   },
 
@@ -504,7 +504,7 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'setting-annual-return': {
     title: 'Default Annual Return',
     definition: 'Assumed portfolio growth rate for multi-year projections.',
-    formula: 'Default: 7% (historical equity average)',
+    formula: 'Default: 0% (no growth assumption)',
     impact: 'Higher returns compound portfolio value; lower returns reduce projected wealth.',
   },
 

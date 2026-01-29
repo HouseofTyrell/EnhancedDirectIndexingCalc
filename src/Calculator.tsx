@@ -435,6 +435,30 @@ export function Calculator() {
               </div>
             </div>
           )}
+
+          <div className="input-group">
+            <label htmlFor="annualReturn">Annual Return Assumption</label>
+            <div className="input-with-suffix">
+              <input
+                id="annualReturn"
+                type="number"
+                step={0.5}
+                min={-20}
+                max={30}
+                value={(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}
+                onChange={e => {
+                  const val = parseFloat(e.target.value) / 100;
+                  if (!isNaN(val)) {
+                    setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
+                  }
+                }}
+              />
+              <span className="suffix">%</span>
+            </div>
+            <span className="input-hint">
+              Expected annual portfolio growth rate (default: 0%)
+            </span>
+          </div>
         </div>
       </section>
 
