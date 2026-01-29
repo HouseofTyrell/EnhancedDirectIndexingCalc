@@ -812,6 +812,138 @@ body {
   border-bottom-color: var(--border);
 }
 
+/* Advanced Tools group */
+.section-group--tools .section-group__label {
+  color: var(--text-light);
+  border-bottom-color: var(--border);
+}
+
+.advanced-tools-section {
+  padding: 0 1rem 1rem;
+}
+
+/* ============================================
+   ADVANCED OPTIONS (inline toggle in inputs)
+   ============================================ */
+
+.advanced-options-toggle {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.advanced-options-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary, var(--text-light));
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  width: 100%;
+  text-align: left;
+}
+
+.advanced-options-btn:hover {
+  color: var(--text);
+}
+
+.advanced-options-btn.active {
+  color: var(--primary);
+}
+
+.advanced-options-btn .toggle-icon {
+  font-size: 0.7rem;
+  width: 1rem;
+  text-align: center;
+}
+
+.advanced-options-hint {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-left: auto;
+}
+
+.advanced-options-content {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: var(--surface, var(--bg-secondary, #f8f9fa));
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.advanced-options-section {
+  margin-bottom: 1.5rem;
+}
+
+.advanced-options-section:last-child {
+  margin-bottom: 0;
+}
+
+.advanced-options-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--text);
+}
+
+/* ============================================
+   DEVELOPMENT DISCLOSURE (QFAF Test page)
+   ============================================ */
+
+.development-disclosure {
+  margin-bottom: 1.5rem;
+}
+
+.development-disclosure__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  color: #664d03;
+}
+
+.development-disclosure__icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.development-disclosure__text h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.development-disclosure__text p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.development-disclosure__dismiss {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 0.5rem 1rem;
+  background: #664d03;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.development-disclosure__dismiss:hover {
+  background: #523e02;
+}
+
 /* ============================================
    HEADLINE METRICS - Prominent results display
    ============================================ */
@@ -5281,6 +5413,26 @@ tfoot td {
 /* Disclaimer */
 [data-theme='dark'] .disclaimer {
   background: var(--card-bg);
+}
+
+[data-theme='dark'] .development-disclosure__content {
+  background: #332701;
+  border-color: #665000;
+  color: #ffc107;
+}
+
+[data-theme='dark'] .development-disclosure__dismiss {
+  background: #ffc107;
+  color: #332701;
+}
+
+[data-theme='dark'] .development-disclosure__dismiss:hover {
+  background: #e0a800;
+}
+
+[data-theme='dark'] .advanced-options-content {
+  background: var(--card-bg);
+  border-color: var(--border);
 }
 
 /* Print button hover */

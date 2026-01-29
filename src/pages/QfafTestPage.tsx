@@ -4,9 +4,33 @@ import { FILING_STATUSES, FilingStatus } from '../types';
 
 export function QfafTestPage() {
   const [filingStatus, setFilingStatus] = useState<FilingStatus>('mfj');
+  const [dismissedDisclosure, setDismissedDisclosure] = useState(false);
 
   return (
     <div className="qfaf-test-page">
+      {/* Under Development Disclosure */}
+      {!dismissedDisclosure && (
+        <div className="development-disclosure">
+          <div className="development-disclosure__content">
+            <div className="development-disclosure__icon">&#9888;</div>
+            <div className="development-disclosure__text">
+              <h3>Under Development</h3>
+              <p>
+                This page is currently under active development and should not be used for
+                investment decisions or client presentations. Calculations may be incomplete,
+                inaccurate, or subject to change without notice.
+              </p>
+            </div>
+            <button
+              className="development-disclosure__dismiss"
+              onClick={() => setDismissedDisclosure(true)}
+            >
+              I understand
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="page-header">
         <h1>QFAF Test (By Year)</h1>
         <p className="page-description">

@@ -34,16 +34,13 @@ import { useQualifiedPurchaser } from './hooks/useQualifiedPurchaser';
 import { StickyHeader } from './components/StickyHeader';
 import { ResultsSummary } from './components/ResultsSummary';
 import { TaxRatesDisplay } from './components/TaxRatesDisplay';
-import { AdvancedModal } from './components/AdvancedModal';
 import { QualifiedPurchaserModal } from './components/QualifiedPurchaserModal';
-import { AdvancedModeToggle } from './AdvancedMode/AdvancedModeToggle';
 import { CollapsibleSection } from './AdvancedMode/CollapsibleSection';
 import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
 import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
 import { ScenarioAnalysis } from './AdvancedMode/ScenarioAnalysis';
 import { StrategyComparison } from './AdvancedMode/StrategyComparison';
 import { SettingsPanel } from './AdvancedMode/SettingsPanel';
-import { QfafTestByYear } from './AdvancedMode/QfafTestByYear';
 import { StrategyRateEditor } from './AdvancedMode/StrategyRateEditor';
 import {
   formatWithCommas,
@@ -86,9 +83,6 @@ export function Calculator() {
     'core-145-45',
     'core-130-30',
   ]);
-
-  // Advanced modal state
-  const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
 
   // Rate editor modal state
   const [isRateEditorOpen, setIsRateEditorOpen] = useState(false);
@@ -220,7 +214,7 @@ export function Calculator() {
           inputs.qfafEnabled && results.years.length > 1 ? results.years[1]?.taxSavings : undefined
         }
         isExpanded={isExpanded}
-        onOpenAdvanced={() => setIsAdvancedModalOpen(true)}
+        onOpenAdvanced={undefined}
       />
 
       <header className="header">
@@ -500,6 +494,91 @@ export function Calculator() {
             </span>
           </div>
         </div>
+
+        {/* Advanced Options Toggle */}
+        <div className="advanced-options-toggle">
+          <button
+            type="button"
+            className={`advanced-options-btn ${advancedMode.state.enabled ? 'active' : ''}`}
+            onClick={advancedMode.toggleEnabled}
+          >
+            <span className="toggle-icon">{advancedMode.state.enabled ? '▼' : '▶'}</span>
+            Advanced Options
+            {advancedMode.state.enabled && (
+              <span className="advanced-options-hint">Carryforwards &amp; formula overrides</span>
+            )}
+          </button>
+        </div>
+
+        {/* Advanced Options Content (inline, no modal) */}
+        {advancedMode.state.enabled && (
+          <div className="advanced-options-content">
+            {/* Existing Carryforwards */}
+            <div className="advanced-options-section">
+              <h3 className="advanced-options-section-title">Existing Carryforwards</h3>
+              <div className="input-grid">
+                <div className="input-group">
+                  <label htmlFor="stCarry">Existing ST Loss Carryforward</label>
+                  <div className="input-with-prefix">
+                    <span className="prefix">$</span>
+                    <input
+                      id="stCarry"
+                      type="text"
+                      inputMode="numeric"
+                      value={formatWithCommas(inputs.existingStLossCarryforward)}
+                      onChange={e =>
+                        updateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="ltCarry">Existing LT Loss Carryforward</label>
+                  <div className="input-with-prefix">
+                    <span className="prefix">$</span>
+                    <input
+                      id="ltCarry"
+                      type="text"
+                      inputMode="numeric"
+                      value={formatWithCommas(inputs.existingLtLossCarryforward)}
+                      onChange={e =>
+                        updateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label htmlFor="nolCarry">Existing NOL Carryforward</label>
+                  <div className="input-with-prefix">
+                    <span className="prefix">$</span>
+                    <input
+                      id="nolCarry"
+                      type="text"
+                      inputMode="numeric"
+                      value={formatWithCommas(inputs.existingNolCarryforward)}
+                      onChange={e =>
+                        updateInput('existingNolCarryforward', parseFormattedNumber(e.target.value))
+                      }
+                    />
+                  </div>
+                  <span className="input-hint">Can offset 80% of future taxable income</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Formula Constants */}
+            <div className="advanced-options-section">
+              <h3 className="advanced-options-section-title">Formula Constants</h3>
+              <SettingsPanel
+                settings={advancedSettings}
+                onChange={setAdvancedSettings}
+                onReset={resetAdvancedSettings}
+              />
+            </div>
+          </div>
+        )}
       </section>
 
       </div>{/* end section-group--inputs */}
@@ -851,146 +930,7 @@ export function Calculator() {
         collateralAmount={inputs.collateralAmount}
       />
 
-      {/* Advanced Settings Modal */}
-      <AdvancedModal isOpen={isAdvancedModalOpen} onClose={() => setIsAdvancedModalOpen(false)}>
-        {/* Existing Carryforwards */}
-        <div className="advanced-modal__section">
-          <h3 className="advanced-modal__section-title">Existing Carryforwards</h3>
-          <div className="input-grid">
-            <div className="input-group">
-              <label htmlFor="stCarry">Existing ST Loss Carryforward</label>
-              <div className="input-with-prefix">
-                <span className="prefix">$</span>
-                <input
-                  id="stCarry"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatWithCommas(inputs.existingStLossCarryforward)}
-                  onChange={e =>
-                    updateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="ltCarry">Existing LT Loss Carryforward</label>
-              <div className="input-with-prefix">
-                <span className="prefix">$</span>
-                <input
-                  id="ltCarry"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatWithCommas(inputs.existingLtLossCarryforward)}
-                  onChange={e =>
-                    updateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="nolCarry">Existing NOL Carryforward</label>
-              <div className="input-with-prefix">
-                <span className="prefix">$</span>
-                <input
-                  id="nolCarry"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatWithCommas(inputs.existingNolCarryforward)}
-                  onChange={e =>
-                    updateInput('existingNolCarryforward', parseFormattedNumber(e.target.value))
-                  }
-                />
-              </div>
-              <span className="input-hint">Can offset 80% of future taxable income</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Advanced Mode Toggle */}
-        <div className="advanced-modal__section">
-          <AdvancedModeToggle
-            enabled={advancedMode.state.enabled}
-            onToggle={advancedMode.toggleEnabled}
-          />
-
-          {advancedMode.state.enabled && (
-            <div className="advanced-sections">
-              <CollapsibleSection
-                title="Year-by-Year Planning"
-                expanded={advancedMode.state.sections.yearByYear}
-                onToggle={() => advancedMode.toggleSection('yearByYear')}
-                hint="Model income changes and cash infusions"
-              >
-                <YearByYearPlanning
-                  baseIncome={inputs.annualIncome}
-                  overrides={yearOverrides}
-                  onChange={setYearOverrides}
-                  onReset={resetYearOverrides}
-                />
-              </CollapsibleSection>
-
-              <CollapsibleSection
-                title="Sensitivity Analysis"
-                expanded={advancedMode.state.sections.sensitivity}
-                onToggle={() => advancedMode.toggleSection('sensitivity')}
-                hint="Stress-test assumptions"
-              >
-                <SensitivityAnalysis
-                  params={sensitivityParams}
-                  onChange={setSensitivityParams}
-                  onReset={resetSensitivityParams}
-                />
-              </CollapsibleSection>
-
-              <CollapsibleSection
-                title="Scenario Analysis"
-                expanded={advancedMode.state.sections.scenarios}
-                onToggle={() => advancedMode.toggleSection('scenarios')}
-                hint="Bull/Base/Bear outcomes"
-              >
-                <ScenarioAnalysis inputs={inputs} settings={advancedSettings} />
-              </CollapsibleSection>
-
-              <CollapsibleSection
-                title="Strategy Comparison"
-                expanded={advancedMode.state.sections.comparison}
-                onToggle={() => advancedMode.toggleSection('comparison')}
-                hint="Compare 2-3 strategies"
-              >
-                <StrategyComparison
-                  baseInputs={inputs}
-                  selectedStrategies={comparisonStrategies}
-                  onChange={setComparisonStrategies}
-                />
-              </CollapsibleSection>
-
-              <CollapsibleSection
-                title="Formula Constants"
-                expanded={advancedMode.state.sections.settings}
-                onToggle={() => advancedMode.toggleSection('settings')}
-                hint="Override formula constants"
-              >
-                <SettingsPanel
-                  settings={advancedSettings}
-                  onChange={setAdvancedSettings}
-                  onReset={resetAdvancedSettings}
-                />
-              </CollapsibleSection>
-
-              <CollapsibleSection
-                title="QFAF Test (By Year)"
-                expanded={advancedMode.state.sections.qfafTest}
-                onToggle={() => advancedMode.toggleSection('qfafTest')}
-                hint="Model QFAF economics year-by-year"
-              >
-                <QfafTestByYear filingStatus={inputs.filingStatus} />
-              </CollapsibleSection>
-            </div>
-          )}
-        </div>
-      </AdvancedModal>
+      {/* Advanced Tools are now inline at the bottom of the page */}
 
       {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
       <section className="results-section">
@@ -1038,6 +978,66 @@ export function Calculator() {
       </section>
 
       </div>{/* end section-group--results */}
+
+      {/* ========================================
+          SECTION GROUP: ADVANCED TOOLS (collapsed)
+          ======================================== */}
+      <div className="section-group section-group--tools">
+        <div className="section-group__label">Advanced Tools</div>
+
+        <section className="advanced-tools-section">
+          <div className="advanced-sections">
+            <CollapsibleSection
+              title="Year-by-Year Planning"
+              expanded={advancedMode.state.sections.yearByYear}
+              onToggle={() => advancedMode.toggleSection('yearByYear')}
+              hint="Model income changes and cash infusions"
+            >
+              <YearByYearPlanning
+                baseIncome={inputs.annualIncome}
+                overrides={yearOverrides}
+                onChange={setYearOverrides}
+                onReset={resetYearOverrides}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Sensitivity Analysis"
+              expanded={advancedMode.state.sections.sensitivity}
+              onToggle={() => advancedMode.toggleSection('sensitivity')}
+              hint="Stress-test assumptions"
+            >
+              <SensitivityAnalysis
+                params={sensitivityParams}
+                onChange={setSensitivityParams}
+                onReset={resetSensitivityParams}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Scenario Analysis"
+              expanded={advancedMode.state.sections.scenarios}
+              onToggle={() => advancedMode.toggleSection('scenarios')}
+              hint="Bull/Base/Bear outcomes"
+            >
+              <ScenarioAnalysis inputs={inputs} settings={advancedSettings} />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Strategy Comparison"
+              expanded={advancedMode.state.sections.comparison}
+              onToggle={() => advancedMode.toggleSection('comparison')}
+              hint="Compare 2-3 strategies"
+            >
+              <StrategyComparison
+                baseInputs={inputs}
+                selectedStrategies={comparisonStrategies}
+                onChange={setComparisonStrategies}
+              />
+            </CollapsibleSection>
+          </div>
+        </section>
+      </div>{/* end section-group--tools */}
 
       {/* ========================================
           SECTION GROUP 4: METHODOLOGY / NOTES
