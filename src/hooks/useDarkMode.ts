@@ -16,7 +16,7 @@ export function useDarkMode() {
     if (stored === 'light' || stored === 'dark' || stored === 'system') {
       return stored;
     }
-    return 'system';
+    return 'light';
   });
 
   // Get the resolved theme (what's actually displayed)
