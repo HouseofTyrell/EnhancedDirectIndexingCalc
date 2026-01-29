@@ -36,7 +36,7 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
 
   return (
     <section className="tax-rates-section">
-      <div className="section-number" data-step="3">
+      <div className="section-number" data-step="2">
         Tax Rate Analysis
       </div>
       <div className="section-header">

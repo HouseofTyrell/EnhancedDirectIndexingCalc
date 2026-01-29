@@ -197,6 +197,12 @@ export function Calculator() {
 
   const currentStrategy = getStrategy(inputs.strategyId);
 
+  // Compute collateral-only savings for incremental benefit comparison
+  const collateralOnlyResults = useMemo(() => {
+    const collateralOnlyInputs = { ...inputs, qfafEnabled: false };
+    return calculate(collateralOnlyInputs, advancedSettings);
+  }, [inputs, advancedSettings]);
+
   // Show QP acknowledgment modal if user hasn't acknowledged
   if (!qualifiedPurchaser.isAcknowledged) {
     return <QualifiedPurchaserModal onAcknowledge={qualifiedPurchaser.acknowledge} />;
@@ -222,21 +228,18 @@ export function Calculator() {
         <p className="subtitle">QFAF + Collateral Strategy</p>
       </header>
 
-      {/* Results Summary - Step 1: Your Projected Benefit */}
-      <ResultsSummary
-        totalTaxSavings={results.summary.totalTaxSavings}
-        finalPortfolioValue={results.summary.finalPortfolioValue}
-        effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
-        totalNolGenerated={results.summary.totalNolGenerated}
-        projectionYears={advancedSettings.projectionYears}
-      />
-
       {/* Scroll sentinel - triggers sticky header expansion when scrolled past */}
       <div id="scroll-sentinel" />
 
-      {/* Input Form - Step 2: Your Situation */}
+      {/* ========================================
+          SECTION GROUP 1: INPUTS
+          ======================================== */}
+      <div className="section-group section-group--inputs">
+        <div className="section-group__label">Inputs</div>
+
+      {/* Input Form - Step 1: Your Situation */}
       <section className="inputs-section">
-        <div className="section-number" data-step="2">
+        <div className="section-number" data-step="1">
           Your Situation
         </div>
         <div className="section-header">
@@ -411,7 +414,15 @@ export function Calculator() {
         </div>
       </section>
 
-      {/* Marginal Tax Rates - Step 3: Tax Rate Analysis */}
+      </div>{/* end section-group--inputs */}
+
+      {/* ========================================
+          SECTION GROUP 2: KEY ASSUMPTIONS
+          ======================================== */}
+      <div className="section-group section-group--assumptions">
+        <div className="section-group__label">Key Assumptions</div>
+
+      {/* Marginal Tax Rates - Step 2: Tax Rate Analysis */}
       <TaxRatesDisplay
         federalStRate={federalStRate}
         federalLtRate={federalLtRate}
@@ -421,9 +432,9 @@ export function Calculator() {
         rateDifferential={rateDifferential}
       />
 
-      {/* Strategy Sizing - Step 4: Optimized Strategy */}
+      {/* Strategy Sizing - Step 3: Optimized Strategy */}
       <section className="sizing-section">
-        <div className="section-number" data-step="4">
+        <div className="section-number" data-step="3">
           Optimized Strategy
         </div>
         <div className="section-header">
@@ -562,7 +573,7 @@ export function Calculator() {
 
         {/* Year 1 Tax Benefit Breakdown */}
         <div className="tax-benefit-summary">
-          <h3>Year 1 Tax Benefit</h3>
+          <h3>Estimated Year 1 Tax Benefit</h3>
           <div className="benefit-cards">
             <div className="benefit-card">
               <span className="benefit-label">
@@ -640,7 +651,7 @@ export function Calculator() {
         {results.years.length > 1 && inputs.qfafEnabled && (
           <div className="tax-benefit-summary subsequent-year">
             <h3>
-              Year 2+ Tax Benefit <span className="year-note">(typical subsequent year)</span>
+              Est. Year 2+ Tax Benefit <span className="year-note">(typical subsequent year)</span>
             </h3>
             <div className="nol-carryforward-note">
               <span className="nol-label">NOL Carryforward from Year 1:</span>
@@ -728,6 +739,25 @@ export function Calculator() {
           </div>
         )}
       </section>
+
+      </div>{/* end section-group--assumptions */}
+
+      {/* ========================================
+          SECTION GROUP 3: RESULTS
+          ======================================== */}
+      <div className="section-group section-group--results">
+        <div className="section-group__label">Results</div>
+
+      {/* Results Summary - headline metrics */}
+      <ResultsSummary
+        totalTaxSavings={results.summary.totalTaxSavings}
+        finalPortfolioValue={results.summary.finalPortfolioValue}
+        effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
+        totalNolGenerated={results.summary.totalNolGenerated}
+        projectionYears={advancedSettings.projectionYears}
+        collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
+        collateralAmount={inputs.collateralAmount}
+      />
 
       {/* Advanced Settings Modal */}
       <AdvancedModal isOpen={isAdvancedModalOpen} onClose={() => setIsAdvancedModalOpen(false)}>
@@ -870,20 +900,20 @@ export function Calculator() {
         </div>
       </AdvancedModal>
 
-      {/* Detailed Results - Step 5: Year-by-Year Breakdown */}
+      {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
       <section className="results-section">
-        <div className="section-number" data-step="5">
+        <div className="section-number" data-step="4">
           Year-by-Year Breakdown
         </div>
         <div className="section-header">
-          <h2>Detailed Projections</h2>
+          <h2>Estimated Detailed Projections</h2>
           <InfoPopup title="Projection Methodology">
             <ProjectionFormula />
           </InfoPopup>
         </div>
         <p className="section-guidance">
-          Year-by-year breakdown showing how tax benefits compound over the{' '}
-          {advancedSettings.projectionYears}-year projection.
+          Estimated year-by-year breakdown showing how tax benefits compound over the{' '}
+          {advancedSettings.projectionYears}-year projection period.
         </p>
 
         {/* Tax Benefits Chart */}
@@ -914,6 +944,14 @@ export function Calculator() {
           Print / Save as PDF
         </button>
       </section>
+
+      </div>{/* end section-group--results */}
+
+      {/* ========================================
+          SECTION GROUP 4: METHODOLOGY / NOTES
+          ======================================== */}
+      <div className="section-group section-group--methodology">
+        <div className="section-group__label">Methodology &amp; Notes</div>
 
       {/* Disclaimer */}
       <footer className="disclaimer">
@@ -970,6 +1008,8 @@ export function Calculator() {
           investment, tax, or legal advice. Past performance does not guarantee future results.
         </p>
       </footer>
+
+      </div>{/* end section-group--methodology */}
     </div>
   );
 }

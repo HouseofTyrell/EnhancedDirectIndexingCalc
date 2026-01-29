@@ -765,6 +765,144 @@ body {
   line-height: 1.4;
 }
 
+/* ============================================
+   SECTION GROUPS - Visual grouping of workflow areas
+   ============================================ */
+.section-group {
+  position: relative;
+  margin-bottom: 2.5rem;
+  padding-top: 0.25rem;
+}
+
+.section-group__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-light);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border);
+}
+
+/* Inputs group - neutral styling */
+.section-group--inputs .section-group__label {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  opacity: 0.7;
+}
+
+/* Assumptions group - subtle purple accent */
+.section-group--assumptions .section-group__label {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
+  opacity: 0.7;
+}
+
+/* Results group - success green accent */
+.section-group--results .section-group__label {
+  color: var(--success);
+  border-bottom-color: var(--success);
+  opacity: 0.7;
+}
+
+/* Methodology group - muted */
+.section-group--methodology .section-group__label {
+  color: var(--text-light);
+  border-bottom-color: var(--border);
+}
+
+/* ============================================
+   HEADLINE METRICS - Prominent results display
+   ============================================ */
+.headline-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.headline-metric {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 1.5rem;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s;
+}
+
+.headline-metric:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.headline-metric.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary-dark);
+  box-shadow: var(--shadow-lg);
+}
+
+.headline-metric h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.headline-metric.primary h3 {
+  opacity: 0.9;
+}
+
+.headline-number {
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.headline-metric .subtext {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+/* ============================================
+   INTERPRETATION TEXT - Plain English summary
+   ============================================ */
+.interpretation-text {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text);
+  border-left: 3px solid var(--primary);
+}
+
+.interpretation-text strong {
+  color: var(--primary);
+}
+
+/* ============================================
+   RESULTS DISCLOSURE - Exclusion notes
+   ============================================ */
+.results-disclosure {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #854d0e;
+}
+
+.results-disclosure strong {
+  color: #713f12;
+}
+
 /* Sections */
 section,
 details {
@@ -1658,6 +1796,13 @@ tfoot td {
     display: none;
   }
 
+  /* Section groups in print */
+  .section-group__label {
+    font-size: 0.6rem;
+    color: #374151;
+    border-bottom-color: #d1d5db;
+  }
+
   /* Show results summary in print */
   .results-summary-section {
     break-inside: avoid;
@@ -1665,7 +1810,23 @@ tfoot td {
   }
 
   .results-summary-section .summary-cards {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .headline-metrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .headline-number {
+    font-size: 1.5rem;
+  }
+
+  .interpretation-text {
+    font-size: 0.75rem;
+  }
+
+  .results-disclosure {
+    font-size: 0.7rem;
   }
 
   /* Keep section numbers and guidance in print */
@@ -4182,6 +4343,38 @@ tfoot td {
     font-size: 0.6rem;
   }
 
+  /* Headline metrics - stack on mobile */
+  .headline-metrics {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .headline-number {
+    font-size: 1.75rem;
+  }
+
+  .headline-metric {
+    padding: 1rem;
+  }
+
+  .interpretation-text {
+    font-size: 0.82rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .results-disclosure {
+    font-size: 0.72rem;
+  }
+
+  /* Section group labels */
+  .section-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .section-group__label {
+    font-size: 0.6rem;
+  }
+
   /* Summary cards - single column */
   .summary-cards {
     grid-template-columns: 1fr;
@@ -4755,6 +4948,55 @@ tfoot td {
   }
 }
 
+/* Section group labels */
+[data-theme='dark'] .section-group__label {
+  border-bottom-color: var(--border);
+  color: var(--text-light);
+}
+
+[data-theme='dark'] .section-group--inputs .section-group__label {
+  color: var(--primary-light);
+  border-bottom-color: var(--primary);
+}
+
+[data-theme='dark'] .section-group--assumptions .section-group__label {
+  color: #a78bfa;
+  border-bottom-color: #7c3aed;
+}
+
+[data-theme='dark'] .section-group--results .section-group__label {
+  color: var(--success-light);
+  border-bottom-color: var(--success);
+}
+
+/* Headline metrics */
+[data-theme='dark'] .headline-metric {
+  background: var(--card-bg);
+  border-color: var(--border);
+}
+
+[data-theme='dark'] .headline-metric.primary {
+  background: var(--primary);
+  border-color: var(--primary-dark);
+}
+
+/* Interpretation text */
+[data-theme='dark'] .interpretation-text {
+  background: var(--card-bg);
+  border-left-color: var(--primary-light);
+}
+
+/* Results disclosure */
+[data-theme='dark'] .results-disclosure {
+  background: rgba(120, 53, 15, 0.2);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .results-disclosure strong {
+  color: #fde68a;
+}
+
 /* Section backgrounds */
 [data-theme='dark'] .results-summary-section,
 [data-theme='dark'] .sizing-section {
@@ -5066,6 +5308,51 @@ tfoot td {
 
 /* System dark mode preference (when no explicit theme set) */
 @media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .section-group__label {
+    border-bottom-color: var(--border);
+    color: var(--text-light);
+  }
+
+  :root:not([data-theme='light']) .section-group--inputs .section-group__label {
+    color: var(--primary-light);
+    border-bottom-color: var(--primary);
+  }
+
+  :root:not([data-theme='light']) .section-group--assumptions .section-group__label {
+    color: #a78bfa;
+    border-bottom-color: #7c3aed;
+  }
+
+  :root:not([data-theme='light']) .section-group--results .section-group__label {
+    color: var(--success-light);
+    border-bottom-color: var(--success);
+  }
+
+  :root:not([data-theme='light']) .headline-metric {
+    background: var(--card-bg);
+    border-color: var(--border);
+  }
+
+  :root:not([data-theme='light']) .headline-metric.primary {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+  }
+
+  :root:not([data-theme='light']) .interpretation-text {
+    background: var(--card-bg);
+    border-left-color: var(--primary-light);
+  }
+
+  :root:not([data-theme='light']) .results-disclosure {
+    background: rgba(120, 53, 15, 0.2);
+    border-color: rgba(251, 191, 36, 0.3);
+    color: #fcd34d;
+  }
+
+  :root:not([data-theme='light']) .results-disclosure strong {
+    color: #fde68a;
+  }
+
   :root:not([data-theme='light']) .results-summary-section,
   :root:not([data-theme='light']) .sizing-section {
     background: var(--gradient-blue);
