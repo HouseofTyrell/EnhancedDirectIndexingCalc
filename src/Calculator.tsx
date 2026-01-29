@@ -312,46 +312,111 @@ export function Calculator() {
             onRatesChanged={() => setRateVersion(v => v + 1)}
           />
 
-          {/* QFAF Toggle */}
-          <div className="input-group toggle-group">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={inputs.qfafEnabled}
-                onChange={e => updateInput('qfafEnabled', e.target.checked)}
-              />
-              <span className="toggle-switch"></span>
-              Enable QFAF Overlay
-            </label>
-            <span className="input-hint">
-              {inputs.qfafEnabled
-                ? 'QFAF generates ST gains + ordinary losses'
-                : 'Collateral-only mode (no QFAF)'}
-            </span>
-          </div>
-
-          {/* QFAF Sizing Window */}
-          {inputs.qfafEnabled && (
-            <div className="input-group">
-              <label htmlFor="sizingYears">
-                QFAF Sizing Window
+          {/* Toggle Row: QFAF + Portfolio Growth + Financing Fees */}
+          <div className="input-group toggle-group toggle-row">
+            <div className="toggle-row-item">
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={inputs.qfafEnabled}
+                  onChange={e => updateInput('qfafEnabled', e.target.checked)}
+                />
+                <span className="toggle-switch"></span>
+                QFAF Overlay
               </label>
-              <select
-                id="sizingYears"
-                value={inputs.qfafSizingYears}
-                onChange={e => updateInput('qfafSizingYears', parseInt(e.target.value, 10))}
-              >
-                {Array.from({ length: advancedSettings.projectionYears }, (_, i) => i + 1).map(y => (
-                  <option key={y} value={y}>
-                    {y === 1 ? 'Year 1 only' : `Average of Years 1–${y}`}
-                  </option>
-                ))}
-              </select>
               <span className="input-hint">
-                Avg ST loss rate: {formatPercent(results.sizing.avgStLossRate)}
-                {inputs.qfafSizingYears === 1 ? ' (Year 1)' : ` (Yrs 1–${inputs.qfafSizingYears})`}
+                {inputs.qfafEnabled
+                  ? 'ST gains + ordinary losses'
+                  : 'Collateral-only'}
               </span>
             </div>
+
+            <div className="toggle-row-item">
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={advancedSettings.growthEnabled}
+                  onChange={e =>
+                    setAdvancedSettings(s => ({ ...s, growthEnabled: e.target.checked }))
+                  }
+                />
+                <span className="toggle-switch"></span>
+                Portfolio Growth
+              </label>
+              <span className="input-hint">
+                {advancedSettings.growthEnabled
+                  ? `${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}% return`
+                  : 'No growth (0%)'}
+              </span>
+            </div>
+
+            <div className="toggle-row-item">
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={advancedSettings.financingFeesEnabled}
+                  onChange={e =>
+                    setAdvancedSettings(s => ({ ...s, financingFeesEnabled: e.target.checked }))
+                  }
+                />
+                <span className="toggle-switch"></span>
+                Financing Fees
+              </label>
+              <span className="input-hint">
+                {advancedSettings.financingFeesEnabled
+                  ? `${((currentStrategy?.financingCostRate ?? 0) * 100).toFixed(1)}% cost`
+                  : 'No fees'}
+              </span>
+            </div>
+          </div>
+
+          {/* QFAF Sizing Window + Cushion (shown when QFAF enabled) */}
+          {inputs.qfafEnabled && (
+            <>
+              <div className="input-group">
+                <label htmlFor="sizingYears">
+                  QFAF Sizing Window
+                </label>
+                <select
+                  id="sizingYears"
+                  value={inputs.qfafSizingYears}
+                  onChange={e => updateInput('qfafSizingYears', parseInt(e.target.value, 10))}
+                >
+                  {Array.from({ length: advancedSettings.projectionYears }, (_, i) => i + 1).map(y => (
+                    <option key={y} value={y}>
+                      {y === 1 ? 'Year 1 only' : `Average of Years 1–${y}`}
+                    </option>
+                  ))}
+                </select>
+                <span className="input-hint">
+                  Avg ST loss rate: {formatPercent(results.sizing.avgStLossRate)}
+                  {inputs.qfafSizingYears === 1 ? ' (Year 1)' : ` (Yrs 1–${inputs.qfafSizingYears})`}
+                </span>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="sizingCushion">
+                  QFAF Sizing Cushion: {(inputs.qfafSizingCushion * 100).toFixed(0)}%
+                </label>
+                <input
+                  id="sizingCushion"
+                  type="range"
+                  min={0}
+                  max={0.10}
+                  step={0.01}
+                  value={inputs.qfafSizingCushion}
+                  onChange={e => updateInput('qfafSizingCushion', parseFloat(e.target.value))}
+                />
+                <div className="allocation-labels">
+                  <span>0%</span>
+                  <span>5%</span>
+                  <span>10%</span>
+                </div>
+                <span className="input-hint">
+                  Reduces QFAF size for conservative sizing
+                </span>
+              </div>
+            </>
           )}
 
           <div className="input-group">
@@ -370,6 +435,7 @@ export function Calculator() {
             </div>
           </div>
 
+          {/* Annual Income + Filing Status row */}
           <div className="input-group">
             <label htmlFor="income">Annual Income</label>
             <div className="input-with-prefix">
@@ -432,69 +498,34 @@ export function Calculator() {
             </div>
           )}
 
-          {/* Growth Assumption Toggle */}
-          <div className="input-group toggle-group">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={advancedSettings.growthEnabled}
-                onChange={e =>
-                  setAdvancedSettings(s => ({ ...s, growthEnabled: e.target.checked }))
-                }
-              />
-              <span className="toggle-switch"></span>
-              Portfolio Growth
-            </label>
-            <span className="input-hint">
-              {advancedSettings.growthEnabled
-                ? `${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}% annual return assumed`
-                : 'No growth assumption (0%)'}
-            </span>
-          </div>
-
-          {/* Growth Rate Slider (shown when growth enabled) */}
+          {/* Annual Return Slider (shown when growth enabled) */}
           {advancedSettings.growthEnabled && (
-            <div className="input-group">
-              <label htmlFor="annualReturn">Annual Return</label>
-              <div className="input-with-suffix">
-                <input
-                  id="annualReturn"
-                  type="number"
-                  step={0.5}
-                  min={-20}
-                  max={30}
-                  value={(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}
-                  onChange={e => {
-                    const val = parseFloat(e.target.value) / 100;
-                    if (!isNaN(val)) {
-                      setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
-                    }
-                  }}
-                />
-                <span className="suffix">%</span>
+            <div className="input-group full-width">
+              <label htmlFor="annualReturn">
+                Annual Return: {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%
+              </label>
+              <input
+                id="annualReturn"
+                type="range"
+                min={-0.20}
+                max={0.30}
+                step={0.005}
+                value={advancedSettings.defaultAnnualReturn}
+                onChange={e => {
+                  const val = parseFloat(e.target.value);
+                  if (!isNaN(val)) {
+                    setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
+                  }
+                }}
+              />
+              <div className="allocation-labels">
+                <span>-20%</span>
+                <span>0%</span>
+                <span>15%</span>
+                <span>30%</span>
               </div>
             </div>
           )}
-
-          {/* Financing Fees Toggle */}
-          <div className="input-group toggle-group">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={advancedSettings.financingFeesEnabled}
-                onChange={e =>
-                  setAdvancedSettings(s => ({ ...s, financingFeesEnabled: e.target.checked }))
-                }
-              />
-              <span className="toggle-switch"></span>
-              Financing Fees
-            </label>
-            <span className="input-hint">
-              {advancedSettings.financingFeesEnabled
-                ? `Deducts strategy financing cost (${((currentStrategy?.financingCostRate ?? 0) * 100).toFixed(1)}%) from growth`
-                : 'No financing cost deduction'}
-            </span>
-          </div>
         </div>
 
         {/* Advanced Options Toggle */}
