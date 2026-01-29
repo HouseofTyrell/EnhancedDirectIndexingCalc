@@ -1231,6 +1231,14 @@ input[type='range']::-webkit-slider-thumb {
   color: var(--primary);
 }
 
+/* Input Pair - two fields side by side on desktop, stacked on mobile */
+.input-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  grid-column: 1 / -1;
+}
+
 /* Toggle Switch */
 .toggle-group {
   grid-column: 1 / -1;
@@ -3346,6 +3354,10 @@ tfoot td {
   .input-grid {
     grid-template-columns: 1fr;
     gap: 0.75rem;
+  }
+
+  .input-pair {
+    grid-template-columns: 1fr;
   }
 
   /* Strategy rates info - stack vertically */

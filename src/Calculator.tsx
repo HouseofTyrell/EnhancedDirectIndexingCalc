@@ -249,33 +249,52 @@ export function Calculator() {
           strategy sizing and tax impact.
         </p>
         <div className="input-grid">
-          <div className="input-group">
-            <label htmlFor="strategy">Collateral Strategy</label>
-            <select
-              id="strategy"
-              value={inputs.strategyId}
-              onChange={e => updateInput('strategyId', e.target.value)}
-            >
-              <optgroup label="Core (Cash Funded)">
-                {STRATEGIES.filter(s => s.type === 'core').map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Overlay (Appreciated Stock)">
-                {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-            <span className="input-hint">
-              {currentStrategy?.type === 'core'
-                ? 'Cash invested in direct indexing'
-                : 'Existing appreciated stock used as collateral'}
-            </span>
+          {/* Collateral Strategy + Collateral Amount side by side */}
+          <div className="input-pair">
+            <div className="input-group">
+              <label htmlFor="strategy">Collateral Strategy</label>
+              <select
+                id="strategy"
+                value={inputs.strategyId}
+                onChange={e => updateInput('strategyId', e.target.value)}
+              >
+                <optgroup label="Core (Cash Funded)">
+                  {STRATEGIES.filter(s => s.type === 'core').map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Overlay (Appreciated Stock)">
+                  {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <span className="input-hint">
+                {currentStrategy?.type === 'core'
+                  ? 'Cash invested in direct indexing'
+                  : 'Existing appreciated stock used as collateral'}
+              </span>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="collateral">Collateral Amount</label>
+              <div className="input-with-prefix">
+                <span className="prefix">$</span>
+                <input
+                  id="collateral"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(inputs.collateralAmount)}
+                  onChange={e =>
+                    updateInput('collateralAmount', parseFormattedNumber(e.target.value))
+                  }
+                />
+              </div>
+            </div>
           </div>
 
           {/* Strategy Rate Info - shows Year 1 effective rates (includes custom overrides) */}
@@ -422,50 +441,36 @@ export function Calculator() {
             </>
           )}
 
-          <div className="input-group">
-            <label htmlFor="collateral">Collateral Amount</label>
-            <div className="input-with-prefix">
-              <span className="prefix">$</span>
-              <input
-                id="collateral"
-                type="text"
-                inputMode="numeric"
-                value={formatWithCommas(inputs.collateralAmount)}
-                onChange={e =>
-                  updateInput('collateralAmount', parseFormattedNumber(e.target.value))
-                }
-              />
+          {/* Filing Status + Annual Income side by side */}
+          <div className="input-pair">
+            <div className="input-group">
+              <label htmlFor="filing">Filing Status</label>
+              <select
+                id="filing"
+                value={inputs.filingStatus}
+                onChange={e => updateInput('filingStatus', e.target.value as FilingStatus)}
+              >
+                {FILING_STATUSES.map(status => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {/* Annual Income + Filing Status row */}
-          <div className="input-group">
-            <label htmlFor="income">Annual Income</label>
-            <div className="input-with-prefix">
-              <span className="prefix">$</span>
-              <input
-                id="income"
-                type="text"
-                inputMode="numeric"
-                value={formatWithCommas(inputs.annualIncome)}
-                onChange={e => updateInput('annualIncome', parseFormattedNumber(e.target.value))}
-              />
+            <div className="input-group">
+              <label htmlFor="income">Annual Income</label>
+              <div className="input-with-prefix">
+                <span className="prefix">$</span>
+                <input
+                  id="income"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(inputs.annualIncome)}
+                  onChange={e => updateInput('annualIncome', parseFormattedNumber(e.target.value))}
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="filing">Filing Status</label>
-            <select
-              id="filing"
-              value={inputs.filingStatus}
-              onChange={e => updateInput('filingStatus', e.target.value as FilingStatus)}
-            >
-              {FILING_STATUSES.map(status => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           <div className="input-group">
