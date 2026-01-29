@@ -66,6 +66,9 @@ export function Calculator() {
   const { isExpanded } = useScrollHeader('scroll-sentinel');
   const qualifiedPurchaser = useQualifiedPurchaser();
 
+  // Advanced options inline toggle (always collapsed on page load)
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+
   // Year-by-Year Planning state
   const [yearOverrides, setYearOverrides] = useState<YearOverride[]>(() =>
     generateDefaultOverrides(DEFAULTS.annualIncome)
@@ -499,19 +502,19 @@ export function Calculator() {
         <div className="advanced-options-toggle">
           <button
             type="button"
-            className={`advanced-options-btn ${advancedMode.state.enabled ? 'active' : ''}`}
-            onClick={advancedMode.toggleEnabled}
+            className={`advanced-options-btn ${showAdvancedOptions ? 'active' : ''}`}
+            onClick={() => setShowAdvancedOptions(v => !v)}
           >
-            <span className="toggle-icon">{advancedMode.state.enabled ? '▼' : '▶'}</span>
+            <span className="toggle-icon">{showAdvancedOptions ? '▼' : '▶'}</span>
             Advanced Options
-            {advancedMode.state.enabled && (
+            {showAdvancedOptions && (
               <span className="advanced-options-hint">Carryforwards &amp; formula overrides</span>
             )}
           </button>
         </div>
 
         {/* Advanced Options Content (inline, no modal) */}
-        {advancedMode.state.enabled && (
+        {showAdvancedOptions && (
           <div className="advanced-options-content">
             {/* Existing Carryforwards */}
             <div className="advanced-options-section">

@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { YearResult } from './types';
 import { formatCurrency, formatCurrencyAbbreviated } from './utils/formatters';
+import { useDarkMode } from './hooks/useDarkMode';
 
 interface WealthChartProps {
   data: YearResult[];
@@ -20,6 +21,8 @@ interface WealthChartProps {
 
 // Memoized chart component to prevent unnecessary re-renders (016)
 export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: WealthChartProps) {
+  const { isDark } = useDarkMode();
+
   // Memoize chart data transformation with O(n) cumulative calculation (007)
   const chartData = useMemo(() => {
     let cumulativeSavings = 0;
@@ -40,16 +43,17 @@ export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: Wea
       <h3>Annual Tax Benefits</h3>
       <ResponsiveContainer width="100%" height={350}>
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-          <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12 }} width={80} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e0e0e0'} />
+          <XAxis dataKey="year" tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} />
+          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} width={80} />
           <Tooltip
             formatter={value => (value !== null ? formatCurrency(value as number) : '')}
-            labelStyle={{ fontWeight: 'bold' }}
+            labelStyle={{ fontWeight: 'bold', color: isDark ? '#f3f4f6' : undefined }}
             contentStyle={{
-              backgroundColor: '#fff',
-              border: '1px solid #ccc',
+              backgroundColor: isDark ? '#1f2937' : '#fff',
+              border: `1px solid ${isDark ? '#374151' : '#ccc'}`,
               borderRadius: '4px',
+              color: isDark ? '#f3f4f6' : undefined,
             }}
           />
           <Legend />
@@ -95,6 +99,8 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
   data,
   trackingError = 0.02,
 }: WealthChartProps) {
+  const { isDark } = useDarkMode();
+
   // Memoize chart data transformation with confidence bands (007)
   const chartData = useMemo(
     () =>
@@ -135,10 +141,11 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
     return (
       <div
         style={{
-          backgroundColor: '#fff',
-          border: '1px solid #ccc',
+          backgroundColor: isDark ? '#1f2937' : '#fff',
+          border: `1px solid ${isDark ? '#374151' : '#ccc'}`,
           borderRadius: '4px',
           padding: '10px',
+          color: isDark ? '#f3f4f6' : undefined,
         }}
       >
         <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{label}</p>
@@ -153,9 +160,9 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
           <p
             style={{
               margin: '4px 0',
-              color: '#6b7280',
+              color: isDark ? '#9ca3af' : '#6b7280',
               fontSize: '0.85em',
-              borderTop: '1px solid #e5e7eb',
+              borderTop: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
               paddingTop: '6px',
               marginTop: '6px',
             }}
@@ -173,11 +180,11 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
       <h3>Portfolio Value Growth</h3>
       <ResponsiveContainer width="100%" height={350}>
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-          <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12 }} width={80} />
+          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e0e0e0'} />
+          <XAxis dataKey="year" tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} />
+          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} width={80} />
           <Tooltip content={<CustomTooltip />} />
-          <Legend />
+          <Legend wrapperStyle={isDark ? { color: '#f3f4f6' } : undefined} />
           {/* Confidence band - upper area (will be masked by lower) */}
           <Area
             type="monotone"
@@ -192,7 +199,7 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
             type="monotone"
             dataKey="lowerBound"
             stroke="none"
-            fill="#ffffff"
+            fill={isDark ? '#111827' : '#ffffff'}
             fillOpacity={1}
             legendType="none"
           />
