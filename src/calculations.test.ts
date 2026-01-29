@@ -31,6 +31,7 @@ function createInputs(overrides: Partial<CalculatorInputs> = {}): CalculatorInpu
     existingLtLossCarryforward: 0,
     existingNolCarryforward: 0,
     qfafEnabled: true,
+    qfafSizingYears: 1, // Year 1 only for backwards-compatible test assertions
     ...overrides,
   };
 }

@@ -29,6 +29,10 @@ export interface CalculatorInputs {
 
   // Toggle QFAF on/off (for testing collateral-only scenarios)
   qfafEnabled: boolean;
+
+  // QFAF sizing window: number of years to average collateral losses for sizing
+  // 1 = Year 1 only (legacy), 10 = average across all projection years (default)
+  qfafSizingYears: number;
 }
 
 export interface CalculatedSizing {
@@ -46,6 +50,9 @@ export interface CalculatedSizing {
   year1UsableOrdinaryLoss: number; // Capped by 461(l)
   year1ExcessToNol: number; // Excess ordinary loss → NOL
   section461Limit: number;
+  // Sizing metadata
+  avgStLossRate: number; // Average ST loss rate used for sizing
+  sizingYears: number; // Number of years averaged
 }
 
 export interface YearResult {

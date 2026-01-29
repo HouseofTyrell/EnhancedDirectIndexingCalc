@@ -18,6 +18,7 @@ import {
   SECTION_461L_LIMITS,
   CAPITAL_LOSS_LIMITS,
   NOL_OFFSET_PERCENTAGE,
+  getAverageStLossRate,
 } from './strategyData';
 import { safeNumber } from './utils/formatters';
 import { getNetCapitalLossRate } from './utils/strategyRates';
@@ -48,8 +49,11 @@ interface TaxRates {
 /**
  * Calculate QFAF sizing based on strategy selection and collateral amount.
  *
- * QFAF is auto-sized so its ST gains equal collateral's ST losses.
- * Formula: QFAF = (Collateral × ST_Loss_Rate) / 150%
+ * QFAF is sized so its ST gains equal the collateral's average ST losses
+ * over a configurable window (default: all projection years).
+ * Formula: QFAF = (Collateral × Avg_ST_Loss_Rate) / 150%
+ *
+ * When qfafSizingYears = 1, this is equivalent to the legacy Year 1-only sizing.
  */
 export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
   const strategy = getStrategy(inputs.strategyId);
@@ -58,9 +62,13 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
   }
 
   const collateralValue = inputs.collateralAmount;
+  const sizingYears = inputs.qfafSizingYears ?? 10;
 
-  // Calculate collateral ST losses
-  const year1StLosses = collateralValue * strategy.stLossRate;
+  // Calculate the average ST loss rate across the sizing window
+  const avgStLossRate = getAverageStLossRate(strategy, 1, sizingYears);
+
+  // Calculate collateral ST losses based on average rate (for sizing purposes)
+  const year1StLosses = collateralValue * avgStLossRate;
 
   // QFAF can be disabled for collateral-only scenarios
   let qfafValue = 0;
@@ -68,7 +76,7 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
   let year1OrdinaryLosses = 0;
 
   if (inputs.qfafEnabled !== false) {
-    // Auto-size QFAF so ST gains = ST losses (or use override)
+    // Auto-size QFAF so ST gains = average ST losses (or use override)
     qfafValue = inputs.qfafOverride ?? year1StLosses / QFAF_ST_GAIN_RATE;
     // QFAF generates ST gains and ordinary losses at 150% of MV
     year1StGains = qfafValue * QFAF_ST_GAIN_RATE;
@@ -95,6 +103,8 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
     year1UsableOrdinaryLoss,
     year1ExcessToNol,
     section461Limit,
+    avgStLossRate,
+    sizingYears,
   };
 }
 
