@@ -1,0 +1,91 @@
+/* ============================================
+   SCENARIO ANALYSIS
+   ============================================ */
+
+.scenario-analysis {
+  padding-top: 0.5rem;
+}
+
+.scenario-table-container {
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.scenario-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.scenario-table th,
+.scenario-table td {
+  padding: 0.75rem 1rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.scenario-table th:first-child,
+.scenario-table td:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.scenario-table th {
+  background: var(--bg);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.scenario-table th .scenario-return {
+  display: block;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--text-light);
+  margin-top: 0.25rem;
+}
+
+.scenario-table th.scenario-bull {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  color: #166534;
+}
+
+.scenario-table th.scenario-base {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  color: #3730a3;
+}
+
+.scenario-table th.scenario-bear {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #991b1b;
+}
+
+.scenario-table th.scenario-expected {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+}
+
+.scenario-table td.scenario-bull {
+  color: #166534;
+}
+
+.scenario-table td.scenario-bear {
+  color: #991b1b;
+}
+
+.scenario-table td.scenario-expected {
+  font-weight: 600;
+  background: #fffbeb;
+}
+
+.scenario-notes {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+
+.scenario-notes strong {
+  color: var(--text);
+}

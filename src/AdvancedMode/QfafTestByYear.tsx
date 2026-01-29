@@ -1,6 +1,11 @@
 import { useReducer, useCallback, useMemo } from 'react';
 import { FilingStatus } from '../types';
-import { STRATEGIES, getStLossRateForYear, SECTION_461L_LIMITS } from '../strategyData';
+import {
+  STRATEGIES,
+  getStLossRateForYear,
+  SECTION_461L_LIMITS,
+  QFAF_ORDINARY_LOSS_RATE,
+} from '../strategyData';
 import { formatWithCommas, parseFormattedNumber, formatCurrency } from '../utils/formatters';
 import './QfafTestByYear.css';
 
@@ -8,16 +13,13 @@ import './QfafTestByYear.css';
 const NUM_YEARS = 10;
 const START_YEAR = 2026;
 
-// Alpha rate constants
-const QFAF_ALPHA_RATE = 0.0557; // 5.57%
-const QUANTINNO_ALPHA_RATE = 0.0117; // 1.17%
+// Alpha rate constants (from QFAF Excel model — test-page-specific, no shared equivalent)
+const QFAF_ALPHA_RATE = 0.0557; // 5.57% per year
+const QUANTINNO_ALPHA_RATE = 0.0117; // 1.17% per year
 
-// Fee rates (derived from Excel - percentage of Deals Collateral)
+// Fee rates (from QFAF Excel model — percentage of Deals Collateral)
 const ADVISOR_MGMT_FEE_RATE = 0.0057; // ~0.57%
 const QFAF_FINANCING_FEE_RATE = 0.00536; // ~0.54%
-
-// Loss rate multiplier (QFAF generates 150% ordinary losses)
-const QFAF_LOSS_RATE = 1.5;
 
 interface QfafTestByYearProps {
   filingStatus: FilingStatus;
@@ -65,13 +67,13 @@ type Action =
   | { type: 'UPDATE_ASSUMPTION'; field: keyof Assumptions; value: number | string }
   | { type: 'RESET' };
 
-// Defaults matching the Excel screenshot
+// Defaults matching the Excel screenshot (validation-specific, not shared with main calculator)
 const DEFAULT_ASSUMPTIONS: Assumptions = {
   initialQfafInvestment: 1000000,
   initialDealsInvestment: 4700000,
-  overlayStrategyId: 'overlay-45-45',
-  coreStrategyId: 'core-145-45',
-  marginalTaxRate: 0.541, // 54.1%
+  overlayStrategyId: OVERLAY_STRATEGIES[1]?.id ?? 'overlay-45-45', // Overlay 45/45
+  coreStrategyId: CORE_STRATEGIES[1]?.id ?? 'core-145-45', // Core 145/45
+  marginalTaxRate: 0.541, // 54.1% combined federal + state
 };
 
 function reducer(state: State, action: Action): State {
@@ -139,7 +141,7 @@ function computeYearResults(
     }
 
     // Annual estimated ordinary losses = QFAF × 150%
-    const annualEstOrdinaryLosses = qfafSubscriptionSize * QFAF_LOSS_RATE;
+    const annualEstOrdinaryLosses = qfafSubscriptionSize * QFAF_ORDINARY_LOSS_RATE;
 
     // Deals Collateral Value calculation:
     // The collateral is sized so ST losses = QFAF ST gains (for tax efficiency)
@@ -456,7 +458,7 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
             <strong>Deals Collateral:</strong> Calculated so total ST losses = QFAF ST gains. Combines Overlay (growing at {(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%) + Core collateral.
           </li>
           <li>
-            <strong>Ordinary Losses:</strong> QFAF generates {(QFAF_LOSS_RATE * 100).toFixed(0)}% of subscription as ordinary losses.
+            <strong>Ordinary Losses:</strong> QFAF generates {(QFAF_ORDINARY_LOSS_RATE * 100).toFixed(0)}% of subscription as ordinary losses.
           </li>
           <li>
             <strong>§461(l) Limit:</strong> {formatCurrency(section461Limit)} for {filingStatus.toUpperCase()} filers. Excess carries forward as NOL.

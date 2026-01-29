@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { STRATEGIES, LOSS_RATE_DECAY_FACTOR, LOSS_RATE_FLOOR } from '../strategyData';
 import {
   StrategyRateOverrides,
@@ -8,10 +8,18 @@ import {
   saveRateOverrides,
   clearRateOverrides,
 } from '../utils/strategyRates';
+import './StrategyRateEditor.css';
 
+/**
+ * Props for the StrategyRateEditor component.
+ * Provides a modal editor for customizing net capital loss rates per strategy and year.
+ */
 interface StrategyRateEditorProps {
+  /** Whether the rate editor modal is currently visible */
   isOpen: boolean;
+  /** Callback to close the modal (triggered by overlay click or close button) */
   onClose: () => void;
+  /** Optional callback fired after rates are saved or reset, to trigger recalculation */
   onRatesChanged?: () => void;
 }
 
@@ -34,7 +42,7 @@ function getAverageRate(rates: StrategyRateOverrides, strategyId: string): numbe
   return sum / 10;
 }
 
-export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: StrategyRateEditorProps) {
+export const StrategyRateEditor = memo(function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: StrategyRateEditorProps) {
   const [rates, setRates] = useState<StrategyRateOverrides>(() => {
     const defaults = getDefaultRates();
     const overrides = loadRateOverrides();
@@ -286,4 +294,4 @@ export function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: Strategy
       </div>
     </div>
   );
-}
+});

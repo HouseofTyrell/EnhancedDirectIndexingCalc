@@ -189,11 +189,24 @@ export const LOSS_RATE_DECAY_FACTOR = 0.93; // 7% annual decay
 export const LOSS_RATE_FLOOR = 0.3; // Minimum 30% of initial rate
 
 // Helper functions
+
+/**
+ * Look up a strategy definition by its unique identifier.
+ * @param id - Strategy identifier (e.g. "core-145-45", "overlay-75-75")
+ * @returns The matching Strategy object, or undefined if no strategy has the given id
+ */
 export function getStrategy(id: string): Strategy | undefined {
   return STRATEGIES.find(s => s.id === id);
 }
 
-// Get ST loss rate for a specific year (1-indexed)
+/**
+ * Get the short-term loss rate for a specific year of a strategy.
+ * The year is 1-indexed; values beyond the defined range are clamped to the
+ * last available year's rate.
+ * @param strategy - The strategy whose loss-rate schedule to query
+ * @param year - The year number (1-indexed, e.g. 1 for Year 1)
+ * @returns The short-term loss rate as a decimal for the requested year
+ */
 export function getStLossRateForYear(strategy: Strategy, year: number): number {
   const index = Math.min(year - 1, strategy.stLossRatesByYear.length - 1);
   return strategy.stLossRatesByYear[Math.max(0, index)];

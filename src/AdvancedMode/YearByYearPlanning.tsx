@@ -1,17 +1,29 @@
+import { memo } from 'react';
 import { YearOverride, LiquidityParams, DEFAULT_LIQUIDITY } from '../types';
 import { InfoText } from '../InfoPopup';
 import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
+import './YearByYearPlanning.css';
 
+/**
+ * Props for the YearByYearPlanning component.
+ * Models income changes, cash infusions, and liquidity constraints over the projection period.
+ */
 interface YearByYearPlanningProps {
+  /** Default W-2 income used as the baseline for each year */
   baseIncome: number;
+  /** Per-year override data including income, cash infusions, and notes */
   overrides: YearOverride[];
+  /** Callback fired when any year's override values are changed */
   onChange: (overrides: YearOverride[]) => void;
+  /** Callback to reset all year overrides back to defaults */
   onReset: () => void;
+  /** Optional liquidity constraint parameters (lock-up, penalties, emergency fund) */
   liquidityParams?: LiquidityParams;
+  /** Optional callback fired when liquidity constraint parameters change */
   onLiquidityChange?: (params: LiquidityParams) => void;
 }
 
-export function YearByYearPlanning({
+export const YearByYearPlanning = memo(function YearByYearPlanning({
   baseIncome,
   overrides,
   onChange,
@@ -201,4 +213,4 @@ export function YearByYearPlanning({
       </div>
     </div>
   );
-}
+});

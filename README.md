@@ -38,6 +38,10 @@ cd EnhancedDirectIndexingCalc
 npm install
 ```
 
+### Environment Variables
+
+No environment variables are required for local development or production builds. All configuration is embedded in TypeScript source files.
+
 ### Development
 
 ```bash
@@ -57,7 +61,7 @@ npm run build
 npm run preview
 ```
 
-The build outputs a single HTML file (via `vite-plugin-singlefile`) for easy distribution.
+The build outputs a single HTML file (via `vite-plugin-singlefile`) for easy distribution. `TaxOptimizationCalculator.html` in the repo root is a pre-built distribution copy for offline sharing.
 
 ### Testing
 

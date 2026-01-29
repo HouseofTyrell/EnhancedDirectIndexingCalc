@@ -63,6 +63,11 @@ export const STATES = [
   { code: 'OTHER', name: 'Other (enter rate)', rate: 0 },
 ];
 
+/**
+ * Look up the top marginal state income tax rate for a given state.
+ * @param code - Two-letter state code (e.g. "CA", "NY") or "OTHER"
+ * @returns The top marginal state income tax rate as a decimal, or 0 if not found
+ */
 export function getStateRate(code: string): number {
   return STATES.find(s => s.code === code)?.rate ?? 0;
 }
@@ -146,6 +151,14 @@ function getNiitThreshold(status: string) {
   }
 }
 
+/**
+ * Compute the federal marginal short-term capital gains tax rate for a given
+ * income level and filing status. Includes the 3.8% Net Investment Income Tax
+ * (NIIT) when income exceeds the applicable threshold.
+ * @param income - Total taxable income in dollars
+ * @param status - Filing status code ("single", "mfj", "mfs", or "hoh")
+ * @returns The combined marginal federal short-term rate as a decimal
+ */
 export function getFederalStRate(income: number, status: string): number {
   const brackets = getBrackets(status);
   const niitThreshold = getNiitThreshold(status);
@@ -166,6 +179,15 @@ export function getFederalStRate(income: number, status: string): number {
   return marginalRate;
 }
 
+/**
+ * Compute the federal marginal long-term capital gains tax rate for a given
+ * income level and filing status. Uses the 2026 inflation-adjusted LTCG
+ * brackets (0% / 15% / 20%) and adds the 3.8% NIIT when income exceeds
+ * the applicable threshold.
+ * @param income - Total taxable income in dollars
+ * @param status - Filing status code ("single", "mfj", "mfs", or "hoh")
+ * @returns The combined marginal federal long-term rate as a decimal
+ */
 export function getFederalLtRate(income: number, status: string): number {
   const niitThreshold = getNiitThreshold(status);
 

@@ -12,12 +12,14 @@ describe('ResultsSummary', () => {
 
   it('renders the section title', () => {
     render(<ResultsSummary {...defaultProps} />);
-    expect(screen.getByText('10-Year Tax Savings')).toBeInTheDocument();
+    expect(screen.getByText('Estimated 10-Year Tax Savings')).toBeInTheDocument();
   });
 
   it('displays formatted total tax savings', () => {
     render(<ResultsSummary {...defaultProps} />);
-    expect(screen.getByText('$500,000')).toBeInTheDocument();
+    // Total tax savings appears in headline metric and interpretation text
+    const elements = screen.getAllByText('$500,000');
+    expect(elements.length).toBeGreaterThan(0);
   });
 
   it('displays formatted final portfolio value', () => {
@@ -35,10 +37,10 @@ describe('ResultsSummary', () => {
     expect(screen.getByText('$150,000')).toBeInTheDocument();
   });
 
-  it('renders all four summary cards', () => {
+  it('renders all summary cards', () => {
     render(<ResultsSummary {...defaultProps} />);
     const cards = document.querySelectorAll('.card');
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(3);
   });
 
   it('handles zero values correctly', () => {

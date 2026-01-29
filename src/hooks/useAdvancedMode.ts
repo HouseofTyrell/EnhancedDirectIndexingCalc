@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
 export interface AdvancedModeState {
   enabled: boolean;
@@ -12,7 +13,7 @@ export interface AdvancedModeState {
   };
 }
 
-const STORAGE_KEY = 'taxCalc_advancedMode';
+const STORAGE_KEY = STORAGE_KEYS.ADVANCED_MODE;
 
 const DEFAULT_STATE: AdvancedModeState = {
   enabled: false,
@@ -78,8 +79,8 @@ export function useAdvancedMode() {
         // Invalid structure - clear corrupted data
         localStorage.removeItem(STORAGE_KEY);
       }
-    } catch {
-      // localStorage not available or invalid JSON
+    } catch (e) {
+      console.warn('Failed to load advanced mode state:', e);
     }
     return DEFAULT_STATE;
   });
@@ -87,8 +88,8 @@ export function useAdvancedMode() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // localStorage not available
+    } catch (e) {
+      console.warn('Failed to save advanced mode state:', e);
     }
   }, [state]);
 
