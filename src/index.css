@@ -3046,6 +3046,10 @@ tfoot td {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
 }
 
 .sensitivity-label {
@@ -5352,7 +5356,20 @@ tfoot td {
 
 /* Sensitivity groups */
 [data-theme='dark'] .sensitivity-group {
-  background: var(--bg);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border);
+}
+
+[data-theme='dark'] .sensitivity-slider {
+  background: #374151;
+}
+
+[data-theme='dark'] .sensitivity-slider::-webkit-slider-thumb {
+  border-color: var(--card-bg);
+}
+
+[data-theme='dark'] .sensitivity-slider::-moz-range-thumb {
+  border-color: var(--card-bg);
 }
 
 /* Scenario cards */
@@ -5586,5 +5603,22 @@ tfoot td {
 
   :root:not([data-theme='light']) .toggle-label > .toggle-switch {
     background: #4b5563;
+  }
+
+  :root:not([data-theme='light']) .sensitivity-group {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border);
+  }
+
+  :root:not([data-theme='light']) .sensitivity-slider {
+    background: #374151;
+  }
+
+  :root:not([data-theme='light']) .sensitivity-slider::-webkit-slider-thumb {
+    border-color: var(--card-bg);
+  }
+
+  :root:not([data-theme='light']) .sensitivity-slider::-moz-range-thumb {
+    border-color: var(--card-bg);
   }
 }
