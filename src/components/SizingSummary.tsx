@@ -182,7 +182,8 @@ export function SizingSummary({
         )}
       </div>
 
-      {/* Year 1 Tax Benefit Breakdown */}
+      {/* Year 1 / Year 2+ Tax Benefit Breakdown with Timeline Connector */}
+      <div className={`tax-benefit-timeline ${!(results.years.length > 1 && qfafEnabled) ? 'tax-benefit-timeline--single' : ''}`}>
       <div className="tax-benefit-summary">
         <h3>Estimated Year 1 Tax Benefit</h3>
         <div className="benefit-cards">
@@ -349,6 +350,7 @@ export function SizingSummary({
           </div>
         </div>
       )}
+      </div>{/* end tax-benefit-timeline */}
     </section>
   );
 }

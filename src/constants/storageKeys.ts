@@ -11,4 +11,6 @@ export const STORAGE_KEYS = {
   QP_ACKNOWLEDGED: 'taxCalc:qp-acknowledged',
   /** Custom strategy rate overrides */
   RATE_OVERRIDES: 'taxCalc:rate-overrides',
+  /** Onboarding tour completion flag */
+  TOUR_COMPLETED: 'taxCalc:tour-completed',
 } as const;

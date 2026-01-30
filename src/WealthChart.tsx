@@ -56,7 +56,7 @@ export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: Wea
               color: isDark ? '#f3f4f6' : undefined,
             }}
           />
-          <Legend />
+          <Legend verticalAlign="top" wrapperStyle={isDark ? { color: '#f3f4f6' } : undefined} />
           <Area
             type="monotone"
             dataKey="Cumulative Tax Savings"
@@ -184,7 +184,7 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} />
           <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} width={80} />
           <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={isDark ? { color: '#f3f4f6' } : undefined} />
+          <Legend verticalAlign="top" wrapperStyle={isDark ? { color: '#f3f4f6' } : undefined} />
           {/* Confidence band - upper area (will be masked by lower) */}
           <Area
             type="monotone"

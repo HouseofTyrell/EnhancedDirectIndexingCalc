@@ -35,6 +35,7 @@ import { TaxRatesDisplay } from './components/TaxRatesDisplay';
 import { QualifiedPurchaserModal } from './components/QualifiedPurchaserModal';
 import { SizingSummary } from './components/SizingSummary';
 import { DisclaimerFooter } from './components/DisclaimerFooter';
+import { OnboardingTour } from './components/OnboardingTour';
 import { CollapsibleSection } from './AdvancedMode/CollapsibleSection';
 import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
 import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
@@ -191,6 +192,24 @@ export function Calculator() {
     setSensitivityParams(DEFAULT_SENSITIVITY);
   }, []);
 
+  // Input validation (warn-only, does not block calculation)
+  const validationWarnings = useMemo(() => {
+    const warnings: Record<string, string> = {};
+    if (inputs.collateralAmount > 0 && inputs.collateralAmount < 100_000) {
+      warnings.collateral = 'Minimum recommended: $100,000';
+    }
+    if (inputs.collateralAmount > 100_000_000) {
+      warnings.collateral = 'Unusually large — verify amount';
+    }
+    if (inputs.annualIncome > 100_000_000) {
+      warnings.income = 'Unusually large — verify amount';
+    }
+    if (inputs.stateCode === 'OTHER' && inputs.stateRate > 0.15) {
+      warnings.stateRate = 'Rate exceeds 15% — verify';
+    }
+    return warnings;
+  }, [inputs.collateralAmount, inputs.annualIncome, inputs.stateCode, inputs.stateRate]);
+
   const currentStrategy = getStrategy(inputs.strategyId);
 
   // Compute collateral-only savings for incremental benefit comparison
@@ -206,6 +225,7 @@ export function Calculator() {
 
   return (
     <div className="calculator">
+      <OnboardingTour />
       <StickyHeader
         strategyName={currentStrategy?.name ?? ''}
         collateral={inputs.collateralAmount}
@@ -222,6 +242,9 @@ export function Calculator() {
       <header className="header">
         <h1>Tax Optimization Calculator</h1>
         <p className="subtitle">QFAF + Collateral Strategy</p>
+        <p className="header-description">
+          Model tax-loss harvesting strategies with QFAF overlays and collateral optimization.
+        </p>
       </header>
 
       {/* Scroll sentinel - triggers sticky header expansion when scrolled past */}
@@ -249,7 +272,9 @@ export function Calculator() {
           strategy sizing and tax impact.
         </p>
         <div className="input-grid">
-          {/* Collateral Strategy + Collateral Amount side by side */}
+          {/* Sub-card: Strategy Selection */}
+          <div className="input-sub-card" style={{ gridColumn: '1 / -1' }}>
+          <div className="input-sub-card__label">Strategy Selection</div>
           <div className="input-pair">
             <div className="input-group">
               <label htmlFor="strategy">Collateral Strategy</label>
@@ -282,7 +307,7 @@ export function Calculator() {
 
             <div className="input-group">
               <label htmlFor="collateral">Collateral Amount</label>
-              <div className="input-with-prefix">
+              <div className={`input-with-prefix ${validationWarnings.collateral ? 'input-warning' : ''}`}>
                 <span className="prefix">$</span>
                 <input
                   id="collateral"
@@ -294,6 +319,9 @@ export function Calculator() {
                   }
                 />
               </div>
+              {validationWarnings.collateral && (
+                <span className="input-warning-text">{validationWarnings.collateral}</span>
+              )}
             </div>
           </div>
 
@@ -493,7 +521,11 @@ export function Calculator() {
             </>
           )}
 
-          {/* Filing Status + Annual Income side by side */}
+          </div>{/* end input-sub-card: Strategy Selection */}
+
+          {/* Sub-card: Tax & Financial Profile */}
+          <div className="input-sub-card" style={{ gridColumn: '1 / -1' }}>
+          <div className="input-sub-card__label">Tax &amp; Financial Profile</div>
           <div className="input-pair">
             <div className="input-group">
               <label htmlFor="filing">Filing Status</label>
@@ -512,7 +544,7 @@ export function Calculator() {
 
             <div className="input-group">
               <label htmlFor="income">Annual Income</label>
-              <div className="input-with-prefix">
+              <div className={`input-with-prefix ${validationWarnings.income ? 'input-warning' : ''}`}>
                 <span className="prefix">$</span>
                 <input
                   id="income"
@@ -522,6 +554,9 @@ export function Calculator() {
                   onChange={e => updateInput('annualIncome', parseFormattedNumber(e.target.value))}
                 />
               </div>
+              {validationWarnings.income && (
+                <span className="input-warning-text">{validationWarnings.income}</span>
+              )}
             </div>
           </div>
 
@@ -558,6 +593,7 @@ export function Calculator() {
             </div>
           )}
 
+          </div>{/* end input-sub-card: Tax & Financial Profile */}
         </div>
 
         {/* Advanced Options Toggle */}
@@ -644,6 +680,26 @@ export function Calculator() {
             </div>
           </div>
         )}
+
+        {/* Reset to Defaults */}
+        <div className="reset-defaults-row">
+          <button
+            type="button"
+            className="reset-defaults-btn"
+            onClick={() => {
+              if (window.confirm('Reset all inputs to defaults? This cannot be undone.')) {
+                setInputs(DEFAULTS);
+                setYearOverrides(generateDefaultOverrides(DEFAULTS.annualIncome));
+                setAdvancedSettings(DEFAULT_SETTINGS);
+                setSensitivityParams(DEFAULT_SENSITIVITY);
+                setComparisonStrategies([STRATEGIES[1].id, STRATEGIES[0].id]);
+                setShowAdvancedOptions(false);
+              }
+            }}
+          >
+            Reset to Defaults
+          </button>
+        </div>
       </section>
 
       </div>{/* end section-group--inputs */}
@@ -739,6 +795,20 @@ export function Calculator() {
         <button className="print-btn" onClick={() => window.print()}>
           Print / Save as PDF
         </button>
+        <button
+          className="export-btn"
+          onClick={async () => {
+            const { exportToExcel } = await import('./utils/excelExport');
+            await exportToExcel({
+              inputs,
+              results,
+              settings: advancedSettings,
+              taxRates,
+            });
+          }}
+        >
+          Export to Excel
+        </button>
       </section>
 
       </div>{/* end section-group--results */}
@@ -756,6 +826,7 @@ export function Calculator() {
               expanded={advancedMode.state.sections.yearByYear}
               onToggle={() => advancedMode.toggleSection('yearByYear')}
               hint="Model income changes and cash infusions"
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
             >
               <YearByYearPlanning
                 baseIncome={inputs.annualIncome}
@@ -770,6 +841,7 @@ export function Calculator() {
               expanded={advancedMode.state.sections.sensitivity}
               onToggle={() => advancedMode.toggleSection('sensitivity')}
               hint="Stress-test assumptions"
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>}
             >
               <SensitivityAnalysis
                 params={sensitivityParams}
@@ -783,6 +855,7 @@ export function Calculator() {
               expanded={advancedMode.state.sections.scenarios}
               onToggle={() => advancedMode.toggleSection('scenarios')}
               hint="Bull/Base/Bear outcomes"
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>}
             >
               <ScenarioAnalysis inputs={inputs} settings={advancedSettings} />
             </CollapsibleSection>
@@ -792,6 +865,7 @@ export function Calculator() {
               expanded={advancedMode.state.sections.comparison}
               onToggle={() => advancedMode.toggleSection('comparison')}
               hint="Compare 2-3 strategies"
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 8 4 12 8 16"/><polyline points="16 8 20 12 16 16"/></svg>}
             >
               <StrategyComparison
                 baseInputs={inputs}

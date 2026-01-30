@@ -15,6 +15,8 @@ interface CollapsibleSectionProps {
   children: ReactNode;
   /** Optional hint text displayed next to the title in the toggle button */
   hint?: string;
+  /** Optional SVG icon rendered before the title */
+  icon?: ReactNode;
 }
 
 export const CollapsibleSection = memo(function CollapsibleSection({
@@ -23,11 +25,13 @@ export const CollapsibleSection = memo(function CollapsibleSection({
   onToggle,
   children,
   hint,
+  icon,
 }: CollapsibleSectionProps) {
   return (
     <div className={`collapsible-section ${expanded ? 'expanded' : ''}`}>
       <button type="button" className="section-toggle" onClick={onToggle} aria-expanded={expanded}>
         <span className="toggle-icon">{expanded ? '▼' : '▶'}</span>
+        {icon && <span className="section-icon">{icon}</span>}
         <span className="section-title">{title}</span>
         {hint && <span className="section-hint">{hint}</span>}
       </button>

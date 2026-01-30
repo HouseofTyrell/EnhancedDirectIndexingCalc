@@ -350,6 +350,19 @@ body {
   font-size: 1.1rem;
 }
 
+.header-description {
+  margin: 0.35rem 0 0;
+  color: var(--text-light);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+@media print {
+  .header-description {
+    display: none;
+  }
+}
+
 /* Sticky Header */
 .sticky-header {
   position: sticky;
@@ -824,6 +837,119 @@ body {
   padding: 0 1rem 1rem;
 }
 
+/* Reset to Defaults button */
+.reset-defaults-row {
+  margin-top: 1rem;
+  text-align: right;
+}
+
+.reset-defaults-btn {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.reset-defaults-btn:hover {
+  color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ============================================
+   ONBOARDING TOUR
+   ============================================ */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 9998;
+}
+
+.tour-tooltip {
+  position: absolute;
+  z-index: 9999;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.tour-tooltip__header {
+  margin-bottom: 0.5rem;
+}
+
+.tour-tooltip__step {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--primary, #7c3aed);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tour-tooltip__title {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tour-tooltip__description {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  line-height: 1.5;
+  margin: 0.5rem 0 1rem;
+}
+
+.tour-tooltip__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tour-tooltip__skip {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+}
+
+.tour-tooltip__skip:hover {
+  color: var(--text);
+  background: var(--hover-bg, rgba(0, 0, 0, 0.05));
+}
+
+.tour-tooltip__next {
+  background: var(--primary, #7c3aed);
+  color: #fff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.tour-tooltip__next:hover {
+  background: var(--primary-dark, #6d28d9);
+}
+
+@media print {
+  .tour-overlay,
+  .tour-tooltip {
+    display: none;
+  }
+}
+
 /* ============================================
    ADVANCED OPTIONS (inline toggle in inputs)
    ============================================ */
@@ -1070,6 +1196,24 @@ details[open] summary {
   margin-bottom: 1rem;
 }
 
+/* Input sub-cards for visual grouping */
+.input-sub-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.input-sub-card__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-light);
+  margin-bottom: 0.75rem;
+}
+
 /* Input grid */
 .input-grid {
   display: grid;
@@ -1110,6 +1254,25 @@ details[open] summary {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Input validation warnings */
+.input-warning {
+  border-color: #f59e0b !important;
+}
+
+.input-warning input {
+  border-color: #f59e0b !important;
+}
+
+.input-warning-text {
+  font-size: 0.75rem;
+  color: #f59e0b;
+  margin-top: 0.25rem;
+}
+
+[data-theme='dark'] .input-warning-text {
+  color: #fbbf24;
 }
 
 /* Input with prefix/suffix */
@@ -1333,19 +1496,22 @@ input[type='range']::-webkit-slider-thumb {
   display: flex;
   flex-direction: column;
   background: var(--card-bg);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0.75rem;
   text-align: center;
+  border: 1px solid var(--border);
 }
 
 .tax-rate-item.highlight {
   background: #7c3aed;
   color: white;
+  border-color: #7c3aed;
 }
 
 .tax-rate-item.accent {
   background: var(--success);
   color: white;
+  border-color: var(--success);
 }
 
 .rate-label {
@@ -1385,11 +1551,13 @@ input[type='range']::-webkit-slider-thumb {
   border-radius: 8px;
   padding: 1rem;
   text-align: center;
+  border: 1px solid var(--border);
 }
 
 .sizing-card.highlight {
   background: var(--primary);
   color: white;
+  border-color: var(--primary);
 }
 
 .sizing-label {
@@ -1540,11 +1708,13 @@ input[type='range']::-webkit-slider-thumb {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  border: 1px solid var(--border);
 }
 
 .benefit-card.highlight {
   background: var(--primary);
   color: white;
+  border-color: var(--primary);
 }
 
 .benefit-card.highlight .benefit-label {
@@ -1614,11 +1784,13 @@ input[type='range']::-webkit-slider-thumb {
   border-radius: 8px;
   padding: 1.5rem;
   text-align: center;
+  border: 1px solid var(--border);
 }
 
 .card.primary {
   background: var(--primary);
   color: white;
+  border-color: var(--primary);
 }
 
 .card h3 {
@@ -1863,6 +2035,10 @@ tfoot td {
 .actions {
   text-align: center;
   padding: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .print-btn {
@@ -1879,6 +2055,29 @@ tfoot td {
 
 .print-btn:hover {
   background: var(--primary-dark);
+}
+
+.export-btn {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.export-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+@media print {
+  .export-btn {
+    display: none;
+  }
 }
 
 /* Disclaimer */
@@ -2525,6 +2724,13 @@ tfoot td {
   font-size: 0.75rem;
   color: var(--text-light);
   width: 1rem;
+}
+
+.section-icon {
+  display: flex;
+  align-items: center;
+  color: var(--primary);
+  flex-shrink: 0;
 }
 
 .section-title {
@@ -4029,6 +4235,273 @@ tfoot td {
 }
 
 /* ============================================
+   TABLET BREAKPOINT (769px - 1024px)
+   ============================================ */
+@media (max-width: 1024px) and (min-width: 769px) {
+  /* Tax rate cards: 3x2 grid */
+  .tax-rates-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* Summary cards: 2+1 grid */
+  .headline-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Sizing cards: 2x2 grid */
+  .sizing-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Benefit cards: 2+1 grid */
+  .benefit-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Charts: slightly reduced height */
+  .recharts-responsive-container {
+    max-height: 300px;
+  }
+
+  /* Disclaimer: 2 columns */
+  .disclaimer-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Calculator container */
+  .calculator {
+    padding: 1.5rem;
+  }
+}
+
+/* ============================================
+   WCAG ACCESSIBILITY IMPROVEMENTS
+   ============================================ */
+
+/* Fix contrast: --text-light at small sizes needs darker color */
+.sticky-header__label,
+.rate-label,
+.sizing-label,
+.benefit-label {
+  color: var(--text-light);
+  /* Minimum 14px for WCAG AA compliance with #6b7280 on white */
+  font-size: max(0.7rem, 11.2px);
+}
+
+/* Focus visible outlines for keyboard navigation */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible,
+.toggle-label input:focus-visible + .toggle-switch,
+.nav-tab:focus-visible,
+.collapsible-section .section-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Remove default focus for mouse users */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ============================================
+   STICKY HEADER ENHANCEMENTS
+   ============================================ */
+
+/* Hover state on metric items */
+.sticky-header__metric {
+  transition: background-color 0.15s ease;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+}
+
+.sticky-header__metric:hover {
+  background-color: var(--bg);
+}
+
+/* Value change animation */
+@keyframes value-flash {
+  0% { background-color: rgba(37, 99, 235, 0.15); }
+  100% { background-color: transparent; }
+}
+
+.sticky-header__value.value-changed {
+  animation: value-flash 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky-header__value.value-changed {
+    animation: none;
+  }
+}
+
+/* ============================================
+   ZEBRA STRIPING & COLOR IMPROVEMENTS
+   ============================================ */
+
+/* Offset table zebra striping */
+.offset-row:nth-child(even) {
+  background-color: var(--bg);
+}
+
+/* NOL positive values in green */
+.offset-row .positive {
+  color: var(--success);
+}
+
+/* ============================================
+   YEAR 1 / YEAR 2+ TIMELINE CONNECTOR
+   ============================================ */
+
+.tax-benefit-timeline {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.tax-benefit-timeline::before {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.tax-benefit-timeline .tax-benefit-summary {
+  position: relative;
+  border-top: none;
+  margin-top: 0;
+  padding-top: 1rem;
+}
+
+.tax-benefit-timeline .tax-benefit-summary::before {
+  content: '';
+  position: absolute;
+  left: -1.625rem;
+  top: 1.5rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--card-bg);
+  z-index: 1;
+}
+
+.tax-benefit-timeline .tax-benefit-summary.subsequent-year::before {
+  background: var(--success);
+}
+
+.tax-benefit-timeline .timeline-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  padding-left: 0;
+}
+
+.tax-benefit-timeline .subsequent-year .timeline-label {
+  color: var(--success);
+}
+
+/* When QFAF is disabled (only Year 1), no connecting line */
+.tax-benefit-timeline--single::before {
+  display: none;
+}
+
+.tax-benefit-timeline--single .tax-benefit-summary::before {
+  left: -1.625rem;
+}
+
+/* Print: hide timeline decoration */
+@media print {
+  .tax-benefit-timeline {
+    padding-left: 0;
+  }
+  .tax-benefit-timeline::before,
+  .tax-benefit-timeline .tax-benefit-summary::before {
+    display: none;
+  }
+}
+
+/* ============================================
+   HERO METRIC ENHANCEMENTS
+   ============================================ */
+
+.headline-metric.primary {
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.2);
+}
+
+/* Callout box for "What this means" */
+.interpretation-text {
+  border-left: 3px solid var(--primary);
+  background: var(--bg);
+  border-radius: 0 8px 8px 0;
+}
+
+/* ============================================
+   RATE EDITOR BUTTON OUTLINED STYLE
+   ============================================ */
+
+.rate-editor-trigger {
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.rate-editor-trigger:hover {
+  background: var(--primary);
+  color: white;
+}
+
+/* ============================================
+   DISCLAIMER COLLAPSIBLE & LAYOUT FIX
+   ============================================ */
+
+.disclaimer-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.disclaimer-toggle .toggle-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  margin-right: 0.5rem;
+}
+
+.disclaimer-toggle.expanded .toggle-icon {
+  transform: rotate(90deg);
+}
+
+/* Print: force disclaimers expanded */
+@media print {
+  .disclaimer-content {
+    display: block !important;
+  }
+  .disclaimer-toggle .toggle-icon {
+    display: none;
+  }
+  .export-bar {
+    display: none;
+  }
+}
+
+/* ============================================
    DARK MODE OVERRIDES
    ============================================ */
 
@@ -4388,6 +4861,46 @@ tfoot td {
 }
 
 /* Disclaimer */
+/* Timeline connector in dark mode */
+[data-theme='dark'] .tax-benefit-timeline::before {
+  background: var(--border);
+}
+
+[data-theme='dark'] .tax-benefit-timeline .tax-benefit-summary::before {
+  border-color: var(--card-bg);
+}
+
+/* Sticky header hover in dark mode */
+[data-theme='dark'] .sticky-header__metric:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Hero metric glow in dark mode */
+[data-theme='dark'] .headline-metric.primary {
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+}
+
+/* Value flash animation in dark mode */
+[data-theme='dark'] .sticky-header__value.value-changed {
+  animation-name: value-flash-dark;
+}
+
+@keyframes value-flash-dark {
+  0% { background-color: rgba(59, 130, 246, 0.2); }
+  100% { background-color: transparent; }
+}
+
+/* Rate editor trigger in dark mode */
+[data-theme='dark'] .rate-editor-trigger {
+  border-color: var(--primary-light);
+  color: var(--primary-light);
+}
+
+[data-theme='dark'] .rate-editor-trigger:hover {
+  background: var(--primary);
+  color: white;
+}
+
 [data-theme='dark'] .disclaimer {
   background: var(--card-bg);
 }
