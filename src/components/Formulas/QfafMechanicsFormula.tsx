@@ -1,12 +1,17 @@
-export function QfafMechanicsFormula() {
+interface QfafMechanicsFormulaProps {
+  qfafMultiplier?: number;
+}
+
+export function QfafMechanicsFormula({ qfafMultiplier = 1.5 }: QfafMechanicsFormulaProps) {
+  const pct = (qfafMultiplier * 100).toFixed(0);
   return (
     <div className="formula-doc">
       <h4>QFAF Mechanics</h4>
       <p>QFAF is a K-1 partnership hedge fund with fixed 250/250 leverage:</p>
       <pre>
         {`QFAF Annual Tax Events (per $1 invested):
-  • ST Capital Gains: 150% of market value
-  • Ordinary Losses: 150% of market value
+  • ST Capital Gains: ${pct}% of market value
+  • Ordinary Losses: ${pct}% of market value
 
 These are generated through swap contracts that produce:
   • Short-term gains (taxed at ordinary rates if unmatched)

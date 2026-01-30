@@ -1,4 +1,9 @@
-export function ProjectionFormula() {
+interface ProjectionFormulaProps {
+  qfafMultiplier?: number;
+}
+
+export function ProjectionFormula({ qfafMultiplier = 1.5 }: ProjectionFormulaProps) {
+  const pct = (qfafMultiplier * 100).toFixed(0);
   return (
     <div className="formula-doc">
       <h4>10-Year Projection Assumptions</h4>
@@ -10,8 +15,8 @@ Each Year:
   Collateral Value(n+1) = Collateral Value(n) × 1.07
 
 Tax Events (annual, based on year-start values):
-  QFAF ST Gains = QFAF Value × 150%
-  QFAF Ordinary Losses = QFAF Value × 150%
+  QFAF ST Gains = QFAF Value × ${pct}%
+  QFAF Ordinary Losses = QFAF Value × ${pct}%
   Collateral ST Losses = Collateral Value × ST Loss Rate
   Collateral LT Gains = Collateral Value × LT Gain Rate`}
       </pre>

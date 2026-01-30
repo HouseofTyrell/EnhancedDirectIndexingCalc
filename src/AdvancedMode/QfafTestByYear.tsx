@@ -17,9 +17,69 @@ const START_YEAR = 2026;
 const QFAF_ALPHA_RATE = 0.0557; // 5.57% per year
 const QUANTINNO_ALPHA_RATE = 0.0117; // 1.17% per year
 
+// Historical QFAF performance data
+const MONTHLY_RETURNS = [
+  { month: 'Nov-24', netReturn: 0.0157 },
+  { month: 'Dec-24', netReturn: 0.0002 },
+  { month: 'Jan-25', netReturn: 0.0212 },
+  { month: 'Feb-25', netReturn: 0.0120 },
+  { month: 'Mar-25', netReturn: -0.0011 },
+  { month: 'Apr-25', netReturn: 0.0153 },
+  { month: 'May-25', netReturn: -0.0054 },
+  { month: 'Jun-25', netReturn: -0.0104 },
+  { month: 'Jul-25', netReturn: -0.0180 },
+  { month: 'Aug-25', netReturn: -0.0055 },
+  { month: 'Sep-25', netReturn: -0.0192 },
+  { month: 'Oct-25', netReturn: -0.0195 },
+];
+
+const ANNUAL_RETURNS = [
+  { year: '2020', netReturn: -0.0851 },
+  { year: '2021', netReturn: 0.1705 },
+  { year: '2022', netReturn: 0.1244 },
+  { year: '2023', netReturn: 0.0433 },
+  { year: '2024', netReturn: 0.1569 },
+];
+
+// Performance breakdown data (ST Capital Gain/Loss % | Ordinary Income/Loss %)
+const MONTHLY_BREAKDOWN = [
+  { month: 'Nov-24', stCapGain: 0.1201, ordinaryIncome: -0.1080 },
+  { month: 'Dec-24', stCapGain: 0.1269, ordinaryIncome: -0.1250 },
+  { month: 'Jan-25', stCapGain: 0.1256, ordinaryIncome: -0.1013 },
+  { month: 'Feb-25', stCapGain: 0.1271, ordinaryIncome: -0.1133 },
+  { month: 'Mar-25', stCapGain: 0.1267, ordinaryIncome: -0.1301 },
+  { month: 'Apr-25', stCapGain: 0.1276, ordinaryIncome: -0.1102 },
+  { month: 'May-25', stCapGain: 0.1243, ordinaryIncome: -0.1309 },
+  { month: 'Jun-25', stCapGain: 0.1268, ordinaryIncome: -0.1393 },
+  { month: 'Jul-25', stCapGain: 0.1231, ordinaryIncome: -0.1401 },
+  { month: 'Aug-25', stCapGain: 0.1277, ordinaryIncome: -0.1339 },
+  { month: 'Sep-25', stCapGain: 0.1313, ordinaryIncome: -0.1504 },
+  { month: 'Oct-25', stCapGain: 0.1273, ordinaryIncome: -0.1477 },
+];
+
+const ANNUAL_BREAKDOWN = [
+  { year: '2020', stCapGain: 1.5293, ordinaryIncome: -1.5788 },
+  { year: '2021', stCapGain: 1.5130, ordinaryIncome: -1.3131 },
+  { year: '2022', stCapGain: 1.4860, ordinaryIncome: -1.3470 },
+  { year: '2023', stCapGain: 1.5076, ordinaryIncome: -1.4809 },
+  { year: '2024', stCapGain: 1.4962, ordinaryIncome: -1.3535 },
+];
+
+
 // Fee rates (from QFAF Excel model — percentage of Deals Collateral)
 const ADVISOR_MGMT_FEE_RATE = 0.0057; // ~0.57%
 const QFAF_FINANCING_FEE_RATE = 0.00536; // ~0.54%
+
+// Compute min, max, mean, median for an array of numbers
+function computeStats(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  return { min, max, mean, median };
+}
 
 interface QfafTestByYearProps {
   filingStatus: FilingStatus;
@@ -29,6 +89,12 @@ interface QfafTestByYearProps {
 const OVERLAY_STRATEGIES = STRATEGIES.filter(s => s.type === 'overlay');
 const CORE_STRATEGIES = STRATEGIES.filter(s => s.type === 'core');
 
+// Compute historical ordinary loss rate stats from annual breakdown
+const HIST_ORD_LOSS_RATES = ANNUAL_BREAKDOWN.map(r => Math.abs(r.ordinaryIncome));
+const HIST_ORD_LOSS_MIN = Math.min(...HIST_ORD_LOSS_RATES);
+const HIST_ORD_LOSS_MAX = Math.max(...HIST_ORD_LOSS_RATES);
+const HIST_ORD_LOSS_AVG = HIST_ORD_LOSS_RATES.reduce((a, b) => a + b, 0) / HIST_ORD_LOSS_RATES.length;
+
 // Assumptions state - editable inputs
 interface Assumptions {
   initialQfafInvestment: number;
@@ -36,6 +102,7 @@ interface Assumptions {
   overlayStrategyId: string; // e.g., 'overlay-45-45'
   coreStrategyId: string; // e.g., 'core-145-45'
   marginalTaxRate: number; // Combined federal + state
+  qfafGenerationRate: number; // ST gains & ordinary losses as multiple of QFAF MV (e.g. 1.5 = 150%)
 }
 
 // Year-by-year computed results
@@ -74,6 +141,7 @@ const DEFAULT_ASSUMPTIONS: Assumptions = {
   overlayStrategyId: OVERLAY_STRATEGIES[1]?.id ?? 'overlay-45-45', // Overlay 45/45
   coreStrategyId: CORE_STRATEGIES[1]?.id ?? 'core-145-45', // Core 145/45
   marginalTaxRate: 0.541, // 54.1% combined federal + state
+  qfafGenerationRate: QFAF_ORDINARY_LOSS_RATE, // Default: 1.5 (150%)
 };
 
 function reducer(state: State, action: Action): State {
@@ -140,8 +208,8 @@ function computeYearResults(
       qfafSubscriptionSize = priorQfaf * 0.9231;
     }
 
-    // Annual estimated ordinary losses = QFAF × 150%
-    const annualEstOrdinaryLosses = qfafSubscriptionSize * QFAF_ORDINARY_LOSS_RATE;
+    // Annual estimated ordinary losses = QFAF × generation rate
+    const annualEstOrdinaryLosses = qfafSubscriptionSize * assumptions.qfafGenerationRate;
 
     // Deals Collateral Value calculation:
     // The collateral is sized so ST losses = QFAF ST gains (for tax efficiency)
@@ -396,6 +464,29 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
               <span className="suffix">%</span>
             </div>
           </div>
+
+          <div className="assumption-row assumption-row-wide">
+            <label>
+              QFAF Generation Rate: {(state.assumptions.qfafGenerationRate * 100).toFixed(0)}%
+            </label>
+            <div className="generation-rate-slider">
+              <input
+                type="range"
+                min={1.0}
+                max={1.5}
+                step={0.05}
+                value={state.assumptions.qfafGenerationRate}
+                onChange={e => handleAssumptionChange('qfafGenerationRate', parseFloat(e.target.value))}
+              />
+              <div className="slider-labels">
+                <span>100%</span>
+                <span className="slider-hist-ref">
+                  Hist: min {(HIST_ORD_LOSS_MIN * 100).toFixed(0)}%, max {(HIST_ORD_LOSS_MAX * 100).toFixed(0)}%, avg {(HIST_ORD_LOSS_AVG * 100).toFixed(0)}%
+                </span>
+                <span>150%</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="assumptions-footer">
@@ -447,6 +538,107 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
         </div>
       </div>
 
+      {/* Historical Performance Section */}
+      <div className="historical-performance-section">
+        <h3>Historical QFAF Performance</h3>
+
+        <div className="historical-tables-grid">
+          {/* Annual Returns + Breakdown */}
+          <div className="historical-table-block">
+            <h4>Annual Returns</h4>
+            <table className="historical-table">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Net Return</th>
+                  <th>% ST Cap Gain/Loss</th>
+                  <th>% Ordinary Inc/Loss</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ANNUAL_RETURNS.map((row, i) => {
+                  const breakdown = ANNUAL_BREAKDOWN[i];
+                  return (
+                    <tr key={row.year}>
+                      <td className="hist-label">{row.year}</td>
+                      <td className={row.netReturn >= 0 ? 'hist-positive' : 'hist-negative'}>
+                        {(row.netReturn * 100).toFixed(2)}%
+                      </td>
+                      <td className="hist-positive">{(breakdown.stCapGain * 100).toFixed(2)}%</td>
+                      <td className="hist-negative">{(breakdown.ordinaryIncome * 100).toFixed(2)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                {(() => {
+                  const netStats = computeStats(ANNUAL_RETURNS.map(r => r.netReturn));
+                  const stStats = computeStats(ANNUAL_BREAKDOWN.map(r => r.stCapGain));
+                  const ordStats = computeStats(ANNUAL_BREAKDOWN.map(r => r.ordinaryIncome));
+                  return (['min', 'max', 'mean', 'median'] as const).map(stat => (
+                    <tr key={stat} className="hist-stat-row">
+                      <td className="hist-label hist-stat-label">{stat.charAt(0).toUpperCase() + stat.slice(1)}</td>
+                      <td className={netStats[stat] >= 0 ? 'hist-positive' : 'hist-negative'}>
+                        {(netStats[stat] * 100).toFixed(2)}%
+                      </td>
+                      <td className="hist-positive">{(stStats[stat] * 100).toFixed(2)}%</td>
+                      <td className="hist-negative">{(ordStats[stat] * 100).toFixed(2)}%</td>
+                    </tr>
+                  ));
+                })()}
+              </tfoot>
+            </table>
+          </div>
+
+          {/* Monthly Returns + Breakdown */}
+          <div className="historical-table-block">
+            <h4>Monthly Returns (Nov-24 to Oct-25)</h4>
+            <table className="historical-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Net Return</th>
+                  <th>% ST Cap Gain/Loss</th>
+                  <th>% Ordinary Inc/Loss</th>
+                </tr>
+              </thead>
+              <tbody>
+                {MONTHLY_RETURNS.map((row, i) => {
+                  const breakdown = MONTHLY_BREAKDOWN[i];
+                  return (
+                    <tr key={row.month}>
+                      <td className="hist-label">{row.month}</td>
+                      <td className={row.netReturn >= 0 ? 'hist-positive' : 'hist-negative'}>
+                        {(row.netReturn * 100).toFixed(2)}%
+                      </td>
+                      <td className="hist-positive">{(breakdown.stCapGain * 100).toFixed(2)}%</td>
+                      <td className="hist-negative">{(breakdown.ordinaryIncome * 100).toFixed(2)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                {(() => {
+                  const netStats = computeStats(MONTHLY_RETURNS.map(r => r.netReturn));
+                  const stStats = computeStats(MONTHLY_BREAKDOWN.map(r => r.stCapGain));
+                  const ordStats = computeStats(MONTHLY_BREAKDOWN.map(r => r.ordinaryIncome));
+                  return (['min', 'max', 'mean', 'median'] as const).map(stat => (
+                    <tr key={stat} className="hist-stat-row">
+                      <td className="hist-label hist-stat-label">{stat.charAt(0).toUpperCase() + stat.slice(1)}</td>
+                      <td className={netStats[stat] >= 0 ? 'hist-positive' : 'hist-negative'}>
+                        {(netStats[stat] * 100).toFixed(2)}%
+                      </td>
+                      <td className="hist-positive">{(stStats[stat] * 100).toFixed(2)}%</td>
+                      <td className="hist-negative">{(ordStats[stat] * 100).toFixed(2)}%</td>
+                    </tr>
+                  ));
+                })()}
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
       {/* Notes */}
       <div className="qfaf-notes">
         <h4>Calculation Notes</h4>
@@ -458,7 +650,7 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
             <strong>Deals Collateral:</strong> Calculated so total ST losses = QFAF ST gains. Combines Overlay (growing at {(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%) + Core collateral.
           </li>
           <li>
-            <strong>Ordinary Losses:</strong> QFAF generates {(QFAF_ORDINARY_LOSS_RATE * 100).toFixed(0)}% of subscription as ordinary losses.
+            <strong>Ordinary Losses:</strong> QFAF generates {(state.assumptions.qfafGenerationRate * 100).toFixed(0)}% of subscription as ordinary losses.
           </li>
           <li>
             <strong>§461(l) Limit:</strong> {formatCurrency(section461Limit)} for {filingStatus.toUpperCase()} filers. Excess carries forward as NOL.

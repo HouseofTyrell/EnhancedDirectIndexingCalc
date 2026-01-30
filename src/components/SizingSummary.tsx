@@ -9,6 +9,7 @@ interface SizingSummaryProps {
   combinedStRate: number;
   combinedLtRate: number;
   rateDifferential: number;
+  qfafMultiplier?: number;
 }
 
 export function SizingSummary({
@@ -18,6 +19,7 @@ export function SizingSummary({
   combinedStRate,
   combinedLtRate,
   rateDifferential,
+  qfafMultiplier,
 }: SizingSummaryProps) {
   return (
     <section className="sizing-section">
@@ -27,7 +29,7 @@ export function SizingSummary({
       <div className="section-header">
         <h2>Strategy Sizing</h2>
         <InfoPopup title="QFAF Auto-Sizing">
-          <QfafSizingFormula />
+          <QfafSizingFormula qfafMultiplier={qfafMultiplier} />
         </InfoPopup>
       </div>
       <p className="section-guidance">
@@ -115,14 +117,32 @@ export function SizingSummary({
           </span>
           <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
         </div>
-        <div className="offset-row result success">
-          <span>
-            <InfoText contentKey="net-st-position" currentValue="$0 (Fully Matched)">
-              Net ST Position
-            </InfoText>
-          </span>
-          <span>Fully Matched{results.sizing.sizingYears > 1 ? ' (on avg)' : ''}</span>
-        </div>
+        {(() => {
+          const netSt = results.sizing.year1StLosses - results.sizing.year1StGains;
+          const isMatched = Math.abs(netSt) < 1;
+          const hasExcessGains = netSt < -1; // ST gains > ST losses
+          const hasExcessLosses = netSt > 1; // ST losses > ST gains
+          const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
+          const statusClass = isMatched ? 'success' : hasExcessGains ? 'danger' : 'success';
+          let label: string;
+          if (isMatched) {
+            label = `Fully Matched${avgNote}`;
+          } else if (hasExcessGains) {
+            label = `${formatCurrency(Math.abs(netSt))} excess ST gains${avgNote}`;
+          } else {
+            label = `${formatCurrency(netSt)} excess ST losses${avgNote}`;
+          }
+          return (
+            <div className={`offset-row result ${statusClass}`}>
+              <span>
+                <InfoText contentKey="net-st-position" currentValue={isMatched ? '$0 (Fully Matched)' : formatCurrency(netSt)}>
+                  Net ST Position
+                </InfoText>
+              </span>
+              <span>{label}</span>
+            </div>
+          );
+        })()}
         <div className="offset-row">
           <span>
             <InfoText

@@ -351,22 +351,51 @@ export function Calculator() {
             </div>
 
             <div className="toggle-row-item">
-              <label className="toggle-label">
-                <input
-                  type="checkbox"
-                  checked={advancedSettings.growthEnabled}
-                  onChange={e =>
-                    setAdvancedSettings(s => ({ ...s, growthEnabled: e.target.checked }))
-                  }
-                />
-                <span className="toggle-switch"></span>
-                Portfolio Growth
-              </label>
-              <span className="input-hint">
-                {advancedSettings.growthEnabled
-                  ? `${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}% return`
-                  : 'No growth (0%)'}
-              </span>
+              {advancedSettings.growthEnabled ? (
+                <>
+                  <label className="toggle-label toggle-label-slider">
+                    <input
+                      type="checkbox"
+                      checked={true}
+                      onChange={() =>
+                        setAdvancedSettings(s => ({ ...s, growthEnabled: false }))
+                      }
+                    />
+                    <span className="toggle-switch"></span>
+                    Growth: {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%
+                  </label>
+                  <input
+                    id="annualReturnInline"
+                    type="range"
+                    className="inline-slider"
+                    min={-0.20}
+                    max={0.30}
+                    step={0.005}
+                    value={advancedSettings.defaultAnnualReturn}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val)) {
+                        setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
+                      }
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      onChange={() =>
+                        setAdvancedSettings(s => ({ ...s, growthEnabled: true }))
+                      }
+                    />
+                    <span className="toggle-switch"></span>
+                    Portfolio Growth
+                  </label>
+                  <span className="input-hint">No growth (0%)</span>
+                </>
+              )}
             </div>
 
             <div className="toggle-row-item">
@@ -438,6 +467,29 @@ export function Calculator() {
                   Reduces QFAF size for conservative sizing
                 </span>
               </div>
+
+              <div className="input-group">
+                <label htmlFor="generationRate">
+                  QFAF Loss Generation Rate: {(advancedSettings.qfafMultiplier * 100).toFixed(0)}%
+                </label>
+                <input
+                  id="generationRate"
+                  type="range"
+                  min={1.0}
+                  max={1.5}
+                  step={0.05}
+                  value={advancedSettings.qfafMultiplier}
+                  onChange={e => setAdvancedSettings(s => ({ ...s, qfafMultiplier: parseFloat(e.target.value) }))}
+                />
+                <div className="allocation-labels">
+                  <span>100%</span>
+                  <span>125%</span>
+                  <span>150%</span>
+                </div>
+                <span className="input-hint">
+                  Historical: min 131%, max 158%, avg 142% — Ordinary losses generated as % of QFAF MV
+                </span>
+              </div>
             </>
           )}
 
@@ -506,34 +558,6 @@ export function Calculator() {
             </div>
           )}
 
-          {/* Annual Return Slider (shown when growth enabled) */}
-          {advancedSettings.growthEnabled && (
-            <div className="input-group full-width">
-              <label htmlFor="annualReturn">
-                Annual Return: {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%
-              </label>
-              <input
-                id="annualReturn"
-                type="range"
-                min={-0.20}
-                max={0.30}
-                step={0.005}
-                value={advancedSettings.defaultAnnualReturn}
-                onChange={e => {
-                  const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) {
-                    setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
-                  }
-                }}
-              />
-              <div className="allocation-labels">
-                <span>-20%</span>
-                <span>0%</span>
-                <span>15%</span>
-                <span>30%</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Advanced Options Toggle */}
@@ -648,6 +672,7 @@ export function Calculator() {
         combinedStRate={combinedStRate}
         combinedLtRate={combinedLtRate}
         rateDifferential={rateDifferential}
+        qfafMultiplier={advancedSettings.qfafMultiplier}
       />
 
       </div>{/* end section-group--assumptions */}
@@ -679,7 +704,7 @@ export function Calculator() {
         <div className="section-header">
           <h2>Estimated Detailed Projections</h2>
           <InfoPopup title="Projection Methodology">
-            <ProjectionFormula />
+            <ProjectionFormula qfafMultiplier={advancedSettings.qfafMultiplier} />
           </InfoPopup>
         </div>
         <p className="section-guidance">

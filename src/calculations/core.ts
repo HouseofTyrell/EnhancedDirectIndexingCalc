@@ -21,7 +21,7 @@ export function calculate(
   inputs: CalculatorInputs,
   settings: AdvancedSettings = DEFAULT_SETTINGS
 ): CalculationResult {
-  const sizing = calculateSizing(inputs);
+  const sizing = calculateSizing(inputs, settings.qfafMultiplier);
   const strategy = getStrategy(inputs.strategyId);
 
   // Validate strategy exists (003 - fix non-null assertion)

@@ -16,7 +16,7 @@ import {
  *
  * When qfafSizingYears = 1, this is equivalent to the legacy Year 1-only sizing.
  */
-export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
+export function calculateSizing(inputs: CalculatorInputs, qfafMultiplier?: number): CalculatedSizing {
   const strategy = getStrategy(inputs.strategyId);
   if (!strategy) {
     throw new Error(`Invalid strategy ID: ${inputs.strategyId}`);
@@ -24,6 +24,8 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
 
   const collateralValue = inputs.collateralAmount;
   const sizingYears = inputs.qfafSizingYears ?? 10;
+  const stGainRate = qfafMultiplier ?? QFAF_ST_GAIN_RATE;
+  const ordLossRate = qfafMultiplier ?? QFAF_ORDINARY_LOSS_RATE;
 
   // Calculate the average ST loss rate across the sizing window
   const avgStLossRate = getAverageStLossRate(strategy, 1, sizingYears);
@@ -40,11 +42,12 @@ export function calculateSizing(inputs: CalculatorInputs): CalculatedSizing {
     // Auto-size QFAF so ST gains = average ST losses (or use override)
     // Apply sizing cushion to reduce QFAF by up to 10%
     const cushion = inputs.qfafSizingCushion ?? 0;
+    // Size QFAF based on default 150% rate (sizing target is always to match ST losses at full rate)
     const baseSizing = inputs.qfafOverride ?? year1StLosses / QFAF_ST_GAIN_RATE;
     qfafValue = baseSizing * (1 - cushion);
-    // QFAF generates ST gains and ordinary losses at 150% of MV
-    year1StGains = qfafValue * QFAF_ST_GAIN_RATE;
-    year1OrdinaryLosses = qfafValue * QFAF_ORDINARY_LOSS_RATE;
+    // QFAF generates ST gains and ordinary losses at the user-selected generation rate
+    year1StGains = qfafValue * stGainRate;
+    year1OrdinaryLosses = qfafValue * ordLossRate;
   }
 
   // Section 461(l) limitation on ordinary losses

@@ -1,4 +1,10 @@
-export function Section461lFormula() {
+interface Section461lFormulaProps {
+  qfafMultiplier?: number;
+}
+
+export function Section461lFormula({ qfafMultiplier = 1.5 }: Section461lFormulaProps) {
+  const pct = (qfafMultiplier * 100).toFixed(0);
+  const exampleLosses = Math.round(866667 * qfafMultiplier).toLocaleString();
   return (
     <div className="formula-doc">
       <h4>Section 461(l) Excess Business Loss Limitation</h4>
@@ -14,10 +20,10 @@ Excess to NOL = QFAF Ordinary Losses - Usable Ordinary Loss`}
 
       <h4>Example ($10M Core 145/45, MFJ)</h4>
       <pre>
-        {`QFAF Ordinary Losses = $866,667 × 150% = $1,300,000
+        {`QFAF Ordinary Losses = $866,667 × ${pct}% = $${exampleLosses}
 §461(l) Limit (MFJ) = $512,000
 
-Usable This Year = min($1,300,000, $512,000, Taxable Income)
+Usable This Year = min($${exampleLosses}, $512,000, Taxable Income)
 Excess → NOL = Ordinary Losses - Usable Amount`}
       </pre>
 

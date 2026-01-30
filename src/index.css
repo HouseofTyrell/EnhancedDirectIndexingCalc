@@ -1268,6 +1268,13 @@ input[type='range']::-webkit-slider-thumb {
   font-weight: 500;
 }
 
+.inline-slider {
+  width: 100%;
+  accent-color: var(--primary, #2563eb);
+  cursor: pointer;
+  margin-top: 0.125rem;
+}
+
 .toggle-label input[type='checkbox'] {
   position: absolute;
   opacity: 0;
@@ -1441,6 +1448,10 @@ input[type='range']::-webkit-slider-thumb {
 
 .offset-row.warning span:last-child {
   color: #d97706;
+}
+
+.offset-row.danger span:last-child {
+  color: #dc2626;
 }
 
 .positive {

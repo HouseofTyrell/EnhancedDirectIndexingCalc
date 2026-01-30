@@ -68,26 +68,6 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
-                <InfoText contentKey="setting-qfaf-multiplier">
-                  QFAF Multiplier
-                </InfoText>
-              </span>
-              <span className="setting-hint">ST gains & ordinary losses as % of QFAF MV</span>
-            </div>
-            <input
-              type="text"
-              className={`setting-input ${settings.qfafMultiplier !== DEFAULT_SETTINGS.qfafMultiplier ? 'modified' : ''}`}
-              value={formatPercent(settings.qfafMultiplier)}
-              onChange={e => {
-                const val = parseFloat(e.target.value.replace('%', '')) / 100;
-                if (!isNaN(val)) handleChange('qfafMultiplier', val);
-              }}
-            />
-          </div>
-
-          <div className="setting-row">
-            <div className="setting-label">
-              <span className="setting-name">
                 <InfoText contentKey="setting-qfaf-growth">
                   QFAF Growth
                 </InfoText>

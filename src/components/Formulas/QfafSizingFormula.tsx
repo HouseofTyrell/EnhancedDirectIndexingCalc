@@ -1,27 +1,33 @@
-export function QfafSizingFormula() {
+interface QfafSizingFormulaProps {
+  qfafMultiplier?: number;
+}
+
+export function QfafSizingFormula({ qfafMultiplier = 1.5 }: QfafSizingFormulaProps) {
+  const pct = (qfafMultiplier * 100).toFixed(0);
+  const decimal = qfafMultiplier.toFixed(2);
   return (
     <div className="formula-doc">
       <h4>QFAF Auto-Sizing Formula</h4>
       <p>QFAF is sized so its ST gains match the collateral's average ST losses over the sizing window:</p>
       <pre>
-        {`QFAF Value = (Collateral × Avg ST Loss Rate) / 150%
+        {`QFAF Value = (Collateral × Avg ST Loss Rate) / ${pct}%
 
 Where:
   • Collateral = Your investment amount
   • Avg ST Loss Rate = Average of strategy's ST loss
     rates over the sizing window (Years 1–N)
-  • 150% = QFAF's ST gain rate (fixed)
+  • ${pct}% = QFAF's ST gain rate (generation rate)
   • Sizing Window = Adjustable from 1 yr to last yr
     (default: all projection years)
 
 Example ($10M Core 145/45, Yrs 1–10 avg):
   Avg ST Loss Rate ≈ 9.7%
   Avg ST Losses = $10M × 9.7% = $970K
-  QFAF Value = $970K / 1.50 = $646,667
+  QFAF Value = $970K / ${decimal} = $${Math.round(970000 / qfafMultiplier).toLocaleString()}
 
 Year 1 only ($10M Core 145/45):
   ST Losses = $10M × 28.5% = $2.85M
-  QFAF Value = $2.85M / 1.50 = $1.9M`}
+  QFAF Value = $2.85M / ${decimal} = $${Math.round(2850000 / qfafMultiplier).toLocaleString()}`}
       </pre>
 
       <h4>Why This Sizing?</h4>

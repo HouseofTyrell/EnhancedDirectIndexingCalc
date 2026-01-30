@@ -41,6 +41,35 @@
   font-weight: 500;
 }
 
+/* Wide assumption row spans full grid */
+.assumption-row-wide {
+  grid-column: 1 / -1;
+}
+
+.generation-rate-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.generation-rate-slider input[type="range"] {
+  width: 100%;
+  accent-color: #f59e0b;
+  cursor: pointer;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-light, #6b7280);
+}
+
+.slider-hist-ref {
+  color: #b45309;
+  font-weight: 500;
+}
+
 /* Editable cells - orange background like Excel */
 .editable-cell {
   background: #fff3cd !important;
@@ -294,6 +323,96 @@
   background: #fecaca;
 }
 
+/* Historical Performance Section */
+.historical-performance-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.historical-performance-section h3 {
+  color: var(--text, #1f2937);
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.historical-tables-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.historical-table-block {
+  overflow-x: auto;
+}
+
+.historical-table-block .historical-table {
+  width: auto;
+}
+
+.historical-table-block h4 {
+  color: var(--text, #1f2937);
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.historical-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.historical-table th,
+.historical-table td {
+  padding: 0.25rem 0.5rem;
+  text-align: right;
+  border: 1px solid var(--border, #e5e7eb);
+  white-space: nowrap;
+}
+
+.historical-table th {
+  background: var(--bg, #f9fafb);
+  color: var(--text, #1f2937);
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+.historical-table .hist-label {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text, #1f2937);
+}
+
+.historical-table .hist-positive {
+  color: #15803d;
+}
+
+.historical-table .hist-negative {
+  color: #dc2626;
+}
+
+.historical-table tfoot {
+  border-top: 2px solid var(--text-light, #6b7280);
+}
+
+.historical-table .hist-stat-row td {
+  background: var(--bg, #f9fafb);
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+.historical-table .hist-stat-label {
+  font-weight: 600;
+  color: var(--text-light, #6b7280);
+}
+
 /* Notes Section */
 .qfaf-notes {
   background: var(--card-bg, #ffffff);
@@ -354,4 +473,6 @@
   .summary-table .row-label {
     min-width: 160px;
   }
+
+
 }

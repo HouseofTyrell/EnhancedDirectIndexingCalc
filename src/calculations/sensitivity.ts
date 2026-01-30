@@ -42,7 +42,7 @@ export function calculateWithSensitivity(
   }
 
   // Calculate initial sizing
-  const sizing = calculateSizing(inputs);
+  const sizing = calculateSizing(inputs, settings.qfafMultiplier);
 
   // Get base state rate
   const baseStateRate =

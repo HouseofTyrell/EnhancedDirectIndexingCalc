@@ -44,7 +44,7 @@ export function calculateWithOverrides(
   }
 
   // Calculate initial sizing (will be adjusted for infusions)
-  const baseSizing = calculateSizing(inputs);
+  const baseSizing = calculateSizing(inputs, settings.qfafMultiplier);
 
   // Pre-calculate base tax rates
   const baseStateRate =
@@ -80,7 +80,7 @@ export function calculateWithOverrides(
       // Resize QFAF to match new collateral ST loss capacity (if QFAF is enabled)
       if (inputs.qfafEnabled !== false) {
         const newStLossCapacity = collateralValue * strategy.stLossRate;
-        qfafValue = newStLossCapacity / QFAF_ST_GAIN_RATE;
+        qfafValue = newStLossCapacity / (settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE);
       }
     }
 
@@ -128,7 +128,7 @@ export function calculateWithOverrides(
       baseSizing.totalExposure +
       cumulativeInfusion +
       (inputs.qfafEnabled !== false
-        ? (cumulativeInfusion * strategy.stLossRate) / QFAF_ST_GAIN_RATE
+        ? (cumulativeInfusion * strategy.stLossRate) / (settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE)
         : 0),
   };
 
