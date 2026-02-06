@@ -29,6 +29,7 @@ const baseClient: CalculatorInputs = {
   existingNolCarryforward: 0,
   qfafEnabled: true,
   qfafSizingYears: 1,
+  qfafSizingCushion: 0,
 };
 
 describe('Sensitivity Analysis', () => {
