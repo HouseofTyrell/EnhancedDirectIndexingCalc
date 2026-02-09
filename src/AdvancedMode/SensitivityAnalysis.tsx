@@ -183,7 +183,7 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
             onChange={e => handleChange('trackingErrorMultiplier', parseFloat(e.target.value))}
           />
           <span className="sensitivity-help">
-            Strategy deviation from expected (0x = perfect, 2x = high variance)
+            Scales strategy tracking error to model implementation risk (0x = perfect, 1x = baseline, 2x = high variance)
           </span>
         </div>
 

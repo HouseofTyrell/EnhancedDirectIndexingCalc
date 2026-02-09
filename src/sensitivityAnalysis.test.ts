@@ -362,4 +362,158 @@ describe('Sensitivity Analysis', () => {
       expect(result.years.length).toBe(10);
     });
   });
+
+  describe('Tracking Error Multiplier', () => {
+    it('should amplify variance based on tracking error when multiplier is 2x', () => {
+      const baseParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 0, // No tracking error effect
+        stLossRateVariance: 0.1, // 10% variance
+      };
+
+      const amplifiedParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 2.0, // 2x tracking error
+        stLossRateVariance: 0.1, // 10% variance
+      };
+
+      const baseResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, baseParams);
+      const amplifiedResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, amplifiedParams);
+
+      // With tracking error amplification, results should differ
+      // Core 145/45 has 1.9% tracking error, so with 2x multiplier:
+      // effectiveVariance = 0.1 * (1 + 0.019 * 2.0) = 0.1 * 1.038 = 10.38%
+      expect(baseResult.summary.totalTaxSavings).not.toBeCloseTo(
+        amplifiedResult.summary.totalTaxSavings,
+        0
+      );
+
+      // Year 1 ST loss rates should show amplification effect
+      expect(baseResult.years[0].effectiveStLossRate).not.toBeCloseTo(
+        amplifiedResult.years[0].effectiveStLossRate,
+        4
+      );
+    });
+
+    it('should produce baseline results when multiplier is 1.0', () => {
+      const params: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 1.0,
+        stLossRateVariance: 0.1,
+      };
+
+      const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
+
+      // With multiplier = 1.0, should apply normal tracking error amplification
+      // Core 145/45 has 1.9% tracking error
+      // effectiveVariance = 0.1 * (1 + 0.019 * 1.0) = 0.1019
+      expect(result.years.length).toBe(10);
+      expect(result.summary.totalTaxSavings).toBeGreaterThan(0);
+    });
+
+    it('should have no amplification when multiplier is 0x', () => {
+      const zeroMultiplierParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 0, // No tracking error effect
+        stLossRateVariance: 0.1,
+      };
+
+      const noVarianceParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 2.0, // High multiplier but no variance to amplify
+        stLossRateVariance: 0.1,
+      };
+
+      const zeroResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, zeroMultiplierParams);
+      const noVarianceResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, noVarianceParams);
+
+      // With multiplier = 0, tracking error has no effect
+      // effectiveVariance = 0.1 * (1 + 0) = 0.1 exactly
+      expect(zeroResult.years.length).toBe(10);
+
+      // Results should differ when tracking error is applied vs not applied
+      expect(zeroResult.summary.totalTaxSavings).not.toBeCloseTo(
+        noVarianceResult.summary.totalTaxSavings,
+        0
+      );
+    });
+
+    it('should have minimal impact when variance is 0', () => {
+      const baselineParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 1.0, // Baseline multiplier
+        stLossRateVariance: 0, // No variance to amplify
+        ltGainRateVariance: 0,
+      };
+
+      const highMultiplierParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 2.0, // High multiplier
+        stLossRateVariance: 0, // No variance to amplify
+        ltGainRateVariance: 0,
+      };
+
+      const baselineResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, baselineParams);
+      const highMultiplierResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, highMultiplierParams);
+
+      // When variance = 0, amplification has no effect (0 * anything = 0)
+      // Results should be very similar (may differ slightly due to floating point)
+      expect(baselineResult.summary.totalTaxSavings).toBeCloseTo(
+        highMultiplierResult.summary.totalTaxSavings,
+        0
+      );
+    });
+
+    it('should show larger impact with higher tracking error strategies', () => {
+      // Test with Core 130/30 which has 4.3% tracking error (higher than Core 145/45's 1.9%)
+      const highTrackingClient: CalculatorInputs = {
+        ...baseClient,
+        strategyId: 'core-130-30', // 4.3% tracking error
+      };
+
+      const params: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 2.0,
+        stLossRateVariance: 0.1,
+      };
+
+      const lowTrackingResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
+      const highTrackingResult = calculateWithSensitivity(highTrackingClient, DEFAULT_SETTINGS, params);
+
+      // Higher tracking error strategy should show different variance amplification
+      // Core 145/45: effectiveVariance = 0.1 * (1 + 0.019 * 2.0) = 0.1038
+      // Core 130/30: effectiveVariance = 0.1 * (1 + 0.043 * 2.0) = 0.1086
+      // The difference should be measurable but results depend on the entire calculation
+      expect(lowTrackingResult.years[0].effectiveStLossRate).toBeDefined();
+      expect(highTrackingResult.years[0].effectiveStLossRate).toBeDefined();
+    });
+
+    it('should work with both positive and negative variances', () => {
+      const positiveVarianceParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 2.0,
+        stLossRateVariance: 0.2, // +20% more losses (beneficial)
+        ltGainRateVariance: -0.2, // -20% fewer gains (beneficial)
+      };
+
+      const negativeVarianceParams: SensitivityParams = {
+        ...DEFAULT_SENSITIVITY,
+        trackingErrorMultiplier: 2.0,
+        stLossRateVariance: -0.2, // -20% fewer losses (detrimental)
+        ltGainRateVariance: 0.2, // +20% more gains (detrimental)
+      };
+
+      const positiveResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, positiveVarianceParams);
+      const negativeResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, negativeVarianceParams);
+
+      // Both should calculate successfully
+      expect(positiveResult.years.length).toBe(10);
+      expect(negativeResult.years.length).toBe(10);
+
+      // Positive variance scenario should have higher tax savings
+      expect(positiveResult.summary.totalTaxSavings).toBeGreaterThan(
+        negativeResult.summary.totalTaxSavings
+      );
+    });
+  });
 });

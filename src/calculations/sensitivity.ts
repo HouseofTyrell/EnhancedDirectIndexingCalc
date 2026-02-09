@@ -51,6 +51,10 @@ export function calculateWithSensitivity(
   // Apply sensitivity adjustments to rates
   const adjustedStateRate = Math.max(0, baseStateRate + sensitivity.stateRateChange);
 
+  // Get base tracking error from strategy and scale by multiplier
+  // This models implementation risk: 0x = perfect, 1x = baseline, 2x = high variance
+  const scaledTrackingError = strategy.trackingError * sensitivity.trackingErrorMultiplier;
+
   // Apply ST loss and LT gain variance to strategy rates
   const adjustedStLossRate = strategy.stLossRate * (1 + sensitivity.stLossRateVariance);
   const adjustedLtGainRate = strategy.ltGainRate * (1 + sensitivity.ltGainRateVariance);
@@ -118,7 +122,8 @@ export function calculateWithSensitivity(
       yearTaxRates,
       adjustedSettings,
       sensitivity.stLossRateVariance,
-      sensitivity.ltGainRateVariance
+      sensitivity.ltGainRateVariance,
+      scaledTrackingError
     );
 
     years.push(result);
@@ -141,6 +146,7 @@ export function calculateWithSensitivity(
 /**
  * Calculate a single year with sensitivity-adjusted rates.
  * Applies the same decay logic as base calculation, but with variance-adjusted base rates.
+ * Tracking error amplifies user-specified variances to model implementation risk.
  */
 function calculateYearWithSensitivity(
   year: number,
@@ -154,7 +160,8 @@ function calculateYearWithSensitivity(
   taxRates: TaxRates,
   settings: AdvancedSettings,
   stLossVariance: number,
-  ltGainVariance: number
+  ltGainVariance: number,
+  scaledTrackingError: number
 ): YearResult {
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
@@ -163,9 +170,18 @@ function calculateYearWithSensitivity(
 
   // Get base rates with decay (same as normal calculation)
   const baseStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-  // Apply variance to the decayed rate
-  const adjustedStLossRate = baseStLossRate * (1 + stLossVariance);
-  const adjustedLtGainRate = strategy.ltGainRate * (1 + ltGainVariance);
+
+  // Amplify user-specified variances by tracking error
+  // Higher tracking error = more uncertainty in variance estimates
+  // effectiveVariance = baseVariance * (1 + scaledTrackingError)
+  // When tracking error = 0, no amplification (perfect implementation)
+  // When tracking error > 0, variances are amplified (implementation risk)
+  const effectiveStVariance = stLossVariance * (1 + scaledTrackingError);
+  const effectiveLtVariance = ltGainVariance * (1 + scaledTrackingError);
+
+  // Apply amplified variances to rates
+  const adjustedStLossRate = baseStLossRate * (1 + effectiveStVariance);
+  const adjustedLtGainRate = strategy.ltGainRate * (1 + effectiveLtVariance);
 
   const grossStLosses = collateralValue * adjustedStLossRate;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));

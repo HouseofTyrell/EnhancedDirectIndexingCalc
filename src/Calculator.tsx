@@ -497,11 +497,11 @@ export function Calculator() {
                 <input
                   id="sizingYears"
                   type="range"
-                  min={1}
+                  min={0}
                   max={advancedSettings.projectionYears}
                   step={1}
                   value={inputs.qfafSizingYears}
-                  onChange={e => updateInput('qfafSizingYears', parseInt(e.target.value, 10))}
+                  onChange={e => updateInput('qfafSizingYears', Math.max(1, parseInt(e.target.value, 10)))}
                 />
                 <div className="allocation-labels">
                   <span>1 yr</span>
