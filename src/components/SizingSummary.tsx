@@ -121,11 +121,9 @@ export function SizingSummary({
           const netSt = results.sizing.year1StLosses - results.sizing.year1StGains;
           const isMatched = Math.abs(netSt) < 1;
           const hasExcessGains = netSt < -1; // ST gains > ST losses
-          const hasExcessLosses = netSt > 1; // ST losses > ST gains
           const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
           const statusClass = isMatched ? 'success' : hasExcessGains ? 'danger' : 'success';
           let label: string;
-          if (isMatched) {
             label = `Fully Matched${avgNote}`;
           } else if (hasExcessGains) {
             label = `${formatCurrency(Math.abs(netSt))} excess ST gains${avgNote}`;
