@@ -130,19 +130,6 @@ export interface YearOverride {
   note: string; // User note (e.g., "Retirement", "Bonus")
 }
 
-// Liquidity Planning
-export interface LiquidityParams {
-  qfafLockupYears: number; // Number of years QFAF is locked (default: 3)
-  qfafRedemptionPenalty: number; // Early redemption penalty (default: 0.05 = 5%)
-  emergencyFundTarget: number; // Target emergency fund as months of income
-}
-
-export const DEFAULT_LIQUIDITY: LiquidityParams = {
-  qfafLockupYears: 3,
-  qfafRedemptionPenalty: 0.05,
-  emergencyFundTarget: 6,
-};
-
 // Sensitivity Analysis
 export interface SensitivityParams {
   federalRateChange: number; // -0.05 to +0.05 (percentage points)
