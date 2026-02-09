@@ -438,11 +438,52 @@ export function Calculator() {
                 <span className="toggle-switch"></span>
                 Financing Fees
               </label>
-              <span className="input-hint">
-                {advancedSettings.financingFeesEnabled
-                  ? `${((currentStrategy?.financingCostRate ?? 0) * 100).toFixed(1)}% cost`
-                  : 'No fees'}
-              </span>
+              {advancedSettings.financingFeesEnabled ? (
+                <div className="fee-inputs">
+                  <div className="fee-input-group">
+                    <label htmlFor="custodianFee">Custodian</label>
+                    <div className="input-with-suffix">
+                      <input
+                        id="custodianFee"
+                        type="number"
+                        step={25}
+                        min={0}
+                        max={1000}
+                        value={(advancedSettings.custodianMarginFeeRate * 10000).toFixed(0)}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) / 10000;
+                          if (!isNaN(val)) {
+                            setAdvancedSettings(s => ({ ...s, custodianMarginFeeRate: val }));
+                          }
+                        }}
+                      />
+                      <span className="suffix">bps</span>
+                    </div>
+                  </div>
+                  <div className="fee-input-group">
+                    <label htmlFor="wealthMgmtFee">Wealth Mgmt</label>
+                    <div className="input-with-suffix">
+                      <input
+                        id="wealthMgmtFee"
+                        type="number"
+                        step={25}
+                        min={0}
+                        max={1000}
+                        value={(advancedSettings.wealthManagementFeeRate * 10000).toFixed(0)}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) / 10000;
+                          if (!isNaN(val)) {
+                            setAdvancedSettings(s => ({ ...s, wealthManagementFeeRate: val }));
+                          }
+                        }}
+                      />
+                      <span className="suffix">bps</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <span className="input-hint">No fees</span>
+              )}
             </div>
           </div>
 

@@ -59,7 +59,6 @@ export function calculateWithSensitivity(
   const adjustedStrategy: StrategyRates = {
     stLossRate: adjustedStLossRate,
     ltGainRate: adjustedLtGainRate,
-    financingCostRate: strategy.financingCostRate,
   };
 
   // Use sensitivity annual return if different from default
@@ -254,8 +253,10 @@ function calculateYearWithSensitivity(
 
   // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
   const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
-  const financingCost = settings.financingFeesEnabled ? strategy.financingCostRate : 0;
-  const growthRate = baseReturn - financingCost;
+  const totalFinancingCost = settings.financingFeesEnabled
+    ? (settings.custodianMarginFeeRate + settings.wealthManagementFeeRate)
+    : 0;
+  const growthRate = baseReturn - totalFinancingCost;
   const qfafGrowthRate = settings.qfafGrowthEnabled ? growthRate : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
   const newCollateralValue = safeNumber(collateralValue * (1 + growthRate));

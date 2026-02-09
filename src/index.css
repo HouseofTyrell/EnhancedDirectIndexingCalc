@@ -1423,6 +1423,30 @@ input[type='range']::-webkit-slider-thumb {
   flex: 1;
 }
 
+.fee-inputs {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.fee-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.fee-input-group label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.fee-input-group input {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
 .toggle-label {
   display: flex;
   align-items: center;

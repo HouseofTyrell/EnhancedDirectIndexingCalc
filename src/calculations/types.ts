@@ -1,7 +1,7 @@
 import { Strategy } from '../strategyData';
 
 // Type for strategy rates needed in calculations
-export type StrategyRates = Pick<Strategy, 'stLossRate' | 'ltGainRate' | 'financingCostRate'>;
+export type StrategyRates = Pick<Strategy, 'stLossRate' | 'ltGainRate'>;
 
 // Pre-calculated tax rates passed through the calculation chain
 export interface TaxRates {

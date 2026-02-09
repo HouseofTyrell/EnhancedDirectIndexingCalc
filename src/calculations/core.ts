@@ -221,8 +221,10 @@ export function calculateYear(
 
   // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
   const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
-  const financingCost = settings.financingFeesEnabled ? strategy.financingCostRate : 0;
-  const growthRate = baseReturn - financingCost;
+  const totalFinancingCost = settings.financingFeesEnabled
+    ? (settings.custodianMarginFeeRate + settings.wealthManagementFeeRate)
+    : 0;
+  const growthRate = baseReturn - totalFinancingCost;
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
   const qfafGrowthRate = settings.qfafGrowthEnabled ? growthRate : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));

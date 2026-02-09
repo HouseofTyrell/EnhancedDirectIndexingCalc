@@ -213,7 +213,9 @@ export interface AdvancedSettings {
   // Portfolio assumptions
   growthEnabled: boolean; // Default: false (no growth assumption)
   defaultAnnualReturn: number; // Default: 0.07 (7% when growth enabled)
-  financingFeesEnabled: boolean; // Default: false (subtract strategy financing costs from growth)
+  financingFeesEnabled: boolean; // Default: false (subtract financing costs from growth)
+  custodianMarginFeeRate: number; // Default: 0.01 (1% = 100 bps)
+  wealthManagementFeeRate: number; // Default: 0.0075 (0.75% = 75 bps)
   projectionYears: number; // Default: 10
 
   // Tax rate assumptions
@@ -236,6 +238,8 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
   growthEnabled: false,
   defaultAnnualReturn: 0.07,
   financingFeesEnabled: false,
+  custodianMarginFeeRate: 0.01, // 100 bps
+  wealthManagementFeeRate: 0.0075, // 75 bps
   projectionYears: 10,
   niitRate: 0.038,
   ltcgRate: 0.2,
