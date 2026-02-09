@@ -239,8 +239,8 @@ export const DEFAULTS: CalculatorInputs = {
   // QFAF toggle (enabled by default)
   qfafEnabled: true,
 
-  // QFAF sizing: average losses over 5 years by default
-  qfafSizingYears: 5,
+  // QFAF sizing: average losses over ~5 years by default (using 6 to visually center slider in 1-10 range)
+  qfafSizingYears: 6,
 
   // QFAF sizing cushion: 0% reduction by default
   qfafSizingCushion: 0,
