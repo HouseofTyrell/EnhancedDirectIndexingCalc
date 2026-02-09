@@ -124,6 +124,7 @@ export function SizingSummary({
           const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
           const statusClass = isMatched ? 'success' : hasExcessGains ? 'danger' : 'success';
           let label: string;
+                  if (isMatched) {
             label = `Fully Matched${avgNote}`;
           } else if (hasExcessGains) {
             label = `${formatCurrency(Math.abs(netSt))} excess ST gains${avgNote}`;
