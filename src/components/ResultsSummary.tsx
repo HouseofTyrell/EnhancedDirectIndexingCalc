@@ -2,6 +2,10 @@ import React from 'react';
 import { InfoText } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 import { getStateConformityWarning } from '../taxData';
+import { CollapsibleSection } from './CollapsibleSection';
+import { useValueFlash } from '../hooks/useValueFlash';
+import { useDelta } from '../hooks/useDelta';
+import { DeltaBadge } from './DeltaBadge';
 
 /**
  * Props for the ResultsSummary component.
@@ -48,18 +52,25 @@ export const ResultsSummary = React.memo(function ResultsSummary({
   const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
   const avgAnnualSavings = totalTaxSavings / projectionYears;
 
-  return (
-    <section className="results-summary-section">
-      <div className="section-number" data-step="1">
-        Estimated Results
-      </div>
-      <div className="section-header">
-        <h2>Estimated {projectionYears}-Year Tax Savings</h2>
-      </div>
-      <p className="section-guidance">
-        Based on the inputs and assumptions below. Adjust values to see updated projections.
-      </p>
+  // Flash on value change
+  const savingsFlash = useValueFlash(totalTaxSavings);
+  const incrementalFlash = useValueFlash(incrementalBenefit);
+  const alphaFlash = useValueFlash(effectiveTaxAlpha);
 
+  // Delta indicators
+  const savingsDelta = useDelta(totalTaxSavings);
+  const incrementalDelta = useDelta(incrementalBenefit);
+  const alphaDelta = useDelta(effectiveTaxAlpha);
+
+  return (
+    <CollapsibleSection
+      sectionKey="results"
+      step="1"
+      stepLabel="Estimated Results"
+      title={`Estimated ${projectionYears}-Year Tax Savings`}
+      guidance="Based on the inputs and assumptions below. Adjust values to see updated projections."
+      className="results-summary-section"
+    >
       {/* Headline metrics - visually prominent */}
       <div className="headline-metrics">
         <div className="headline-metric primary">
@@ -68,7 +79,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
               Estimated Tax Savings
             </InfoText>
           </h3>
-          <p className="headline-number">{formatCurrency(totalTaxSavings)}</p>
+          <p className="headline-number" ref={savingsFlash}>
+            {formatCurrency(totalTaxSavings)}
+            <DeltaBadge delta={savingsDelta} />
+          </p>
           <p className="subtext">Over {projectionYears} years</p>
         </div>
         <div className="headline-metric">
@@ -77,7 +91,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
               Est. Incremental Benefit
             </InfoText>
           </h3>
-          <p className="headline-number">{formatCurrency(incrementalBenefit)}</p>
+          <p className="headline-number" ref={incrementalFlash}>
+            {formatCurrency(incrementalBenefit)}
+            <DeltaBadge delta={incrementalDelta} />
+          </p>
           <p className="subtext">vs. standard direct indexing</p>
         </div>
         <div className="headline-metric">
@@ -86,7 +103,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
               Est. Annualized Tax Alpha
             </InfoText>
           </h3>
-          <p className="headline-number">{formatPercent(effectiveTaxAlpha)}</p>
+          <p className="headline-number" ref={alphaFlash}>
+            {formatPercent(effectiveTaxAlpha)}
+            <DeltaBadge delta={alphaDelta} format="percent" />
+          </p>
           <p className="subtext">Per year</p>
         </div>
       </div>
@@ -152,6 +172,6 @@ export const ResultsSummary = React.memo(function ResultsSummary({
           <p>{getStateConformityWarning(stateCode)}</p>
         </div>
       )}
-    </section>
+    </CollapsibleSection>
   );
 });

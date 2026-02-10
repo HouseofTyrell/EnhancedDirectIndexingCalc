@@ -1,6 +1,10 @@
 import { CalculationResult } from '../types';
 import { InfoPopup, InfoText, QfafSizingFormula } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
+import { CollapsibleSection } from './CollapsibleSection';
+import { useValueFlash } from '../hooks/useValueFlash';
+import { useDelta } from '../hooks/useDelta';
+import { DeltaBadge } from './DeltaBadge';
 
 interface SizingSummaryProps {
   results: CalculationResult;
@@ -21,21 +25,35 @@ export function SizingSummary({
   rateDifferential,
   qfafMultiplier,
 }: SizingSummaryProps) {
+  const year1Savings = results.years[0]?.taxSavings ?? 0;
+  const year2Savings = results.years[1]?.taxSavings ?? 0;
+
+  // Flash on sizing card values
+  const collateralFlash = useValueFlash(results.sizing.collateralValue);
+  const qfafFlash = useValueFlash(results.sizing.qfafValue);
+  const exposureFlash = useValueFlash(results.sizing.totalExposure);
+  const limitFlash = useValueFlash(results.sizing.section461Limit);
+
+  // Flash + delta on net savings highlights
+  const year1Flash = useValueFlash(year1Savings);
+  const year2Flash = useValueFlash(year2Savings);
+  const year1Delta = useDelta(year1Savings);
+  const year2Delta = useDelta(year2Savings);
+
   return (
-    <section className="sizing-section">
-      <div className="section-number" data-step="3">
-        Optimized Strategy
-      </div>
-      <div className="section-header">
-        <h2>Strategy Sizing</h2>
+    <CollapsibleSection
+      sectionKey="sizing"
+      step="3"
+      stepLabel="Optimized Strategy"
+      title="Strategy Sizing"
+      headerAction={
         <InfoPopup title="QFAF Auto-Sizing">
           <QfafSizingFormula qfafMultiplier={qfafMultiplier} />
         </InfoPopup>
-      </div>
-      <p className="section-guidance">
-        We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within
-        IRS limits.
-      </p>
+      }
+      guidance="We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits."
+      className="sizing-section"
+    >
       <div className="sizing-cards">
         <div className="sizing-card">
           <span className="sizing-label">
@@ -46,7 +64,7 @@ export function SizingSummary({
               Collateral
             </InfoText>
           </span>
-          <span className="sizing-value">{formatCurrency(results.sizing.collateralValue)}</span>
+          <span className="sizing-value" ref={collateralFlash}>{formatCurrency(results.sizing.collateralValue)}</span>
           <span className="sizing-sublabel">{results.sizing.strategyName}</span>
         </div>
         <div className="sizing-card">
@@ -58,7 +76,7 @@ export function SizingSummary({
               Auto-Sized QFAF
             </InfoText>
           </span>
-          <span className="sizing-value">{formatCurrency(results.sizing.qfafValue)}</span>
+          <span className="sizing-value" ref={qfafFlash}>{formatCurrency(results.sizing.qfafValue)}</span>
           <span className="sizing-sublabel">
             {formatPercent(results.sizing.qfafRatio)} of collateral
           </span>
@@ -72,7 +90,7 @@ export function SizingSummary({
               Total Exposure
             </InfoText>
           </span>
-          <span className="sizing-value">{formatCurrency(results.sizing.totalExposure)}</span>
+          <span className="sizing-value" ref={exposureFlash}>{formatCurrency(results.sizing.totalExposure)}</span>
         </div>
         <div className="sizing-card">
           <span className="sizing-label">
@@ -83,7 +101,7 @@ export function SizingSummary({
               §461(l) Limit
             </InfoText>
           </span>
-          <span className="sizing-value">{formatCurrency(results.sizing.section461Limit)}</span>
+          <span className="sizing-value" ref={limitFlash}>{formatCurrency(results.sizing.section461Limit)}</span>
           <span className="sizing-sublabel">
             {filingStatus === 'mfj' ? 'MFJ' : 'Single/Other'}
           </span>
@@ -247,8 +265,9 @@ export function SizingSummary({
                 Net Year 1 Tax Savings
               </InfoText>
             </span>
-            <span className="benefit-value">
+            <span className="benefit-value" ref={year1Flash}>
               {formatCurrency(results.years[0]?.taxSavings ?? 0)}
+              <DeltaBadge delta={year1Delta} />
             </span>
             <span className="benefit-formula">
               {formatPercent((results.years[0]?.taxSavings ?? 0) / results.sizing.totalExposure)}{' '}
@@ -336,8 +355,9 @@ export function SizingSummary({
                   Net Year 2 Tax Savings
                 </InfoText>
               </span>
-              <span className="benefit-value">
+              <span className="benefit-value" ref={year2Flash}>
                 {formatCurrency(results.years[1]?.taxSavings ?? 0)}
+                <DeltaBadge delta={year2Delta} />
               </span>
               <span className="benefit-formula">
                 {formatPercent(
@@ -350,6 +370,6 @@ export function SizingSummary({
         </div>
       )}
       </div>{/* end tax-benefit-timeline */}
-    </section>
+    </CollapsibleSection>
   );
 }

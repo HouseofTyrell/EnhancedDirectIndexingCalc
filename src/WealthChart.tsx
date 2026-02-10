@@ -116,8 +116,9 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
           'Total Value': year.totalValue,
           'QFAF Value': year.qfafValue,
           'Collateral Value': year.collateralValue,
-          upperBound,
-          lowerBound,
+          // Stacked areas: bandBase + bandSize = confidence band without masking
+          bandBase: lowerBound,
+          bandSize: upperBound - lowerBound,
         };
       }),
     [data, trackingError]
@@ -150,7 +151,7 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
       >
         <p style={{ fontWeight: 'bold', margin: '0 0 8px 0' }}>{label}</p>
         {payload
-          .filter(entry => entry.name !== 'upperBound' && entry.name !== 'lowerBound')
+          .filter(entry => entry.name !== 'bandBase' && entry.name !== 'bandSize')
           .map((entry, index) => (
             <p key={index} style={{ margin: '4px 0', color: entry.color }}>
               {entry.name}: {formatCurrency(entry.value)}
@@ -167,8 +168,8 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
               marginTop: '6px',
             }}
           >
-            Range (±1.5σ): {formatCurrency(dataPoint.lowerBound)} –{' '}
-            {formatCurrency(dataPoint.upperBound)}
+            Range (±1.5σ): {formatCurrency(dataPoint.bandBase)} –{' '}
+            {formatCurrency(dataPoint.bandBase + dataPoint.bandSize)}
           </p>
         )}
       </div>
@@ -185,22 +186,22 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
           <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} width={80} />
           <Tooltip content={<CustomTooltip />} />
           <Legend verticalAlign="top" wrapperStyle={isDark ? { color: '#f3f4f6' } : undefined} />
-          {/* Confidence band - upper area (will be masked by lower) */}
+          {/* Confidence band via stacked areas (no background masking needed) */}
           <Area
             type="monotone"
-            dataKey="upperBound"
+            dataKey="bandBase"
+            stackId="confidence"
             stroke="none"
-            fill="#2563eb"
-            fillOpacity={0.1}
+            fill="transparent"
             legendType="none"
           />
-          {/* Confidence band - lower area (masks the upper to create band effect) */}
           <Area
             type="monotone"
-            dataKey="lowerBound"
+            dataKey="bandSize"
+            stackId="confidence"
             stroke="none"
-            fill={isDark ? '#111827' : '#ffffff'}
-            fillOpacity={1}
+            fill={isDark ? '#60a5fa' : '#2563eb'}
+            fillOpacity={0.12}
             legendType="none"
           />
           <Line

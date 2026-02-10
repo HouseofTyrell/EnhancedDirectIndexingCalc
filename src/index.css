@@ -1078,13 +1078,13 @@ body {
 .headline-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.25rem;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
 .headline-metric {
   background: var(--card-bg);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 1.5rem;
   text-align: center;
   border: 1px solid var(--border);
@@ -1096,10 +1096,13 @@ body {
 }
 
 .headline-metric.primary {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary-dark);
+  background: var(--card-bg);
+  border-left: 3px solid var(--primary);
   box-shadow: var(--shadow-lg);
+}
+
+.headline-metric.primary .headline-number {
+  color: var(--primary);
 }
 
 .headline-metric h3 {
@@ -1108,10 +1111,6 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-.headline-metric.primary h3 {
-  opacity: 0.9;
 }
 
 .headline-number {
@@ -1200,7 +1199,7 @@ details[open] summary {
 .input-sub-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 1.25rem;
   margin-bottom: 1rem;
 }
@@ -1810,7 +1809,7 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .offset-row.danger span:last-child {
-  color: #dc2626;
+  color: var(--negative);
 }
 
 .positive {
@@ -1818,7 +1817,7 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .negative {
-  color: #dc2626;
+  color: var(--negative);
 }
 
 .warning-note {
@@ -1996,7 +1995,7 @@ input[type='range']::-webkit-slider-thumb {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   color: var(--text-light);
   display: flex;
   align-items: center;
@@ -2013,7 +2012,7 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .benefit-value.negative {
-  color: #dc2626;
+  color: var(--negative);
 }
 
 .benefit-card.highlight .benefit-value {
@@ -2145,12 +2144,12 @@ tbody tr:hover {
   background: var(--bg);
 }
 
-.positive {
+tbody .positive {
   color: var(--text);
 }
 
 .negative {
-  color: #dc2626;
+  color: var(--negative);
 }
 
 .highlight {
@@ -3005,6 +3004,72 @@ tfoot td {
   border-top: 1px solid var(--border);
 }
 
+/* Smooth collapsible content animation (grid-template-rows trick) */
+.section-collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms ease;
+}
+
+.section-collapsible--open {
+  grid-template-rows: 1fr;
+}
+
+.section-collapsible__inner {
+  overflow: hidden;
+}
+
+/* Toggle button for self-managed collapsible sections (main sections) */
+.section-toggle-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.375rem;
+  color: var(--text-light);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 150ms ease;
+}
+
+.section-toggle-btn:hover {
+  color: var(--primary);
+}
+
+.section-toggle-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Chevron rotation animation */
+.section-toggle-btn__chevron {
+  transition: transform 300ms ease;
+  transform: rotate(-90deg);
+}
+
+.section-toggle-btn__chevron--open {
+  transform: rotate(0deg);
+}
+
+/* Collapsed section visual cue */
+.section--collapsed {
+  padding-bottom: 0.5rem;
+}
+
+.section--collapsed .section-header {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-collapsible {
+    transition: none;
+  }
+  .section-toggle-btn__chevron {
+    transition: none;
+  }
+}
+
 .section-description {
   margin: 0 0 1rem 0;
   color: var(--text-light);
@@ -3163,7 +3228,7 @@ tfoot td {
 }
 
 .qfaf-table.transposed .computed.negative {
-  color: #dc2626;
+  color: var(--negative);
 }
 
 /* Summary value styles */
@@ -3180,7 +3245,7 @@ tfoot td {
 }
 
 .qfaf-table.transposed .summary-value.negative {
-  color: #dc2626;
+  color: var(--negative);
 }
 
 /* Input with suffix (for percentages and multipliers) */
@@ -4591,19 +4656,49 @@ select:focus:not(:focus-visible) {
   background-color: var(--bg);
 }
 
-/* Value change animation */
+/* Value change flash animation (generic — works on any element) */
 @keyframes value-flash {
   0% { background-color: rgba(37, 99, 235, 0.15); }
   100% { background-color: transparent; }
 }
 
-.sticky-header__value.value-changed {
+.value-changed {
   animation: value-flash 0.6s ease-out;
+  border-radius: 4px;
+}
+
+/* Delta badge — temporary +/- indicator on value change */
+.delta-badge {
+  display: inline-block;
+  font-size: 0.7em;
+  font-weight: 600;
+  margin-left: 0.35em;
+  vertical-align: middle;
+  animation: delta-fade 2.5s ease-out forwards;
+}
+
+.delta-badge--positive {
+  color: var(--success);
+}
+
+.delta-badge--negative {
+  color: var(--negative);
+}
+
+@keyframes delta-fade {
+  0% { opacity: 0; transform: translateY(2px); }
+  10% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sticky-header__value.value-changed {
+  .value-changed {
     animation: none;
+  }
+  .delta-badge {
+    animation: none;
+    opacity: 1;
   }
 }
 
@@ -4810,8 +4905,8 @@ select:focus:not(:focus-visible) {
 }
 
 [data-theme='dark'] .headline-metric.primary {
-  background: var(--primary);
-  border-color: var(--primary-dark);
+  background: var(--card-bg);
+  border-left-color: var(--primary);
 }
 
 /* Interpretation text */
@@ -4979,6 +5074,98 @@ select:focus:not(:focus-visible) {
 
 [data-theme='dark'] .state-conformity-warning strong {
   color: #fbbf24;
+}
+
+/* Sticky header advanced button */
+[data-theme='dark'] .sticky-header__advanced-btn {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Slideout panel header */
+[data-theme='dark'] .slideout-panel__header {
+  background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+}
+
+/* Page disclaimer */
+[data-theme='dark'] .page-disclaimer {
+  background: #451a03;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+[data-theme='dark'] .page-disclaimer h4 {
+  color: #fbbf24;
+}
+
+[data-theme='dark'] .page-disclaimer ul {
+  color: #fcd34d;
+}
+
+/* Field popup impact section */
+[data-theme='dark'] .field-popup .field-impact {
+  background: #451a03;
+  border-left-color: var(--warning);
+}
+
+[data-theme='dark'] .field-popup .field-impact strong {
+  color: #fbbf24;
+}
+
+/* Compact input focus backgrounds */
+[data-theme='dark'] .input-with-suffix.compact input:focus,
+[data-theme='dark'] .input-with-prefix.compact input:focus {
+  background: #78350f;
+}
+
+/* Advanced toggle knob */
+[data-theme='dark'] .advanced-toggle-knob {
+  background-color: #4b5563;
+}
+
+/* Table column headers */
+[data-theme='dark'] .col-expandable:hover {
+  background: #312e81 !important;
+}
+
+[data-theme='dark'] .col-portfolio.col-expandable {
+  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 100%);
+}
+
+[data-theme='dark'] .col-net-capital {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+}
+
+[data-theme='dark'] .col-nol-activity {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+}
+
+[data-theme='dark'] .col-savings {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+}
+
+[data-theme='dark'] .col-detail.collateral-col {
+  background: #451a03;
+}
+
+[data-theme='dark'] .col-detail.qfaf-col {
+  background: #1e3a5f;
+}
+
+/* QFAF transposed table cells */
+[data-theme='dark'] .qfaf-table.transposed .editable-row {
+  background: #451a03;
+}
+
+[data-theme='dark'] .qfaf-table.transposed .editable-row .row-label {
+  background: #451a03;
+}
+
+[data-theme='dark'] .qfaf-table.transposed .editable-row .total-cell {
+  background: #78350f;
+}
+
+[data-theme='dark'] .col-total,
+[data-theme='dark'] .total-cell {
+  background: #1e3a5f;
 }
 
 /* Rate mismatch warning (dark mode) */
@@ -5164,10 +5351,7 @@ select:focus:not(:focus-visible) {
   border-bottom-color: var(--card-bg);
 }
 
-/* Chart tooltip (inline styles in component, so we target the container) */
-[data-theme='dark'] .recharts-tooltip-wrapper {
-  filter: invert(1) hue-rotate(180deg);
-}
+/* Chart tooltips handled via inline styles in WealthChart.tsx */
 
 /* Disclaimer */
 /* Timeline connector in dark mode */
@@ -5190,13 +5374,22 @@ select:focus:not(:focus-visible) {
 }
 
 /* Value flash animation in dark mode */
-[data-theme='dark'] .sticky-header__value.value-changed {
+[data-theme='dark'] .value-changed {
   animation-name: value-flash-dark;
 }
 
 @keyframes value-flash-dark {
   0% { background-color: rgba(59, 130, 246, 0.2); }
   100% { background-color: transparent; }
+}
+
+/* Delta badges in dark mode */
+[data-theme='dark'] .delta-badge--positive {
+  color: var(--success-light);
+}
+
+[data-theme='dark'] .delta-badge--negative {
+  color: var(--negative);
 }
 
 /* Rate editor trigger in dark mode */
@@ -5315,8 +5508,8 @@ select:focus:not(:focus-visible) {
   }
 
   :root:not([data-theme='light']) .headline-metric.primary {
-    background: var(--primary);
-    border-color: var(--primary-dark);
+    background: var(--card-bg);
+    border-left-color: var(--primary);
   }
 
   :root:not([data-theme='light']) .interpretation-text {

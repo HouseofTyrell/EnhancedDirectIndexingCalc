@@ -11,8 +11,8 @@
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: #374151;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
   padding-bottom: 0.5rem;
 }
 
@@ -40,38 +40,38 @@
   display: inline-block;
   padding: 0.25rem 0.5rem;
   background: linear-gradient(to bottom, #ffffff, #f3f4f6);
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border);
   border-radius: 4px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), inset 0 -2px 0 rgba(0, 0, 0, 0.05);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--text);
   min-width: 2rem;
   text-align: center;
 }
 
 .key-separator {
   margin: 0 0.25rem;
-  color: #9ca3af;
+  color: var(--text-light);
   font-weight: 500;
 }
 
 .shortcut-description {
   flex: 1;
-  color: #6b7280;
+  color: var(--text-light);
   font-size: 0.9375rem;
 }
 
 .shortcuts-footer {
   margin-top: 2rem;
   padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   text-align: center;
 }
 
 .shortcuts-hint {
-  color: #6b7280;
+  color: var(--text-light);
   font-size: 0.875rem;
   margin: 0;
 }
@@ -81,24 +81,12 @@
 }
 
 /* Dark mode support */
+[data-theme='dark'] .key {
+  background: linear-gradient(to bottom, #4b5563, #374151);
+}
+
 @media (prefers-color-scheme: dark) {
-  .shortcuts-section h3 {
-    color: #e5e7eb;
-    border-bottom-color: #374151;
-  }
-
-  .key {
+  :root:not([data-theme='light']) .key {
     background: linear-gradient(to bottom, #4b5563, #374151);
-    border-color: #6b7280;
-    color: #e5e7eb;
-  }
-
-  .shortcut-description,
-  .shortcuts-hint {
-    color: #9ca3af;
-  }
-
-  .key-separator {
-    color: #6b7280;
   }
 }

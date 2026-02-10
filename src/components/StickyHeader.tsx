@@ -1,5 +1,8 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React from 'react';
 import { formatCurrency } from '../utils/formatters';
+import { useValueFlash } from '../hooks/useValueFlash';
+import { useDelta } from '../hooks/useDelta';
+import { DeltaBadge } from './DeltaBadge';
 
 /**
  * Settings gear icon for the advanced settings button.
@@ -62,32 +65,6 @@ interface StickyHeaderProps {
  * />
  * ```
  */
-/**
- * Hook that adds a brief CSS flash animation when a numeric value changes.
- * Returns a ref callback to attach to the element that should flash.
- */
-function useValueFlash(value: number | undefined) {
-  const elRef = useRef<HTMLSpanElement | null>(null);
-  const prevRef = useRef(value);
-
-  useEffect(() => {
-    if (prevRef.current !== value && elRef.current) {
-      const el = elRef.current;
-      el.classList.remove('value-changed');
-      // Force reflow so re-adding the class restarts the animation
-      void el.offsetWidth;
-      el.classList.add('value-changed');
-    }
-    prevRef.current = value;
-  }, [value]);
-
-  const setRef = useCallback((node: HTMLSpanElement | null) => {
-    elRef.current = node;
-  }, []);
-
-  return setRef;
-}
-
 export const StickyHeader = React.memo(function StickyHeader({
   strategyName,
   collateral,
@@ -106,6 +83,12 @@ export const StickyHeader = React.memo(function StickyHeader({
   const qfafFlash = useValueFlash(qfafValue);
   const savingsFlash = useValueFlash(annualTaxSavings);
   const year2Flash = useValueFlash(year2TaxSavings);
+
+  // Delta indicators
+  const collateralDelta = useDelta(collateral);
+  const qfafDelta = useDelta(qfafValue);
+  const savingsDelta = useDelta(annualTaxSavings);
+  const year2Delta = useDelta(year2TaxSavings ?? 0);
 
   return (
     <div
@@ -127,6 +110,7 @@ export const StickyHeader = React.memo(function StickyHeader({
           <span className="sticky-header__label">Collateral</span>
           <span className="sticky-header__value" aria-live="polite" ref={collateralFlash}>
             {formatCurrency(collateral)}
+            <DeltaBadge delta={collateralDelta} />
           </span>
           {isExpanded && <span className="sticky-header__subtext">Starting investment</span>}
         </div>
@@ -134,6 +118,7 @@ export const StickyHeader = React.memo(function StickyHeader({
           <span className="sticky-header__label">QFAF Value</span>
           <span className="sticky-header__value" aria-live="polite" ref={qfafFlash}>
             {formatCurrency(qfafValue)}
+            <DeltaBadge delta={qfafDelta} />
           </span>
           {isExpanded && <span className="sticky-header__subtext">Auto-sized position</span>}
         </div>
@@ -141,6 +126,7 @@ export const StickyHeader = React.memo(function StickyHeader({
           <span className="sticky-header__label">Year 1 Savings</span>
           <span className="sticky-header__value" aria-live="polite" ref={savingsFlash}>
             {formatCurrency(annualTaxSavings)}
+            <DeltaBadge delta={savingsDelta} />
           </span>
           {isExpanded && <span className="sticky-header__subtext">First year benefit</span>}
         </div>
@@ -149,6 +135,7 @@ export const StickyHeader = React.memo(function StickyHeader({
             <span className="sticky-header__label">Year 2+ Savings</span>
             <span className="sticky-header__value" aria-live="polite" ref={year2Flash}>
               {formatCurrency(year2TaxSavings)}
+              <DeltaBadge delta={year2Delta} />
             </span>
             {isExpanded && <span className="sticky-header__subtext">Includes NOL usage</span>}
           </div>

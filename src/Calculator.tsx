@@ -256,20 +256,19 @@ export function Calculator() {
         <div className="section-group__label">Inputs</div>
 
       {/* Input Form - Step 1: Your Situation */}
-      <section className="inputs-section">
-        <div className="section-number" data-step="1">
-          Your Situation
-        </div>
-        <div className="section-header">
-          <h2>Client Profile</h2>
+      <CollapsibleSection
+        sectionKey="inputs"
+        step="1"
+        stepLabel="Your Situation"
+        title="Client Profile"
+        headerAction={
           <InfoPopup title="Strategy Selection">
             <StrategyRatesFormula />
           </InfoPopup>
-        </div>
-        <p className="section-guidance">
-          Tell us about your client's investment and tax profile. These inputs determine the
-          strategy sizing and tax impact.
-        </p>
+        }
+        guidance="Tell us about your client's investment and tax profile. These inputs determine the strategy sizing and tax impact."
+        className="inputs-section"
+      >
         <div className="input-grid">
           {/* Sub-card: Strategy Selection */}
           <StrategySelectionInputs
@@ -320,7 +319,7 @@ export function Calculator() {
             Reset to Defaults
           </button>
         </div>
-      </section>
+      </CollapsibleSection>
 
       </div>{/* end section-group--inputs */}
 
@@ -374,21 +373,19 @@ export function Calculator() {
       {/* Advanced Tools are now inline at the bottom of the page */}
 
       {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
-      <section className="results-section">
-        <div className="section-number" data-step="4">
-          Year-by-Year Breakdown
-        </div>
-        <div className="section-header">
-          <h2>Estimated Detailed Projections</h2>
+      <CollapsibleSection
+        sectionKey="yearByYear"
+        step="4"
+        stepLabel="Year-by-Year Breakdown"
+        title="Estimated Detailed Projections"
+        headerAction={
           <InfoPopup title="Projection Methodology">
             <ProjectionFormula qfafMultiplier={advancedSettings.qfafMultiplier} />
           </InfoPopup>
-        </div>
-        <p className="section-guidance">
-          Estimated year-by-year breakdown showing how tax benefits compound over the{' '}
-          {advancedSettings.projectionYears}-year projection period.
-        </p>
-
+        }
+        guidance={`Estimated year-by-year breakdown showing how tax benefits compound over the ${advancedSettings.projectionYears}-year projection period.`}
+        className="results-section"
+      >
         {/* Charts and Export Actions */}
         <ResultsChartsSection
           results={results}
@@ -400,7 +397,7 @@ export function Calculator() {
           onPrintRef={(handler) => setPrintHandler(() => handler)}
           onExportRef={(handler) => setExportHandler(() => handler)}
         />
-      </section>
+      </CollapsibleSection>
 
       </div>{/* end section-group--results */}
 
