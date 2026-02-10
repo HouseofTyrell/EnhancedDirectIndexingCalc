@@ -1664,6 +1664,28 @@ input[type='range']::-webkit-slider-thumb {
   color: #92400e;
 }
 
+.state-conformity-warning {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #92400e;
+}
+
+.state-conformity-warning strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  color: #78350f;
+}
+
+.state-conformity-warning p {
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* Tax Benefit Summary */
 .tax-benefit-summary {
   margin-top: 1.5rem;
@@ -4701,6 +4723,16 @@ select:focus:not(:focus-visible) {
   background: #451a03;
   border-left-color: var(--warning);
   color: #fcd34d;
+}
+
+[data-theme='dark'] .state-conformity-warning {
+  background: #451a03;
+  border-left-color: var(--warning);
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .state-conformity-warning strong {
+  color: #fbbf24;
 }
 
 /* Settings warning */

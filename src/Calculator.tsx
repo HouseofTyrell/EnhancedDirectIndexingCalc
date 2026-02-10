@@ -9,7 +9,7 @@ const PortfolioValueChart = lazy(() =>
   import('./WealthChart').then(m => ({ default: m.PortfolioValueChart }))
 );
 import { ResultsTable } from './ResultsTable';
-import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
+import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate, getStateConformityWarning } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
 import {
   CalculatorInputs,
@@ -634,6 +634,14 @@ export function Calculator() {
             </div>
           )}
 
+          {/* State tax conformity warning for CA, NY, PA */}
+          {getStateConformityWarning(inputs.stateCode) && (
+            <div className="state-conformity-warning">
+              <strong>⚠️ State Tax Conformity Note:</strong>
+              <p>{getStateConformityWarning(inputs.stateCode)}</p>
+            </div>
+          )}
+
           </div>{/* end input-sub-card: Tax & Financial Profile */}
         </div>
 
@@ -789,6 +797,7 @@ export function Calculator() {
         projectionYears={advancedSettings.projectionYears}
         collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
         collateralAmount={inputs.collateralAmount}
+        stateCode={inputs.stateCode}
       />
 
       {/* Advanced Tools are now inline at the bottom of the page */}

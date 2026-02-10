@@ -1,6 +1,7 @@
 import React from 'react';
 import { InfoText } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
+import { getStateConformityWarning } from '../taxData';
 
 /**
  * Props for the ResultsSummary component.
@@ -20,6 +21,8 @@ interface ResultsSummaryProps {
   collateralOnlyTaxSavings?: number;
   /** Total collateral amount for context */
   collateralAmount?: number;
+  /** State code for conformity warning (e.g. "CA", "NY") */
+  stateCode?: string;
 }
 
 /**
@@ -40,6 +43,7 @@ export const ResultsSummary = React.memo(function ResultsSummary({
   projectionYears = 10,
   collateralOnlyTaxSavings = 0,
   collateralAmount = 0,
+  stateCode,
 }: ResultsSummaryProps) {
   const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
   const avgAnnualSavings = totalTaxSavings / projectionYears;
@@ -140,6 +144,14 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         impacts, transaction costs, or behavioral effects. Actual results will vary. See full
         disclosures below.
       </div>
+
+      {/* State tax conformity warning for CA, NY, PA */}
+      {stateCode && getStateConformityWarning(stateCode) && (
+        <div className="state-conformity-warning">
+          <strong>⚠️ State Tax Conformity:</strong>
+          <p>{getStateConformityWarning(stateCode)}</p>
+        </div>
+      )}
     </section>
   );
 });

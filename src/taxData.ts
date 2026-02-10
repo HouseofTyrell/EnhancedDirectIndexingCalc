@@ -72,6 +72,25 @@ export function getStateRate(code: string): number {
   return STATES.find(s => s.code === code)?.rate ?? 0;
 }
 
+/**
+ * State tax conformity warnings for Section 461(l) excess business loss limitations.
+ * Some states do not conform to federal IRC Section 461(l) or have their own variations.
+ */
+export const STATE_TAX_CONFORMITY_WARNINGS: Record<string, string> = {
+  'CA': 'California has its own excess business loss rules that differ from federal treatment. Disallowed losses remain as excess business losses (not NOLs) and have different carryforward treatment. State tax estimates shown are based on federal rules and may not reflect actual California state tax liability.',
+  'NY': 'New York does not conform to federal IRC changes after March 1, 2020, including Section 461(l) excess business loss limitations. State tax treatment may differ significantly from federal calculations shown.',
+  'PA': 'Pennsylvania has selective IRC conformity. State tax treatment of excess business losses may differ from federal calculations. Consult a tax professional for precise Pennsylvania state tax calculations.',
+};
+
+/**
+ * Check if a state has known conformity issues with Section 461(l).
+ * @param stateCode - Two-letter state code
+ * @returns Warning message if state has conformity issues, undefined otherwise
+ */
+export function getStateConformityWarning(stateCode: string): string | undefined {
+  return STATE_TAX_CONFORMITY_WARNINGS[stateCode];
+}
+
 // Federal brackets for 2026 (MFJ)
 // Source: IRS Rev. Proc. 2025-XX, includes OBBBA adjustments
 // Bottom two brackets get 4% inflation adjustment, upper brackets get 2.3%
