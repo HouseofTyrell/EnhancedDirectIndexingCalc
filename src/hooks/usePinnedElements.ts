@@ -93,6 +93,15 @@ export function usePinnedElements() {
     });
   }, []);
 
+  const pin = useCallback((id: string) => {
+    setPinnedIds(prev => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
   const unpin = useCallback((id: string) => {
     setPinnedIds(prev => {
       const next = new Set(prev);
@@ -123,6 +132,7 @@ export function usePinnedElements() {
     pinnedIds,
     hasPinned: pinnedIds.size > 0,
     togglePin,
+    pin,
     unpin,
     unpinAll,
     isPinned,

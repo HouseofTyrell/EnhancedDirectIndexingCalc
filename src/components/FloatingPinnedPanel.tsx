@@ -20,6 +20,8 @@ const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 480;
 const MIN_WIDTH = 280;
 const MIN_HEIGHT = 200;
+const DEFAULT_ITEM_HEIGHT = 320;
+const MIN_ITEM_HEIGHT = 60;
 
 function getDefaultPosition() {
   const x = window.innerWidth - DEFAULT_WIDTH - 16;
@@ -53,10 +55,13 @@ export function FloatingPinnedPanel({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [itemHeights, setItemHeights] = useState<Record<string, number>>({});
+  const [itemResizing, setItemResizing] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const resizeStartRef = useRef<{ w: number; h: number; px: number; py: number } | null>(null);
+  const itemResizeStartRef = useRef<{ id: string; h: number; py: number } | null>(null);
 
   // Resolve effective position/size
   const pos = layout
@@ -136,6 +141,35 @@ export function FloatingPinnedPanel({
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
     resizeStartRef.current = null;
+  }, []);
+
+  // --- Per-item vertical resize ---
+  const handleItemResizeStart = useCallback(
+    (id: string, e: React.PointerEvent) => {
+      if (isMobile) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const currentH = itemHeights[id] ?? DEFAULT_ITEM_HEIGHT;
+      setItemResizing(id);
+      itemResizeStartRef.current = { id, h: currentH, py: e.clientY };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [isMobile, itemHeights]
+  );
+
+  const handleItemResizeMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!itemResizing || !itemResizeStartRef.current) return;
+      const dy = e.clientY - itemResizeStartRef.current.py;
+      const newH = Math.max(MIN_ITEM_HEIGHT, itemResizeStartRef.current.h + dy);
+      setItemHeights(prev => ({ ...prev, [itemResizeStartRef.current!.id]: newH }));
+    },
+    [itemResizing]
+  );
+
+  const handleItemResizeEnd = useCallback(() => {
+    setItemResizing(null);
+    itemResizeStartRef.current = null;
   }, []);
 
   // Toggle collapse on individual item
@@ -245,9 +279,24 @@ export function FloatingPinnedPanel({
                   </button>
                 </div>
                 {!itemCollapsed && (
-                  <div className="floating-panel__item-content">
-                    {el.content}
-                  </div>
+                  <>
+                    <div
+                      className="floating-panel__item-content"
+                      style={itemHeights[el.id] ? { maxHeight: itemHeights[el.id], height: itemHeights[el.id] } : undefined}
+                    >
+                      {el.content}
+                    </div>
+                    {!isMobile && (
+                      <div
+                        className={`floating-panel__item-resize${itemResizing === el.id ? ' floating-panel__item-resize--active' : ''}`}
+                        onPointerDown={e => handleItemResizeStart(el.id, e)}
+                        onPointerMove={handleItemResizeMove}
+                        onPointerUp={handleItemResizeEnd}
+                        onPointerCancel={handleItemResizeEnd}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </>
                 )}
               </div>
             );

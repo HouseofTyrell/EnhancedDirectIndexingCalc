@@ -222,6 +222,15 @@ export function Calculator() {
     }
   }, [pinnedScenario]);
 
+  // Auto-pin comparison panel to floating panel when scenario is pinned
+  useEffect(() => {
+    if (pinnedScenario.hasPinned) {
+      pinnedElements.pin('comparison');
+    } else {
+      pinnedElements.unpin('comparison');
+    }
+  }, [pinnedScenario.hasPinned]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Setup keyboard shortcuts (after all handlers are defined)
   useKeyboardShortcuts({
     onPrint: printHandler || undefined,
@@ -623,6 +632,21 @@ export function Calculator() {
               />
             ),
           }] : []),
+          ...(pinnedElements.isPinned('comparison') && pinnedScenario.pinned ? [{
+            id: 'comparison',
+            label: 'Scenario Comparison',
+            content: (
+              <ScenarioComparisonPanel
+                pinned={pinnedScenario.pinned}
+                currentInputs={inputs}
+                currentSettings={advancedSettings}
+                currentResults={results}
+                onUnpin={pinnedScenario.unpin}
+                onRestore={handleRestorePinned}
+                onReplacePin={() => pinnedScenario.replacePin(inputs, advancedSettings, results)}
+              />
+            ),
+          }] : []),
           ...(pinnedElements.isPinned('sizing') ? [{
             id: 'sizing',
             label: 'Strategy Sizing',
@@ -653,7 +677,10 @@ export function Calculator() {
             ),
           }] : []),
         ]}
-        onUnpin={pinnedElements.unpin}
+        onUnpin={(id: string) => {
+          pinnedElements.unpin(id);
+          if (id === 'comparison') pinnedScenario.unpin();
+        }}
         onUnpinAll={pinnedElements.unpinAll}
         layout={pinnedElements.panelLayout}
         onLayoutChange={pinnedElements.updatePanelLayout}

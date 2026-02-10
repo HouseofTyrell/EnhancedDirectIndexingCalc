@@ -2852,6 +2852,41 @@ tfoot td {
   overscroll-behavior: contain;
 }
 
+/* --- Per-item vertical resize handle --- */
+.floating-panel__item-resize {
+  height: 6px;
+  cursor: ns-resize;
+  position: relative;
+  flex-shrink: 0;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.floating-panel__item:hover .floating-panel__item-resize,
+.floating-panel__item-resize--active {
+  opacity: 1;
+}
+
+.floating-panel__item-resize::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--text-light);
+  opacity: 0.4;
+}
+
+.floating-panel__item-resize--active::before,
+.floating-panel__item-resize:hover::before {
+  opacity: 0.7;
+  background: var(--primary);
+}
+
 /* --- Resize handle --- */
 .floating-panel__resize-handle {
   position: absolute;
