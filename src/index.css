@@ -2728,6 +2728,7 @@ tfoot td {
   gap: 0.25rem;
 }
 
+.floating-panel__anchor-btn,
 .floating-panel__collapse-toggle-btn,
 .floating-panel__reset-btn,
 .floating-panel__close-all {
@@ -2744,10 +2745,19 @@ tfoot td {
   cursor: pointer;
 }
 
+.floating-panel__anchor-btn:hover,
 .floating-panel__collapse-toggle-btn:hover,
 .floating-panel__reset-btn:hover {
   color: var(--primary);
   border-color: var(--primary);
+}
+
+.floating-panel__anchor-btn--active {
+  color: var(--primary);
+  border-color: var(--primary);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .floating-panel__close-all:hover {
@@ -2780,6 +2790,13 @@ tfoot td {
   overflow: hidden;
   border-left: 3px solid transparent;
   transition: border-left-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.floating-panel__item:not(.floating-panel__item--collapsed) {
+  flex: 1;
 }
 
 .floating-panel__item:focus-within {
@@ -2875,9 +2892,15 @@ tfoot td {
 .floating-panel__item-content {
   padding: 0.625rem;
   font-size: 0.8rem;
-  max-height: 320px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* When user has manually resized, use fixed height instead of flex */
+.floating-panel__item-content--fixed {
+  flex: none;
 }
 
 /* --- Per-item vertical resize handle --- */

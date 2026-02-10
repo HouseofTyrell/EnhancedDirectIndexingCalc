@@ -1,5 +1,5 @@
 import { ReactNode, useState, useRef, useCallback, useEffect } from 'react';
-import type { PanelLayout } from '../hooks/usePinnedElements';
+import type { PanelLayout, AnchorPosition } from '../hooks/usePinnedElements';
 
 interface PinnedElement {
   id: string;
@@ -16,16 +16,33 @@ interface FloatingPinnedPanelProps {
   onLayoutReset: () => void;
 }
 
-const DEFAULT_WIDTH = 420;
-const DEFAULT_HEIGHT = 480;
+const DEFAULT_WIDTH = 480;
+const DEFAULT_HEIGHT = 560;
 const MIN_WIDTH = 280;
 const MIN_HEIGHT = 200;
-const DEFAULT_ITEM_HEIGHT = 320;
 const MIN_ITEM_HEIGHT = 60;
+const EDGE_MARGIN = 12;
+
+const ANCHOR_CYCLE: (AnchorPosition | null)[] = [
+  'bottom-right', 'bottom-left', 'top-right', 'top-left', null,
+];
+
+function getAnchoredPosition(anchor: AnchorPosition, w: number, h: number) {
+  switch (anchor) {
+    case 'bottom-right':
+      return { x: window.innerWidth - w - EDGE_MARGIN, y: window.innerHeight - h - EDGE_MARGIN };
+    case 'bottom-left':
+      return { x: EDGE_MARGIN, y: window.innerHeight - h - EDGE_MARGIN };
+    case 'top-right':
+      return { x: window.innerWidth - w - EDGE_MARGIN, y: EDGE_MARGIN };
+    case 'top-left':
+      return { x: EDGE_MARGIN, y: EDGE_MARGIN };
+  }
+}
 
 function getDefaultPosition() {
-  const x = window.innerWidth - DEFAULT_WIDTH - 16;
-  const y = window.innerHeight - DEFAULT_HEIGHT - 16;
+  const x = window.innerWidth - DEFAULT_WIDTH - EDGE_MARGIN;
+  const y = window.innerHeight - DEFAULT_HEIGHT - EDGE_MARGIN;
   return { x: Math.max(0, x), y: Math.max(0, y) };
 }
 
@@ -37,6 +54,13 @@ function clampPosition(x: number, y: number, w: number) {
     y: Math.max(0, Math.min(y, maxY)),
   };
 }
+
+const ANCHOR_LABELS: Record<AnchorPosition, string> = {
+  'bottom-right': 'BR',
+  'bottom-left': 'BL',
+  'top-right': 'TR',
+  'top-left': 'TL',
+};
 
 /**
  * Draggable + resizable floating panel that shows pinned UI elements.
@@ -68,20 +92,30 @@ export function FloatingPinnedPanel({
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Resolve effective position/size
-  const pos = layout
-    ? { x: layout.x, y: layout.y }
-    : getDefaultPosition();
+  const anchor = layout?.anchor ?? null;
   const size = {
     width: layout?.width ?? DEFAULT_WIDTH,
     height: layout?.height ?? DEFAULT_HEIGHT,
   };
+  const pos = anchor
+    ? getAnchoredPosition(anchor, size.width, size.height)
+    : layout
+      ? { x: layout.x, y: layout.y }
+      : getDefaultPosition();
 
-  // Track mobile breakpoint
+  // Track mobile breakpoint + recompute anchored position on window resize
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    const onResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+      // Recompute anchored position when viewport changes
+      if (layout?.anchor) {
+        const newPos = getAnchoredPosition(layout.anchor, layout.width, layout.height);
+        onLayoutChange({ ...layout, ...newPos });
+      }
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [layout, onLayoutChange]);
 
   // Sync itemOrder with elements (preserve existing order, append new, remove stale)
   useEffect(() => {
@@ -132,7 +166,11 @@ export function FloatingPinnedPanel({
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
     dragStartRef.current = null;
-  }, []);
+    // Dragging breaks the anchor
+    if (anchor) {
+      onLayoutChange({ x: pos.x, y: pos.y, width: size.width, height: size.height, anchor: null });
+    }
+  }, [anchor, pos.x, pos.y, size.width, size.height, onLayoutChange]);
 
   // --- Resize ---
   const handleResizeStart = useCallback(
@@ -172,7 +210,10 @@ export function FloatingPinnedPanel({
       if (isMobile) return;
       e.preventDefault();
       e.stopPropagation();
-      const currentH = itemHeights[id] ?? DEFAULT_ITEM_HEIGHT;
+      // Get current actual height from DOM, or fall back to a reasonable default
+      const el = itemRefs.current.get(id);
+      const contentEl = el?.querySelector('.floating-panel__item-content') as HTMLElement | null;
+      const currentH = itemHeights[id] ?? contentEl?.offsetHeight ?? 200;
       setItemResizing(id);
       itemResizeStartRef.current = { id, h: currentH, py: e.clientY };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -258,6 +299,17 @@ export function FloatingPinnedPanel({
     setCollapsedItems(new Set());
   }, []);
 
+  const cycleAnchor = useCallback(() => {
+    const currentIdx = ANCHOR_CYCLE.indexOf(anchor);
+    const nextAnchor = ANCHOR_CYCLE[(currentIdx + 1) % ANCHOR_CYCLE.length];
+    if (nextAnchor) {
+      const newPos = getAnchoredPosition(nextAnchor, size.width, size.height);
+      onLayoutChange({ ...newPos, width: size.width, height: size.height, anchor: nextAnchor });
+    } else {
+      onLayoutChange({ x: pos.x, y: pos.y, width: size.width, height: size.height, anchor: null });
+    }
+  }, [anchor, size.width, size.height, pos.x, pos.y, onLayoutChange]);
+
   if (elements.length === 0) return null;
 
   const allCollapsed = elements.length > 0 && elements.every(e => collapsedItems.has(e.id));
@@ -316,6 +368,24 @@ export function FloatingPinnedPanel({
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="17 11 12 6 7 11" />
                   <polyline points="17 18 12 13 7 18" />
+                </svg>
+              )}
+            </button>
+          )}
+          {!isMobile && (
+            <button
+              className={`floating-panel__anchor-btn${anchor ? ' floating-panel__anchor-btn--active' : ''}`}
+              onClick={cycleAnchor}
+              title={anchor ? `Anchored ${ANCHOR_LABELS[anchor]} — click to cycle` : 'Anchor to corner'}
+              aria-label={anchor ? `Anchored ${anchor}, click to change` : 'Anchor panel to screen corner'}
+            >
+              {anchor ? ANCHOR_LABELS[anchor] : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 17v5" />
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 3v2" />
+                  <path d="M3 12h2" />
+                  <path d="M19 12h2" />
                 </svg>
               )}
             </button>
@@ -397,8 +467,8 @@ export function FloatingPinnedPanel({
                 {!itemCollapsed && (
                   <>
                     <div
-                      className="floating-panel__item-content"
-                      style={itemHeights[el.id] ? { maxHeight: itemHeights[el.id], height: itemHeights[el.id] } : undefined}
+                      className={`floating-panel__item-content${itemHeights[el.id] ? ' floating-panel__item-content--fixed' : ''}`}
+                      style={itemHeights[el.id] ? { height: itemHeights[el.id] } : undefined}
                     >
                       {el.content}
                     </div>

@@ -4,11 +4,14 @@ import { STORAGE_KEYS } from '../constants/storageKeys';
 const STORAGE_KEY = STORAGE_KEYS.PINNED_ELEMENTS;
 const LAYOUT_KEY = STORAGE_KEYS.PINNED_PANEL_LAYOUT;
 
+export type AnchorPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
 export interface PanelLayout {
   x: number;
   y: number;
   width: number;
   height: number;
+  anchor?: AnchorPosition | null;
 }
 
 function loadLayout(): PanelLayout | null {
