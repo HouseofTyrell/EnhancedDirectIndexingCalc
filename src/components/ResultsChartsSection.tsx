@@ -1,6 +1,6 @@
-import { lazy, Suspense, useCallback } from 'react';
+import { lazy, Suspense, useCallback, useEffect } from 'react';
 import { ResultsTable } from '../ResultsTable';
-import { CalculatorInputs, AdvancedSettings, CalculationResults } from '../types';
+import { CalculatorInputs, AdvancedSettings, CalculationResult } from '../types';
 import { Strategy } from '../strategyData';
 import { formatShortcut } from '../hooks/useKeyboardShortcuts';
 
@@ -22,7 +22,7 @@ const PortfolioValueChart = lazy(() =>
 );
 
 interface ResultsChartsSectionProps {
-  results: CalculationResults;
+  results: CalculationResult;
   inputs: CalculatorInputs;
   advancedSettings: AdvancedSettings;
   currentStrategy?: Strategy;
@@ -56,9 +56,11 @@ export function ResultsChartsSection({
     });
   }, [inputs, results, advancedSettings, taxRates]);
 
-  // Expose handlers to parent via refs
-  if (onPrintRef) onPrintRef(handlePrint);
-  if (onExportRef) onExportRef(handleExport);
+  // Expose handlers to parent via useEffect (not during render)
+  useEffect(() => {
+    if (onPrintRef) onPrintRef(handlePrint);
+    if (onExportRef) onExportRef(handleExport);
+  }, [handlePrint, handleExport, onPrintRef, onExportRef]);
 
   return (
     <>

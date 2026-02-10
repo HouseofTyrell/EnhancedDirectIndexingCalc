@@ -1,8 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { calculate, calculateWithOverrides, calculateWithSensitivity } from './calculations';
-import { ResultsTable } from './ResultsTable';
-import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate, getStateConformityWarning } from './taxData';
-import { STRATEGIES, getStrategy, getLongLeverageRatio, getShortRatio } from './strategyData';
+import { DEFAULTS, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
+import { STRATEGIES, getStrategy } from './strategyData';
 import {
   CalculatorInputs,
   YearOverride,
@@ -10,8 +9,6 @@ import {
   DEFAULT_SETTINGS,
   SensitivityParams,
   DEFAULT_SENSITIVITY,
-  FILING_STATUSES,
-  FilingStatus,
 } from './types';
 import {
   InfoPopup,
@@ -39,14 +36,6 @@ import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
 import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
 import { ScenarioAnalysis } from './AdvancedMode/ScenarioAnalysis';
 import { StrategyComparison } from './AdvancedMode/StrategyComparison';
-import { SettingsPanel } from './AdvancedMode/SettingsPanel';
-import { StrategyRateEditor } from './AdvancedMode/StrategyRateEditor';
-import {
-  formatWithCommas,
-  parseFormattedNumber,
-  formatPercent,
-  parseStateRate,
-} from './utils/formatters';
 
 // Generate default year overrides for 10 years
 const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
@@ -408,8 +397,8 @@ export function Calculator() {
           currentStrategy={currentStrategy}
           taxRates={taxRates}
           projectionYears={advancedSettings.projectionYears}
-          onPrintRef={setPrintHandler}
-          onExportRef={setExportHandler}
+          onPrintRef={(handler) => setPrintHandler(() => handler)}
+          onExportRef={(handler) => setExportHandler(() => handler)}
         />
       </section>
 
