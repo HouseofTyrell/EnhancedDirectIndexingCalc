@@ -426,7 +426,7 @@ export function StrategySelectionInputs({
                 <input
                   id="qfafMultiplier"
                   type="range"
-                  min={1.0}
+                  min={1.25}
                   max={1.75}
                   step={0.01}
                   value={advancedSettings.qfafMultiplier}
@@ -438,7 +438,7 @@ export function StrategySelectionInputs({
                   }}
                 />
                 <div className="slider-labels">
-                  <span>100%</span>
+                  <span>125%</span>
                   <span className="current-value">{(advancedSettings.qfafMultiplier * 100).toFixed(0)}%</span>
                   <span>175%</span>
                 </div>
@@ -447,6 +447,31 @@ export function StrategySelectionInputs({
                 </span>
               </div>
 
+              <div className="input-group">
+                <label htmlFor="qfafSizingYears">Sizing Window (years)</label>
+                <input
+                  id="qfafSizingYears"
+                  type="range"
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={inputs.qfafSizingYears}
+                  onChange={e => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      onUpdateInput('qfafSizingYears', val);
+                    }
+                  }}
+                />
+                <div className="slider-labels">
+                  <span>1 year</span>
+                  <span className="current-value">{inputs.qfafSizingYears} {inputs.qfafSizingYears === 1 ? 'year' : 'years'}</span>
+                  <span>10 years</span>
+                </div>
+                <span className="input-hint">
+                  Years averaged for QFAF sizing — Default: 5 (conservative multi-year average)
+                </span>
+              </div>
             </div>
 
             {/* QFAF Annual Return (separate from collateral growth rate) */}

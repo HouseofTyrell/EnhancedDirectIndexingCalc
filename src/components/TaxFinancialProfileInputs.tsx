@@ -19,7 +19,7 @@ export function TaxFinancialProfileInputs({
   return (
     <div className="input-sub-card" style={{ gridColumn: '1 / -1' }}>
       <div className="input-sub-card__label">Tax &amp; Financial Profile</div>
-      <div className="input-pair">
+      <div className="input-triple">
         <div className="input-group">
           <label htmlFor="filing">Filing Status</label>
           <select
@@ -51,21 +51,32 @@ export function TaxFinancialProfileInputs({
             <span className="input-warning-text">{validationWarnings.income}</span>
           )}
         </div>
-      </div>
 
-      <div className="input-group">
-        <label htmlFor="state">State of Residence</label>
-        <select
-          id="state"
-          value={inputs.stateCode}
-          onChange={e => onUpdateInput('stateCode', e.target.value)}
-        >
-          {STATES.map(s => (
-            <option key={s.code} value={s.code}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        <div className="input-group">
+          <label htmlFor="state">
+            State
+            {getStateConformityWarning(inputs.stateCode) && (
+              <span className="conformity-indicator" tabIndex={0} aria-label="State tax conformity note">
+                <span className="conformity-indicator__icon">&#9888;</span>
+                <span className="conformity-indicator__tooltip">
+                  <strong>State Tax Conformity Note</strong>
+                  {getStateConformityWarning(inputs.stateCode)}
+                </span>
+              </span>
+            )}
+          </label>
+          <select
+            id="state"
+            value={inputs.stateCode}
+            onChange={e => onUpdateInput('stateCode', e.target.value)}
+          >
+            {STATES.map(s => (
+              <option key={s.code} value={s.code}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {inputs.stateCode === 'OTHER' && (
@@ -83,14 +94,6 @@ export function TaxFinancialProfileInputs({
             />
             <span className="suffix">%</span>
           </div>
-        </div>
-      )}
-
-      {/* State tax conformity warning for CA, NY, PA */}
-      {getStateConformityWarning(inputs.stateCode) && (
-        <div className="state-conformity-warning">
-          <strong>⚠️ State Tax Conformity Note:</strong>
-          <p>{getStateConformityWarning(inputs.stateCode)}</p>
         </div>
       )}
     </div>

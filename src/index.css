@@ -1362,6 +1362,7 @@ input[type='range']::-webkit-slider-thumb {
   border-radius: 8px;
   border: 1px solid var(--border);
   grid-column: 1 / -1;
+  margin-bottom: 0.5rem;
 }
 
 .strategy-rate {
@@ -1402,9 +1403,18 @@ input[type='range']::-webkit-slider-thumb {
   grid-column: 1 / -1;
 }
 
+/* Input Triple - three fields in a row */
+.input-triple {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  grid-column: 1 / -1;
+}
+
 /* Toggle Switch */
 .toggle-group {
   grid-column: 1 / -1;
+  margin-top: 0.5rem;
 }
 
 /* Toggle Row - displays multiple toggles side by side */
@@ -1636,10 +1646,34 @@ input[type='range']::-webkit-slider-thumb {
   background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
 }
 
-.tax-rates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+/* Tax rates two-row layout */
+.tax-rates-rows {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
+}
+
+.tax-rates-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tax-rates-row__heading {
+  flex-shrink: 0;
+  width: 5.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-light);
+}
+
+.tax-rates-row__items {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  flex: 1;
 }
 
 .tax-rate-item {
@@ -1647,34 +1681,38 @@ input[type='range']::-webkit-slider-thumb {
   flex-direction: column;
   background: var(--card-bg);
   border-radius: 8px;
-  padding: 0.75rem;
-  text-align: center;
+  padding: 0.625rem 0.75rem;
   border: 1px solid var(--border);
 }
 
 .tax-rate-item.highlight {
-  background: #7c3aed;
-  color: white;
-  border-color: #7c3aed;
+  background: var(--card-bg);
+  border-left: 3px solid #7c3aed;
+}
+
+.tax-rate-item.highlight .rate-value {
+  color: #7c3aed;
 }
 
 .tax-rate-item.accent {
-  background: var(--success);
-  color: white;
-  border-color: var(--success);
+  background: var(--card-bg);
+  border-left: 3px solid var(--success);
+}
+
+.tax-rate-item.accent .rate-value {
+  color: var(--success);
 }
 
 .rate-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.8;
-  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-bottom: 0.125rem;
 }
 
 .rate-value {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 700;
+  color: var(--text);
 }
 
 /* Sizing section */
@@ -1705,9 +1743,12 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .sizing-card.highlight {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
+  background: var(--card-bg);
+  border-left: 3px solid var(--primary);
+}
+
+.sizing-card.highlight .sizing-value {
+  color: var(--primary);
 }
 
 .sizing-label {
@@ -1790,6 +1831,61 @@ input[type='range']::-webkit-slider-thumb {
   color: #92400e;
 }
 
+/* State conformity indicator (inline tooltip) */
+.conformity-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.375rem;
+  cursor: help;
+}
+
+.conformity-indicator__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #d97706;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 50%;
+}
+
+.conformity-indicator__tooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: -0.5rem;
+  z-index: 50;
+  width: 300px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.conformity-indicator__tooltip strong {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8rem;
+  color: #78350f;
+}
+
+.conformity-indicator:hover .conformity-indicator__tooltip,
+.conformity-indicator:focus .conformity-indicator__tooltip,
+.conformity-indicator:focus-within .conformity-indicator__tooltip {
+  display: block;
+}
+
+/* Legacy class kept for ResultsSummary usage */
 .state-conformity-warning {
   margin: 1rem 0 0;
   padding: 1rem;
@@ -1884,17 +1980,16 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .benefit-card.highlight {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
+  background: var(--card-bg);
+  border-left: 3px solid var(--primary);
 }
 
 .benefit-card.highlight .benefit-label {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-light);
 }
 
 .benefit-card.highlight .benefit-formula {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-light);
 }
 
 .benefit-label {
@@ -1922,7 +2017,7 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .benefit-card.highlight .benefit-value {
-  color: white;
+  color: var(--primary);
 }
 
 .benefit-formula {
@@ -1959,22 +2054,12 @@ input[type='range']::-webkit-slider-thumb {
   border: 1px solid var(--border);
 }
 
-.card.primary {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
 .card h3 {
   margin: 0 0 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-.card.primary h3 {
-  opacity: 0.9;
 }
 
 .card .big-number {
@@ -3750,6 +3835,10 @@ tfoot td {
     grid-template-columns: 1fr;
   }
 
+  .input-triple {
+    grid-template-columns: 1fr;
+  }
+
   /* Strategy rates info - stack vertically */
   .strategy-rates-info {
     flex-direction: column;
@@ -3868,9 +3957,13 @@ tfoot td {
   }
 
   /* Tax rates grid - 3 columns instead of auto-fit */
-  .tax-rates-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
+  .tax-rates-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tax-rates-row__heading {
+    width: auto;
   }
 
   .tax-rate-item {
@@ -3878,7 +3971,7 @@ tfoot td {
   }
 
   .tax-rate-item .rate-label {
-    font-size: 0.55rem;
+    font-size: 0.65rem;
   }
 
   .tax-rate-item .rate-value {
@@ -4301,7 +4394,7 @@ tfoot td {
     font-size: 1.1rem;
   }
 
-  .tax-rates-grid {
+  .tax-rates-row__items {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -4410,8 +4503,8 @@ tfoot td {
    TABLET BREAKPOINT (769px - 1024px)
    ============================================ */
 @media (max-width: 1024px) and (min-width: 769px) {
-  /* Tax rate cards: 3x2 grid */
-  .tax-rates-grid {
+  /* Tax rate rows: already 3-col, no change needed */
+  .tax-rates-row__items {
     grid-template-columns: repeat(3, 1fr);
   }
 
@@ -4763,15 +4856,26 @@ select:focus:not(:focus-visible) {
 }
 
 [data-theme='dark'] .sizing-card.highlight {
-  background: var(--primary);
+  background: var(--card-bg);
+  border-left-color: var(--primary);
 }
 
 [data-theme='dark'] .tax-rate-item.highlight {
-  background: #7c3aed;
+  background: var(--card-bg);
+  border-left-color: #a78bfa;
+}
+
+[data-theme='dark'] .tax-rate-item.highlight .rate-value {
+  color: #a78bfa;
 }
 
 [data-theme='dark'] .tax-rate-item.accent {
-  background: var(--success);
+  background: var(--card-bg);
+  border-left-color: var(--success);
+}
+
+[data-theme='dark'] .tax-rate-item.accent .rate-value {
+  color: var(--success);
 }
 
 /* NOL carryforward note */
@@ -4849,6 +4953,22 @@ select:focus:not(:focus-visible) {
   background: #451a03;
   border-left-color: var(--warning);
   color: #fcd34d;
+}
+
+[data-theme='dark'] .conformity-indicator__icon {
+  color: #fbbf24;
+  background: #451a03;
+  border-color: #78350f;
+}
+
+[data-theme='dark'] .conformity-indicator__tooltip {
+  color: #fcd34d;
+  background: #451a03;
+  border-color: #78350f;
+}
+
+[data-theme='dark'] .conformity-indicator__tooltip strong {
+  color: #fbbf24;
 }
 
 [data-theme='dark'] .state-conformity-warning {
@@ -5232,7 +5352,8 @@ select:focus:not(:focus-visible) {
   }
 
   :root:not([data-theme='light']) .sizing-card.highlight {
-    background: var(--primary);
+    background: var(--card-bg);
+    border-left-color: var(--primary);
   }
 
   :root:not([data-theme='light']) .sticky-header {

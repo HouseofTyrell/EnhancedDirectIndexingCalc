@@ -49,54 +49,64 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
         These marginal rates determine the value of each tax event. Higher ST→LT benefit means more
         savings from the strategy.
       </p>
-      <div className="tax-rates-grid">
-        <div className="tax-rate-item">
-          <span className="rate-label">
-            <InfoText contentKey="federal-st-rate" currentValue={formatRate(federalStRate)}>
-              Federal Ordinary/ST
-            </InfoText>
-          </span>
-          <span className="rate-value">{formatRate(federalStRate)}</span>
+      <div className="tax-rates-rows">
+        <div className="tax-rates-row">
+          <span className="tax-rates-row__heading">Component Rates</span>
+          <div className="tax-rates-row__items">
+            <div className="tax-rate-item">
+              <span className="rate-label">
+                <InfoText contentKey="federal-st-rate" currentValue={formatRate(federalStRate)}>
+                  Federal Ordinary / ST
+                </InfoText>
+              </span>
+              <span className="rate-value">{formatRate(federalStRate)}</span>
+            </div>
+            <div className="tax-rate-item">
+              <span className="rate-label">
+                <InfoText contentKey="federal-lt-rate" currentValue={formatRate(federalLtRate)}>
+                  Federal LT Cap Gains
+                </InfoText>
+              </span>
+              <span className="rate-value">{formatRate(federalLtRate)}</span>
+            </div>
+            <div className="tax-rate-item">
+              <span className="rate-label">
+                <InfoText contentKey="state-rate" currentValue={formatRate(stateRate)}>
+                  State
+                </InfoText>
+              </span>
+              <span className="rate-value">{formatRate(stateRate)}</span>
+            </div>
+          </div>
         </div>
-        <div className="tax-rate-item">
-          <span className="rate-label">
-            <InfoText contentKey="federal-lt-rate" currentValue={formatRate(federalLtRate)}>
-              Federal LT Cap Gains
-            </InfoText>
-          </span>
-          <span className="rate-value">{formatRate(federalLtRate)}</span>
-        </div>
-        <div className="tax-rate-item">
-          <span className="rate-label">
-            <InfoText contentKey="state-rate" currentValue={formatRate(stateRate)}>
-              State
-            </InfoText>
-          </span>
-          <span className="rate-value">{formatRate(stateRate)}</span>
-        </div>
-        <div className="tax-rate-item highlight">
-          <span className="rate-label">
-            <InfoText contentKey="combined-st-rate" currentValue={formatRate(combinedStRate)}>
-              Combined Ordinary
-            </InfoText>
-          </span>
-          <span className="rate-value">{formatRate(combinedStRate)}</span>
-        </div>
-        <div className="tax-rate-item highlight">
-          <span className="rate-label">
-            <InfoText contentKey="combined-lt-rate" currentValue={formatRate(combinedLtRate)}>
-              Combined LT
-            </InfoText>
-          </span>
-          <span className="rate-value">{formatRate(combinedLtRate)}</span>
-        </div>
-        <div className="tax-rate-item accent">
-          <span className="rate-label">
-            <InfoText contentKey="st-lt-benefit" currentValue={formatRate(rateDifferential)}>
-              ST→LT Benefit
-            </InfoText>
-          </span>
-          <span className="rate-value">{formatRate(rateDifferential)}</span>
+        <div className="tax-rates-row">
+          <span className="tax-rates-row__heading">Combined &amp; Benefit</span>
+          <div className="tax-rates-row__items">
+            <div className="tax-rate-item highlight">
+              <span className="rate-label">
+                <InfoText contentKey="combined-st-rate" currentValue={formatRate(combinedStRate)}>
+                  Combined Ordinary
+                </InfoText>
+              </span>
+              <span className="rate-value">{formatRate(combinedStRate)}</span>
+            </div>
+            <div className="tax-rate-item highlight">
+              <span className="rate-label">
+                <InfoText contentKey="combined-lt-rate" currentValue={formatRate(combinedLtRate)}>
+                  Combined LT
+                </InfoText>
+              </span>
+              <span className="rate-value">{formatRate(combinedLtRate)}</span>
+            </div>
+            <div className="tax-rate-item accent">
+              <span className="rate-label">
+                <InfoText contentKey="st-lt-benefit" currentValue={formatRate(rateDifferential)}>
+                  ST → LT Benefit
+                </InfoText>
+              </span>
+              <span className="rate-value">{formatRate(rateDifferential)}</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
