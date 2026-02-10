@@ -230,3 +230,45 @@ export function getAverageStLossRate(strategy: Strategy, fromYear: number, toYea
   }
   return count > 0 ? sum / count : 0;
 }
+
+/**
+ * Get the leverage ratio for long positions (margin debt) based on strategy type.
+ * Core strategies are cash-funded with leverage; overlay strategies use collateral.
+ * @param strategy - The strategy to analyze
+ * @returns The leverage ratio (borrowed amount / portfolio value) for long positions
+ * @example Core 145/45: 145% long - 100% cash = 45% borrowed = 0.45 leverage ratio
+ * @example Overlay 45/45: 45% overlay long = 0.45 leverage ratio
+ */
+export function getLongLeverageRatio(strategy: Strategy): number {
+  // Extract leverage from strategy name (e.g., "130-30" -> 130)
+  const match = strategy.name.match(/(\d+)\/\d+/);
+  if (!match) return 0;
+
+  const longPct = parseInt(match[1], 10);
+
+  if (strategy.type === 'core') {
+    // Core: Long positions funded by cash + margin
+    // 145/45 means 145% long with 100% cash, so 45% is borrowed
+    return Math.max(0, (longPct - 100) / 100);
+  } else {
+    // Overlay: Long positions are overlay on top of collateral
+    // 45/45 means 45% overlay long, all funded by margin against collateral
+    return longPct / 100;
+  }
+}
+
+/**
+ * Get the short position ratio based on strategy type.
+ * @param strategy - The strategy to analyze
+ * @returns The short position ratio (short notional / portfolio value)
+ * @example Core 145/45: 45% short = 0.45 ratio
+ * @example Overlay 45/45: 45% short = 0.45 ratio
+ */
+export function getShortRatio(strategy: Strategy): number {
+  // Extract short percentage from strategy name (e.g., "145-45" -> 45)
+  const match = strategy.name.match(/(\d+)\/(\d+)/);
+  if (!match) return 0;
+
+  const shortPct = parseInt(match[2], 10);
+  return shortPct / 100;
+}

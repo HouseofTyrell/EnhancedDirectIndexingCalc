@@ -11,11 +11,46 @@ import {
   QFAF_ST_GAIN_RATE,
   CAPITAL_LOSS_LIMITS,
   SECTION_461L_LIMITS,
+  getLongLeverageRatio,
+  getShortRatio,
+  Strategy,
 } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
 import { StrategyRates, TaxRates } from './types';
 import { getEffectiveStLossRate, calculateCarryforwards, calculateSummary } from './helpers';
 import { calculateSizing } from './sizing';
+
+/**
+ * Calculate the effective financing cost based on strategy leverage and user settings.
+ * In simple mode, uses the user-specified rate directly.
+ * In detailed mode, calculates cost from component rates and strategy leverage.
+ * @param strategy - The investment strategy (determines leverage ratios)
+ * @param settings - Advanced settings with financing cost configuration
+ * @returns Effective financing cost as a decimal (e.g., 0.025 = 2.5% of portfolio per year)
+ */
+function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSettings): number {
+  if (!settings.financingFeesEnabled) return 0;
+
+  if (settings.financingMode === 'simple') {
+    // Simple mode: use the single effective rate directly
+    return settings.simpleFinancingRate;
+  } else {
+    // Detailed mode: calculate from component rates
+    const longLeverage = getLongLeverageRatio(strategy);
+    const shortRatio = getShortRatio(strategy);
+
+    // Margin interest cost: broker rate × long leverage
+    const marginCost = settings.brokerMarginRate * longLeverage;
+
+    // Short position costs: (borrow fees + dividend payments) × short ratio
+    const shortCosts = (settings.shortBorrowRate + settings.shortDividendRate) * shortRatio;
+
+    // Wealth management advisory fee: applied to entire portfolio
+    const advisoryFee = settings.wealthManagementFeeRate;
+
+    return marginCost + shortCosts + advisoryFee;
+  }
+}
 
 export function calculate(
   inputs: CalculatorInputs,
@@ -76,7 +111,9 @@ export function calculate(
       inputs,
       strategy,
       taxRates,
-      settings
+      settings,
+      undefined, // yearIncome (not overridden)
+      strategy // Pass full strategy for financing cost calculation
     );
 
     years.push(result);
@@ -105,7 +142,8 @@ export function calculateYear(
   strategy: StrategyRates,
   taxRates: TaxRates,
   settings: AdvancedSettings,
-  yearIncome?: number // Optional income override for this year
+  yearIncome?: number, // Optional income override for this year
+  fullStrategy?: Strategy // Full strategy object for financing cost calculation
 ): YearResult {
   // Use year income override if provided, otherwise use base annual income
   const effectiveIncome = yearIncome ?? inputs.annualIncome;
@@ -221,8 +259,10 @@ export function calculateYear(
 
   // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
   const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
-  const totalFinancingCost = settings.financingFeesEnabled
-    ? (settings.custodianMarginFeeRate + settings.wealthManagementFeeRate)
+  // Use fullStrategy if provided, otherwise lookup by ID
+  const strategyForFinancing = fullStrategy || getStrategy(inputs.strategyId);
+  const totalFinancingCost = strategyForFinancing
+    ? getEffectiveFinancingCost(strategyForFinancing, settings)
     : 0;
   const growthRate = baseReturn - totalFinancingCost;
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)

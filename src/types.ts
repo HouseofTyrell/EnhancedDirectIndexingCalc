@@ -201,8 +201,17 @@ export interface AdvancedSettings {
   growthEnabled: boolean; // Default: false (no growth assumption)
   defaultAnnualReturn: number; // Default: 0.07 (7% when growth enabled)
   financingFeesEnabled: boolean; // Default: false (subtract financing costs from growth)
-  custodianMarginFeeRate: number; // Default: 0.01 (1% = 100 bps)
+  financingMode: 'simple' | 'detailed'; // Default: 'simple' (show single rate vs. component breakdown)
+
+  // Simple financing mode (single effective rate)
+  simpleFinancingRate: number; // Default: 0.025 (2.5% of portfolio, auto-calculated in detailed mode)
+
+  // Detailed financing mode (component rates)
+  brokerMarginRate: number; // Default: 0.0425 (4.25% charged on margin debit)
+  shortBorrowRate: number; // Default: 0.005 (0.5% stock borrow fees)
+  shortDividendRate: number; // Default: 0.015 (1.5% dividend payments on shorts)
   wealthManagementFeeRate: number; // Default: 0.0075 (0.75% = 75 bps)
+
   projectionYears: number; // Default: 10
 
   // Tax rate assumptions
@@ -225,8 +234,18 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
   growthEnabled: false,
   defaultAnnualReturn: 0.07,
   financingFeesEnabled: false,
-  custodianMarginFeeRate: 0.01, // 100 bps
-  wealthManagementFeeRate: 0.0075, // 75 bps
+  financingMode: 'simple',
+
+  // Simple mode default (calculated for default overlay-45-45 strategy)
+  // 4.25% × 45% + (0.5% + 1.5%) × 45% + 0.75% = 3.5625%
+  simpleFinancingRate: 0.035625, // 3.5625% of portfolio
+
+  // Detailed mode defaults
+  brokerMarginRate: 0.0425, // 4.25%
+  shortBorrowRate: 0.005, // 0.5%
+  shortDividendRate: 0.015, // 1.5%
+  wealthManagementFeeRate: 0.0075, // 0.75%
+
   projectionYears: 10,
   niitRate: 0.038,
   ltcgRate: 0.2,
