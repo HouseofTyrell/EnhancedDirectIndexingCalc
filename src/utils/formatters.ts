@@ -35,18 +35,21 @@ export const formatCurrency = (value: number): string => {
 
 /**
  * Format a number as currency, abbreviated for charts (K, M, B).
+ * Handles negative values correctly.
  */
 export const formatCurrencyAbbreviated = (value: number): string => {
-  if (value >= 1e9) {
-    return `$${(value / 1e9).toFixed(1)}B`;
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+  if (abs >= 1e9) {
+    return `${sign}$${(abs / 1e9).toFixed(1)}B`;
   }
-  if (value >= 1e6) {
-    return `$${(value / 1e6).toFixed(1)}M`;
+  if (abs >= 1e6) {
+    return `${sign}$${(abs / 1e6).toFixed(1)}M`;
   }
-  if (value >= 1e3) {
-    return `$${(value / 1e3).toFixed(0)}K`;
+  if (abs >= 1e3) {
+    return `${sign}$${(abs / 1e3).toFixed(0)}K`;
   }
-  return `$${value.toFixed(0)}`;
+  return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 };
 
 /**

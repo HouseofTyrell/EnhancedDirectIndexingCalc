@@ -139,12 +139,16 @@ function formatMetricValue(value: number, format: 'currency' | 'percent'): strin
 }
 
 function formatDelta(metric: ComparisonMetric): string {
-  const sign = metric.delta >= 0 ? '+' : '';
+  const sign = metric.delta > 0 ? '+' : metric.delta < 0 ? '-' : '';
+  const pctSign = metric.deltaPercent > 0 ? '+' : metric.deltaPercent < 0 ? '-' : '';
   if (metric.format === 'percent') {
-    return `${sign}${(metric.delta * 100).toFixed(2)}pp`;
+    return `${sign}${Math.abs(metric.delta * 100).toFixed(2)}pp`;
   }
-  const pctStr = metric.pinnedValue !== 0 ? ` (${sign}${(metric.deltaPercent * 100).toFixed(0)}%)` : '';
-  return `${sign}${formatCurrencyAbbreviated(metric.delta)}${pctStr}`;
+  const absDelta = Math.abs(metric.delta);
+  const pctStr = metric.pinnedValue !== 0
+    ? ` (${pctSign}${Math.abs(metric.deltaPercent * 100).toFixed(0)}%)`
+    : '';
+  return `${sign}${formatCurrencyAbbreviated(absDelta)}${pctStr}`;
 }
 
 function getDeltaClass(metric: ComparisonMetric): string {
