@@ -57,11 +57,15 @@ export function FloatingPinnedPanel({
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [itemHeights, setItemHeights] = useState<Record<string, number>>({});
   const [itemResizing, setItemResizing] = useState<string | null>(null);
+  const [itemOrder, setItemOrder] = useState<string[]>([]);
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const resizeStartRef = useRef<{ w: number; h: number; px: number; py: number } | null>(null);
   const itemResizeStartRef = useRef<{ id: string; h: number; py: number } | null>(null);
+  const itemDragStartRef = useRef<{ id: string; py: number } | null>(null);
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Resolve effective position/size
   const pos = layout
@@ -78,6 +82,25 @@ export function FloatingPinnedPanel({
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Sync itemOrder with elements (preserve existing order, append new, remove stale)
+  useEffect(() => {
+    const elementIds = new Set(elements.map(e => e.id));
+    setItemOrder(prev => {
+      const kept = prev.filter(id => elementIds.has(id));
+      const existing = new Set(kept);
+      const added = elements.filter(e => !existing.has(e.id)).map(e => e.id);
+      const merged = [...kept, ...added];
+      // Only update if actually changed
+      if (merged.length === prev.length && merged.every((id, i) => prev[i] === id)) return prev;
+      return merged;
+    });
+  }, [elements]);
+
+  // Derive ordered elements from itemOrder
+  const orderedElements = itemOrder.length > 0
+    ? itemOrder.map(id => elements.find(e => e.id === id)).filter((e): e is PinnedElement => !!e)
+    : elements;
 
   // --- Drag ---
   const handleDragStart = useCallback(
@@ -172,6 +195,51 @@ export function FloatingPinnedPanel({
     itemResizeStartRef.current = null;
   }, []);
 
+  // --- Item drag-to-reorder ---
+  const handleItemDragStart = useCallback(
+    (id: string, e: React.PointerEvent) => {
+      if (isMobile) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setDragItemId(id);
+      itemDragStartRef.current = { id, py: e.clientY };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [isMobile]
+  );
+
+  const handleItemDragMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragItemId || !itemDragStartRef.current) return;
+      // Find which item the pointer is over by checking item element midpoints
+      const pointerY = e.clientY;
+      let targetIdx = -1;
+      for (const [id, el] of itemRefs.current.entries()) {
+        if (id === dragItemId) continue;
+        const rect = el.getBoundingClientRect();
+        if (pointerY >= rect.top && pointerY <= rect.bottom) {
+          targetIdx = itemOrder.indexOf(id);
+          break;
+        }
+      }
+      if (targetIdx === -1) return;
+      const currentIdx = itemOrder.indexOf(dragItemId);
+      if (currentIdx === targetIdx) return;
+      setItemOrder(prev => {
+        const next = [...prev];
+        next.splice(currentIdx, 1);
+        next.splice(targetIdx, 0, dragItemId);
+        return next;
+      });
+    },
+    [dragItemId, itemOrder]
+  );
+
+  const handleItemDragEnd = useCallback(() => {
+    setDragItemId(null);
+    itemDragStartRef.current = null;
+  }, []);
+
   // Toggle collapse on individual item
   const toggleItemCollapse = useCallback((id: string) => {
     setCollapsedItems(prev => {
@@ -182,7 +250,17 @@ export function FloatingPinnedPanel({
     });
   }, []);
 
+  const collapseAll = useCallback(() => {
+    setCollapsedItems(new Set(elements.map(e => e.id)));
+  }, [elements]);
+
+  const expandAll = useCallback(() => {
+    setCollapsedItems(new Set());
+  }, []);
+
   if (elements.length === 0) return null;
+
+  const allCollapsed = elements.length > 0 && elements.every(e => collapsedItems.has(e.id));
 
   // Mobile: bottom sheet style
   const panelStyle: React.CSSProperties = isMobile
@@ -222,6 +300,26 @@ export function FloatingPinnedPanel({
           Pinned <span className="floating-panel__count">{elements.length}</span>
         </span>
         <div className="floating-panel__header-actions">
+          {!collapsed && elements.length > 1 && (
+            <button
+              className="floating-panel__collapse-toggle-btn"
+              onClick={allCollapsed ? expandAll : collapseAll}
+              title={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+              aria-label={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+            >
+              {allCollapsed ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="7 13 12 18 17 13" />
+                  <polyline points="7 6 12 11 17 6" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="17 11 12 6 7 11" />
+                  <polyline points="17 18 12 13 7 18" />
+                </svg>
+              )}
+            </button>
+          )}
           {!isMobile && (
             <button
               className="floating-panel__reset-btn"
@@ -254,10 +352,14 @@ export function FloatingPinnedPanel({
       {/* Body — items */}
       {!collapsed && (
         <div className="floating-panel__body">
-          {elements.map(el => {
+          {orderedElements.map(el => {
             const itemCollapsed = collapsedItems.has(el.id);
             return (
-              <div key={el.id} className={`floating-panel__item${itemCollapsed ? ' floating-panel__item--collapsed' : ''}`}>
+              <div
+                key={el.id}
+                ref={node => { if (node) itemRefs.current.set(el.id, node); else itemRefs.current.delete(el.id); }}
+                className={`floating-panel__item${itemCollapsed ? ' floating-panel__item--collapsed' : ''}${dragItemId === el.id ? ' floating-panel__item--dragging' : ''}`}
+              >
                 <div
                   className="floating-panel__item-header"
                   onClick={() => toggleItemCollapse(el.id)}
@@ -265,6 +367,20 @@ export function FloatingPinnedPanel({
                   tabIndex={0}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleItemCollapse(el.id); } }}
                 >
+                  {!isMobile && elements.length > 1 && (
+                    <span
+                      className="floating-panel__item-drag"
+                      onPointerDown={e => handleItemDragStart(el.id, e)}
+                      onPointerMove={handleItemDragMove}
+                      onPointerUp={handleItemDragEnd}
+                      onPointerCancel={handleItemDragEnd}
+                      onClick={e => e.stopPropagation()}
+                      aria-hidden="true"
+                      title="Drag to reorder"
+                    >
+                      ⋮
+                    </span>
+                  )}
                   <span className="floating-panel__item-chevron" aria-hidden="true">
                     {itemCollapsed ? '›' : '⌄'}
                   </span>

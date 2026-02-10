@@ -2728,6 +2728,7 @@ tfoot td {
   gap: 0.25rem;
 }
 
+.floating-panel__collapse-toggle-btn,
 .floating-panel__reset-btn,
 .floating-panel__close-all {
   display: flex;
@@ -2743,6 +2744,7 @@ tfoot td {
   cursor: pointer;
 }
 
+.floating-panel__collapse-toggle-btn:hover,
 .floating-panel__reset-btn:hover {
   color: var(--primary);
   border-color: var(--primary);
@@ -2805,6 +2807,32 @@ tfoot td {
 
 .floating-panel__item-header:hover {
   background: color-mix(in srgb, var(--bg) 85%, var(--primary));
+}
+
+.floating-panel__item--dragging {
+  opacity: 0.6;
+  border-color: var(--primary);
+}
+
+.floating-panel__item-drag {
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--text-light);
+  font-size: 0.7rem;
+  padding: 0 2px;
+  user-select: none;
+  touch-action: none;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+
+.floating-panel__item-drag:hover {
+  opacity: 1;
+  color: var(--primary);
+}
+
+.floating-panel__item-drag:active {
+  cursor: grabbing;
 }
 
 .floating-panel__item-chevron {
