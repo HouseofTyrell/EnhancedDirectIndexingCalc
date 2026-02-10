@@ -4402,6 +4402,14 @@ tfoot td {
     font-size: 0.72rem;
   }
 
+  /* State conformity tooltip - keep within viewport on mobile */
+  .conformity-indicator__tooltip {
+    right: auto;
+    left: 0;
+    width: calc(100vw - 6rem);
+    max-width: 280px;
+  }
+
   /* Section group labels */
   .section-group {
     margin-bottom: 1.5rem;
