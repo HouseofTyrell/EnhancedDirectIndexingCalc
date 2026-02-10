@@ -2629,7 +2629,7 @@ tfoot td {
    ============================ */
 .floating-panel {
   position: fixed;
-  z-index: 90;
+  z-index: 110; /* Above sticky header (z-index: 100) */
   display: flex;
   flex-direction: column;
   background: var(--card-bg);

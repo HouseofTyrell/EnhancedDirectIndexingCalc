@@ -17,7 +17,7 @@ interface FloatingPinnedPanelProps {
 }
 
 const DEFAULT_WIDTH = 480;
-const DEFAULT_HEIGHT = 560;
+const DEFAULT_HEIGHT = 640;
 const MIN_WIDTH = 280;
 const MIN_HEIGHT = 200;
 const MIN_ITEM_HEIGHT = 60;
@@ -190,8 +190,8 @@ export function FloatingPinnedPanel({
       if (!isResizing || !resizeStartRef.current) return;
       const dx = e.clientX - resizeStartRef.current.px;
       const dy = e.clientY - resizeStartRef.current.py;
-      const maxW = Math.round(window.innerWidth * 0.8);
-      const maxH = Math.round(window.innerHeight * 0.8);
+      const maxW = Math.round(window.innerWidth * 0.9);
+      const maxH = Math.round(window.innerHeight * 0.95);
       const newW = Math.max(MIN_WIDTH, Math.min(resizeStartRef.current.w + dx, maxW));
       const newH = Math.max(MIN_HEIGHT, Math.min(resizeStartRef.current.h + dy, maxH));
       onLayoutChange({ x: pos.x, y: pos.y, width: newW, height: newH });
