@@ -100,6 +100,216 @@ function detectInputChanges(
     });
   }
 
+  // --- CalculatorInputs: carryforwards, QFAF sizing, custom state rate ---
+
+  if (pinned.stateCode === 'OTHER' && current.stateCode === 'OTHER' && pinned.stateRate !== current.stateRate) {
+    changes.push({
+      label: 'Custom State Rate',
+      pinnedDisplay: formatPercent(pinned.stateRate),
+      currentDisplay: formatPercent(current.stateRate),
+    });
+  }
+
+  if (pinned.existingStLossCarryforward !== current.existingStLossCarryforward) {
+    changes.push({
+      label: 'ST Loss CF',
+      pinnedDisplay: formatCurrency(pinned.existingStLossCarryforward),
+      currentDisplay: formatCurrency(current.existingStLossCarryforward),
+    });
+  }
+
+  if (pinned.existingLtLossCarryforward !== current.existingLtLossCarryforward) {
+    changes.push({
+      label: 'LT Loss CF',
+      pinnedDisplay: formatCurrency(pinned.existingLtLossCarryforward),
+      currentDisplay: formatCurrency(current.existingLtLossCarryforward),
+    });
+  }
+
+  if (pinned.existingNolCarryforward !== current.existingNolCarryforward) {
+    changes.push({
+      label: 'NOL CF',
+      pinnedDisplay: formatCurrency(pinned.existingNolCarryforward),
+      currentDisplay: formatCurrency(current.existingNolCarryforward),
+    });
+  }
+
+  if ((pinned.qfafOverride ?? 0) !== (current.qfafOverride ?? 0)) {
+    changes.push({
+      label: 'QFAF Override',
+      pinnedDisplay: pinned.qfafOverride ? formatCurrency(pinned.qfafOverride) : 'Auto',
+      currentDisplay: current.qfafOverride ? formatCurrency(current.qfafOverride) : 'Auto',
+    });
+  }
+
+  if (pinned.qfafSizingYears !== current.qfafSizingYears) {
+    changes.push({
+      label: 'Sizing Window',
+      pinnedDisplay: `${pinned.qfafSizingYears} yr`,
+      currentDisplay: `${current.qfafSizingYears} yr`,
+    });
+  }
+
+  if (pinned.qfafSizingCushion !== current.qfafSizingCushion) {
+    changes.push({
+      label: 'Sizing Cushion',
+      pinnedDisplay: formatPercent(pinned.qfafSizingCushion),
+      currentDisplay: formatPercent(current.qfafSizingCushion),
+    });
+  }
+
+  // --- AdvancedSettings: QFAF mechanics ---
+
+  if (pinnedSettings.qfafMultiplier !== currentSettings.qfafMultiplier) {
+    changes.push({
+      label: 'QFAF Multiplier',
+      pinnedDisplay: `×${pinnedSettings.qfafMultiplier}`,
+      currentDisplay: `×${currentSettings.qfafMultiplier}`,
+    });
+  }
+
+  if (pinnedSettings.qfafGrowthEnabled !== currentSettings.qfafGrowthEnabled) {
+    changes.push({
+      label: 'QFAF Growth',
+      pinnedDisplay: pinnedSettings.qfafGrowthEnabled ? 'On' : 'Off',
+      currentDisplay: currentSettings.qfafGrowthEnabled ? 'On' : 'Off',
+    });
+  }
+
+  // --- AdvancedSettings: Section 461(l) limit (compare only active filing status) ---
+
+  const activeFs = current.filingStatus;
+  const pinnedLimit = pinnedSettings.section461Limits[activeFs];
+  const currentLimit = currentSettings.section461Limits[activeFs];
+  if (pinnedLimit !== currentLimit) {
+    changes.push({
+      label: '461(l) Limit',
+      pinnedDisplay: formatCurrency(pinnedLimit),
+      currentDisplay: formatCurrency(currentLimit),
+    });
+  }
+
+  // --- AdvancedSettings: NOL rules ---
+
+  if (pinnedSettings.nolOffsetLimit !== currentSettings.nolOffsetLimit) {
+    changes.push({
+      label: 'NOL Offset',
+      pinnedDisplay: formatPercent(pinnedSettings.nolOffsetLimit, 0),
+      currentDisplay: formatPercent(currentSettings.nolOffsetLimit, 0),
+    });
+  }
+
+  // --- AdvancedSettings: Growth assumptions ---
+
+  if (pinnedSettings.growthEnabled !== currentSettings.growthEnabled) {
+    changes.push({
+      label: 'Growth',
+      pinnedDisplay: pinnedSettings.growthEnabled ? 'On' : 'Off',
+      currentDisplay: currentSettings.growthEnabled ? 'On' : 'Off',
+    });
+  }
+
+  if (pinnedSettings.defaultAnnualReturn !== currentSettings.defaultAnnualReturn) {
+    changes.push({
+      label: 'Annual Return',
+      pinnedDisplay: formatPercent(pinnedSettings.defaultAnnualReturn),
+      currentDisplay: formatPercent(currentSettings.defaultAnnualReturn),
+    });
+  }
+
+  if (pinnedSettings.qfafAnnualReturn !== currentSettings.qfafAnnualReturn) {
+    const fmtQfafReturn = (v: number | null) => v === null ? '= Portfolio' : formatPercent(v);
+    changes.push({
+      label: 'QFAF Return',
+      pinnedDisplay: fmtQfafReturn(pinnedSettings.qfafAnnualReturn),
+      currentDisplay: fmtQfafReturn(currentSettings.qfafAnnualReturn),
+    });
+  }
+
+  // --- AdvancedSettings: Financing costs ---
+
+  if (pinnedSettings.financingFeesEnabled !== currentSettings.financingFeesEnabled) {
+    changes.push({
+      label: 'Financing Fees',
+      pinnedDisplay: pinnedSettings.financingFeesEnabled ? 'On' : 'Off',
+      currentDisplay: currentSettings.financingFeesEnabled ? 'On' : 'Off',
+    });
+  }
+
+  if (pinnedSettings.financingMode !== currentSettings.financingMode) {
+    changes.push({
+      label: 'Financing Mode',
+      pinnedDisplay: pinnedSettings.financingMode === 'simple' ? 'Simple' : 'Detailed',
+      currentDisplay: currentSettings.financingMode === 'simple' ? 'Simple' : 'Detailed',
+    });
+  }
+
+  if (pinnedSettings.simpleFinancingRate !== currentSettings.simpleFinancingRate) {
+    changes.push({
+      label: 'Financing Rate',
+      pinnedDisplay: formatPercent(pinnedSettings.simpleFinancingRate),
+      currentDisplay: formatPercent(currentSettings.simpleFinancingRate),
+    });
+  }
+
+  if (pinnedSettings.brokerMarginRate !== currentSettings.brokerMarginRate) {
+    changes.push({
+      label: 'Margin Rate',
+      pinnedDisplay: formatPercent(pinnedSettings.brokerMarginRate),
+      currentDisplay: formatPercent(currentSettings.brokerMarginRate),
+    });
+  }
+
+  if (pinnedSettings.shortBorrowRate !== currentSettings.shortBorrowRate) {
+    changes.push({
+      label: 'Borrow Rate',
+      pinnedDisplay: formatPercent(pinnedSettings.shortBorrowRate),
+      currentDisplay: formatPercent(currentSettings.shortBorrowRate),
+    });
+  }
+
+  if (pinnedSettings.shortDividendRate !== currentSettings.shortDividendRate) {
+    changes.push({
+      label: 'Div Cost',
+      pinnedDisplay: formatPercent(pinnedSettings.shortDividendRate),
+      currentDisplay: formatPercent(currentSettings.shortDividendRate),
+    });
+  }
+
+  if (pinnedSettings.wealthManagementFeeRate !== currentSettings.wealthManagementFeeRate) {
+    changes.push({
+      label: 'Advisory Fee',
+      pinnedDisplay: formatPercent(pinnedSettings.wealthManagementFeeRate),
+      currentDisplay: formatPercent(currentSettings.wealthManagementFeeRate),
+    });
+  }
+
+  // --- AdvancedSettings: Tax rate overrides ---
+
+  if (pinnedSettings.niitRate !== currentSettings.niitRate) {
+    changes.push({
+      label: 'NIIT Rate',
+      pinnedDisplay: formatPercent(pinnedSettings.niitRate),
+      currentDisplay: formatPercent(currentSettings.niitRate),
+    });
+  }
+
+  if (pinnedSettings.ltcgRate !== currentSettings.ltcgRate) {
+    changes.push({
+      label: 'LTCG Rate',
+      pinnedDisplay: formatPercent(pinnedSettings.ltcgRate),
+      currentDisplay: formatPercent(currentSettings.ltcgRate),
+    });
+  }
+
+  if (pinnedSettings.stcgRate !== currentSettings.stcgRate) {
+    changes.push({
+      label: 'STCG Rate',
+      pinnedDisplay: formatPercent(pinnedSettings.stcgRate),
+      currentDisplay: formatPercent(currentSettings.stcgRate),
+    });
+  }
+
   return changes;
 }
 

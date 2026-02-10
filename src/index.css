@@ -1339,6 +1339,11 @@ details[open] summary {
   gap: 1rem;
 }
 
+/* Pinnable sub-cards should span full width of the input grid */
+.input-grid > .pinnable-section {
+  grid-column: 1 / -1;
+}
+
 .input-group {
   display: flex;
   flex-direction: column;

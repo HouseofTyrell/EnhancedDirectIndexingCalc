@@ -35,7 +35,7 @@ export function StrategySelectionInputs({
   onRateVersionIncrement,
 }: StrategySelectionInputsProps) {
   return (
-    <div className="input-sub-card" style={{ gridColumn: '1 / -1' }}>
+    <div className="input-sub-card">
       <div className="input-sub-card__label">Strategy Selection</div>
       <div className="input-pair">
         <div className="input-group">

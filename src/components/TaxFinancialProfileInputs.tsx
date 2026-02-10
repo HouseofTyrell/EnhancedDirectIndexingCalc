@@ -17,7 +17,7 @@ export function TaxFinancialProfileInputs({
   onUpdateInput,
 }: TaxFinancialProfileInputsProps) {
   return (
-    <div className="input-sub-card" style={{ gridColumn: '1 / -1' }}>
+    <div className="input-sub-card">
       <div className="input-sub-card__label">Tax &amp; Financial Profile</div>
       <div className="input-triple">
         <div className="input-group">
