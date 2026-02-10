@@ -328,6 +328,7 @@ export function Calculator() {
       >
         <div className="input-grid">
           {/* Sub-card: Strategy Selection */}
+          <PinnableSection id="strategy" label="Strategy Selection" isPinned={pinnedElements.isPinned('strategy')} onTogglePin={() => pinnedElements.togglePin('strategy')}>
           <StrategySelectionInputs
             inputs={inputs}
             advancedSettings={advancedSettings}
@@ -340,13 +341,16 @@ export function Calculator() {
             onSetRateEditorOpen={setIsRateEditorOpen}
             onRateVersionIncrement={() => setRateVersion(v => v + 1)}
           />
+          </PinnableSection>
 
           {/* Sub-card: Tax & Financial Profile */}
+          <PinnableSection id="tax-profile" label="Tax & Financial Profile" isPinned={pinnedElements.isPinned('tax-profile')} onTogglePin={() => pinnedElements.togglePin('tax-profile')}>
           <TaxFinancialProfileInputs
             inputs={inputs}
             validationWarnings={validationWarnings}
             onUpdateInput={updateInput}
           />
+          </PinnableSection>
         </div>
 
         {/* Advanced Options */}
@@ -387,6 +391,7 @@ export function Calculator() {
         <div className="section-group__label">Key Assumptions</div>
 
       {/* Marginal Tax Rates - Step 2: Tax Rate Analysis */}
+      <PinnableSection id="tax-rates" label="Tax Rates" isPinned={pinnedElements.isPinned('tax-rates')} onTogglePin={() => pinnedElements.togglePin('tax-rates')}>
       <TaxRatesDisplay
         federalStRate={federalStRate}
         federalLtRate={federalLtRate}
@@ -395,6 +400,7 @@ export function Calculator() {
         combinedLtRate={combinedLtRate}
         rateDifferential={rateDifferential}
       />
+      </PinnableSection>
 
       {/* Strategy Sizing - Step 3: Optimized Strategy */}
       <PinnableSection id="sizing" label="Strategy Sizing" isPinned={pinnedElements.isPinned('sizing')} onTogglePin={() => pinnedElements.togglePin('sizing')}>
@@ -558,6 +564,49 @@ export function Calculator() {
       {/* Floating panel for pinned UI elements */}
       <FloatingPinnedPanel
         elements={[
+          ...(pinnedElements.isPinned('strategy') ? [{
+            id: 'strategy',
+            label: 'Strategy Selection',
+            content: (
+              <StrategySelectionInputs
+                inputs={inputs}
+                advancedSettings={advancedSettings}
+                results={results}
+                currentStrategy={currentStrategy}
+                validationWarnings={validationWarnings}
+                isRateEditorOpen={false}
+                onUpdateInput={updateInput}
+                onUpdateSettings={setAdvancedSettings}
+                onSetRateEditorOpen={setIsRateEditorOpen}
+                onRateVersionIncrement={() => setRateVersion(v => v + 1)}
+              />
+            ),
+          }] : []),
+          ...(pinnedElements.isPinned('tax-profile') ? [{
+            id: 'tax-profile',
+            label: 'Tax & Financial Profile',
+            content: (
+              <TaxFinancialProfileInputs
+                inputs={inputs}
+                validationWarnings={validationWarnings}
+                onUpdateInput={updateInput}
+              />
+            ),
+          }] : []),
+          ...(pinnedElements.isPinned('tax-rates') ? [{
+            id: 'tax-rates',
+            label: 'Tax Rates',
+            content: (
+              <TaxRatesDisplay
+                federalStRate={federalStRate}
+                federalLtRate={federalLtRate}
+                stateRate={stateRate}
+                combinedStRate={combinedStRate}
+                combinedLtRate={combinedLtRate}
+                rateDifferential={rateDifferential}
+              />
+            ),
+          }] : []),
           ...(pinnedElements.isPinned('results') ? [{
             id: 'results',
             label: 'Results Summary',
@@ -606,6 +655,9 @@ export function Calculator() {
         ]}
         onUnpin={pinnedElements.unpin}
         onUnpinAll={pinnedElements.unpinAll}
+        layout={pinnedElements.panelLayout}
+        onLayoutChange={pinnedElements.updatePanelLayout}
+        onLayoutReset={pinnedElements.resetPanelLayout}
       />
     </div>
   );

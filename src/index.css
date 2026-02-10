@@ -2557,16 +2557,33 @@ tfoot td {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  gap: 0.25rem;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--card-bg);
   color: var(--text-light);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, width 0.15s ease;
+}
+
+.pinnable-section__tooltip {
+  display: none;
+  font-size: 0.6rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pinnable-section__btn:hover .pinnable-section__tooltip {
+  display: inline;
+}
+
+.pinnable-section__btn:hover {
+  width: auto;
+  padding: 0 0.5rem;
 }
 
 .pinnable-section:hover .pinnable-section__btn,
@@ -2591,41 +2608,72 @@ tfoot td {
   border-color: var(--negative);
 }
 
+/* Mobile: always show pin button at reduced opacity */
+@media (max-width: 768px) {
+  .pinnable-section__btn {
+    opacity: 0.5;
+  }
+  .pinnable-section:hover .pinnable-section__btn,
+  .pinnable-section__btn--active {
+    opacity: 1;
+  }
+}
+
 /* ============================
    FLOATING PINNED PANEL
    ============================ */
 .floating-panel {
   position: fixed;
-  bottom: 1rem;
-  right: 1rem;
   z-index: 90;
-  width: 420px;
-  max-height: 70vh;
   display: flex;
   flex-direction: column;
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
 .floating-panel--collapsed {
-  max-height: none;
+  height: auto !important;
 }
 
+.floating-panel--dragging {
+  user-select: none;
+  transition: none;
+}
+
+[data-theme='dark'] .floating-panel {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* --- Header (drag handle) --- */
 .floating-panel__header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  gap: 0.375rem;
+  padding: 0.625rem 0.75rem;
   background: var(--gradient-blue);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.floating-panel--dragging .floating-panel__header {
+  cursor: grabbing;
 }
 
 [data-theme='dark'] .floating-panel__header {
   background: rgba(59, 130, 246, 0.12);
+}
+
+.floating-panel__drag-dots {
+  font-size: 0.7rem;
+  color: var(--text-light);
+  opacity: 0.5;
+  letter-spacing: -1px;
+  line-height: 1;
 }
 
 .floating-panel__toggle {
@@ -2654,14 +2702,45 @@ tfoot td {
   flex: 1;
 }
 
+.floating-panel__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 9px;
+  background: var(--primary);
+  color: white;
+}
+
+.floating-panel__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.floating-panel__reset-btn,
 .floating-panel__close-all {
-  padding: 0.125rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 5px;
   background: transparent;
-  font-size: 0.65rem;
   color: var(--text-light);
   cursor: pointer;
+}
+
+.floating-panel__reset-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .floating-panel__close-all:hover {
@@ -2669,49 +2748,90 @@ tfoot td {
   border-color: var(--negative);
 }
 
+/* --- Body --- */
 .floating-panel__body {
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
 }
 
+/* Scroll fade indicators */
+.floating-panel__body {
+  mask-image: linear-gradient(to bottom, transparent 0, black 6px, black calc(100% - 6px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 6px, black calc(100% - 6px), transparent 100%);
+}
+
+/* --- Items --- */
 .floating-panel__item {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
+  border-left: 3px solid transparent;
+  transition: border-left-color 0.15s ease;
+}
+
+.floating-panel__item:focus-within {
+  border-left-color: var(--primary);
+}
+
+.floating-panel__item--collapsed {
+  border-left-color: transparent;
 }
 
 .floating-panel__item-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.25rem 0.5rem;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.floating-panel__item--collapsed .floating-panel__item-header {
+  border-bottom: none;
+}
+
+.floating-panel__item-header:hover {
+  background: color-mix(in srgb, var(--bg) 85%, var(--primary));
+}
+
+.floating-panel__item-chevron {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .floating-panel__item-label {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--text);
+  flex: 1;
 }
 
 .floating-panel__item-close {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
-  border-radius: 3px;
+  border-radius: 4px;
   background: transparent;
   color: var(--text-light);
-  font-size: 0.9rem;
+  font-size: 1rem;
   cursor: pointer;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .floating-panel__item-close:hover {
@@ -2720,13 +2840,51 @@ tfoot td {
 }
 
 .floating-panel__item-content {
-  padding: 0.5rem;
+  padding: 0.625rem;
   font-size: 0.8rem;
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-/* Compact overrides for elements inside floating panel */
+/* --- Resize handle --- */
+.floating-panel__resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  touch-action: none;
+}
+
+.floating-panel:hover .floating-panel__resize-handle {
+  opacity: 1;
+}
+
+.floating-panel__resize-handle::before {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-light);
+  border-bottom: 2px solid var(--text-light);
+  opacity: 0.4;
+}
+
+[data-theme='dark'] .floating-panel__resize-handle::before {
+  opacity: 0.3;
+}
+
+/* ============================
+   FLOATING PANEL: COMPACT OVERRIDES
+   ============================ */
+
+/* --- Results/Sizing compact --- */
 .floating-panel__item-content .headline-metrics {
   gap: 0.5rem;
 }
@@ -2741,6 +2899,7 @@ tfoot td {
 
 .floating-panel__item-content .summary-cards {
   gap: 0.5rem;
+  grid-template-columns: 1fr 1fr;
 }
 
 .floating-panel__item-content .card {
@@ -2771,7 +2930,8 @@ tfoot td {
 
 /* Charts in floating panel get reduced height */
 .floating-panel__item-content .recharts-responsive-container {
-  height: 180px !important;
+  height: 150px !important;
+  min-height: 150px;
 }
 
 /* Actions (print/export) hidden in floating panel */
@@ -2784,13 +2944,93 @@ tfoot td {
   font-size: 0.7rem;
 }
 
-/* Mobile: full-width bottom panel */
+/* --- Input section compact overrides --- */
+.floating-panel__item-content .input-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.floating-panel__item-content .sub-card-header,
+.floating-panel__item-content .input-guidance {
+  display: none;
+}
+
+.floating-panel__item-content label {
+  font-size: 0.7rem;
+}
+
+.floating-panel__item-content input,
+.floating-panel__item-content select {
+  padding: 0.25rem 0.375rem;
+  font-size: 0.75rem;
+}
+
+.floating-panel__item-content .info-popup-trigger,
+.floating-panel__item-content .info-popup {
+  display: none;
+}
+
+.floating-panel__item-content .reset-defaults-row,
+.floating-panel__item-content .reset-defaults-btn {
+  display: none;
+}
+
+.floating-panel__item-content .financing-detail-toggle,
+.floating-panel__item-content .financing-breakdown {
+  display: none;
+}
+
+.floating-panel__item-content .strategy-rates-info {
+  display: none;
+}
+
+/* Tax rates compact: single column cards */
+.floating-panel__item-content .tax-rates-grid {
+  grid-template-columns: 1fr;
+  gap: 0.375rem;
+}
+
+.floating-panel__item-content .tax-rate-card {
+  padding: 0.375rem 0.5rem;
+}
+
+/* Pinnable section buttons hidden inside floating panel */
+.floating-panel__item-content .pinnable-section__btn {
+  display: none;
+}
+
+/* ============================
+   FLOATING PANEL: MOBILE BOTTOM SHEET
+   ============================ */
+.floating-panel--mobile {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  top: auto;
+  transform: none !important;
+  width: 100% !important;
+  max-height: 55vh;
+  border-radius: 16px 16px 0 0;
+  border-bottom: none;
+}
+
+.floating-panel--mobile .floating-panel__header {
+  cursor: default;
+  padding: 0.75rem 1rem;
+}
+
+.floating-panel--mobile .floating-panel__toggle,
+.floating-panel--mobile .floating-panel__close-all,
+.floating-panel--mobile .floating-panel__item-close {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 @media (max-width: 768px) {
-  .floating-panel {
-    width: calc(100% - 1rem);
-    right: 0.5rem;
-    bottom: 0.5rem;
-    max-height: 50vh;
+  .floating-panel__drag-dots {
+    display: none;
   }
 }
 

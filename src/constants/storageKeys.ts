@@ -17,4 +17,6 @@ export const STORAGE_KEYS = {
   PINNED_SCENARIO: 'taxCalc:pinned-scenario',
   /** Pinned UI elements for floating panel */
   PINNED_ELEMENTS: 'taxCalc:pinned-elements',
+  /** Floating panel position and size */
+  PINNED_PANEL_LAYOUT: 'taxCalc:pinned-panel-layout',
 } as const;
