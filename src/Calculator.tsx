@@ -1,13 +1,5 @@
-import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { calculate, calculateWithOverrides, calculateWithSensitivity } from './calculations';
-
-// Lazy load chart components to reduce initial bundle size (~400KB savings)
-const TaxSavingsChart = lazy(() =>
-  import('./WealthChart').then(m => ({ default: m.TaxSavingsChart }))
-);
-const PortfolioValueChart = lazy(() =>
-  import('./WealthChart').then(m => ({ default: m.PortfolioValueChart }))
-);
 import { ResultsTable } from './ResultsTable';
 import { DEFAULTS, STATES, getFederalStRate, getFederalLtRate, getStateRate, getStateConformityWarning } from './taxData';
 import { STRATEGIES, getStrategy, getLongLeverageRatio, getShortRatio } from './strategyData';
@@ -36,6 +28,12 @@ import { QualifiedPurchaserModal } from './components/QualifiedPurchaserModal';
 import { SizingSummary } from './components/SizingSummary';
 import { DisclaimerFooter } from './components/DisclaimerFooter';
 import { OnboardingTour } from './components/OnboardingTour';
+import { AdvancedOptionsPanel } from './components/AdvancedOptionsPanel';
+import { ResultsChartsSection } from './components/ResultsChartsSection';
+import { TaxFinancialProfileInputs } from './components/TaxFinancialProfileInputs';
+import { StrategySelectionInputs } from './components/StrategySelectionInputs';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { CollapsibleSection } from './AdvancedMode/CollapsibleSection';
 import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
 import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
@@ -66,9 +64,6 @@ export function Calculator() {
   const { isExpanded } = useScrollHeader('scroll-sentinel');
   const qualifiedPurchaser = useQualifiedPurchaser();
 
-  // Advanced options inline toggle (always collapsed on page load)
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-
   // Year-by-Year Planning state
   const [yearOverrides, setYearOverrides] = useState<YearOverride[]>(() =>
     generateDefaultOverrides(DEFAULTS.annualIncome)
@@ -92,6 +87,21 @@ export function Calculator() {
 
   // Rate version - increments when custom rates are saved to trigger recalculation
   const [rateVersion, setRateVersion] = useState(0);
+
+  // Keyboard shortcuts help modal state
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+
+  // Handlers for keyboard shortcuts (will be set by ResultsChartsSection)
+  const [printHandler, setPrintHandler] = useState<(() => void) | null>(null);
+  const [exportHandler, setExportHandler] = useState<(() => void) | null>(null);
+
+  // Setup keyboard shortcuts
+  useKeyboardShortcuts({
+    onPrint: printHandler || undefined,
+    onExport: exportHandler || undefined,
+    onShowHelp: () => setShowKeyboardHelp(true),
+    onEscape: () => setShowKeyboardHelp(false),
+  });
 
   // Check if any year overrides differ from defaults
   const hasActiveOverrides = useMemo(
@@ -273,687 +283,35 @@ export function Calculator() {
         </p>
         <div className="input-grid">
           {/* Sub-card: Strategy Selection */}
-          <div className="input-sub-card" style={{ gridColumn: '1 / -1' }}>
-          <div className="input-sub-card__label">Strategy Selection</div>
-          <div className="input-pair">
-            <div className="input-group">
-              <label htmlFor="strategy">Collateral Strategy</label>
-              <select
-                id="strategy"
-                value={inputs.strategyId}
-                onChange={e => updateInput('strategyId', e.target.value)}
-              >
-                <optgroup label="Core (Cash Funded)">
-                  {STRATEGIES.filter(s => s.type === 'core').map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Overlay (Appreciated Stock)">
-                  {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-              <span className="input-hint">
-                {currentStrategy?.type === 'core'
-                  ? 'Cash invested in direct indexing'
-                  : 'Existing appreciated stock used as collateral'}
-              </span>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="collateral">Collateral Amount</label>
-              <div className={`input-with-prefix ${validationWarnings.collateral ? 'input-warning' : ''}`}>
-                <span className="prefix">$</span>
-                <input
-                  id="collateral"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatWithCommas(inputs.collateralAmount)}
-                  onChange={e =>
-                    updateInput('collateralAmount', parseFormattedNumber(e.target.value))
-                  }
-                />
-              </div>
-              {validationWarnings.collateral && (
-                <span className="input-warning-text">{validationWarnings.collateral}</span>
-              )}
-            </div>
-          </div>
-
-          {/* Strategy Rate Info - shows Year 1 effective rates (includes custom overrides) */}
-          {currentStrategy && results.years[0] && (
-            <div className="strategy-rates-info">
-              <div className="strategy-rate">
-                <span className="rate-label">ST Loss Rate (Y1):</span>
-                <span className="rate-value positive">
-                  {formatPercent(results.years[0].effectiveStLossRate)}
-                </span>
-              </div>
-              <div className="strategy-rate">
-                <span className="rate-label">LT Gain Rate:</span>
-                <span className="rate-value negative">
-                  {formatPercent(currentStrategy.ltGainRate)}
-                </span>
-              </div>
-              <div className="strategy-rate">
-                <span className="rate-label">Net Capital Loss (Y1):</span>
-                <span className="rate-value highlight">
-                  {formatPercent(results.years[0].effectiveStLossRate - currentStrategy.ltGainRate)}
-                </span>
-              </div>
-              <button className="rate-editor-trigger" onClick={() => setIsRateEditorOpen(true)}>
-                Edit Rates by Year
-              </button>
-            </div>
-          )}
-
-          {/* Strategy Rate Editor Modal */}
-          <StrategyRateEditor
-            isOpen={isRateEditorOpen}
-            onClose={() => setIsRateEditorOpen(false)}
-            onRatesChanged={() => setRateVersion(v => v + 1)}
+          <StrategySelectionInputs
+            inputs={inputs}
+            advancedSettings={advancedSettings}
+            results={results}
+            currentStrategy={currentStrategy}
+            validationWarnings={validationWarnings}
+            isRateEditorOpen={isRateEditorOpen}
+            onUpdateInput={updateInput}
+            onUpdateSettings={setAdvancedSettings}
+            onSetRateEditorOpen={setIsRateEditorOpen}
+            onRateVersionIncrement={() => setRateVersion(v => v + 1)}
           />
 
-          {/* Toggle Row: QFAF + Portfolio Growth + Financing Fees */}
-          <div className="input-group toggle-group toggle-row">
-            <div className="toggle-row-item">
-              <label className="toggle-label">
-                <input
-                  type="checkbox"
-                  checked={inputs.qfafEnabled}
-                  onChange={e => updateInput('qfafEnabled', e.target.checked)}
-                />
-                <span className="toggle-switch"></span>
-                QFAF Overlay
-              </label>
-              <span className="input-hint">
-                {inputs.qfafEnabled
-                  ? 'ST gains + ordinary losses'
-                  : 'Collateral-only'}
-              </span>
-            </div>
-
-            <div className="toggle-row-item">
-              {advancedSettings.growthEnabled ? (
-                <>
-                  <label className="toggle-label toggle-label-slider">
-                    <input
-                      type="checkbox"
-                      checked={true}
-                      onChange={() =>
-                        setAdvancedSettings(s => ({ ...s, growthEnabled: false }))
-                      }
-                    />
-                    <span className="toggle-switch"></span>
-                    Growth: {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%
-                  </label>
-                  <input
-                    id="annualReturnInline"
-                    type="range"
-                    className="inline-slider"
-                    min={-0.20}
-                    max={0.30}
-                    step={0.005}
-                    value={advancedSettings.defaultAnnualReturn}
-                    onChange={e => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val)) {
-                        setAdvancedSettings(s => ({ ...s, defaultAnnualReturn: val }));
-                      }
-                    }}
-                  />
-                </>
-              ) : (
-                <>
-                  <label className="toggle-label">
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={() =>
-                        setAdvancedSettings(s => ({ ...s, growthEnabled: true }))
-                      }
-                    />
-                    <span className="toggle-switch"></span>
-                    Portfolio Growth
-                  </label>
-                  <span className="input-hint">No growth (0%)</span>
-                </>
-              )}
-            </div>
-
-            <div className="toggle-row-item">
-              <label className="toggle-label">
-                <input
-                  type="checkbox"
-                  checked={advancedSettings.financingFeesEnabled}
-                  onChange={e =>
-                    setAdvancedSettings(s => ({ ...s, financingFeesEnabled: e.target.checked }))
-                  }
-                />
-                <span className="toggle-switch"></span>
-                Financing Fees
-              </label>
-              {advancedSettings.financingFeesEnabled ? (
-                <div className="fee-inputs">
-                  {advancedSettings.financingMode === 'simple' ? (
-                    // Simple mode: single effective rate
-                    <div className="fee-input-group simple-financing">
-                      <label htmlFor="simpleFinancing">Effective Rate</label>
-                      <div className="input-with-suffix">
-                        <input
-                          id="simpleFinancing"
-                          type="number"
-                          step={0.25}
-                          min={0}
-                          max={15}
-                          value={(advancedSettings.simpleFinancingRate * 100).toFixed(2)}
-                          onChange={e => {
-                            const val = parseFloat(e.target.value) / 100;
-                            if (!isNaN(val)) {
-                              setAdvancedSettings(s => ({ ...s, simpleFinancingRate: val }));
-                            }
-                          }}
-                        />
-                        <span className="suffix">% of portfolio</span>
-                      </div>
-                      {inputs.collateralAmount > 0 && (
-                        <span className="input-hint">
-                          ${((advancedSettings.simpleFinancingRate * inputs.collateralAmount) / 1000).toFixed(0)}K per year on ${(inputs.collateralAmount / 1000000).toFixed(1)}M portfolio
-                        </span>
-                      )}
-                      {(() => {
-                        const strategy = getStrategy(inputs.strategyId);
-                        if (!strategy) return null;
-                        const longLeverage = getLongLeverageRatio(strategy);
-                        const shortRatio = getShortRatio(strategy);
-                        const marginCost = advancedSettings.brokerMarginRate * longLeverage;
-                        const borrowCost = advancedSettings.shortBorrowRate * shortRatio;
-                        const dividendCost = advancedSettings.shortDividendRate * shortRatio;
-                        const calculatedRate = marginCost + borrowCost + dividendCost + advancedSettings.wealthManagementFeeRate;
-                        return (
-                          <div className="simple-mode-explanation">
-                            <div className="explanation-header">Based on {strategy.name}:</div>
-                            <div className="explanation-items">
-                              <div>• Margin interest ({(advancedSettings.brokerMarginRate * 100).toFixed(2)}% × {(longLeverage * 100).toFixed(0)}%): {(marginCost * 100).toFixed(2)}%</div>
-                              <div>• Stock borrow ({(advancedSettings.shortBorrowRate * 100).toFixed(2)}% × {(shortRatio * 100).toFixed(0)}%): {(borrowCost * 100).toFixed(2)}%</div>
-                              <div>• Dividends on shorts ({(advancedSettings.shortDividendRate * 100).toFixed(2)}% × {(shortRatio * 100).toFixed(0)}%): {(dividendCost * 100).toFixed(2)}%</div>
-                              <div>• Wealth management: {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}%</div>
-                              {Math.abs(calculatedRate - advancedSettings.simpleFinancingRate) > 0.0001 && (
-                                <div className="rate-mismatch">
-                                  ⚠️ Input ({(advancedSettings.simpleFinancingRate * 100).toFixed(2)}%) differs from calculated ({(calculatedRate * 100).toFixed(2)}%)
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      <button
-                        type="button"
-                        className="customize-btn"
-                        onClick={() => setAdvancedSettings(s => ({ ...s, financingMode: 'detailed' }))}
-                      >
-                        Customize components →
-                      </button>
-                    </div>
-                  ) : (
-                    // Detailed mode: component breakdown
-                    <>
-                      <div className="financing-detailed-header">
-                        <h4>Component Breakdown</h4>
-                        <button
-                          type="button"
-                          className="simplify-btn"
-                          onClick={() => {
-                            // Calculate current effective rate before switching modes
-                            const strategy = getStrategy(inputs.strategyId);
-                            if (strategy) {
-                              const longLeverage = getLongLeverageRatio(strategy);
-                              const shortRatio = getShortRatio(strategy);
-                              const effectiveRate =
-                                advancedSettings.brokerMarginRate * longLeverage +
-                                (advancedSettings.shortBorrowRate + advancedSettings.shortDividendRate) * shortRatio +
-                                advancedSettings.wealthManagementFeeRate;
-                              setAdvancedSettings(s => ({
-                                ...s,
-                                financingMode: 'simple',
-                                simpleFinancingRate: effectiveRate
-                              }));
-                            }
-                          }}
-                        >
-                          ← Use simple mode
-                        </button>
-                      </div>
-                      {(() => {
-                        const strategy = getStrategy(inputs.strategyId);
-                        const longLeverage = strategy ? getLongLeverageRatio(strategy) : 0;
-                        const shortRatio = strategy ? getShortRatio(strategy) : 0;
-                        const marginCost = advancedSettings.brokerMarginRate * longLeverage;
-                        const borrowCost = advancedSettings.shortBorrowRate * shortRatio;
-                        const dividendCost = advancedSettings.shortDividendRate * shortRatio;
-
-                        return (
-                          <>
-                            <div className="fee-input-group">
-                              <label htmlFor="brokerMargin">
-                                Broker Margin Rate
-                                {strategy && (
-                                  <span className="effective-cost"> → {(marginCost * 100).toFixed(2)}% of portfolio</span>
-                                )}
-                              </label>
-                              <div className="input-with-suffix">
-                                <input
-                                  id="brokerMargin"
-                                  type="number"
-                                  step={0.25}
-                                  min={0}
-                                  max={20}
-                                  value={(advancedSettings.brokerMarginRate * 100).toFixed(2)}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) / 100;
-                                    if (!isNaN(val)) {
-                                      setAdvancedSettings(s => ({ ...s, brokerMarginRate: val }));
-                                    }
-                                  }}
-                                />
-                                <span className="suffix">%</span>
-                              </div>
-                              <span className="input-hint">
-                                Applied to {strategy ? `${(longLeverage * 100).toFixed(0)}%` : '—'} long leverage
-                                {strategy && ` (${(advancedSettings.brokerMarginRate * 100).toFixed(2)}% × ${(longLeverage * 100).toFixed(0)}% = ${(marginCost * 100).toFixed(2)}%)`}
-                              </span>
-                            </div>
-                            <div className="fee-input-group">
-                              <label htmlFor="shortBorrow">
-                                Short Borrow Fee
-                                {strategy && (
-                                  <span className="effective-cost"> → {(borrowCost * 100).toFixed(2)}% of portfolio</span>
-                                )}
-                              </label>
-                              <div className="input-with-suffix">
-                                <input
-                                  id="shortBorrow"
-                                  type="number"
-                                  step={0.1}
-                                  min={0}
-                                  max={10}
-                                  value={(advancedSettings.shortBorrowRate * 100).toFixed(2)}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) / 100;
-                                    if (!isNaN(val)) {
-                                      setAdvancedSettings(s => ({ ...s, shortBorrowRate: val }));
-                                    }
-                                  }}
-                                />
-                                <span className="suffix">%</span>
-                              </div>
-                              <span className="input-hint">
-                                Applied to {strategy ? `${(shortRatio * 100).toFixed(0)}%` : '—'} short positions
-                                {strategy && ` (${(advancedSettings.shortBorrowRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(borrowCost * 100).toFixed(2)}%)`}
-                              </span>
-                            </div>
-                            <div className="fee-input-group">
-                              <label htmlFor="shortDividend">
-                                Short Dividend Cost
-                                {strategy && (
-                                  <span className="effective-cost"> → {(dividendCost * 100).toFixed(2)}% of portfolio</span>
-                                )}
-                              </label>
-                              <div className="input-with-suffix">
-                                <input
-                                  id="shortDividend"
-                                  type="number"
-                                  step={0.1}
-                                  min={0}
-                                  max={5}
-                                  value={(advancedSettings.shortDividendRate * 100).toFixed(2)}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) / 100;
-                                    if (!isNaN(val)) {
-                                      setAdvancedSettings(s => ({ ...s, shortDividendRate: val }));
-                                    }
-                                  }}
-                                />
-                                <span className="suffix">%</span>
-                              </div>
-                              <span className="input-hint">
-                                Applied to {strategy ? `${(shortRatio * 100).toFixed(0)}%` : '—'} short positions
-                                {strategy && ` (${(advancedSettings.shortDividendRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(dividendCost * 100).toFixed(2)}%)`}
-                              </span>
-                            </div>
-                            <div className="fee-input-group">
-                              <label htmlFor="wealthMgmtFee">
-                                Wealth Management Fee
-                                {strategy && (
-                                  <span className="effective-cost"> → {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}% of portfolio</span>
-                                )}
-                              </label>
-                              <div className="input-with-suffix">
-                                <input
-                                  id="wealthMgmtFee"
-                                  type="number"
-                                  step={0.05}
-                                  min={0}
-                                  max={3}
-                                  value={(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) / 100;
-                                    if (!isNaN(val)) {
-                                      setAdvancedSettings(s => ({ ...s, wealthManagementFeeRate: val }));
-                                    }
-                                  }}
-                                />
-                                <span className="suffix">%</span>
-                              </div>
-                              <span className="input-hint">Applied to 100% of portfolio (no leverage multiplier)</span>
-                            </div>
-                          </>
-                        );
-                      })()}
-                      {(() => {
-                        const strategy = getStrategy(inputs.strategyId);
-                        if (!strategy) return null;
-                        const longLeverage = getLongLeverageRatio(strategy);
-                        const shortRatio = getShortRatio(strategy);
-                        const marginCost = advancedSettings.brokerMarginRate * longLeverage;
-                        const borrowCost = advancedSettings.shortBorrowRate * shortRatio;
-                        const dividendCost = advancedSettings.shortDividendRate * shortRatio;
-                        const totalEffective = marginCost + borrowCost + dividendCost + advancedSettings.wealthManagementFeeRate;
-                        const showDollars = inputs.collateralAmount > 0;
-                        return (
-                          <div className="financing-summary">
-                            <strong>Total Effective Cost for {strategy.name}:</strong>
-                            <div className="financing-breakdown">
-                              <div>
-                                Margin interest: {(marginCost * 100).toFixed(2)}%
-                                {showDollars && (
-                                  <span className="cost-dollars"> (${((marginCost * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>
-                                )}
-                              </div>
-                              <div>
-                                Stock borrow: {(borrowCost * 100).toFixed(2)}%
-                                {showDollars && (
-                                  <span className="cost-dollars"> (${((borrowCost * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>
-                                )}
-                              </div>
-                              <div>
-                                Short dividends: {(dividendCost * 100).toFixed(2)}%
-                                {showDollars && (
-                                  <span className="cost-dollars"> (${((dividendCost * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>
-                                )}
-                              </div>
-                              <div>
-                                Advisory fee: {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}%
-                                {showDollars && (
-                                  <span className="cost-dollars"> (${((advancedSettings.wealthManagementFeeRate * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>
-                                )}
-                              </div>
-                              <div className="financing-total">
-                                <strong>Total: {(totalEffective * 100).toFixed(2)}% of portfolio</strong>
-                                {showDollars && (
-                                  <strong className="cost-dollars"> (${((totalEffective * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</strong>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </>
-                  )}
-                </div>
-              ) : (
-                <span className="input-hint">No fees</span>
-              )}
-            </div>
-          </div>
-
-          {/* QFAF Sizing Window + Cushion (shown when QFAF enabled) */}
-          {inputs.qfafEnabled && (
-            <>
-              <div className="input-group">
-                <label htmlFor="sizingYears">
-                  QFAF Sizing Window: {inputs.qfafSizingYears === 1 ? 'Year 1 only' : `Average of Years 1–${inputs.qfafSizingYears}`}
-                </label>
-                <input
-                  id="sizingYears"
-                  type="range"
-                  min={0}
-                  max={advancedSettings.projectionYears}
-                  step={1}
-                  value={inputs.qfafSizingYears}
-                  onChange={e => updateInput('qfafSizingYears', Math.max(1, parseInt(e.target.value, 10)))}
-                />
-                <div className="allocation-labels">
-                  <span>1 yr</span>
-                  <span>{Math.ceil(advancedSettings.projectionYears / 2)} yrs</span>
-                  <span>{advancedSettings.projectionYears} yrs</span>
-                </div>
-                <span className="input-hint">
-                  Avg ST loss rate: {formatPercent(results.sizing.avgStLossRate)}
-                  {inputs.qfafSizingYears === 1 ? ' (Year 1)' : ` (Yrs 1–${inputs.qfafSizingYears})`}
-                </span>
-              </div>
-
-              <div className="input-group">
-                <label htmlFor="sizingCushion">
-                  QFAF Sizing Cushion: {(inputs.qfafSizingCushion * 100).toFixed(0)}%
-                </label>
-                <input
-                  id="sizingCushion"
-                  type="range"
-                  min={0}
-                  max={0.10}
-                  step={0.01}
-                  value={inputs.qfafSizingCushion}
-                  onChange={e => updateInput('qfafSizingCushion', parseFloat(e.target.value))}
-                />
-                <div className="allocation-labels">
-                  <span>0%</span>
-                  <span>5%</span>
-                  <span>10%</span>
-                </div>
-                <span className="input-hint">
-                  Reduces QFAF size for conservative sizing
-                </span>
-              </div>
-
-              <div className="input-group">
-                <label htmlFor="generationRate">
-                  QFAF Loss Generation Rate: {(advancedSettings.qfafMultiplier * 100).toFixed(0)}%
-                </label>
-                <input
-                  id="generationRate"
-                  type="range"
-                  min={1.0}
-                  max={1.5}
-                  step={0.05}
-                  value={advancedSettings.qfafMultiplier}
-                  onChange={e => setAdvancedSettings(s => ({ ...s, qfafMultiplier: parseFloat(e.target.value) }))}
-                />
-                <div className="allocation-labels">
-                  <span>100%</span>
-                  <span>125%</span>
-                  <span>150%</span>
-                </div>
-                <span className="input-hint">
-                  Historical: min 131%, max 158%, avg 142% — Ordinary losses generated as % of QFAF MV
-                </span>
-              </div>
-            </>
-          )}
-
-          </div>{/* end input-sub-card: Strategy Selection */}
-
           {/* Sub-card: Tax & Financial Profile */}
-          <div className="input-sub-card" style={{ gridColumn: '1 / -1' }}>
-          <div className="input-sub-card__label">Tax &amp; Financial Profile</div>
-          <div className="input-pair">
-            <div className="input-group">
-              <label htmlFor="filing">Filing Status</label>
-              <select
-                id="filing"
-                value={inputs.filingStatus}
-                onChange={e => updateInput('filingStatus', e.target.value as FilingStatus)}
-              >
-                {FILING_STATUSES.map(status => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="income">Annual Income</label>
-              <div className={`input-with-prefix ${validationWarnings.income ? 'input-warning' : ''}`}>
-                <span className="prefix">$</span>
-                <input
-                  id="income"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatWithCommas(inputs.annualIncome)}
-                  onChange={e => updateInput('annualIncome', parseFormattedNumber(e.target.value))}
-                />
-              </div>
-              {validationWarnings.income && (
-                <span className="input-warning-text">{validationWarnings.income}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="input-group">
-            <label htmlFor="state">State of Residence</label>
-            <select
-              id="state"
-              value={inputs.stateCode}
-              onChange={e => updateInput('stateCode', e.target.value)}
-            >
-              {STATES.map(s => (
-                <option key={s.code} value={s.code}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {inputs.stateCode === 'OTHER' && (
-            <div className="input-group">
-              <label htmlFor="stateRate">State Tax Rate (%)</label>
-              <div className="input-with-suffix">
-                <input
-                  id="stateRate"
-                  type="number"
-                  step={0.1}
-                  min={0}
-                  max={15}
-                  value={(inputs.stateRate * 100).toFixed(1)}
-                  onChange={e => updateInput('stateRate', parseStateRate(e.target.value))}
-                />
-                <span className="suffix">%</span>
-              </div>
-            </div>
-          )}
-
-          {/* State tax conformity warning for CA, NY, PA */}
-          {getStateConformityWarning(inputs.stateCode) && (
-            <div className="state-conformity-warning">
-              <strong>⚠️ State Tax Conformity Note:</strong>
-              <p>{getStateConformityWarning(inputs.stateCode)}</p>
-            </div>
-          )}
-
-          </div>{/* end input-sub-card: Tax & Financial Profile */}
+          <TaxFinancialProfileInputs
+            inputs={inputs}
+            validationWarnings={validationWarnings}
+            onUpdateInput={updateInput}
+          />
         </div>
 
-        {/* Advanced Options Toggle */}
-        <div className="advanced-options-toggle">
-          <button
-            type="button"
-            className={`advanced-options-btn ${showAdvancedOptions ? 'active' : ''}`}
-            onClick={() => setShowAdvancedOptions(v => !v)}
-          >
-            <span className="toggle-icon">{showAdvancedOptions ? '▼' : '▶'}</span>
-            Advanced Options
-            {showAdvancedOptions && (
-              <span className="advanced-options-hint">Carryforwards &amp; formula overrides</span>
-            )}
-          </button>
-        </div>
-
-        {/* Advanced Options Content (inline, no modal) */}
-        {showAdvancedOptions && (
-          <div className="advanced-options-content">
-            {/* Existing Carryforwards */}
-            <div className="advanced-options-section">
-              <h3 className="advanced-options-section-title">Existing Carryforwards</h3>
-              <div className="input-grid">
-                <div className="input-group">
-                  <label htmlFor="stCarry">Existing ST Loss Carryforward</label>
-                  <div className="input-with-prefix">
-                    <span className="prefix">$</span>
-                    <input
-                      id="stCarry"
-                      type="text"
-                      inputMode="numeric"
-                      value={formatWithCommas(inputs.existingStLossCarryforward)}
-                      onChange={e =>
-                        updateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="input-group">
-                  <label htmlFor="ltCarry">Existing LT Loss Carryforward</label>
-                  <div className="input-with-prefix">
-                    <span className="prefix">$</span>
-                    <input
-                      id="ltCarry"
-                      type="text"
-                      inputMode="numeric"
-                      value={formatWithCommas(inputs.existingLtLossCarryforward)}
-                      onChange={e =>
-                        updateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="input-group">
-                  <label htmlFor="nolCarry">Existing NOL Carryforward</label>
-                  <div className="input-with-prefix">
-                    <span className="prefix">$</span>
-                    <input
-                      id="nolCarry"
-                      type="text"
-                      inputMode="numeric"
-                      value={formatWithCommas(inputs.existingNolCarryforward)}
-                      onChange={e =>
-                        updateInput('existingNolCarryforward', parseFormattedNumber(e.target.value))
-                      }
-                    />
-                  </div>
-                  <span className="input-hint">Can offset 80% of future taxable income</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Formula Constants */}
-            <div className="advanced-options-section">
-              <h3 className="advanced-options-section-title">Formula Constants</h3>
-              <SettingsPanel
-                settings={advancedSettings}
-                onChange={setAdvancedSettings}
-                onReset={resetAdvancedSettings}
-              />
-            </div>
-          </div>
-        )}
+        {/* Advanced Options */}
+        <AdvancedOptionsPanel
+          inputs={inputs}
+          advancedSettings={advancedSettings}
+          onUpdateInput={updateInput}
+          onUpdateSettings={setAdvancedSettings}
+          onResetSettings={resetAdvancedSettings}
+        />
 
         {/* Reset to Defaults */}
         <div className="reset-defaults-row">
@@ -967,7 +325,6 @@ export function Calculator() {
                 setAdvancedSettings(DEFAULT_SETTINGS);
                 setSensitivityParams(DEFAULT_SENSITIVITY);
                 setComparisonStrategies([STRATEGIES[1].id, STRATEGIES[0].id]);
-                setShowAdvancedOptions(false);
               }
             }}
           >
@@ -1043,47 +400,17 @@ export function Calculator() {
           {advancedSettings.projectionYears}-year projection period.
         </p>
 
-        {/* Tax Benefits Chart */}
-        <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
-          <TaxSavingsChart data={results.years} />
-        </Suspense>
-
-        {/* Table */}
-        <ResultsTable
-          data={results.years}
-          sizing={results.sizing}
-          qfafEnabled={inputs.qfafEnabled}
+        {/* Charts and Export Actions */}
+        <ResultsChartsSection
+          results={results}
+          inputs={inputs}
+          advancedSettings={advancedSettings}
+          currentStrategy={currentStrategy}
+          taxRates={taxRates}
           projectionYears={advancedSettings.projectionYears}
+          onPrintRef={setPrintHandler}
+          onExportRef={setExportHandler}
         />
-
-        {/* Portfolio Value Chart */}
-        <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
-          <PortfolioValueChart
-            data={results.years}
-            trackingError={currentStrategy?.trackingError}
-          />
-        </Suspense>
-      </section>
-
-      {/* Actions */}
-      <section className="actions">
-        <button className="print-btn" onClick={() => window.print()}>
-          Print / Save as PDF
-        </button>
-        <button
-          className="export-btn"
-          onClick={async () => {
-            const { exportToExcel } = await import('./utils/excelExport');
-            await exportToExcel({
-              inputs,
-              results,
-              settings: advancedSettings,
-              taxRates,
-            });
-          }}
-        >
-          Export to Excel
-        </button>
       </section>
 
       </div>{/* end section-group--results */}
@@ -1161,6 +488,12 @@ export function Calculator() {
       <DisclaimerFooter />
 
       </div>{/* end section-group--methodology */}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      <KeyboardShortcutsHelp
+        isOpen={showKeyboardHelp}
+        onClose={() => setShowKeyboardHelp(false)}
+      />
     </div>
   );
 }

@@ -36,6 +36,7 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
     settings.nolOffsetLimit !== DEFAULT_SETTINGS.nolOffsetLimit ||
     settings.growthEnabled !== DEFAULT_SETTINGS.growthEnabled ||
     settings.defaultAnnualReturn !== DEFAULT_SETTINGS.defaultAnnualReturn ||
+    settings.qfafAnnualReturn !== DEFAULT_SETTINGS.qfafAnnualReturn ||
     settings.financingFeesEnabled !== DEFAULT_SETTINGS.financingFeesEnabled ||
     settings.projectionYears !== DEFAULT_SETTINGS.projectionYears ||
     settings.niitRate !== DEFAULT_SETTINGS.niitRate ||

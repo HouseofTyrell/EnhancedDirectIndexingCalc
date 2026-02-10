@@ -266,7 +266,12 @@ export function calculateYear(
     : 0;
   const growthRate = baseReturn - totalFinancingCost;
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
-  const qfafGrowthRate = settings.qfafGrowthEnabled ? growthRate : 0;
+  // QFAF can also use a separate return rate if specified (defaults to collateral growth rate)
+  const qfafBaseReturn = settings.growthEnabled
+    ? (settings.qfafAnnualReturn !== null ? settings.qfafAnnualReturn : settings.defaultAnnualReturn)
+    : 0;
+  const qfafGrowthRateWithFees = qfafBaseReturn - totalFinancingCost;
+  const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafGrowthRateWithFees : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
   const newCollateralValue = safeNumber(collateralValue * (1 + growthRate));
 

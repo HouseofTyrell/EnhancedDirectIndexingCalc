@@ -200,6 +200,7 @@ export interface AdvancedSettings {
   // Portfolio assumptions
   growthEnabled: boolean; // Default: false (no growth assumption)
   defaultAnnualReturn: number; // Default: 0.07 (7% when growth enabled)
+  qfafAnnualReturn: number | null; // Default: null (uses defaultAnnualReturn), allows separate QFAF growth rate
   financingFeesEnabled: boolean; // Default: false (subtract financing costs from growth)
   financingMode: 'simple' | 'detailed'; // Default: 'simple' (show single rate vs. component breakdown)
 
@@ -233,6 +234,7 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
   nolOffsetLimit: 0.8,
   growthEnabled: false,
   defaultAnnualReturn: 0.07,
+  qfafAnnualReturn: null, // null means use defaultAnnualReturn
   financingFeesEnabled: false,
   financingMode: 'simple',
 
