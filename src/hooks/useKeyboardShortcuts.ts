@@ -5,6 +5,7 @@ export interface KeyboardShortcutHandlers {
   onExport?: () => void;
   onShowHelp?: () => void;
   onEscape?: () => void;
+  onPin?: () => void;
 }
 
 /**
@@ -44,6 +45,13 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers) {
             if (handlers.onExport) {
               e.preventDefault();
               handlers.onExport();
+            }
+            break;
+
+          case 'b':
+            if (handlers.onPin) {
+              e.preventDefault();
+              handlers.onPin();
             }
             break;
         }

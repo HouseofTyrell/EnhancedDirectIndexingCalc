@@ -13,4 +13,8 @@ export const STORAGE_KEYS = {
   RATE_OVERRIDES: 'taxCalc:rate-overrides',
   /** Onboarding tour completion flag */
   TOUR_COMPLETED: 'taxCalc:tour-completed',
+  /** Pinned scenario for comparison */
+  PINNED_SCENARIO: 'taxCalc:pinned-scenario',
+  /** Pinned UI elements for floating panel */
+  PINNED_ELEMENTS: 'taxCalc:pinned-elements',
 } as const;

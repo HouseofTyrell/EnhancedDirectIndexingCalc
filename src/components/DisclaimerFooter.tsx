@@ -53,6 +53,7 @@ export function DisclaimerFooter() {
         This calculator provides estimates for illustrative purposes only and does not constitute
         investment, tax, or legal advice. Past performance does not guarantee future results.
       </p>
+
     </footer>
   );
 }

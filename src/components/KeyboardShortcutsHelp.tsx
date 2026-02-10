@@ -17,6 +17,7 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
       items: [
         { keys: [`${modifier}`, 'P'], description: 'Print or save as PDF' },
         { keys: [`${modifier}`, 'E'], description: 'Export results to Excel' },
+        { keys: [`${modifier}`, 'B'], description: 'Pin/unpin current scenario' },
       ],
     },
     {

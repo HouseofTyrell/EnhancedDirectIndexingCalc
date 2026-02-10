@@ -296,6 +296,35 @@ export const DEFAULT_QFAF_TEST_YEAR: Omit<QfafTestYearInput, 'year'> = {
   section461Limit: 640000, // 2026 projected MFJ limit
 };
 
+// ============================================
+// PINNED SCENARIO COMPARISON TYPES
+// ============================================
+
+export interface PinnedScenario {
+  id: string;
+  label: string; // Auto-generated: "CA $3.0M / Overlay 45/45"
+  pinnedAt: number;
+  inputs: CalculatorInputs;
+  advancedSettings: AdvancedSettings;
+  results: CalculationResult;
+}
+
+export interface ComparisonMetric {
+  label: string;
+  pinnedValue: number;
+  currentValue: number;
+  delta: number;
+  deltaPercent: number;
+  format: 'currency' | 'percent';
+  higherIsBetter: boolean;
+}
+
+export interface InputChange {
+  label: string;
+  pinnedDisplay: string;
+  currentDisplay: string;
+}
+
 // Section 461(l) limits by filing status for 2026 (projected)
 export const SECTION_461_LIMITS_2026: Record<FilingStatus, number> = {
   single: 320000,

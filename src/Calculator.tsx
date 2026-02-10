@@ -31,6 +31,11 @@ import { TaxFinancialProfileInputs } from './components/TaxFinancialProfileInput
 import { StrategySelectionInputs } from './components/StrategySelectionInputs';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { usePinnedScenario } from './hooks/usePinnedScenario';
+import { usePinnedElements } from './hooks/usePinnedElements';
+import { ScenarioComparisonPanel } from './components/ScenarioComparisonPanel';
+import { PinnableSection } from './components/PinnableSection';
+import { FloatingPinnedPanel } from './components/FloatingPinnedPanel';
 import { CollapsibleSection } from './AdvancedMode/CollapsibleSection';
 import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
 import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
@@ -52,6 +57,8 @@ export function Calculator() {
   const advancedMode = useAdvancedMode();
   const { isExpanded } = useScrollHeader('scroll-sentinel');
   const qualifiedPurchaser = useQualifiedPurchaser();
+  const pinnedScenario = usePinnedScenario();
+  const pinnedElements = usePinnedElements();
 
   // Year-by-Year Planning state
   const [yearOverrides, setYearOverrides] = useState<YearOverride[]>(() =>
@@ -83,14 +90,6 @@ export function Calculator() {
   // Handlers for keyboard shortcuts (will be set by ResultsChartsSection)
   const [printHandler, setPrintHandler] = useState<(() => void) | null>(null);
   const [exportHandler, setExportHandler] = useState<(() => void) | null>(null);
-
-  // Setup keyboard shortcuts
-  useKeyboardShortcuts({
-    onPrint: printHandler || undefined,
-    onExport: exportHandler || undefined,
-    onShowHelp: () => setShowKeyboardHelp(true),
-    onEscape: () => setShowKeyboardHelp(false),
-  });
 
   // Check if any year overrides differ from defaults
   const hasActiveOverrides = useMemo(
@@ -191,6 +190,33 @@ export function Calculator() {
     setSensitivityParams(DEFAULT_SENSITIVITY);
   }, []);
 
+  // Pin/unpin scenario handlers
+  const handlePinScenario = useCallback(() => {
+    if (pinnedScenario.hasPinned) {
+      pinnedScenario.unpin();
+    } else {
+      pinnedScenario.pin(inputs, advancedSettings, results);
+    }
+  }, [inputs, advancedSettings, results, pinnedScenario]);
+
+  const handleRestorePinned = useCallback(() => {
+    const state = pinnedScenario.getPinnedState();
+    if (state && window.confirm('Restore pinned inputs? Current values will be replaced.')) {
+      setInputs(state.inputs);
+      setAdvancedSettings(state.advancedSettings);
+      setYearOverrides(generateDefaultOverrides(state.inputs.annualIncome));
+    }
+  }, [pinnedScenario]);
+
+  // Setup keyboard shortcuts (after all handlers are defined)
+  useKeyboardShortcuts({
+    onPrint: printHandler || undefined,
+    onExport: exportHandler || undefined,
+    onShowHelp: () => setShowKeyboardHelp(true),
+    onEscape: () => setShowKeyboardHelp(false),
+    onPin: handlePinScenario,
+  });
+
   // Input validation (warn-only, does not block calculation)
   const validationWarnings = useMemo(() => {
     const warnings: Record<string, string> = {};
@@ -236,6 +262,17 @@ export function Calculator() {
         }
         isExpanded={isExpanded}
         onOpenAdvanced={undefined}
+        hasPinnedScenario={pinnedScenario.hasPinned}
+        onPinScenario={() => pinnedScenario.pin(inputs, advancedSettings, results)}
+        onUnpinScenario={pinnedScenario.unpin}
+        pinnedValues={pinnedScenario.pinned ? {
+          collateral: pinnedScenario.pinned.inputs.collateralAmount,
+          qfafValue: pinnedScenario.pinned.results.sizing.qfafValue,
+          annualTaxSavings: pinnedScenario.pinned.results.years[0]?.taxSavings ?? 0,
+          year2TaxSavings: pinnedScenario.pinned.inputs.qfafEnabled && pinnedScenario.pinned.results.years.length > 1
+            ? pinnedScenario.pinned.results.years[1]?.taxSavings
+            : undefined,
+        } : undefined}
       />
 
       <header className="header">
@@ -244,6 +281,12 @@ export function Calculator() {
         <p className="header-description">
           Model tax-loss harvesting strategies with QFAF overlays and collateral optimization.
         </p>
+        <div className="header-feedback-banner">
+          This tool is in active development. Feedback and suggestions are welcome!{' '}
+          <a href="mailto:suggestions@edicalc.com" className="header-feedback-link">
+            suggestions@edicalc.com
+          </a>
+        </div>
       </header>
 
       {/* Scroll sentinel - triggers sticky header expansion when scrolled past */}
@@ -340,6 +383,7 @@ export function Calculator() {
       />
 
       {/* Strategy Sizing - Step 3: Optimized Strategy */}
+      <PinnableSection id="sizing" label="Strategy Sizing" isPinned={pinnedElements.isPinned('sizing')} onTogglePin={() => pinnedElements.togglePin('sizing')}>
       <SizingSummary
         results={results}
         filingStatus={inputs.filingStatus}
@@ -349,6 +393,7 @@ export function Calculator() {
         rateDifferential={rateDifferential}
         qfafMultiplier={advancedSettings.qfafMultiplier}
       />
+      </PinnableSection>
 
       </div>{/* end section-group--assumptions */}
 
@@ -359,6 +404,7 @@ export function Calculator() {
         <div className="section-group__label">Results</div>
 
       {/* Results Summary - headline metrics */}
+      <PinnableSection id="results" label="Results Summary" isPinned={pinnedElements.isPinned('results')} onTogglePin={() => pinnedElements.togglePin('results')}>
       <ResultsSummary
         totalTaxSavings={results.summary.totalTaxSavings}
         finalPortfolioValue={results.summary.finalPortfolioValue}
@@ -369,10 +415,23 @@ export function Calculator() {
         collateralAmount={inputs.collateralAmount}
         stateCode={inputs.stateCode}
       />
+      </PinnableSection>
 
-      {/* Advanced Tools are now inline at the bottom of the page */}
+      {/* Scenario comparison panel (shown when a scenario is pinned) */}
+      {pinnedScenario.pinned && (
+        <ScenarioComparisonPanel
+          pinned={pinnedScenario.pinned}
+          currentInputs={inputs}
+          currentSettings={advancedSettings}
+          currentResults={results}
+          onUnpin={pinnedScenario.unpin}
+          onRestore={handleRestorePinned}
+          onReplacePin={() => pinnedScenario.replacePin(inputs, advancedSettings, results)}
+        />
+      )}
 
       {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
+      <PinnableSection id="charts" label="Charts & Table" isPinned={pinnedElements.isPinned('charts')} onTogglePin={() => pinnedElements.togglePin('charts')}>
       <CollapsibleSection
         sectionKey="yearByYear"
         step="4"
@@ -398,6 +457,7 @@ export function Calculator() {
           onExportRef={(handler) => setExportHandler(() => handler)}
         />
       </CollapsibleSection>
+      </PinnableSection>
 
       </div>{/* end section-group--results */}
 
@@ -479,6 +539,59 @@ export function Calculator() {
       <KeyboardShortcutsHelp
         isOpen={showKeyboardHelp}
         onClose={() => setShowKeyboardHelp(false)}
+      />
+
+      {/* Floating panel for pinned UI elements */}
+      <FloatingPinnedPanel
+        elements={[
+          ...(pinnedElements.isPinned('results') ? [{
+            id: 'results',
+            label: 'Results Summary',
+            content: (
+              <ResultsSummary
+                totalTaxSavings={results.summary.totalTaxSavings}
+                finalPortfolioValue={results.summary.finalPortfolioValue}
+                effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
+                totalNolGenerated={results.summary.totalNolGenerated}
+                projectionYears={advancedSettings.projectionYears}
+                collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
+                collateralAmount={inputs.collateralAmount}
+                stateCode={inputs.stateCode}
+              />
+            ),
+          }] : []),
+          ...(pinnedElements.isPinned('sizing') ? [{
+            id: 'sizing',
+            label: 'Strategy Sizing',
+            content: (
+              <SizingSummary
+                results={results}
+                filingStatus={inputs.filingStatus}
+                qfafEnabled={inputs.qfafEnabled}
+                combinedStRate={combinedStRate}
+                combinedLtRate={combinedLtRate}
+                rateDifferential={rateDifferential}
+                qfafMultiplier={advancedSettings.qfafMultiplier}
+              />
+            ),
+          }] : []),
+          ...(pinnedElements.isPinned('charts') ? [{
+            id: 'charts',
+            label: 'Charts & Table',
+            content: (
+              <ResultsChartsSection
+                results={results}
+                inputs={inputs}
+                advancedSettings={advancedSettings}
+                currentStrategy={currentStrategy}
+                taxRates={taxRates}
+                projectionYears={advancedSettings.projectionYears}
+              />
+            ),
+          }] : []),
+        ]}
+        onUnpin={pinnedElements.unpin}
+        onUnpinAll={pinnedElements.unpinAll}
       />
     </div>
   );

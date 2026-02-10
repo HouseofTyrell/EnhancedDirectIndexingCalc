@@ -1,8 +1,30 @@
 import React from 'react';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCurrencyAbbreviated } from '../utils/formatters';
 import { useValueFlash } from '../hooks/useValueFlash';
 import { useDelta } from '../hooks/useDelta';
 import { DeltaBadge } from './DeltaBadge';
+
+/**
+ * Pin/thumbtack icon for the pin scenario button.
+ * @internal
+ */
+function PinIcon({ active }: { active?: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={active ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="12" y1="17" x2="12" y2="22" />
+      <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+    </svg>
+  );
+}
 
 /**
  * Settings gear icon for the advanced settings button.
@@ -46,6 +68,19 @@ interface StickyHeaderProps {
   isExpanded: boolean;
   /** Callback when advanced settings button is clicked */
   onOpenAdvanced?: () => void;
+  /** Whether a scenario is currently pinned */
+  hasPinnedScenario?: boolean;
+  /** Callback to pin the current scenario */
+  onPinScenario?: () => void;
+  /** Callback to unpin the current scenario */
+  onUnpinScenario?: () => void;
+  /** Pinned scenario values for persistent delta display */
+  pinnedValues?: {
+    collateral: number;
+    qfafValue: number;
+    annualTaxSavings: number;
+    year2TaxSavings?: number;
+  };
 }
 
 /**
@@ -65,6 +100,22 @@ interface StickyHeaderProps {
  * />
  * ```
  */
+/**
+ * Persistent delta shown under a metric when a scenario is pinned.
+ * Unlike DeltaBadge (transient 2.5s), this stays visible as long as the pin exists.
+ */
+function PinnedDelta({ current, pinned }: { current: number; pinned: number }) {
+  const delta = current - pinned;
+  if (Math.abs(delta) < 1) return null;
+  const sign = delta > 0 ? '+' : '';
+  const cls = delta > 0 ? 'pinned-delta--positive' : 'pinned-delta--negative';
+  return (
+    <span className={`sticky-header__pinned-delta ${cls}`}>
+      vs pin: {sign}{formatCurrencyAbbreviated(delta)}
+    </span>
+  );
+}
+
 export const StickyHeader = React.memo(function StickyHeader({
   strategyName,
   collateral,
@@ -74,6 +125,10 @@ export const StickyHeader = React.memo(function StickyHeader({
   year2TaxSavings,
   isExpanded,
   onOpenAdvanced,
+  hasPinnedScenario,
+  onPinScenario,
+  onUnpinScenario,
+  pinnedValues,
 }: StickyHeaderProps) {
   // Calculate leverage ratio
   const leverageRatio = collateral > 0 ? totalExposure / collateral : 0;
@@ -113,6 +168,7 @@ export const StickyHeader = React.memo(function StickyHeader({
             <DeltaBadge delta={collateralDelta} />
           </span>
           {isExpanded && <span className="sticky-header__subtext">Starting investment</span>}
+          {pinnedValues && <PinnedDelta current={collateral} pinned={pinnedValues.collateral} />}
         </div>
         <div className="sticky-header__metric">
           <span className="sticky-header__label">QFAF Value</span>
@@ -121,6 +177,7 @@ export const StickyHeader = React.memo(function StickyHeader({
             <DeltaBadge delta={qfafDelta} />
           </span>
           {isExpanded && <span className="sticky-header__subtext">Auto-sized position</span>}
+          {pinnedValues && <PinnedDelta current={qfafValue} pinned={pinnedValues.qfafValue} />}
         </div>
         <div className="sticky-header__metric sticky-header__metric--highlight">
           <span className="sticky-header__label">Year 1 Savings</span>
@@ -129,6 +186,7 @@ export const StickyHeader = React.memo(function StickyHeader({
             <DeltaBadge delta={savingsDelta} />
           </span>
           {isExpanded && <span className="sticky-header__subtext">First year benefit</span>}
+          {pinnedValues && <PinnedDelta current={annualTaxSavings} pinned={pinnedValues.annualTaxSavings} />}
         </div>
         {year2TaxSavings !== undefined && year2TaxSavings > 0 && (
           <div className="sticky-header__metric sticky-header__metric--primary">
@@ -138,7 +196,34 @@ export const StickyHeader = React.memo(function StickyHeader({
               <DeltaBadge delta={year2Delta} />
             </span>
             {isExpanded && <span className="sticky-header__subtext">Includes NOL usage</span>}
+            {pinnedValues?.year2TaxSavings != null && (
+              <PinnedDelta current={year2TaxSavings} pinned={pinnedValues.year2TaxSavings} />
+            )}
           </div>
+        )}
+        {(onPinScenario || onUnpinScenario) && (
+          <>
+            <button
+              className={`sticky-header__pin-btn${hasPinnedScenario ? ' sticky-header__pin-btn--active' : ''}`}
+              onClick={hasPinnedScenario ? onUnpinScenario : onPinScenario}
+              aria-label={hasPinnedScenario ? 'Unpin scenario' : 'Pin current scenario'}
+              title={hasPinnedScenario ? 'Unpin scenario' : 'Pin current scenario for comparison'}
+            >
+              <PinIcon active={hasPinnedScenario} />
+              {isExpanded && <span>{hasPinnedScenario ? 'Pinned' : 'Pin'}</span>}
+            </button>
+            {hasPinnedScenario && (
+              <button
+                className="sticky-header__compare-link"
+                onClick={() => {
+                  document.querySelector('.comparison-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                title="Scroll to comparison panel"
+              >
+                {isExpanded ? 'View Comparison \u2193' : '\u2193'}
+              </button>
+            )}
+          </>
         )}
         {onOpenAdvanced && (
           <button
