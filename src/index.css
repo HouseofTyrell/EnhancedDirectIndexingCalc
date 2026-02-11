@@ -2904,15 +2904,13 @@ tfoot td {
   padding: 0.625rem;
   font-size: 0.8rem;
   min-width: 0;
-  max-height: 50vh;
-  overflow-y: auto;
   overflow-x: hidden;
-  overscroll-behavior: contain;
 }
 
-/* When user has manually resized, override natural max-height */
+/* When user has manually resized, constrain to fixed height and scroll */
 .floating-panel__item-content--fixed {
-  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* --- Per-item vertical resize handle --- */
