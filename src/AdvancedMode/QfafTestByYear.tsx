@@ -1,152 +1,48 @@
 import { useReducer, useCallback, useMemo } from 'react';
 import { FilingStatus } from '../types';
-import {
-  STRATEGIES,
-  getStLossRateForYear,
-  SECTION_461L_LIMITS,
-  QFAF_ORDINARY_LOSS_RATE,
-} from '../strategyData';
+import { STRATEGIES, SECTION_461L_LIMITS } from '../strategyData';
 import { formatWithCommas, parseFormattedNumber, formatCurrency } from '../utils/formatters';
+import {
+  computeYearResults,
+  computeTotals,
+  computeStats,
+  QfafTestAssumptions,
+  QfafTestYearRow,
+  DEFAULT_ASSUMPTIONS,
+  QFAF_ALPHA_RATE,
+  QUANTINNO_ALPHA_RATE,
+  NUM_YEARS,
+} from '../qfafTestCalculations';
+import {
+  MONTHLY_RETURNS,
+  ANNUAL_RETURNS,
+  MONTHLY_BREAKDOWN,
+  ANNUAL_BREAKDOWN,
+  HIST_ORD_LOSS_MIN,
+  HIST_ORD_LOSS_MAX,
+  HIST_ORD_LOSS_AVG,
+} from '../qfafTestData';
 import './QfafTestByYear.css';
-
-// Number of years to show in the table
-const NUM_YEARS = 10;
-const START_YEAR = 2026;
-
-// Alpha rate constants (from QFAF Excel model — test-page-specific, no shared equivalent)
-const QFAF_ALPHA_RATE = 0.0557; // 5.57% per year
-const QUANTINNO_ALPHA_RATE = 0.0117; // 1.17% per year
-
-// Historical QFAF performance data
-const MONTHLY_RETURNS = [
-  { month: 'Nov-24', netReturn: 0.0157 },
-  { month: 'Dec-24', netReturn: 0.0002 },
-  { month: 'Jan-25', netReturn: 0.0212 },
-  { month: 'Feb-25', netReturn: 0.0120 },
-  { month: 'Mar-25', netReturn: -0.0011 },
-  { month: 'Apr-25', netReturn: 0.0153 },
-  { month: 'May-25', netReturn: -0.0054 },
-  { month: 'Jun-25', netReturn: -0.0104 },
-  { month: 'Jul-25', netReturn: -0.0180 },
-  { month: 'Aug-25', netReturn: -0.0055 },
-  { month: 'Sep-25', netReturn: -0.0192 },
-  { month: 'Oct-25', netReturn: -0.0195 },
-];
-
-const ANNUAL_RETURNS = [
-  { year: '2020', netReturn: -0.0851 },
-  { year: '2021', netReturn: 0.1705 },
-  { year: '2022', netReturn: 0.1244 },
-  { year: '2023', netReturn: 0.0433 },
-  { year: '2024', netReturn: 0.1569 },
-];
-
-// Performance breakdown data (ST Capital Gain/Loss % | Ordinary Income/Loss %)
-const MONTHLY_BREAKDOWN = [
-  { month: 'Nov-24', stCapGain: 0.1201, ordinaryIncome: -0.1080 },
-  { month: 'Dec-24', stCapGain: 0.1269, ordinaryIncome: -0.1250 },
-  { month: 'Jan-25', stCapGain: 0.1256, ordinaryIncome: -0.1013 },
-  { month: 'Feb-25', stCapGain: 0.1271, ordinaryIncome: -0.1133 },
-  { month: 'Mar-25', stCapGain: 0.1267, ordinaryIncome: -0.1301 },
-  { month: 'Apr-25', stCapGain: 0.1276, ordinaryIncome: -0.1102 },
-  { month: 'May-25', stCapGain: 0.1243, ordinaryIncome: -0.1309 },
-  { month: 'Jun-25', stCapGain: 0.1268, ordinaryIncome: -0.1393 },
-  { month: 'Jul-25', stCapGain: 0.1231, ordinaryIncome: -0.1401 },
-  { month: 'Aug-25', stCapGain: 0.1277, ordinaryIncome: -0.1339 },
-  { month: 'Sep-25', stCapGain: 0.1313, ordinaryIncome: -0.1504 },
-  { month: 'Oct-25', stCapGain: 0.1273, ordinaryIncome: -0.1477 },
-];
-
-const ANNUAL_BREAKDOWN = [
-  { year: '2020', stCapGain: 1.5293, ordinaryIncome: -1.5788 },
-  { year: '2021', stCapGain: 1.5130, ordinaryIncome: -1.3131 },
-  { year: '2022', stCapGain: 1.4860, ordinaryIncome: -1.3470 },
-  { year: '2023', stCapGain: 1.5076, ordinaryIncome: -1.4809 },
-  { year: '2024', stCapGain: 1.4962, ordinaryIncome: -1.3535 },
-];
-
-
-// Fee rates (from QFAF Excel model — percentage of Deals Collateral)
-const ADVISOR_MGMT_FEE_RATE = 0.0057; // ~0.57%
-const QFAF_FINANCING_FEE_RATE = 0.00536; // ~0.54%
-
-// Compute min, max, mean, median for an array of numbers
-function computeStats(values: number[]) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const min = sorted[0];
-  const max = sorted[sorted.length - 1];
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const mid = Math.floor(sorted.length / 2);
-  const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  return { min, max, mean, median };
-}
 
 interface QfafTestByYearProps {
   filingStatus: FilingStatus;
 }
 
-// Get overlay and core strategies from strategy data
+// Strategy lists for dropdown selects
 const OVERLAY_STRATEGIES = STRATEGIES.filter(s => s.type === 'overlay');
 const CORE_STRATEGIES = STRATEGIES.filter(s => s.type === 'core');
 
-// Compute historical ordinary loss rate stats from annual breakdown
-const HIST_ORD_LOSS_RATES = ANNUAL_BREAKDOWN.map(r => Math.abs(r.ordinaryIncome));
-const HIST_ORD_LOSS_MIN = Math.min(...HIST_ORD_LOSS_RATES);
-const HIST_ORD_LOSS_MAX = Math.max(...HIST_ORD_LOSS_RATES);
-const HIST_ORD_LOSS_AVG = HIST_ORD_LOSS_RATES.reduce((a, b) => a + b, 0) / HIST_ORD_LOSS_RATES.length;
-
-// Assumptions state - editable inputs
-interface Assumptions {
-  initialQfafInvestment: number;
-  initialDealsInvestment: number; // Overlay collateral
-  overlayStrategyId: string; // e.g., 'overlay-45-45'
-  coreStrategyId: string; // e.g., 'core-145-45'
-  marginalTaxRate: number; // Combined federal + state
-  qfafGenerationRate: number; // ST gains & ordinary losses as multiple of QFAF MV (e.g. 1.5 = 150%)
-}
-
-// Year-by-year computed results
-interface YearResult {
-  year: number;
-  calendarYear: number;
-  dealsCollateralValue: number;
-  qfafSubscriptionSize: number;
-  annualEstOrdinaryLosses: number;
-  section461Limit: number;
-  carryForwardPrior: number;
-  carryForwardNext: number;
-  writeOffAmount: number;
-  taxSavings: number;
-  advisorManagementFee: number;
-  quantinnoFees: number;
-  totalFees: number;
-  netTaxBenefit: number;
-  qfafAlpha: number;
-  quantinnoAlpha: number;
-  totalAlpha: number;
-}
-
 type State = {
-  assumptions: Assumptions;
+  assumptions: QfafTestAssumptions;
 };
 
 type Action =
-  | { type: 'UPDATE_ASSUMPTION'; field: keyof Assumptions; value: number | string }
+  | { type: 'UPDATE_ASSUMPTION'; field: keyof QfafTestAssumptions; value: number | string }
   | { type: 'RESET' };
-
-// Defaults matching the Excel screenshot (validation-specific, not shared with main calculator)
-const DEFAULT_ASSUMPTIONS: Assumptions = {
-  initialQfafInvestment: 1000000,
-  initialDealsInvestment: 4700000,
-  overlayStrategyId: OVERLAY_STRATEGIES[1]?.id ?? 'overlay-45-45', // Overlay 45/45
-  coreStrategyId: CORE_STRATEGIES[1]?.id ?? 'core-145-45', // Core 145/45
-  marginalTaxRate: 0.541, // 54.1% combined federal + state
-  qfafGenerationRate: QFAF_ORDINARY_LOSS_RATE, // Default: 1.5 (150%)
-};
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'UPDATE_ASSUMPTION': {
+    case 'UPDATE_ASSUMPTION':
       return {
         ...state,
         assumptions: {
@@ -154,139 +50,18 @@ function reducer(state: State, action: Action): State {
           [action.field]: action.value,
         },
       };
-    }
-    case 'RESET': {
+    case 'RESET':
       return { assumptions: { ...DEFAULT_ASSUMPTIONS } };
-    }
     default:
       return state;
   }
-}
-
-// Compute year-by-year results from assumptions
-function computeYearResults(
-  assumptions: Assumptions,
-  filingStatus: FilingStatus,
-  numYears: number
-): YearResult[] {
-  const results: YearResult[] = [];
-  let carryForward = 0;
-
-  // Get selected strategies
-  const overlayStrategy = STRATEGIES.find(s => s.id === assumptions.overlayStrategyId);
-  const coreStrategy = STRATEGIES.find(s => s.id === assumptions.coreStrategyId);
-
-  if (!overlayStrategy || !coreStrategy) {
-    return results;
-  }
-
-  // Get §461(l) limit for filing status
-  const section461Limit = SECTION_461L_LIMITS[filingStatus] || SECTION_461L_LIMITS.single;
-
-  // Base values for calculations
-  const initialQfafBase = assumptions.initialQfafInvestment;
-  const initialDealsBase = assumptions.initialDealsInvestment;
-
-  for (let i = 0; i < numYears; i++) {
-    const year = i + 1;
-    const calendarYear = START_YEAR + i;
-
-    // Get year-specific ST loss rates from strategy data
-    const overlayStLossRate = getStLossRateForYear(overlayStrategy, year);
-    const coreStLossRate = getStLossRateForYear(coreStrategy, year);
-
-    // QFAF Subscription Size calculation:
-    // Year 1: Initial QFAF × 1.049 (small growth factor)
-    // Subsequent years: Decays as QFAF generates losses
-    let qfafSubscriptionSize: number;
-    if (i === 0) {
-      qfafSubscriptionSize = initialQfafBase * 1.049;
-    } else {
-      // QFAF decreases over time as it generates losses
-      // Using decay factor derived from Excel: ~0.9231 per year after Year 1
-      const priorQfaf = results[i - 1].qfafSubscriptionSize;
-      qfafSubscriptionSize = priorQfaf * 0.9231;
-    }
-
-    // Annual estimated ordinary losses = QFAF × generation rate
-    const annualEstOrdinaryLosses = qfafSubscriptionSize * assumptions.qfafGenerationRate;
-
-    // Deals Collateral Value calculation:
-    // The collateral is sized so ST losses = QFAF ST gains (for tax efficiency)
-    // Total ST losses needed = annualEstOrdinaryLosses (since QFAF ST gains = ordinary losses)
-    // Overlay generates: initialDeals × overlayStLossRate
-    // Core makes up the difference
-
-    // ST losses from overlay portion (grows with Quantinno alpha)
-    const overlayCollateral = initialDealsBase * Math.pow(1 + QUANTINNO_ALPHA_RATE, i);
-    const overlayStLosses = overlayCollateral * overlayStLossRate;
-
-    // Additional core collateral needed to match QFAF ST gains
-    const stLossesNeeded = annualEstOrdinaryLosses; // ST gains = ordinary losses for QFAF
-    const coreStLossesNeeded = Math.max(0, stLossesNeeded - overlayStLosses);
-    const coreCollateral = coreStLossRate > 0 ? coreStLossesNeeded / coreStLossRate : 0;
-
-    // Total Deals Collateral = Overlay + Core
-    const dealsCollateralValue = overlayCollateral + coreCollateral;
-
-    // §461(l) limitation and carryforward logic
-    // New losses that can be written off this year (capped by §461(l))
-    const newLossWriteOff = Math.min(annualEstOrdinaryLosses, section461Limit);
-
-    // Total write-off = new loss write-off + all prior carryforward
-    const writeOffAmount = newLossWriteOff + carryForward;
-
-    // Carryforward to next year = new losses that exceed §461(l) limit
-    const carryForwardNext = annualEstOrdinaryLosses - newLossWriteOff;
-
-    // Tax savings = write-off × marginal tax rate
-    const taxSavings = writeOffAmount * assumptions.marginalTaxRate;
-
-    // Fees (based on Deals Collateral Value)
-    const advisorManagementFee = dealsCollateralValue * ADVISOR_MGMT_FEE_RATE;
-    const quantinnoFees = dealsCollateralValue * QFAF_FINANCING_FEE_RATE;
-    const totalFees = advisorManagementFee + quantinnoFees;
-
-    // Net tax benefit = tax savings - fees
-    const netTaxBenefit = taxSavings - totalFees;
-
-    // Alpha calculations
-    const qfafAlpha = qfafSubscriptionSize * QFAF_ALPHA_RATE;
-    const quantinnoAlpha = dealsCollateralValue * QUANTINNO_ALPHA_RATE;
-    const totalAlpha = qfafAlpha + quantinnoAlpha;
-
-    results.push({
-      year,
-      calendarYear,
-      dealsCollateralValue,
-      qfafSubscriptionSize,
-      annualEstOrdinaryLosses,
-      section461Limit,
-      carryForwardPrior: carryForward,
-      carryForwardNext,
-      writeOffAmount,
-      taxSavings,
-      advisorManagementFee,
-      quantinnoFees,
-      totalFees,
-      netTaxBenefit,
-      qfafAlpha,
-      quantinnoAlpha,
-      totalAlpha,
-    });
-
-    // Update carryforward for next year
-    carryForward = carryForwardNext;
-  }
-
-  return results;
 }
 
 // Row definitions for the summary table
 interface RowDef {
   key: string;
   label: string;
-  field: keyof YearResult;
+  field: keyof QfafTestYearRow;
   format: 'currency' | 'currency-highlight' | 'currency-positive' | 'currency-negative';
 }
 
@@ -322,8 +97,11 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
   // Get §461(l) limit for display
   const section461Limit = SECTION_461L_LIMITS[filingStatus] || SECTION_461L_LIMITS.single;
 
+  // Compute totals (memoized)
+  const totals = useMemo(() => computeTotals(results), [results]);
+
   // Assumption change handler
-  const handleAssumptionChange = useCallback((field: keyof Assumptions, value: number | string) => {
+  const handleAssumptionChange = useCallback((field: keyof QfafTestAssumptions, value: number | string) => {
     dispatch({ type: 'UPDATE_ASSUMPTION', field, value });
   }, []);
 
@@ -347,34 +125,10 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
     }
   };
 
-  // Compute totals
-  const totals = useMemo(() => {
-    const sum = (field: keyof YearResult) =>
-      results.reduce((acc, r) => acc + (r[field] as number), 0);
-
-    return {
-      dealsCollateralValue: results[results.length - 1]?.dealsCollateralValue || 0,
-      qfafSubscriptionSize: sum('qfafSubscriptionSize'),
-      annualEstOrdinaryLosses: sum('annualEstOrdinaryLosses'),
-      section461Limit: section461Limit,
-      carryForwardPrior: 0,
-      carryForwardNext: results[results.length - 1]?.carryForwardNext || 0,
-      writeOffAmount: sum('writeOffAmount'),
-      taxSavings: sum('taxSavings'),
-      advisorManagementFee: sum('advisorManagementFee'),
-      quantinnoFees: sum('quantinnoFees'),
-      totalFees: sum('totalFees'),
-      netTaxBenefit: sum('netTaxBenefit'),
-      qfafAlpha: sum('qfafAlpha'),
-      quantinnoAlpha: sum('quantinnoAlpha'),
-      totalAlpha: sum('totalAlpha'),
-    };
-  }, [results, section461Limit]);
-
   // Get strategy display name
   const getStrategyLabel = (strategyId: string) => {
     const strategy = STRATEGIES.find(s => s.id === strategyId);
-    return strategy ? strategy.name.split(' ')[1] : strategyId; // e.g., "145/45"
+    return strategy ? strategy.name.split(' ')[1] : strategyId;
   };
 
   return (
