@@ -1,5 +1,6 @@
 import { ReactNode, useState, useRef, useCallback, useEffect } from 'react';
 import type { PanelLayout, AnchorPosition } from '../hooks/usePinnedElements';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 
 interface PinnedElement {
   id: string;
@@ -22,6 +23,32 @@ const MIN_WIDTH = 280;
 const MIN_HEIGHT = 200;
 const MIN_ITEM_HEIGHT = 60;
 const EDGE_MARGIN = 12;
+const ORDER_KEY = STORAGE_KEYS.PINNED_PANEL_ORDER;
+const HEIGHTS_KEY = STORAGE_KEYS.PINNED_PANEL_HEIGHTS;
+
+function loadItemOrder(): string[] {
+  try {
+    const stored = localStorage.getItem(ORDER_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.every((v: unknown) => typeof v === 'string')) return parsed;
+      localStorage.removeItem(ORDER_KEY);
+    }
+  } catch { /* ignore */ }
+  return [];
+}
+
+function loadItemHeights(): Record<string, number> {
+  try {
+    const stored = localStorage.getItem(HEIGHTS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) return parsed;
+      localStorage.removeItem(HEIGHTS_KEY);
+    }
+  } catch { /* ignore */ }
+  return {};
+}
 
 const ANCHOR_CYCLE: (AnchorPosition | null)[] = [
   'bottom-right', 'bottom-left', 'top-right', 'top-left', null,
@@ -79,10 +106,11 @@ export function FloatingPinnedPanel({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
-  const [itemHeights, setItemHeights] = useState<Record<string, number>>({});
+  const [itemHeights, setItemHeights] = useState<Record<string, number>>(loadItemHeights);
   const [itemResizing, setItemResizing] = useState<string | null>(null);
-  const [itemOrder, setItemOrder] = useState<string[]>([]);
+  const [itemOrder, setItemOrder] = useState<string[]>(loadItemOrder);
   const [dragItemId, setDragItemId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
@@ -118,6 +146,7 @@ export function FloatingPinnedPanel({
   }, [layout, onLayoutChange]);
 
   // Sync itemOrder with elements (preserve existing order, append new, remove stale)
+  // Also clean stale collapsedItems and itemHeights (#8)
   useEffect(() => {
     const elementIds = new Set(elements.map(e => e.id));
     setItemOrder(prev => {
@@ -125,11 +154,46 @@ export function FloatingPinnedPanel({
       const existing = new Set(kept);
       const added = elements.filter(e => !existing.has(e.id)).map(e => e.id);
       const merged = [...kept, ...added];
-      // Only update if actually changed
       if (merged.length === prev.length && merged.every((id, i) => prev[i] === id)) return prev;
       return merged;
     });
+    setCollapsedItems(prev => {
+      const stale = [...prev].filter(id => !elementIds.has(id));
+      if (stale.length === 0) return prev;
+      const next = new Set(prev);
+      stale.forEach(id => next.delete(id));
+      return next;
+    });
+    setItemHeights(prev => {
+      const staleKeys = Object.keys(prev).filter(id => !elementIds.has(id));
+      if (staleKeys.length === 0) return prev;
+      const next = { ...prev };
+      staleKeys.forEach(id => delete next[id]);
+      return next;
+    });
   }, [elements]);
+
+  // Persist item order (#4)
+  useEffect(() => {
+    try {
+      if (itemOrder.length > 0) {
+        localStorage.setItem(ORDER_KEY, JSON.stringify(itemOrder));
+      } else {
+        localStorage.removeItem(ORDER_KEY);
+      }
+    } catch { /* ignore */ }
+  }, [itemOrder]);
+
+  // Persist item heights (#5)
+  useEffect(() => {
+    try {
+      if (Object.keys(itemHeights).length > 0) {
+        localStorage.setItem(HEIGHTS_KEY, JSON.stringify(itemHeights));
+      } else {
+        localStorage.removeItem(HEIGHTS_KEY);
+      }
+    } catch { /* ignore */ }
+  }, [itemHeights]);
 
   // Derive ordered elements from itemOrder
   const orderedElements = itemOrder.length > 0
@@ -158,9 +222,9 @@ export function FloatingPinnedPanel({
         dragStartRef.current.y + dy,
         size.width
       );
-      onLayoutChange({ ...clamped, width: size.width, height: size.height });
+      onLayoutChange({ ...clamped, width: size.width, height: size.height, anchor });
     },
-    [isDragging, size.width, size.height, onLayoutChange]
+    [isDragging, size.width, size.height, anchor, onLayoutChange]
   );
 
   const handleDragEnd = useCallback(() => {
@@ -194,9 +258,14 @@ export function FloatingPinnedPanel({
       const maxH = Math.round(window.innerHeight * 0.95);
       const newW = Math.max(MIN_WIDTH, Math.min(resizeStartRef.current.w + dx, maxW));
       const newH = Math.max(MIN_HEIGHT, Math.min(resizeStartRef.current.h + dy, maxH));
-      onLayoutChange({ x: pos.x, y: pos.y, width: newW, height: newH });
+      if (anchor) {
+        const newPos = getAnchoredPosition(anchor, newW, newH);
+        onLayoutChange({ ...newPos, width: newW, height: newH, anchor });
+      } else {
+        onLayoutChange({ x: pos.x, y: pos.y, width: newW, height: newH });
+      }
     },
-    [isResizing, pos.x, pos.y, onLayoutChange]
+    [isResizing, pos.x, pos.y, anchor, onLayoutChange]
   );
 
   const handleResizeEnd = useCallback(() => {
@@ -252,17 +321,19 @@ export function FloatingPinnedPanel({
   const handleItemDragMove = useCallback(
     (e: React.PointerEvent) => {
       if (!dragItemId || !itemDragStartRef.current) return;
-      // Find which item the pointer is over by checking item element midpoints
       const pointerY = e.clientY;
+      let targetId: string | null = null;
       let targetIdx = -1;
       for (const [id, el] of itemRefs.current.entries()) {
         if (id === dragItemId) continue;
         const rect = el.getBoundingClientRect();
         if (pointerY >= rect.top && pointerY <= rect.bottom) {
+          targetId = id;
           targetIdx = itemOrder.indexOf(id);
           break;
         }
       }
+      setDropTargetId(targetId);
       if (targetIdx === -1) return;
       const currentIdx = itemOrder.indexOf(dragItemId);
       if (currentIdx === targetIdx) return;
@@ -278,7 +349,18 @@ export function FloatingPinnedPanel({
 
   const handleItemDragEnd = useCallback(() => {
     setDragItemId(null);
+    setDropTargetId(null);
     itemDragStartRef.current = null;
+  }, []);
+
+  // Double-click item resize handle to reset to flex sizing (#7)
+  const resetItemHeight = useCallback((id: string) => {
+    setItemHeights(prev => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
 
   // Toggle collapse on individual item
@@ -428,7 +510,7 @@ export function FloatingPinnedPanel({
               <div
                 key={el.id}
                 ref={node => { if (node) itemRefs.current.set(el.id, node); else itemRefs.current.delete(el.id); }}
-                className={`floating-panel__item${itemCollapsed ? ' floating-panel__item--collapsed' : ''}${dragItemId === el.id ? ' floating-panel__item--dragging' : ''}`}
+                className={`floating-panel__item${itemCollapsed ? ' floating-panel__item--collapsed' : ''}${dragItemId === el.id ? ' floating-panel__item--dragging' : ''}${dropTargetId === el.id ? ' floating-panel__item--drop-target' : ''}`}
               >
                 <div
                   className="floating-panel__item-header"
@@ -479,6 +561,8 @@ export function FloatingPinnedPanel({
                         onPointerMove={handleItemResizeMove}
                         onPointerUp={handleItemResizeEnd}
                         onPointerCancel={handleItemResizeEnd}
+                        onDoubleClick={() => resetItemHeight(el.id)}
+                        title="Drag to resize · Double-click to reset"
                         aria-hidden="true"
                       />
                     )}

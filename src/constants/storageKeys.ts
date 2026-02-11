@@ -19,4 +19,8 @@ export const STORAGE_KEYS = {
   PINNED_ELEMENTS: 'taxCalc:pinned-elements',
   /** Floating panel position and size */
   PINNED_PANEL_LAYOUT: 'taxCalc:pinned-panel-layout',
+  /** Floating panel item order */
+  PINNED_PANEL_ORDER: 'taxCalc:pinned-panel-order',
+  /** Floating panel per-item heights */
+  PINNED_PANEL_HEIGHTS: 'taxCalc:pinned-panel-heights',
 } as const;
