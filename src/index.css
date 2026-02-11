@@ -2665,8 +2665,6 @@ tfoot td {
   flex-shrink: 0;
   cursor: grab;
   user-select: none;
-  position: relative;
-  z-index: 4; /* Above resize zones so header buttons remain clickable */
 }
 
 .floating-panel--dragging .floating-panel__header {
@@ -2801,7 +2799,7 @@ tfoot td {
 }
 
 .floating-panel__item:not(.floating-panel__item--collapsed) {
-  flex: 1;
+  flex: none;
 }
 
 .floating-panel__item:focus-within {
@@ -2905,17 +2903,16 @@ tfoot td {
 .floating-panel__item-content {
   padding: 0.625rem;
   font-size: 0.8rem;
-  flex: 1;
-  min-height: 0;
   min-width: 0;
+  max-height: 50vh;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
 }
 
-/* When user has manually resized, use fixed height instead of flex */
+/* When user has manually resized, override natural max-height */
 .floating-panel__item-content--fixed {
-  flex: none;
+  max-height: none;
 }
 
 /* --- Per-item vertical resize handle --- */
