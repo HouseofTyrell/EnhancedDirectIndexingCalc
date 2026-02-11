@@ -2637,13 +2637,15 @@ tfoot td {
   border-radius: 10px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  transition: transform 0.25s ease;
 }
 
 .floating-panel--collapsed {
   height: auto !important;
 }
 
-.floating-panel--dragging {
+.floating-panel--dragging,
+.floating-panel--resizing {
   user-select: none;
   transition: none;
 }
@@ -2663,6 +2665,8 @@ tfoot td {
   flex-shrink: 0;
   cursor: grab;
   user-select: none;
+  position: relative;
+  z-index: 4; /* Above resize zones so header buttons remain clickable */
 }
 
 .floating-panel--dragging .floating-panel__header {
@@ -2946,24 +2950,34 @@ tfoot td {
   background: var(--primary);
 }
 
-/* --- Resize handle --- */
-.floating-panel__resize-handle {
+/* --- Multi-directional resize zones --- */
+.floating-panel__resize-zone {
   position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 16px;
-  height: 16px;
-  cursor: nwse-resize;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  z-index: 2;
   touch-action: none;
 }
 
-.floating-panel:hover .floating-panel__resize-handle {
-  opacity: 1;
+/* Edges */
+.floating-panel__resize-zone--n { top: 0; left: 10px; right: 10px; height: 4px; cursor: ns-resize; }
+.floating-panel__resize-zone--s { bottom: 0; left: 10px; right: 10px; height: 4px; cursor: ns-resize; }
+.floating-panel__resize-zone--e { right: 0; top: 10px; bottom: 10px; width: 4px; cursor: ew-resize; }
+.floating-panel__resize-zone--w { left: 0; top: 10px; bottom: 10px; width: 4px; cursor: ew-resize; }
+
+/* Corners (higher z-index to take priority over edges) */
+.floating-panel__resize-zone--ne,
+.floating-panel__resize-zone--nw,
+.floating-panel__resize-zone--se,
+.floating-panel__resize-zone--sw {
+  z-index: 3;
 }
 
-.floating-panel__resize-handle::before {
+.floating-panel__resize-zone--ne { top: 0; right: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+.floating-panel__resize-zone--nw { top: 0; left: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+.floating-panel__resize-zone--se { bottom: 0; right: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+.floating-panel__resize-zone--sw { bottom: 0; left: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+
+/* Visual indicator on SE corner (conventional resize grip) */
+.floating-panel__resize-zone--se::before {
   content: '';
   position: absolute;
   bottom: 3px;
@@ -2972,10 +2986,15 @@ tfoot td {
   height: 8px;
   border-right: 2px solid var(--text-light);
   border-bottom: 2px solid var(--text-light);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.floating-panel:hover .floating-panel__resize-zone--se::before {
   opacity: 0.4;
 }
 
-[data-theme='dark'] .floating-panel__resize-handle::before {
+[data-theme='dark'] .floating-panel:hover .floating-panel__resize-zone--se::before {
   opacity: 0.3;
 }
 
@@ -3092,6 +3111,29 @@ tfoot td {
 
 .floating-panel__item-content .tax-rate-card {
   padding: 0.375rem 0.5rem;
+}
+
+/* Comparison panel compact: strip chrome when inside floating panel */
+.floating-panel__item-content .comparison-panel {
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.floating-panel__item-content .comparison-panel__header {
+  background: none;
+  border-bottom: 1px solid var(--border);
+  padding: 0.375rem 0.5rem;
+}
+
+[data-theme='dark'] .floating-panel__item-content .comparison-panel__header {
+  background: none;
+}
+
+.floating-panel__item-content .comparison-panel__body {
+  padding: 0.5rem;
 }
 
 /* Pinnable section buttons hidden inside floating panel */

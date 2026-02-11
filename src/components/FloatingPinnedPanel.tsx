@@ -17,12 +17,16 @@ interface FloatingPinnedPanelProps {
   onLayoutReset: () => void;
 }
 
+type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
 const DEFAULT_WIDTH = 480;
 const DEFAULT_HEIGHT = 640;
 const MIN_WIDTH = 280;
 const MIN_HEIGHT = 200;
 const MIN_ITEM_HEIGHT = 60;
 const EDGE_MARGIN = 12;
+const COLLAPSED_HEIGHT = 48;
+const RESIZE_DIRS: ResizeDir[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 const ORDER_KEY = STORAGE_KEYS.PINNED_PANEL_ORDER;
 const HEIGHTS_KEY = STORAGE_KEYS.PINNED_PANEL_HEIGHTS;
 
@@ -104,7 +108,7 @@ export function FloatingPinnedPanel({
   const [collapsed, setCollapsed] = useState(false);
   const [collapsedItems, setCollapsedItems] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDir, setResizeDir] = useState<ResizeDir | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [itemHeights, setItemHeights] = useState<Record<string, number>>(loadItemHeights);
   const [itemResizing, setItemResizing] = useState<string | null>(null);
@@ -112,9 +116,13 @@ export function FloatingPinnedPanel({
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
+  const isResizing = resizeDir !== null;
+
   const panelRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
-  const resizeStartRef = useRef<{ w: number; h: number; px: number; py: number } | null>(null);
+  const resizeStartRef = useRef<{
+    dir: ResizeDir; w: number; h: number; x: number; y: number; px: number; py: number;
+  } | null>(null);
   const itemResizeStartRef = useRef<{ id: string; h: number; py: number } | null>(null);
   const itemDragStartRef = useRef<{ id: string; py: number } | null>(null);
   const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -131,22 +139,27 @@ export function FloatingPinnedPanel({
       ? { x: layout.x, y: layout.y }
       : getDefaultPosition();
 
-  // Track mobile breakpoint + recompute anchored position on window resize
+  // Track mobile breakpoint + recompute anchored position on window resize (throttled)
   useEffect(() => {
+    let rafId = 0;
     const onResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-      // Recompute anchored position when viewport changes
-      if (layout?.anchor) {
-        const newPos = getAnchoredPosition(layout.anchor, layout.width, layout.height);
-        onLayoutChange({ ...layout, ...newPos });
-      }
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        setIsMobile(window.innerWidth <= 768);
+        if (layout?.anchor) {
+          const newPos = getAnchoredPosition(layout.anchor, layout.width, layout.height);
+          onLayoutChange({ ...layout, ...newPos });
+        }
+      });
     };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(rafId);
+    };
   }, [layout, onLayoutChange]);
 
-  // Sync itemOrder with elements (preserve existing order, append new, remove stale)
-  // Also clean stale collapsedItems and itemHeights (#8)
+  // Sync itemOrder with elements + clean stale collapsedItems and itemHeights
   useEffect(() => {
     const elementIds = new Set(elements.map(e => e.id));
     setItemOrder(prev => {
@@ -173,7 +186,7 @@ export function FloatingPinnedPanel({
     });
   }, [elements]);
 
-  // Persist item order (#4)
+  // Persist item order
   useEffect(() => {
     try {
       if (itemOrder.length > 0) {
@@ -184,7 +197,7 @@ export function FloatingPinnedPanel({
     } catch { /* ignore */ }
   }, [itemOrder]);
 
-  // Persist item heights (#5)
+  // Persist item heights
   useEffect(() => {
     try {
       if (Object.keys(itemHeights).length > 0) {
@@ -200,14 +213,14 @@ export function FloatingPinnedPanel({
     ? itemOrder.map(id => elements.find(e => e.id === id)).filter((e): e is PinnedElement => !!e)
     : elements;
 
-  // --- Drag ---
+  // --- Panel drag ---
   const handleDragStart = useCallback(
     (e: React.PointerEvent) => {
       if (isMobile || isResizing) return;
       e.preventDefault();
       setIsDragging(true);
       dragStartRef.current = { x: pos.x, y: pos.y, px: e.clientX, py: e.clientY };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
     [pos.x, pos.y, isMobile, isResizing]
   );
@@ -236,40 +249,59 @@ export function FloatingPinnedPanel({
     }
   }, [anchor, pos.x, pos.y, size.width, size.height, onLayoutChange]);
 
-  // --- Resize ---
+  // --- Panel resize (multi-directional) ---
   const handleResizeStart = useCallback(
-    (e: React.PointerEvent) => {
+    (dir: ResizeDir, e: React.PointerEvent) => {
       if (isMobile) return;
       e.preventDefault();
       e.stopPropagation();
-      setIsResizing(true);
-      resizeStartRef.current = { w: size.width, h: size.height, px: e.clientX, py: e.clientY };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      setResizeDir(dir);
+      resizeStartRef.current = {
+        dir, w: size.width, h: size.height, x: pos.x, y: pos.y,
+        px: e.clientX, py: e.clientY,
+      };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [size.width, size.height, isMobile]
+    [size.width, size.height, pos.x, pos.y, isMobile]
   );
 
   const handleResizeMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!isResizing || !resizeStartRef.current) return;
-      const dx = e.clientX - resizeStartRef.current.px;
-      const dy = e.clientY - resizeStartRef.current.py;
+      if (!resizeDir || !resizeStartRef.current) return;
+      const { dir, w: startW, h: startH, x: startX, y: startY, px: startPx, py: startPy } = resizeStartRef.current;
+      const dx = e.clientX - startPx;
+      const dy = e.clientY - startPy;
       const maxW = Math.round(window.innerWidth * 0.9);
       const maxH = Math.round(window.innerHeight * 0.95);
-      const newW = Math.max(MIN_WIDTH, Math.min(resizeStartRef.current.w + dx, maxW));
-      const newH = Math.max(MIN_HEIGHT, Math.min(resizeStartRef.current.h + dy, maxH));
+
+      let newW = startW;
+      let newH = startH;
+      if (dir.includes('e')) newW = startW + dx;
+      if (dir.includes('w')) newW = startW - dx;
+      if (dir.includes('s')) newH = startH + dy;
+      if (dir.includes('n')) newH = startH - dy;
+
+      newW = Math.max(MIN_WIDTH, Math.min(newW, maxW));
+      newH = Math.max(MIN_HEIGHT, Math.min(newH, maxH));
+
+      // Adjust position so opposite edge stays fixed
+      let newX = startX;
+      let newY = startY;
+      if (dir.includes('w')) newX = startX + startW - newW;
+      if (dir.includes('n')) newY = startY + startH - newH;
+
       if (anchor) {
-        const newPos = getAnchoredPosition(anchor, newW, newH);
-        onLayoutChange({ ...newPos, width: newW, height: newH, anchor });
+        const anchoredPos = getAnchoredPosition(anchor, newW, newH);
+        onLayoutChange({ ...anchoredPos, width: newW, height: newH, anchor });
       } else {
-        onLayoutChange({ x: pos.x, y: pos.y, width: newW, height: newH });
+        onLayoutChange({ x: newX, y: newY, width: newW, height: newH });
       }
     },
-    [isResizing, pos.x, pos.y, anchor, onLayoutChange]
+    [resizeDir, anchor, onLayoutChange]
   );
 
   const handleResizeEnd = useCallback(() => {
-    setIsResizing(false);
+    setResizeDir(null);
     resizeStartRef.current = null;
   }, []);
 
@@ -279,13 +311,12 @@ export function FloatingPinnedPanel({
       if (isMobile) return;
       e.preventDefault();
       e.stopPropagation();
-      // Get current actual height from DOM, or fall back to a reasonable default
       const el = itemRefs.current.get(id);
       const contentEl = el?.querySelector('.floating-panel__item-content') as HTMLElement | null;
       const currentH = itemHeights[id] ?? contentEl?.offsetHeight ?? 200;
       setItemResizing(id);
       itemResizeStartRef.current = { id, h: currentH, py: e.clientY };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
     [isMobile, itemHeights]
   );
@@ -313,7 +344,7 @@ export function FloatingPinnedPanel({
       e.stopPropagation();
       setDragItemId(id);
       itemDragStartRef.current = { id, py: e.clientY };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
     [isMobile]
   );
@@ -353,7 +384,7 @@ export function FloatingPinnedPanel({
     itemDragStartRef.current = null;
   }, []);
 
-  // Double-click item resize handle to reset to flex sizing (#7)
+  // Double-click item resize handle to reset to flex sizing
   const resetItemHeight = useCallback((id: string) => {
     setItemHeights(prev => {
       if (!(id in prev)) return prev;
@@ -392,18 +423,31 @@ export function FloatingPinnedPanel({
     }
   }, [anchor, size.width, size.height, pos.x, pos.y, onLayoutChange]);
 
+  // Full reset: position, size, order, heights, collapsed state
+  const handleFullReset = useCallback(() => {
+    setItemOrder([]);
+    setItemHeights({});
+    setCollapsedItems(new Set());
+    onLayoutReset();
+  }, [onLayoutReset]);
+
   if (elements.length === 0) return null;
 
   const allCollapsed = elements.length > 0 && elements.every(e => collapsedItems.has(e.id));
 
-  // Mobile: bottom sheet style
+  // When collapsed, anchor Y to bottom of viewport
+  const effectiveY = collapsed
+    ? window.innerHeight - COLLAPSED_HEIGHT - EDGE_MARGIN
+    : pos.y;
+
+  // Mobile: bottom sheet style; Desktop: fixed with transform
   const panelStyle: React.CSSProperties = isMobile
     ? {}
     : {
         position: 'fixed',
         top: 0,
         left: 0,
-        transform: `translate(${pos.x}px, ${pos.y}px)`,
+        transform: `translate(${pos.x}px, ${effectiveY}px)`,
         width: size.width,
         height: collapsed ? 'auto' : size.height,
       };
@@ -411,7 +455,7 @@ export function FloatingPinnedPanel({
   return (
     <div
       ref={panelRef}
-      className={`floating-panel${collapsed ? ' floating-panel--collapsed' : ''}${isDragging ? ' floating-panel--dragging' : ''}${isMobile ? ' floating-panel--mobile' : ''}`}
+      className={`floating-panel${collapsed ? ' floating-panel--collapsed' : ''}${isDragging ? ' floating-panel--dragging' : ''}${isResizing ? ' floating-panel--resizing' : ''}${isMobile ? ' floating-panel--mobile' : ''}`}
       style={panelStyle}
     >
       {/* Header — draggable */}
@@ -426,6 +470,7 @@ export function FloatingPinnedPanel({
         <button
           className="floating-panel__toggle"
           onClick={() => setCollapsed(c => !c)}
+          onPointerDown={e => e.stopPropagation()}
           aria-label={collapsed ? 'Expand pinned panel' : 'Collapse pinned panel'}
         >
           {collapsed ? '▲' : '▼'}
@@ -433,7 +478,7 @@ export function FloatingPinnedPanel({
         <span className="floating-panel__title">
           Pinned <span className="floating-panel__count">{elements.length}</span>
         </span>
-        <div className="floating-panel__header-actions">
+        <div className="floating-panel__header-actions" onPointerDown={e => e.stopPropagation()}>
           {!collapsed && elements.length > 1 && (
             <button
               className="floating-panel__collapse-toggle-btn"
@@ -475,9 +520,9 @@ export function FloatingPinnedPanel({
           {!isMobile && (
             <button
               className="floating-panel__reset-btn"
-              onClick={onLayoutReset}
-              title="Reset position & size"
-              aria-label="Reset panel position and size"
+              onClick={handleFullReset}
+              title="Reset position, size & layout"
+              aria-label="Reset panel position, size and layout"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -574,17 +619,18 @@ export function FloatingPinnedPanel({
         </div>
       )}
 
-      {/* Resize handle (desktop only, when expanded) */}
-      {!collapsed && !isMobile && (
+      {/* Multi-directional resize zones (desktop, expanded only) */}
+      {!collapsed && !isMobile && RESIZE_DIRS.map(dir => (
         <div
-          className="floating-panel__resize-handle"
-          onPointerDown={handleResizeStart}
+          key={dir}
+          className={`floating-panel__resize-zone floating-panel__resize-zone--${dir}`}
+          onPointerDown={e => handleResizeStart(dir, e)}
           onPointerMove={handleResizeMove}
           onPointerUp={handleResizeEnd}
           onPointerCancel={handleResizeEnd}
           aria-hidden="true"
         />
-      )}
+      ))}
     </div>
   );
 }

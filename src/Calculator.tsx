@@ -681,7 +681,10 @@ export function Calculator() {
           pinnedElements.unpin(id);
           if (id === 'comparison') pinnedScenario.unpin();
         }}
-        onUnpinAll={pinnedElements.unpinAll}
+        onUnpinAll={() => {
+          pinnedElements.unpinAll();
+          pinnedScenario.unpin();
+        }}
         layout={pinnedElements.panelLayout}
         onLayoutChange={pinnedElements.updatePanelLayout}
         onLayoutReset={pinnedElements.resetPanelLayout}
