@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Calculator } from './Calculator';
 import { QfafTestPage } from './pages/QfafTestPage';
+import { EdiOnlyPage } from './pages/EdiOnlyPage';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-type View = 'calculator' | 'qfaf-test';
+type View = 'calculator' | 'qfaf-test' | 'edi-only';
 
 export function App() {
   const [activeView, setActiveView] = useState<View>('calculator');
@@ -25,6 +26,12 @@ export function App() {
           >
             QFAF Test
           </button>
+          <button
+            className={`nav-tab ${activeView === 'edi-only' ? 'active' : ''}`}
+            onClick={() => setActiveView('edi-only')}
+          >
+            EDI-Only
+          </button>
           <ThemeToggle />
         </div>
       </nav>
@@ -33,6 +40,7 @@ export function App() {
         <ErrorBoundary>
           {activeView === 'calculator' && <Calculator />}
           {activeView === 'qfaf-test' && <QfafTestPage />}
+          {activeView === 'edi-only' && <EdiOnlyPage />}
         </ErrorBoundary>
       </main>
     </div>

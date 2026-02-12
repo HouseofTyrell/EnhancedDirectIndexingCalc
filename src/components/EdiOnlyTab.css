@@ -1,0 +1,592 @@
+/* EDI-Only Tab - Excel-style layout */
+
+.edi-only-tab {
+  padding: 0;
+  max-width: 100%;
+}
+
+/* Assumptions Section */
+.edi-assumptions-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.edi-assumptions-section h3 {
+  color: var(--text, #1f2937);
+  font-size: 1.1rem;
+  margin: 0 0 1.25rem 0;
+  font-weight: 600;
+}
+
+.edi-assumptions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.edi-assumption-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.edi-assumption-row label {
+  color: var(--text-light, #6b7280);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.edi-only-tab .editable-cell {
+  background: #fff3cd !important;
+  border: 1px solid #ffc107 !important;
+  border-radius: 4px;
+}
+
+.edi-only-tab .editable-cell input,
+.edi-only-tab .editable-cell select {
+  background: transparent !important;
+  color: #664d03 !important;
+  font-weight: 600 !important;
+  border: none !important;
+}
+
+.edi-only-tab .input-with-prefix,
+.edi-only-tab .input-with-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background: var(--bg, #f9fafb);
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.edi-only-tab .input-with-prefix input,
+.edi-only-tab .input-with-suffix input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text, #1f2937);
+  font-size: 0.95rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.edi-only-tab .input-with-prefix input:focus,
+.edi-only-tab .input-with-suffix input:focus {
+  outline: none;
+}
+
+.edi-only-tab .input-with-prefix .prefix {
+  color: var(--text-light, #6b7280);
+  font-size: 0.875rem;
+  margin-right: 0.25rem;
+}
+
+.edi-only-tab .input-with-suffix .suffix {
+  color: var(--text-light, #6b7280);
+  font-size: 0.875rem;
+  margin-left: 0.25rem;
+}
+
+.edi-only-tab .select-cell {
+  padding: 0 !important;
+}
+
+.edi-only-tab .select-cell select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.edi-assumptions-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.edi-assumptions-footer .filing-status-note {
+  color: var(--text-light, #6b7280);
+  font-size: 0.8rem;
+}
+
+/* Year-by-Year Table */
+.edi-summary-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.edi-summary-section h3 {
+  color: var(--text, #1f2937);
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.edi-table-container {
+  overflow-x: auto;
+  margin: -0.5rem;
+  padding: 0.5rem;
+}
+
+.edi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  min-width: 900px;
+}
+
+.edi-table th,
+.edi-table td {
+  padding: 0.5rem 0.625rem;
+  text-align: right;
+  border: 1px solid var(--border, #e5e7eb);
+  white-space: nowrap;
+}
+
+.edi-table th {
+  background: var(--bg, #f9fafb);
+  color: var(--text, #1f2937);
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+.edi-table .col-label {
+  text-align: left;
+  min-width: 200px;
+  position: sticky;
+  left: 0;
+  background: var(--bg, #f9fafb);
+  z-index: 20;
+}
+
+.edi-table .row-label {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text, #1f2937);
+  position: sticky;
+  left: 0;
+  background: var(--card-bg, #ffffff);
+  z-index: 5;
+  font-size: 0.75rem;
+}
+
+.edi-table .col-year {
+  min-width: 80px;
+}
+
+.edi-table .col-total {
+  min-width: 90px;
+  background: var(--bg, #f9fafb);
+  font-weight: 600;
+}
+
+.edi-table .cell-total {
+  font-weight: 600;
+  background: var(--bg, #f9fafb);
+  color: var(--text, #1f2937);
+}
+
+/* Row highlighting */
+.edi-table tr.row-highlight td {
+  background: #fef3c7;
+}
+.edi-table tr.row-highlight .row-label {
+  background: #fef3c7;
+}
+.edi-table tr.row-highlight .cell-total {
+  background: #fde68a;
+}
+
+.edi-table tr.row-positive td {
+  background: #dcfce7;
+}
+.edi-table tr.row-positive .row-label {
+  background: #dcfce7;
+}
+.edi-table tr.row-positive .cell-total {
+  background: #bbf7d0;
+}
+
+.edi-table tr.row-negative td {
+  background: #fee2e2;
+}
+.edi-table tr.row-negative .row-label {
+  background: #fee2e2;
+}
+.edi-table tr.row-negative .cell-total {
+  background: #fecaca;
+}
+
+/* Cell formatting */
+.edi-cell-highlight {
+  color: #b45309 !important;
+  font-weight: 600;
+}
+
+.edi-cell-positive {
+  color: #15803d !important;
+}
+
+.edi-cell-negative {
+  color: #dc2626 !important;
+}
+
+.edi-cell-ratio {
+  color: var(--primary, #2563eb) !important;
+  font-weight: 600;
+}
+
+/* Summary Cards */
+.edi-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.edi-summary-card {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.edi-summary-card .card-label {
+  color: var(--text-light, #6b7280);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.edi-summary-card .card-value {
+  color: var(--text, #1f2937);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.edi-summary-card .card-value.positive {
+  color: #15803d;
+}
+
+.edi-summary-card .card-value.highlight {
+  color: #b45309;
+}
+
+.edi-summary-card .card-detail {
+  color: var(--text-light, #6b7280);
+  font-size: 0.7rem;
+  margin-top: 0.25rem;
+}
+
+/* Scenario Cards */
+.edi-scenarios-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.edi-scenarios-section h3 {
+  color: var(--text, #1f2937);
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.edi-scenario-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.edi-scenario-card {
+  background: var(--bg, #f9fafb);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.edi-scenario-card h4 {
+  color: var(--text, #1f2937);
+  font-size: 0.95rem;
+  margin: 0 0 0.25rem 0;
+  font-weight: 600;
+}
+
+.edi-scenario-card .scenario-description {
+  color: var(--text-light, #6b7280);
+  font-size: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.scenario-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scenario-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.scenario-metric .metric-label {
+  color: var(--text-light, #6b7280);
+}
+
+.scenario-metric .metric-value {
+  color: var(--text, #1f2937);
+  font-weight: 600;
+}
+
+.scenario-metric .metric-value.saved {
+  color: #15803d;
+  font-size: 1rem;
+}
+
+.scenario-metric-divider {
+  border: none;
+  border-top: 1px solid var(--border, #e5e7eb);
+  margin: 0.25rem 0;
+}
+
+/* Unwind Analysis Section */
+.edi-unwind-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.edi-unwind-section h3 {
+  color: var(--text, #1f2937);
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.unwind-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.unwind-slider-row label {
+  color: var(--text, #1f2937);
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.unwind-slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--primary, #2563eb);
+  cursor: pointer;
+}
+
+.unwind-slider-row .unwind-year-display {
+  color: var(--primary, #2563eb);
+  font-weight: 700;
+  font-size: 1.1rem;
+  min-width: 60px;
+  text-align: center;
+}
+
+.unwind-comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.unwind-comparison-table th,
+.unwind-comparison-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: right;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.unwind-comparison-table th {
+  background: var(--bg, #f9fafb);
+  color: var(--text, #1f2937);
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.unwind-comparison-table td:first-child {
+  text-align: center;
+  font-weight: 600;
+}
+
+.unwind-comparison-table tr.break-even-row td {
+  background: #dcfce7;
+  font-weight: 600;
+}
+
+/* Estate Comparison */
+.edi-estate-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.edi-estate-section h3 {
+  color: var(--text, #1f2937);
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.estate-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.estate-option {
+  background: var(--bg, #f9fafb);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.estate-option.recommended {
+  border-color: #15803d;
+  background: #f0fdf4;
+}
+
+.estate-option h4 {
+  color: var(--text, #1f2937);
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem 0;
+  font-weight: 600;
+}
+
+.estate-option.recommended h4::after {
+  content: ' (Recommended)';
+  color: #15803d;
+  font-size: 0.75rem;
+}
+
+.estate-metric {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin-bottom: 0.375rem;
+}
+
+.estate-metric .estate-label {
+  color: var(--text-light, #6b7280);
+}
+
+.estate-metric .estate-value {
+  color: var(--text, #1f2937);
+  font-weight: 600;
+}
+
+.estate-explanation {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 1rem;
+  font-size: 0.8rem;
+  color: #1e40af;
+  line-height: 1.5;
+}
+
+.estate-disclaimer {
+  color: var(--text-light, #6b7280);
+  font-size: 0.7rem;
+  font-style: italic;
+  margin-top: 0.75rem;
+}
+
+/* PA State Warning */
+.state-warning-banner {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  color: #92400e;
+}
+
+/* Notes */
+.edi-notes {
+  background: var(--card-bg, #ffffff);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.edi-notes h4 {
+  color: var(--text, #1f2937);
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem 0;
+  font-weight: 600;
+}
+
+.edi-notes ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.edi-notes li {
+  color: var(--text-light, #6b7280);
+  font-size: 0.8rem;
+  margin-bottom: 0.375rem;
+  padding-left: 1rem;
+  position: relative;
+}
+
+.edi-notes li::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+  color: var(--primary, #2563eb);
+}
+
+.edi-notes li strong {
+  color: var(--text, #1f2937);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .edi-assumptions-grid {
+    grid-template-columns: 1fr;
+  }
+  .estate-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+  .edi-table {
+    font-size: 0.7rem;
+  }
+}
