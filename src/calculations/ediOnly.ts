@@ -452,20 +452,21 @@ export function estimateEmbeddedGainPct(
 
   let portfolioValue = 1.0;
   let cumulativeBasisReduction = 0;
-  let cumulativeRealized = 0;
 
   for (let y = 1; y <= year; y++) {
     const stLossRate = getStLossRateForYear(strategy, y);
     const ltGainRate = strategy.ltGainRate;
+    // Net basis reduction: harvesting lowers basis, LT realization raises it
     const netStLoss = Math.max(0, stLossRate - ltGainRate);
 
     cumulativeBasisReduction += portfolioValue * netStLoss;
-    cumulativeRealized += portfolioValue * ltGainRate;
     portfolioValue *= (1 + annualReturn);
   }
 
+  // Embedded gain = unrealized appreciation + cumulative net basis reduction
+  // cumulativeBasisReduction is already net of LT gain realization (stLoss - ltGain)
   const cumulativeAppreciation = portfolioValue - 1.0;
-  const embeddedGain = cumulativeAppreciation - cumulativeRealized + cumulativeBasisReduction;
+  const embeddedGain = cumulativeAppreciation + cumulativeBasisReduction;
   return Math.max(0, embeddedGain / portfolioValue);
 }
 

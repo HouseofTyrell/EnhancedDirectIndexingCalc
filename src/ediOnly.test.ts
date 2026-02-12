@@ -263,7 +263,10 @@ describe('embedded gain estimation', () => {
   it('should have embedded gain with zero growth from basis reduction', () => {
     const pct = estimateEmbeddedGainPct('overlay-45-45', 1, 0);
     // Basis reduction from harvesting creates embedded gain even at 0% growth
-    expect(pct).toBeGreaterThan(0);
+    // Year 1: stLossRate=16.5%, ltGainRate=1.4%, netStLoss=15.1%
+    // embeddedGain = 0 (no appreciation) + 0.151 (basis reduction) = 0.151
+    // PV stays 1.0, so pct = 0.151 / 1.0 = 15.1%
+    expect(pct).toBeCloseTo(0.151, 3);
   });
 });
 
