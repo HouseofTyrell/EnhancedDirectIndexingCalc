@@ -91,12 +91,12 @@ export const EdiStickyHeader = React.memo(function EdiStickyHeader({
           {pinnedValues && <PinnedDelta current={collateral} pinned={pinnedValues.collateral} />}
         </div>
         <div className="sticky-header__metric sticky-header__metric--highlight">
-          <span className="sticky-header__label">Total Tax Savings</span>
+          <span className="sticky-header__label">Potential Tax Savings</span>
           <span className="sticky-header__value" ref={savingsFlash}>
             {formatCurrency(totalTaxSavings)}
             <DeltaBadge delta={savingsDelta} />
           </span>
-          {isExpanded && <span className="sticky-header__subtext">Across all years</span>}
+          {isExpanded && <span className="sticky-header__subtext">CF shield + realized</span>}
           {pinnedValues && <PinnedDelta current={totalTaxSavings} pinned={pinnedValues.totalTaxSavings} />}
         </div>
         <div className="sticky-header__metric sticky-header__metric--primary">

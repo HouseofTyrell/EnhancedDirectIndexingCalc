@@ -126,7 +126,7 @@ function buildEdiMetrics(
   current: EdiPinnedResults
 ): ComparisonMetric[] {
   const metrics: { label: string; pv: number; cv: number; format: 'currency' | 'percent'; higherIsBetter: boolean }[] = [
-    { label: 'Total Tax Savings', pv: pinned.totalTaxSavings, cv: current.totalTaxSavings, format: 'currency', higherIsBetter: true },
+    { label: 'Potential Tax Savings', pv: pinned.totalTaxSavings, cv: current.totalTaxSavings, format: 'currency', higherIsBetter: true },
     { label: 'Carryforward Built', pv: pinned.totalCarryforwardBuilt, cv: current.totalCarryforwardBuilt, format: 'currency', higherIsBetter: true },
     { label: 'Final ST Carryforward', pv: pinned.finalStCarryforward, cv: current.finalStCarryforward, format: 'currency', higherIsBetter: true },
     { label: 'Final LT Carryforward', pv: pinned.finalLtCarryforward, cv: current.finalLtCarryforward, format: 'currency', higherIsBetter: true },

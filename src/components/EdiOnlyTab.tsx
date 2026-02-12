@@ -210,8 +210,10 @@ export function EdiOnlyTab({
   }), [combinedStRate, combinedLtRate, filingStatus, stateCode]);
 
   const lastYear = projection.years[projection.years.length - 1];
+  // Total potential tax savings = realized benefit ($3K deductions) + carryforward tax shield
+  const totalPotentialSavings = projection.summary.totalRealizedBenefit + projection.summary.carryforwardTaxShield;
   const currentResults: EdiPinnedResults = useMemo(() => ({
-    totalTaxSavings: projection.summary.totalRealizedBenefit,
+    totalTaxSavings: projection.summary.totalRealizedBenefit + projection.summary.carryforwardTaxShield,
     totalCarryforwardBuilt: projection.summary.finalCarryforward,
     finalStCarryforward: lastYear?.endingStCarryforward ?? 0,
     finalLtCarryforward: lastYear?.endingLtCarryforward ?? 0,
@@ -243,7 +245,7 @@ export function EdiOnlyTab({
       <EdiStickyHeader
         strategyName={strategy?.name ?? state.assumptions.strategyId}
         collateral={state.assumptions.collateralValue}
-        totalTaxSavings={projection.summary.totalRealizedBenefit}
+        totalTaxSavings={totalPotentialSavings}
         totalCarryforward={projection.summary.finalCarryforward}
         isExpanded={isExpanded}
         hasPinned={hasPinned}
@@ -279,14 +281,16 @@ export function EdiOnlyTab({
       {/* Summary Cards */}
       <div className="edi-summary-cards">
         <div className="edi-summary-card">
-          <div className="card-label">Final Carryforward (Year {state.assumptions.projectionYears})</div>
-          <div className="card-value highlight">{formatCurrency(projection.summary.finalCarryforward)}</div>
-          <div className="card-detail">Tax shield: {formatCurrency(projection.summary.carryforwardTaxShield)}</div>
+          <div className="card-label">Total Potential Tax Savings</div>
+          <div className="card-value positive">{formatCurrency(totalPotentialSavings)}</div>
+          <div className="card-detail">
+            CF shield: {formatCurrency(projection.summary.carryforwardTaxShield)} + realized: {formatCurrency(projection.summary.totalRealizedBenefit)}
+          </div>
         </div>
         <div className="edi-summary-card">
-          <div className="card-label">Total Realized Benefit</div>
-          <div className="card-value positive">{formatCurrency(projection.summary.totalRealizedBenefit)}</div>
-          <div className="card-detail">From $3K annual deductions</div>
+          <div className="card-label">Final Carryforward (Year {state.assumptions.projectionYears})</div>
+          <div className="card-value highlight">{formatCurrency(projection.summary.finalCarryforward)}</div>
+          <div className="card-detail">Shelters gains at {(combinedLtRate * 100).toFixed(1)}% LT rate</div>
         </div>
         <div className="edi-summary-card">
           <div className="card-label">Total ST Losses Harvested</div>
