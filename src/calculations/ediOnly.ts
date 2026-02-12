@@ -497,7 +497,9 @@ export function calculateUnwindAnalysis(input: UnwindInput): UnwindResult {
   const yearIdx = Math.min(unwindYear - 1, projection.years.length - 1);
   const yearData = projection.years[yearIdx];
 
-  const portfolioValue = yearData.collateralValue;
+  // Use end-of-year portfolio value to match estimateEmbeddedGainPct's denominator
+  // and endingCarryforward timing (both are end-of-year values)
+  const portfolioValue = yearData.collateralValue * (1 + annualReturn);
   const embeddedGainPct = estimateEmbeddedGainPct(strategyId, unwindYear, annualReturn);
   const embeddedGain = safeNumber(portfolioValue * embeddedGainPct);
 
