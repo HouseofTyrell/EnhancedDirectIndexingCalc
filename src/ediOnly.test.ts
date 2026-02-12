@@ -5,6 +5,8 @@ import {
   calculateRealizationScenario,
   getDefaultScenarios,
   computeScenarioResults,
+  estimateEmbeddedGainPct,
+  calculateUnwindAnalysis,
 } from './calculations/ediOnly';
 
 describe('computeEdiYear', () => {
@@ -239,5 +241,59 @@ describe('default realization scenarios', () => {
     // Multi-year scenario should have year-by-year details
     expect(results.yearDetails).toBeDefined();
     expect(results.yearDetails!.length).toBeGreaterThan(0);
+  });
+});
+
+describe('embedded gain estimation', () => {
+  it('should estimate embedded gain percentage by year', () => {
+    const pct1 = estimateEmbeddedGainPct('overlay-45-45', 1, 0.07);
+    const pct5 = estimateEmbeddedGainPct('overlay-45-45', 5, 0.07);
+    const pct10 = estimateEmbeddedGainPct('overlay-45-45', 10, 0.07);
+
+    // Embedded gain grows over time
+    expect(pct1).toBeGreaterThan(0.10);
+    expect(pct5).toBeGreaterThan(pct1);
+    expect(pct10).toBeGreaterThan(pct5);
+
+    // Should be in reasonable range
+    expect(pct10).toBeLessThan(0.90);
+  });
+
+  it('should have embedded gain with zero growth from basis reduction', () => {
+    const pct = estimateEmbeddedGainPct('overlay-45-45', 1, 0);
+    // Basis reduction from harvesting creates embedded gain even at 0% growth
+    expect(pct).toBeGreaterThan(0);
+  });
+});
+
+describe('unwind analysis', () => {
+  it('should compute full liquidation unwind', () => {
+    const projection = computeEdiProjection({
+      strategyId: 'overlay-45-45',
+      collateralValue: 10_000_000,
+      combinedStRate: 0.541,
+      combinedLtRate: 0.371,
+      filingStatus: 'mfj',
+      washSaleRate: 0,
+      existingStCarryforward: 0,
+      existingLtCarryforward: 0,
+      annualReturn: 0.07,
+      projectionYears: 10,
+    });
+
+    const unwind = calculateUnwindAnalysis({
+      unwindYear: 5,
+      projection,
+      strategyId: 'overlay-45-45',
+      annualReturn: 0.07,
+      combinedLtRate: 0.371,
+    });
+
+    // Should have embedded gains
+    expect(unwind.embeddedGainEstimate).toBeGreaterThan(0);
+    // Carryforward should shelter some/all of the gains
+    expect(unwind.carryforwardUsed).toBeGreaterThan(0);
+    // Tax saved should be substantial
+    expect(unwind.taxSavedByCf).toBeGreaterThan(0);
   });
 });

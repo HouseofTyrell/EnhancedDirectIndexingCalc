@@ -437,3 +437,84 @@ export function computeScenarioResults(
     yearDetails,
   };
 }
+
+// ============================================
+// EMBEDDED GAIN ESTIMATION & UNWIND ANALYSIS
+// ============================================
+
+export function estimateEmbeddedGainPct(
+  strategyId: string,
+  year: number,
+  annualReturn: number,
+): number {
+  const strategy = STRATEGIES.find(s => s.id === strategyId);
+  if (!strategy) return 0;
+
+  let portfolioValue = 1.0;
+  let cumulativeBasisReduction = 0;
+  let cumulativeRealized = 0;
+
+  for (let y = 1; y <= year; y++) {
+    const stLossRate = getStLossRateForYear(strategy, y);
+    const ltGainRate = strategy.ltGainRate;
+    const netStLoss = Math.max(0, stLossRate - ltGainRate);
+
+    cumulativeBasisReduction += portfolioValue * netStLoss;
+    cumulativeRealized += portfolioValue * ltGainRate;
+    portfolioValue *= (1 + annualReturn);
+  }
+
+  const cumulativeAppreciation = portfolioValue - 1.0;
+  const embeddedGain = cumulativeAppreciation - cumulativeRealized + cumulativeBasisReduction;
+  return Math.max(0, embeddedGain / portfolioValue);
+}
+
+export interface UnwindInput {
+  unwindYear: number;
+  projection: EdiProjectionResult;
+  strategyId: string;
+  annualReturn: number;
+  combinedLtRate: number;
+}
+
+export interface UnwindResult {
+  unwindYear: number;
+  portfolioValueAtUnwind: number;
+  embeddedGainPct: number;
+  embeddedGainEstimate: number;
+  availableCarryforward: number;
+  carryforwardUsed: number;
+  taxableGainAfterCf: number;
+  grossUnwindTax: number;
+  netUnwindTax: number;
+  taxSavedByCf: number;
+  remainingCarryforward: number;
+}
+
+export function calculateUnwindAnalysis(input: UnwindInput): UnwindResult {
+  const { unwindYear, projection, strategyId, annualReturn, combinedLtRate } = input;
+  const yearIdx = Math.min(unwindYear - 1, projection.years.length - 1);
+  const yearData = projection.years[yearIdx];
+
+  const portfolioValue = yearData.collateralValue;
+  const embeddedGainPct = estimateEmbeddedGainPct(strategyId, unwindYear, annualReturn);
+  const embeddedGain = safeNumber(portfolioValue * embeddedGainPct);
+
+  const totalCf = yearData.endingStCarryforward + yearData.endingLtCarryforward;
+  const cfUsed = Math.min(totalCf, embeddedGain);
+  const taxableAfterCf = Math.max(0, embeddedGain - cfUsed);
+
+  return {
+    unwindYear,
+    portfolioValueAtUnwind: safeNumber(portfolioValue),
+    embeddedGainPct,
+    embeddedGainEstimate: embeddedGain,
+    availableCarryforward: safeNumber(totalCf),
+    carryforwardUsed: safeNumber(cfUsed),
+    taxableGainAfterCf: safeNumber(taxableAfterCf),
+    grossUnwindTax: safeNumber(embeddedGain * combinedLtRate),
+    netUnwindTax: safeNumber(taxableAfterCf * combinedLtRate),
+    taxSavedByCf: safeNumber(cfUsed * combinedLtRate),
+    remainingCarryforward: safeNumber(totalCf - cfUsed),
+  };
+}
