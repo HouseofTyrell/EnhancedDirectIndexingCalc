@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeEdiYear } from './calculations/ediOnly';
+import { computeEdiYear, computeEdiProjection } from './calculations/ediOnly';
 
 describe('computeEdiYear', () => {
   const defaults = {
@@ -75,5 +75,54 @@ describe('computeEdiYear', () => {
     });
 
     expect(result.capitalLossDeduction).toBe(1500);
+  });
+});
+
+describe('computeEdiProjection', () => {
+  const defaults = {
+    strategyId: 'overlay-45-45',
+    collateralValue: 10_000_000,
+    combinedStRate: 0.541,
+    combinedLtRate: 0.371,
+    filingStatus: 'mfj' as const,
+    washSaleRate: 0,
+    existingStCarryforward: 0,
+    existingLtCarryforward: 0,
+    annualReturn: 0.07,
+    projectionYears: 10,
+  };
+
+  it('should accumulate carryforward over 10 years', () => {
+    const result = computeEdiProjection(defaults);
+
+    expect(result.years).toHaveLength(10);
+
+    // Year 1: ~$1.507M CF
+    expect(result.years[0].endingStCarryforward).toBeGreaterThan(1_400_000);
+
+    // Year 10: CF should be significantly larger
+    expect(result.years[9].endingStCarryforward).toBeGreaterThan(4_000_000);
+
+    // Carryforward should increase every year
+    for (let i = 1; i < result.years.length; i++) {
+      expect(result.years[i].endingStCarryforward)
+        .toBeGreaterThan(result.years[i - 1].endingStCarryforward);
+    }
+  });
+
+  it('should compute correct summary totals', () => {
+    const result = computeEdiProjection(defaults);
+
+    expect(result.summary.totalRealizedBenefit).toBeGreaterThan(0);
+    expect(result.summary.finalCarryforward).toBeGreaterThan(4_000_000);
+    expect(result.summary.carryforwardTaxShield).toBeGreaterThan(1_500_000);
+    expect(result.summary.cumulativeHarvestingEfficiency).toBeGreaterThan(2);
+  });
+
+  it('should grow collateral value when annualReturn > 0', () => {
+    const result = computeEdiProjection(defaults);
+
+    expect(result.years[9].collateralValue)
+      .toBeGreaterThan(defaults.collateralValue);
   });
 });

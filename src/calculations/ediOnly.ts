@@ -142,3 +142,78 @@ export function computeEdiYear(input: EdiYearInput): EdiYearResult {
     harvestingEfficiency,
   };
 }
+
+// ============================================
+// MULTI-YEAR PROJECTION
+// ============================================
+
+export interface EdiProjectionInput {
+  strategyId: string;
+  collateralValue: number;
+  combinedStRate: number;
+  combinedLtRate: number;
+  filingStatus: FilingStatus;
+  washSaleRate: number;
+  existingStCarryforward: number;
+  existingLtCarryforward: number;
+  annualReturn: number;
+  projectionYears: number;
+}
+
+export interface EdiProjectionSummary {
+  totalRealizedBenefit: number;
+  totalStLossesHarvested: number;
+  totalLtGainsRealized: number;
+  finalCarryforward: number;
+  carryforwardTaxShield: number;
+  cumulativeHarvestingEfficiency: number;
+}
+
+export interface EdiProjectionResult {
+  years: EdiYearResult[];
+  summary: EdiProjectionSummary;
+}
+
+export function computeEdiProjection(input: EdiProjectionInput): EdiProjectionResult {
+  const years: EdiYearResult[] = [];
+  let stCf = input.existingStCarryforward;
+  let ltCf = input.existingLtCarryforward;
+  let collateralValue = input.collateralValue;
+
+  for (let year = 1; year <= input.projectionYears; year++) {
+    const yearResult = computeEdiYear({
+      year,
+      strategyId: input.strategyId,
+      collateralValue,
+      combinedStRate: input.combinedStRate,
+      combinedLtRate: input.combinedLtRate,
+      filingStatus: input.filingStatus,
+      washSaleRate: input.washSaleRate,
+      priorStCarryforward: stCf,
+      priorLtCarryforward: ltCf,
+    });
+
+    years.push(yearResult);
+
+    // Thread state forward
+    stCf = yearResult.endingStCarryforward;
+    ltCf = yearResult.endingLtCarryforward;
+    collateralValue = safeNumber(collateralValue * (1 + input.annualReturn));
+  }
+
+  // Compute summary
+  const totalStLosses = years.reduce((s, y) => s + y.stLossesHarvested, 0);
+  const totalLtGains = years.reduce((s, y) => s + y.ltGainsRealized, 0);
+  const finalCf = stCf + ltCf;
+
+  const summary: EdiProjectionSummary = {
+    totalRealizedBenefit: safeNumber(years.reduce((s, y) => s + y.annualRealizedBenefit, 0)),
+    totalStLossesHarvested: safeNumber(totalStLosses),
+    totalLtGainsRealized: safeNumber(totalLtGains),
+    finalCarryforward: safeNumber(finalCf),
+    carryforwardTaxShield: safeNumber(finalCf * input.combinedLtRate),
+    cumulativeHarvestingEfficiency: totalLtGains > 0 ? safeNumber(totalStLosses / totalLtGains) : Infinity,
+  };
+
+  return { years, summary };
+}
