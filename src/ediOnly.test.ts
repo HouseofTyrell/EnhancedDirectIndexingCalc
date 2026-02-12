@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { computeEdiYear, computeEdiProjection, calculateRealizationScenario } from './calculations/ediOnly';
+import {
+  computeEdiYear,
+  computeEdiProjection,
+  calculateRealizationScenario,
+  getDefaultScenarios,
+  computeScenarioResults,
+} from './calculations/ediOnly';
 
 describe('computeEdiYear', () => {
   const defaults = {
@@ -180,5 +186,58 @@ describe('calculateRealizationScenario', () => {
     // $5.47M CF shelters $5M gain fully
     expect(result.taxableGainAfterCf).toBe(0);
     expect(result.taxSaved).toBeCloseTo(1_855_000, -3);
+  });
+});
+
+describe('default realization scenarios', () => {
+  it('should provide 3 pre-built scenarios', () => {
+    const scenarios = getDefaultScenarios(10_000_000);
+    expect(scenarios).toHaveLength(3);
+    expect(scenarios[0].label).toBe('Concentrated Stock Exit');
+    expect(scenarios[1].label).toBe('Portfolio Transition');
+    expect(scenarios[2].label).toBe('Retirement Liquidation');
+  });
+
+  it('should compute concentrated stock exit at Year 5', () => {
+    const projection = computeEdiProjection({
+      strategyId: 'overlay-45-45',
+      collateralValue: 10_000_000,
+      combinedStRate: 0.541,
+      combinedLtRate: 0.371,
+      filingStatus: 'mfj',
+      washSaleRate: 0,
+      existingStCarryforward: 0,
+      existingLtCarryforward: 0,
+      annualReturn: 0.07,
+      projectionYears: 10,
+    });
+
+    const scenarios = getDefaultScenarios(10_000_000);
+    const results = computeScenarioResults(scenarios[0], projection, 0.541, 0.371);
+
+    // At Year 5, should have substantial CF to shelter the $5M gain
+    expect(results.taxSaved).toBeGreaterThan(1_000_000);
+  });
+
+  it('should compute multi-year retirement liquidation', () => {
+    const projection = computeEdiProjection({
+      strategyId: 'overlay-45-45',
+      collateralValue: 10_000_000,
+      combinedStRate: 0.541,
+      combinedLtRate: 0.371,
+      filingStatus: 'mfj',
+      washSaleRate: 0,
+      existingStCarryforward: 0,
+      existingLtCarryforward: 0,
+      annualReturn: 0.07,
+      projectionYears: 10,
+    });
+
+    const scenarios = getDefaultScenarios(10_000_000);
+    const results = computeScenarioResults(scenarios[2], projection, 0.541, 0.371);
+
+    // Multi-year scenario should have year-by-year details
+    expect(results.yearDetails).toBeDefined();
+    expect(results.yearDetails!.length).toBeGreaterThan(0);
   });
 });

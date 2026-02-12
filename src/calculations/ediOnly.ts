@@ -294,3 +294,146 @@ export function calculateRealizationScenario(input: RealizationInput): Realizati
     remainingLtCarryforward: safeNumber(ltCf),
   };
 }
+
+// ============================================
+// DEFAULT SCENARIOS & SCENARIO RESULTS
+// ============================================
+
+export interface RealizationScenario {
+  label: string;
+  description: string;
+  gainAmount: number;
+  gainCharacter: GainCharacter;
+  yearOfEvent: number;
+  isMultiYear: boolean;
+  annualGainAmount?: number;
+  durationYears?: number;
+}
+
+export interface ScenarioResult {
+  scenario: RealizationScenario;
+  taxWithoutCarryforward: number;
+  taxWithCarryforward: number;
+  taxSaved: number;
+  carryforwardUsed: number;
+  remainingCarryforward: number;
+  yearDetails?: Array<{
+    year: number;
+    gainThisYear: number;
+    cfAvailable: number;
+    cfUsed: number;
+    taxableGain: number;
+    taxOwed: number;
+    taxSaved: number;
+    cfRemaining: number;
+  }>;
+}
+
+export function getDefaultScenarios(collateralValue: number): RealizationScenario[] {
+  return [
+    {
+      label: 'Concentrated Stock Exit',
+      description: 'Client sells appreciated stock position',
+      gainAmount: collateralValue * 0.5,
+      gainCharacter: 'lt',
+      yearOfEvent: 5,
+      isMultiYear: false,
+    },
+    {
+      label: 'Portfolio Transition',
+      description: 'Client moves to new advisor, realizes embedded gains',
+      gainAmount: collateralValue * 0.2,
+      gainCharacter: 'lt',
+      yearOfEvent: 3,
+      isMultiYear: false,
+    },
+    {
+      label: 'Retirement Liquidation',
+      description: 'Systematic drawdown over multiple years',
+      gainAmount: 0,
+      gainCharacter: 'lt',
+      yearOfEvent: 7,
+      isMultiYear: true,
+      annualGainAmount: collateralValue * 0.05,
+      durationYears: 5,
+    },
+  ];
+}
+
+export function computeScenarioResults(
+  scenario: RealizationScenario,
+  projection: EdiProjectionResult,
+  combinedStRate: number,
+  combinedLtRate: number,
+): ScenarioResult {
+  const yearIdx = Math.min(scenario.yearOfEvent - 1, projection.years.length - 1);
+  const cfAtEvent = projection.years[yearIdx];
+  let stCf = cfAtEvent.endingStCarryforward;
+  let ltCf = cfAtEvent.endingLtCarryforward;
+
+  if (!scenario.isMultiYear) {
+    const result = calculateRealizationScenario({
+      gainAmount: scenario.gainAmount,
+      gainCharacter: scenario.gainCharacter,
+      availableStCarryforward: stCf,
+      availableLtCarryforward: ltCf,
+      combinedStRate,
+      combinedLtRate,
+    });
+    return {
+      scenario,
+      taxWithoutCarryforward: result.taxWithoutCarryforward,
+      taxWithCarryforward: result.taxWithCarryforward,
+      taxSaved: result.taxSaved,
+      carryforwardUsed: result.carryforwardUsed,
+      remainingCarryforward: result.remainingStCarryforward + result.remainingLtCarryforward,
+    };
+  }
+
+  // Multi-year realization
+  const yearDetails: NonNullable<ScenarioResult['yearDetails']> = [];
+  let totalTaxWithout = 0;
+  let totalTaxWith = 0;
+
+  for (let i = 0; i < (scenario.durationYears ?? 1); i++) {
+    const annualGain = scenario.annualGainAmount ?? scenario.gainAmount;
+    const cfAvailable = stCf + ltCf;
+
+    const result = calculateRealizationScenario({
+      gainAmount: annualGain,
+      gainCharacter: scenario.gainCharacter,
+      availableStCarryforward: stCf,
+      availableLtCarryforward: ltCf,
+      combinedStRate,
+      combinedLtRate,
+    });
+
+    yearDetails.push({
+      year: scenario.yearOfEvent + i,
+      gainThisYear: annualGain,
+      cfAvailable,
+      cfUsed: result.carryforwardUsed,
+      taxableGain: result.taxableGainAfterCf,
+      taxOwed: result.taxWithCarryforward,
+      taxSaved: result.taxSaved,
+      cfRemaining: result.remainingStCarryforward + result.remainingLtCarryforward,
+    });
+
+    totalTaxWithout += result.taxWithoutCarryforward;
+    totalTaxWith += result.taxWithCarryforward;
+    stCf = result.remainingStCarryforward;
+    ltCf = result.remainingLtCarryforward;
+  }
+
+  return {
+    scenario,
+    taxWithoutCarryforward: safeNumber(totalTaxWithout),
+    taxWithCarryforward: safeNumber(totalTaxWith),
+    taxSaved: safeNumber(totalTaxWithout - totalTaxWith),
+    carryforwardUsed: safeNumber(
+      (cfAtEvent.endingStCarryforward + cfAtEvent.endingLtCarryforward) - (stCf + ltCf)
+    ),
+    remainingCarryforward: safeNumber(stCf + ltCf),
+    yearDetails,
+  };
+}
