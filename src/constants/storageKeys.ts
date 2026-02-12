@@ -23,4 +23,6 @@ export const STORAGE_KEYS = {
   PINNED_PANEL_ORDER: 'taxCalc:pinned-panel-order',
   /** Floating panel per-item heights */
   PINNED_PANEL_HEIGHTS: 'taxCalc:pinned-panel-heights',
+  /** Pinned EDI-only scenario for comparison */
+  PINNED_EDI_SCENARIO: 'taxCalc:pinned-edi-scenario',
 } as const;

@@ -325,6 +325,44 @@ export interface InputChange {
   currentDisplay: string;
 }
 
+// ============================================
+// EDI-ONLY PINNED SCENARIO TYPES
+// ============================================
+
+export interface EdiPinnedAssumptions {
+  strategyId: string;
+  collateralValue: number;
+  annualReturn: number;
+  washSaleRate: number;
+  existingStCarryforward: number;
+  existingLtCarryforward: number;
+  projectionYears: number;
+}
+
+export interface EdiPinnedTaxRates {
+  combinedStRate: number;
+  combinedLtRate: number;
+  filingStatus: string;
+  stateCode: string;
+}
+
+export interface EdiPinnedResults {
+  totalTaxSavings: number;
+  totalCarryforwardBuilt: number;
+  finalStCarryforward: number;
+  finalLtCarryforward: number;
+  finalEmbeddedGainPct: number;
+}
+
+export interface EdiPinnedScenario {
+  id: string;
+  label: string;
+  pinnedAt: number;
+  assumptions: EdiPinnedAssumptions;
+  taxRates: EdiPinnedTaxRates;
+  results: EdiPinnedResults;
+}
+
 // Section 461(l) limits by filing status for 2026 (projected)
 export const SECTION_461_LIMITS_2026: Record<FilingStatus, number> = {
   single: 320000,

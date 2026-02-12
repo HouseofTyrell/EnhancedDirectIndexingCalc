@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { EdiOnlyTab } from '../components/EdiOnlyTab';
 import { FILING_STATUSES, FilingStatus } from '../types';
 import { STATES, getStateRate, getFederalLtRate, getFederalStRate } from '../taxData';
+import { usePinnedEdiScenario } from '../hooks/usePinnedEdiScenario';
 
 const HIGH_INCOME = 3_000_000; // Assume high earner for rate lookups
 
@@ -9,6 +10,7 @@ export function EdiOnlyPage() {
   const [filingStatus, setFilingStatus] = useState<FilingStatus>('mfj');
   const [stateCode, setStateCode] = useState('CA');
   const [dismissedDisclosure, setDismissedDisclosure] = useState(false);
+  const pinnedScenario = usePinnedEdiScenario();
 
   // Compute combined rates
   const stateRate = getStateRate(stateCode);
@@ -16,8 +18,6 @@ export function EdiOnlyPage() {
   const federalLtRate = getFederalLtRate(HIGH_INCOME, filingStatus);
   const combinedStRate = federalStRate + stateRate;
   const combinedLtRate = federalLtRate + stateRate;
-  // Note: getFederalLtRate already includes NIIT for high earners
-  // getFederalStRate already includes NIIT for high earners
 
   return (
     <div className="qfaf-test-page">
@@ -86,6 +86,11 @@ export function EdiOnlyPage() {
           combinedStRate={combinedStRate}
           combinedLtRate={combinedLtRate}
           stateCode={stateCode}
+          pinned={pinnedScenario.pinned}
+          hasPinned={pinnedScenario.hasPinned}
+          onPin={pinnedScenario.pin}
+          onUnpin={pinnedScenario.unpin}
+          onReplacePin={pinnedScenario.replacePin}
         />
       </section>
 

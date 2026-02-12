@@ -1,5 +1,11 @@
 import { useReducer, useCallback, useMemo, useState } from 'react';
 import { FilingStatus } from '../types';
+import type {
+  EdiPinnedScenario,
+  EdiPinnedAssumptions,
+  EdiPinnedTaxRates,
+  EdiPinnedResults,
+} from '../types';
 import { STRATEGIES } from '../strategyData';
 import { formatWithCommas, parseFormattedNumber, formatCurrency } from '../utils/formatters';
 import {
@@ -8,9 +14,14 @@ import {
   computeScenarioResults,
   calculateUnwindAnalysis,
   calculateEstateComparison,
+  estimateEmbeddedGainPct,
   type EdiYearResult,
   type EdiProjectionInput,
 } from '../calculations/ediOnly';
+import { useScrollHeader } from '../hooks/useScrollHeader';
+import { EdiStickyHeader } from './EdiStickyHeader';
+import { EdiComparisonPanel } from './EdiComparisonPanel';
+import { EdiTaxSavingsChart, EdiEmbeddedGainChart } from './EdiCharts';
 import './EdiOnlyTab.css';
 
 interface EdiOnlyTabProps {
@@ -18,6 +29,11 @@ interface EdiOnlyTabProps {
   combinedStRate: number;
   combinedLtRate: number;
   stateCode?: string;
+  pinned: EdiPinnedScenario | null;
+  hasPinned: boolean;
+  onPin: (assumptions: EdiPinnedAssumptions, taxRates: EdiPinnedTaxRates, results: EdiPinnedResults) => void;
+  onUnpin: () => void;
+  onReplacePin: (assumptions: EdiPinnedAssumptions, taxRates: EdiPinnedTaxRates, results: EdiPinnedResults) => void;
 }
 
 interface EdiAssumptions {
@@ -92,11 +108,22 @@ function formatCellValue(format: RowDef['format'], value: number) {
   }
 }
 
-export function EdiOnlyTab({ filingStatus, combinedStRate, combinedLtRate, stateCode }: EdiOnlyTabProps) {
+export function EdiOnlyTab({
+  filingStatus,
+  combinedStRate,
+  combinedLtRate,
+  stateCode,
+  pinned,
+  hasPinned,
+  onPin,
+  onUnpin,
+  onReplacePin,
+}: EdiOnlyTabProps) {
   const [state, dispatch] = useReducer(reducer, null, () => ({
     assumptions: { ...DEFAULT_ASSUMPTIONS },
   }));
   const [unwindYear, setUnwindYear] = useState(5);
+  const { isExpanded } = useScrollHeader('edi-scroll-sentinel');
 
   const handleChange = useCallback((field: keyof EdiAssumptions, value: number | string) => {
     dispatch({ type: 'UPDATE', field, value });
@@ -164,8 +191,79 @@ export function EdiOnlyTab({ filingStatus, combinedStRate, combinedLtRate, state
 
   const strategy = STRATEGIES.find(s => s.id === state.assumptions.strategyId);
 
+  // Build pin data from current state
+  const currentAssumptions: EdiPinnedAssumptions = useMemo(() => ({
+    strategyId: state.assumptions.strategyId,
+    collateralValue: state.assumptions.collateralValue,
+    annualReturn: state.assumptions.annualReturn,
+    washSaleRate: state.assumptions.washSaleRate,
+    existingStCarryforward: state.assumptions.existingStCarryforward,
+    existingLtCarryforward: state.assumptions.existingLtCarryforward,
+    projectionYears: state.assumptions.projectionYears,
+  }), [state.assumptions]);
+
+  const currentTaxRates: EdiPinnedTaxRates = useMemo(() => ({
+    combinedStRate,
+    combinedLtRate,
+    filingStatus,
+    stateCode: stateCode ?? 'CA',
+  }), [combinedStRate, combinedLtRate, filingStatus, stateCode]);
+
+  const lastYear = projection.years[projection.years.length - 1];
+  const currentResults: EdiPinnedResults = useMemo(() => ({
+    totalTaxSavings: projection.summary.totalRealizedBenefit,
+    totalCarryforwardBuilt: projection.summary.finalCarryforward,
+    finalStCarryforward: lastYear?.endingStCarryforward ?? 0,
+    finalLtCarryforward: lastYear?.endingLtCarryforward ?? 0,
+    finalEmbeddedGainPct: estimateEmbeddedGainPct(
+      state.assumptions.strategyId,
+      state.assumptions.projectionYears,
+      state.assumptions.annualReturn
+    ),
+  }), [projection, lastYear, state.assumptions]);
+
+  const handlePin = useCallback(() => {
+    onPin(currentAssumptions, currentTaxRates, currentResults);
+  }, [onPin, currentAssumptions, currentTaxRates, currentResults]);
+
+  const handleReplacePin = useCallback(() => {
+    onReplacePin(currentAssumptions, currentTaxRates, currentResults);
+  }, [onReplacePin, currentAssumptions, currentTaxRates, currentResults]);
+
+  // Pinned values for sticky header delta display
+  const pinnedValues = pinned ? {
+    collateral: pinned.assumptions.collateralValue,
+    totalTaxSavings: pinned.results.totalTaxSavings,
+    totalCarryforward: pinned.results.totalCarryforwardBuilt,
+  } : undefined;
+
   return (
     <div className="edi-only-tab">
+      {/* Sticky Header */}
+      <EdiStickyHeader
+        strategyName={strategy?.name ?? state.assumptions.strategyId}
+        collateral={state.assumptions.collateralValue}
+        totalTaxSavings={projection.summary.totalRealizedBenefit}
+        totalCarryforward={projection.summary.finalCarryforward}
+        isExpanded={isExpanded}
+        hasPinned={hasPinned}
+        onPin={handlePin}
+        onUnpin={onUnpin}
+        pinnedValues={pinnedValues}
+      />
+
+      {/* Comparison Panel */}
+      {pinned && (
+        <EdiComparisonPanel
+          pinned={pinned}
+          currentAssumptions={currentAssumptions}
+          currentTaxRates={currentTaxRates}
+          currentResults={currentResults}
+          onUnpin={onUnpin}
+          onReplacePin={handleReplacePin}
+        />
+      )}
+
       {/* PA State Warning */}
       {stateCode === 'PA' && (
         <div className="state-warning-banner">
@@ -174,6 +272,9 @@ export function EdiOnlyTab({ filingStatus, combinedStRate, combinedLtRate, state
           The federal benefit calculations shown here do not include PA state savings.
         </div>
       )}
+
+      {/* Scroll sentinel for sticky header */}
+      <div id="edi-scroll-sentinel" />
 
       {/* Summary Cards */}
       <div className="edi-summary-cards">
@@ -296,6 +397,20 @@ export function EdiOnlyTab({ filingStatus, combinedStRate, combinedLtRate, state
             Strategy: {strategy?.name ?? '—'} | Combined ST Rate: {(combinedStRate * 100).toFixed(1)}% | LT Rate: {(combinedLtRate * 100).toFixed(1)}%
           </span>
         </div>
+      </div>
+
+      {/* Charts */}
+      <div className="edi-charts-section">
+        <EdiTaxSavingsChart
+          data={projection.years}
+          strategyId={state.assumptions.strategyId}
+          annualReturn={state.assumptions.annualReturn}
+        />
+        <EdiEmbeddedGainChart
+          data={projection.years}
+          strategyId={state.assumptions.strategyId}
+          annualReturn={state.assumptions.annualReturn}
+        />
       </div>
 
       {/* Year-by-Year Table */}
