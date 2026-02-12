@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeEdiYear, computeEdiProjection } from './calculations/ediOnly';
+import { computeEdiYear, computeEdiProjection, calculateRealizationScenario } from './calculations/ediOnly';
 
 describe('computeEdiYear', () => {
   const defaults = {
@@ -124,5 +124,61 @@ describe('computeEdiProjection', () => {
 
     expect(result.years[9].collateralValue)
       .toBeGreaterThan(defaults.collateralValue);
+  });
+});
+
+describe('calculateRealizationScenario', () => {
+  it('should shelter gains with carryforward — no annual limit', () => {
+    const result = calculateRealizationScenario({
+      gainAmount: 3_000_000,
+      gainCharacter: 'lt',
+      availableStCarryforward: 5_000_000,
+      availableLtCarryforward: 0,
+      combinedStRate: 0.541,
+      combinedLtRate: 0.371,
+    });
+
+    // $5M CF can shelter $3M in gains — NO dollar limit
+    expect(result.carryforwardUsed).toBe(3_000_000);
+    expect(result.taxableGainAfterCf).toBe(0);
+    expect(result.taxWithCarryforward).toBe(0);
+    expect(result.taxWithoutCarryforward).toBeCloseTo(1_113_000, -2);
+    expect(result.taxSaved).toBeCloseTo(1_113_000, -2);
+    expect(result.remainingStCarryforward).toBe(2_000_000);
+  });
+
+  it('should apply same-character CF first, then cross-apply', () => {
+    const result = calculateRealizationScenario({
+      gainAmount: 2_000_000,
+      gainCharacter: 'lt',
+      availableStCarryforward: 500_000,
+      availableLtCarryforward: 1_000_000,
+      combinedStRate: 0.541,
+      combinedLtRate: 0.371,
+    });
+
+    // LT CF offsets LT gain first: $1M
+    // Then ST CF cross-applies: $500K
+    // Total offset: $1.5M
+    // Remaining taxable: $500K
+    expect(result.carryforwardUsed).toBe(1_500_000);
+    expect(result.taxableGainAfterCf).toBe(500_000);
+    expect(result.remainingStCarryforward).toBe(0);
+    expect(result.remainingLtCarryforward).toBe(0);
+  });
+
+  it('should handle concentrated stock exit scenario defaults', () => {
+    const result = calculateRealizationScenario({
+      gainAmount: 5_000_000,
+      gainCharacter: 'lt',
+      availableStCarryforward: 5_470_000,
+      availableLtCarryforward: 0,
+      combinedStRate: 0.541,
+      combinedLtRate: 0.371,
+    });
+
+    // $5.47M CF shelters $5M gain fully
+    expect(result.taxableGainAfterCf).toBe(0);
+    expect(result.taxSaved).toBeCloseTo(1_855_000, -3);
   });
 });

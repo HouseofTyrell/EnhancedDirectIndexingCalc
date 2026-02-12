@@ -217,3 +217,80 @@ export function computeEdiProjection(input: EdiProjectionInput): EdiProjectionRe
 
   return { years, summary };
 }
+
+// ============================================
+// REALIZATION SCENARIO ENGINE
+// ============================================
+
+export type GainCharacter = 'st' | 'lt';
+
+export interface RealizationInput {
+  gainAmount: number;
+  gainCharacter: GainCharacter;
+  availableStCarryforward: number;
+  availableLtCarryforward: number;
+  combinedStRate: number;
+  combinedLtRate: number;
+}
+
+export interface RealizationResult {
+  gainAmount: number;
+  gainCharacter: GainCharacter;
+  applicableTaxRate: number;
+  carryforwardUsed: number;
+  taxableGainAfterCf: number;
+  taxWithoutCarryforward: number;
+  taxWithCarryforward: number;
+  taxSaved: number;
+  remainingStCarryforward: number;
+  remainingLtCarryforward: number;
+}
+
+export function calculateRealizationScenario(input: RealizationInput): RealizationResult {
+  const {
+    gainAmount, gainCharacter, availableStCarryforward,
+    availableLtCarryforward, combinedStRate, combinedLtRate,
+  } = input;
+
+  const applicableTaxRate = gainCharacter === 'lt' ? combinedLtRate : combinedStRate;
+  const taxWithoutCarryforward = safeNumber(gainAmount * applicableTaxRate);
+
+  let remainingGain = gainAmount;
+  let stCf = availableStCarryforward;
+  let ltCf = availableLtCarryforward;
+
+  // Same-character CF first
+  if (gainCharacter === 'lt') {
+    const ltUsed = Math.min(ltCf, remainingGain);
+    remainingGain -= ltUsed;
+    ltCf -= ltUsed;
+    // Cross-apply ST CF
+    const stUsed = Math.min(stCf, remainingGain);
+    remainingGain -= stUsed;
+    stCf -= stUsed;
+  } else {
+    const stUsed = Math.min(stCf, remainingGain);
+    remainingGain -= stUsed;
+    stCf -= stUsed;
+    // Cross-apply LT CF
+    const ltUsed = Math.min(ltCf, remainingGain);
+    remainingGain -= ltUsed;
+    ltCf -= ltUsed;
+  }
+
+  const cfUsed = gainAmount - remainingGain;
+  const taxWithCarryforward = safeNumber(remainingGain * applicableTaxRate);
+
+  return {
+    gainAmount,
+    gainCharacter,
+    applicableTaxRate,
+    carryforwardUsed: safeNumber(cfUsed),
+    taxableGainAfterCf: safeNumber(remainingGain),
+    taxWithoutCarryforward,
+    taxWithCarryforward,
+    taxSaved: safeNumber(taxWithoutCarryforward - taxWithCarryforward),
+    remainingStCarryforward: safeNumber(stCf),
+    remainingLtCarryforward: safeNumber(ltCf),
+  };
+}
