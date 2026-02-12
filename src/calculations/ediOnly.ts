@@ -518,3 +518,93 @@ export function calculateUnwindAnalysis(input: UnwindInput): UnwindResult {
     remainingCarryforward: safeNumber(totalCf - cfUsed),
   };
 }
+
+// ============================================
+// ESTATE COMPARISON
+// ============================================
+
+export interface EstateComparisonInput {
+  portfolioValue: number;
+  embeddedGainPct: number;
+  availableStCarryforward: number;
+  availableLtCarryforward: number;
+  combinedLtRate: number;
+}
+
+export interface EstateComparisonResult {
+  continueAndDie: {
+    stepUpValue: number;
+    carryforwardLost: number;
+    carryforwardValueLost: number;
+    netBenefit: number;
+  };
+  unwindBeforeDeath: {
+    embeddedGains: number;
+    carryforwardUsed: number;
+    taxPaid: number;
+    netCost: number;
+  };
+  recommendation: 'continue' | 'unwind' | 'partial_unwind';
+  optimalUnwindPct: number;
+  explanation: string;
+}
+
+export function calculateEstateComparison(input: EstateComparisonInput): EstateComparisonResult {
+  const {
+    portfolioValue, embeddedGainPct, availableStCarryforward,
+    availableLtCarryforward, combinedLtRate,
+  } = input;
+
+  const embeddedGains = safeNumber(portfolioValue * embeddedGainPct);
+  const totalCf = availableStCarryforward + availableLtCarryforward;
+
+  // Continue + Die: step-up eliminates gains, but CF is lost
+  const stepUpValue = safeNumber(embeddedGains * combinedLtRate);
+  const cfValueLost = safeNumber(totalCf * combinedLtRate);
+
+  // Unwind: use CF to shelter gains
+  const cfUsed = Math.min(totalCf, embeddedGains);
+  const taxPaid = safeNumber(Math.max(0, embeddedGains - cfUsed) * combinedLtRate);
+
+  // Optimal partial unwind: use exactly the CF, keep rest for step-up
+  const optimalUnwindAmount = embeddedGainPct > 0
+    ? Math.min(totalCf / embeddedGainPct, portfolioValue)
+    : 0;
+  const optimalUnwindPct = portfolioValue > 0
+    ? safeNumber(optimalUnwindAmount / portfolioValue)
+    : 0;
+
+  let recommendation: EstateComparisonResult['recommendation'];
+  let explanation: string;
+
+  if (totalCf === 0) {
+    recommendation = 'continue';
+    explanation = 'No carryforward to use. Step-up at death eliminates all embedded gains tax-free.';
+  } else if (totalCf >= embeddedGains) {
+    recommendation = 'unwind';
+    explanation = 'Carryforward exceeds embedded gains. Unwind fully: CF shelters all gains tax-free. Excess CF would be lost at death.';
+  } else {
+    recommendation = 'partial_unwind';
+    explanation =
+      `Unwind ${Math.round(optimalUnwindPct * 100)}% of portfolio (using all CF to shelter gains), ` +
+      `keep ${Math.round((1 - optimalUnwindPct) * 100)}% for step-up at death.`;
+  }
+
+  return {
+    continueAndDie: {
+      stepUpValue,
+      carryforwardLost: safeNumber(totalCf),
+      carryforwardValueLost: cfValueLost,
+      netBenefit: safeNumber(stepUpValue - cfValueLost),
+    },
+    unwindBeforeDeath: {
+      embeddedGains,
+      carryforwardUsed: safeNumber(cfUsed),
+      taxPaid,
+      netCost: taxPaid,
+    },
+    recommendation,
+    optimalUnwindPct,
+    explanation,
+  };
+}

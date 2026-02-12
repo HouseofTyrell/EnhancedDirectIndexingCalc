@@ -7,6 +7,7 @@ import {
   computeScenarioResults,
   estimateEmbeddedGainPct,
   calculateUnwindAnalysis,
+  calculateEstateComparison,
 } from './calculations/ediOnly';
 
 describe('computeEdiYear', () => {
@@ -295,5 +296,48 @@ describe('unwind analysis', () => {
     expect(unwind.carryforwardUsed).toBeGreaterThan(0);
     // Tax saved should be substantial
     expect(unwind.taxSavedByCf).toBeGreaterThan(0);
+  });
+});
+
+describe('estate comparison', () => {
+  it('should recommend full unwind when CF > embedded gains', () => {
+    const result = calculateEstateComparison({
+      portfolioValue: 10_000_000,
+      embeddedGainPct: 0.30,
+      availableStCarryforward: 5_000_000,
+      availableLtCarryforward: 0,
+      combinedLtRate: 0.371,
+    });
+
+    // CF ($5M) > embedded gains ($3M) -> unwind
+    expect(result.recommendation).toBe('unwind');
+    expect(result.unwindBeforeDeath.taxPaid).toBe(0);
+  });
+
+  it('should recommend partial unwind when CF < embedded gains', () => {
+    const result = calculateEstateComparison({
+      portfolioValue: 10_000_000,
+      embeddedGainPct: 0.60,
+      availableStCarryforward: 3_000_000,
+      availableLtCarryforward: 0,
+      combinedLtRate: 0.371,
+    });
+
+    // CF ($3M) < embedded gains ($6M) -> partial unwind
+    expect(result.recommendation).toBe('partial_unwind');
+    expect(result.optimalUnwindPct).toBeGreaterThan(0);
+    expect(result.optimalUnwindPct).toBeLessThan(1);
+  });
+
+  it('should recommend continue when CF is zero', () => {
+    const result = calculateEstateComparison({
+      portfolioValue: 10_000_000,
+      embeddedGainPct: 0.50,
+      availableStCarryforward: 0,
+      availableLtCarryforward: 0,
+      combinedLtRate: 0.371,
+    });
+
+    expect(result.recommendation).toBe('continue');
   });
 });
