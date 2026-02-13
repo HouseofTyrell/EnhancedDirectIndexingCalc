@@ -618,6 +618,36 @@
   }
 }
 
+/* Strategy × Scenario Matrix */
+.edi-scenario-matrix-section {
+  margin-bottom: 2rem;
+}
+.scenario-matrix-table .col-scenario {
+  min-width: 120px;
+  text-align: center;
+}
+.scenario-matrix-table .col-scenario .scenario-col-detail {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #64748b;
+  white-space: nowrap;
+}
+.best-strategy-cell {
+  background: rgba(16, 185, 129, 0.15) !important;
+  font-weight: 700;
+  color: #047857;
+}
+.scenario-winner-card .card-value {
+  font-size: 0.95rem;
+}
+.matrix-footnote {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 0.75rem;
+  font-style: italic;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .edi-assumptions-grid {

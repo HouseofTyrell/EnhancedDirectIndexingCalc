@@ -27,6 +27,7 @@ import { useScrollHeader } from '../hooks/useScrollHeader';
 import { EdiStickyHeader } from './EdiStickyHeader';
 import { EdiComparisonPanel } from './EdiComparisonPanel';
 import { EdiTaxSavingsChart, EdiEmbeddedGainChart, EdiCrossoverChart } from './EdiCharts';
+import { InfoText } from '../InfoPopup';
 import './EdiOnlyTab.css';
 
 interface EdiOnlyTabProps {
@@ -92,23 +93,24 @@ interface RowDef {
   getValue: (r: EdiYearResult) => number;
   format: 'currency' | 'highlight' | 'positive' | 'negative' | 'ratio';
   rowClass?: string;
+  infoKey?: string;
 }
 
 const ROW_DEFINITIONS: RowDef[] = [
-  { key: 'collateral', label: 'Collateral Value', getValue: r => r.collateralValue, format: 'currency' },
-  { key: 'stLosses', label: 'ST Losses Harvested', getValue: r => r.stLossesHarvested, format: 'negative' },
-  { key: 'ltGains', label: 'LT Gains Realized', getValue: r => r.ltGainsRealized, format: 'currency' },
-  { key: 'stUsed', label: 'ST Losses Offsetting LT Gains', getValue: r => r.stLossesUsedToOffsetLtGains, format: 'currency' },
-  { key: 'priorCfUsed', label: 'Prior CF Used vs LT Gains', getValue: r => r.priorCfUsedAgainstLtGains, format: 'currency' },
-  { key: 'ltGainsTax', label: 'Tax on Remaining LT Gains', getValue: r => r.taxOnRemainingLtGains, format: 'negative' },
-  { key: 'excess', label: 'Excess ST Loss to CF', getValue: r => r.excessStLossAfterOffset, format: 'highlight', rowClass: 'row-highlight' },
-  { key: 'deduction', label: '$3K Capital Loss Deduction', getValue: r => r.capitalLossDeduction, format: 'currency' },
-  { key: 'taxSaved', label: 'Tax Saved (Deduction)', getValue: r => r.taxSavedByCapitalLossDeduction, format: 'positive', rowClass: 'row-positive' },
-  { key: 'benefit', label: 'Net Annual Realized Benefit', getValue: r => r.annualRealizedBenefit, format: 'positive', rowClass: 'row-positive' },
-  { key: 'stCf', label: 'ST Carryforward', getValue: r => r.endingStCarryforward, format: 'highlight', rowClass: 'row-highlight' },
-  { key: 'ltCf', label: 'LT Carryforward', getValue: r => r.endingLtCarryforward, format: 'currency' },
-  { key: 'cfEnding', label: 'Total Carryforward', getValue: r => r.endingStCarryforward + r.endingLtCarryforward, format: 'highlight', rowClass: 'row-highlight' },
-  { key: 'efficiency', label: 'Harvesting Efficiency (ST/LT)', getValue: r => r.harvestingEfficiency, format: 'ratio' },
+  { key: 'collateral', label: 'Collateral Value', getValue: r => r.collateralValue, format: 'currency', infoKey: 'edi-collateral-value-row' },
+  { key: 'stLosses', label: 'ST Losses Harvested', getValue: r => r.stLossesHarvested, format: 'negative', infoKey: 'edi-st-losses-harvested' },
+  { key: 'ltGains', label: 'LT Gains Realized', getValue: r => r.ltGainsRealized, format: 'currency', infoKey: 'edi-lt-gains-realized' },
+  { key: 'stUsed', label: 'ST Losses Offsetting LT Gains', getValue: r => r.stLossesUsedToOffsetLtGains, format: 'currency', infoKey: 'edi-st-offset-lt' },
+  { key: 'priorCfUsed', label: 'Prior CF Used vs LT Gains', getValue: r => r.priorCfUsedAgainstLtGains, format: 'currency', infoKey: 'edi-prior-cf-used' },
+  { key: 'ltGainsTax', label: 'Tax on Remaining LT Gains', getValue: r => r.taxOnRemainingLtGains, format: 'negative', infoKey: 'edi-tax-remaining-lt' },
+  { key: 'excess', label: 'Excess ST Loss to CF', getValue: r => r.excessStLossAfterOffset, format: 'highlight', rowClass: 'row-highlight', infoKey: 'edi-excess-st-to-cf' },
+  { key: 'deduction', label: '$3K Capital Loss Deduction', getValue: r => r.capitalLossDeduction, format: 'currency', infoKey: 'edi-capital-loss-deduction' },
+  { key: 'taxSaved', label: 'Tax Saved (Deduction)', getValue: r => r.taxSavedByCapitalLossDeduction, format: 'positive', rowClass: 'row-positive', infoKey: 'edi-tax-saved-deduction' },
+  { key: 'benefit', label: 'Net Annual Realized Benefit', getValue: r => r.annualRealizedBenefit, format: 'positive', rowClass: 'row-positive', infoKey: 'edi-net-annual-benefit' },
+  { key: 'stCf', label: 'ST Carryforward', getValue: r => r.endingStCarryforward, format: 'highlight', rowClass: 'row-highlight', infoKey: 'edi-st-carryforward' },
+  { key: 'ltCf', label: 'LT Carryforward', getValue: r => r.endingLtCarryforward, format: 'currency', infoKey: 'edi-lt-carryforward' },
+  { key: 'cfEnding', label: 'Total Carryforward', getValue: r => r.endingStCarryforward + r.endingLtCarryforward, format: 'highlight', rowClass: 'row-highlight', infoKey: 'edi-total-carryforward' },
+  { key: 'efficiency', label: 'Harvesting Efficiency (ST/LT)', getValue: r => r.harvestingEfficiency, format: 'ratio', infoKey: 'edi-harvesting-efficiency' },
 ];
 
 function formatCellValue(format: RowDef['format'], value: number) {
@@ -300,6 +302,59 @@ export function EdiOnlyTab({
     });
   }, [showStrategyComparison, projectionInput, state.assumptions, combinedLtRate]);
 
+  // Strategy × Scenario matrix: which strategy is best for each life event
+  const [showScenarioMatrix, setShowScenarioMatrix] = useState(false);
+  const scenarioMatrix = useMemo(() => {
+    if (!showScenarioMatrix) return null;
+    const matrixScenarios = getDefaultScenarios(state.assumptions.collateralValue);
+
+    const strategyResults = STRATEGIES.map(s => {
+      const sFinancing = computeIncrementalFinancingCost(
+        s, state.assumptions.brokerMarginRate,
+        state.assumptions.shortBorrowRate, state.assumptions.shortDividendRate,
+      );
+      const proj = computeEdiProjection({
+        ...projectionInput, strategyId: s.id, financingCostRate: sFinancing,
+      });
+      const econ = computeStrategyEconomics(proj, sFinancing, state.assumptions.advisoryFeeRate, combinedLtRate);
+      const scenarioTaxSaved = matrixScenarios.map(sc => {
+        const result = computeScenarioResults(sc, proj, combinedStRate, combinedLtRate);
+        return {
+          scenario: sc,
+          taxSaved: result.taxSaved,
+          taxWithCf: result.taxWithCarryforward,
+          taxWithoutCf: result.taxWithoutCarryforward,
+          cfUsed: result.carryforwardUsed,
+          netValue: result.taxSaved - econ.years
+            .slice(0, Math.min(sc.yearOfEvent, econ.years.length))
+            .reduce((sum, y) => sum + y.financingCost, 0),
+        };
+      });
+      return {
+        id: s.id,
+        name: s.name,
+        type: s.type as 'core' | 'overlay',
+        financingRate: sFinancing,
+        scenarioTaxSaved,
+      };
+    });
+
+    // For each scenario, find the best strategy (highest netValue)
+    const bestPerScenario = matrixScenarios.map((_, scIdx) => {
+      let bestId = '';
+      let bestNet = -Infinity;
+      strategyResults.forEach(sr => {
+        if (sr.scenarioTaxSaved[scIdx].netValue > bestNet) {
+          bestNet = sr.scenarioTaxSaved[scIdx].netValue;
+          bestId = sr.id;
+        }
+      });
+      return bestId;
+    });
+
+    return { scenarios: matrixScenarios, strategies: strategyResults, bestPerScenario };
+  }, [showScenarioMatrix, projectionInput, state.assumptions, combinedStRate, combinedLtRate]);
+
   // Custom realization scenario result
   const customScenarioResult = useMemo(() => {
     const yearIdx = Math.min(customGainYear - 1, projection.years.length - 1);
@@ -446,7 +501,7 @@ export function EdiOnlyTab({
       {/* Summary Cards */}
       <div className="edi-summary-cards">
         <div className="edi-summary-card">
-          <div className="card-label">Potential Tax Protection</div>
+          <div className="card-label"><InfoText contentKey="edi-potential-tax-protection">Potential Tax Protection</InfoText></div>
           <div className="card-value positive">{formatCurrency(projection.summary.carryforwardTaxShield)}</div>
           <div className="card-detail">
             CF: {formatCurrency(projection.summary.finalCarryforward)} at {(combinedLtRate * 100).toFixed(1)}% rate
@@ -454,24 +509,24 @@ export function EdiOnlyTab({
           <div className="card-detail muted">Contingent on gain event</div>
         </div>
         <div className="edi-summary-card">
-          <div className="card-label">Realized Benefit</div>
+          <div className="card-label"><InfoText contentKey="edi-realized-benefit">Realized Benefit</InfoText></div>
           <div className="card-value positive">{formatCurrency(projection.summary.totalRealizedBenefit)}</div>
           <div className="card-detail">Cumulative $3K deductions — certain</div>
         </div>
         <div className="edi-summary-card">
-          <div className="card-label">Break-Even Gain Event</div>
+          <div className="card-label"><InfoText contentKey="edi-break-even-gain">Break-Even Gain Event</InfoText></div>
           <div className="card-value">{formatCurrency(economics.summary.breakEvenGainEvent)}</div>
           <div className="card-detail">Gain needed to recover {(incrementalFinancingCost * 100).toFixed(2)}% financing</div>
         </div>
         <div className="edi-summary-card">
-          <div className="card-label">Tax-Free Exit Year</div>
+          <div className="card-label"><InfoText contentKey="edi-tax-free-exit-year">Tax-Free Exit Year</InfoText></div>
           <div className="card-value positive">
             {breakEvenYear > 0 ? `Year ${breakEvenYear}` : 'Not reached'}
           </div>
           <div className="card-detail">CF exceeds embedded gains — can exit tax-free</div>
         </div>
         <div className="edi-summary-card">
-          <div className="card-label">Protection Ratio</div>
+          <div className="card-label"><InfoText contentKey="edi-protection-ratio">Protection Ratio</InfoText></div>
           <div className="card-value positive">
             {economics.summary.protectionToCostRatio.toFixed(1)}x
           </div>
@@ -487,7 +542,7 @@ export function EdiOnlyTab({
         <h3>Assumptions</h3>
         <div className="edi-assumptions-grid">
           <div className="edi-assumption-row">
-            <label>Collateral Value</label>
+            <label><InfoText contentKey="edi-collateral-value">Collateral Value</InfoText></label>
             <div className="input-with-prefix editable-cell">
               <span className="prefix">$</span>
               <input
@@ -512,7 +567,7 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
-            <label>Annual Portfolio Return</label>
+            <label><InfoText contentKey="edi-annual-return">Annual Portfolio Return</InfoText></label>
             <div className="input-with-suffix editable-cell">
               <input
                 type="number"
@@ -529,7 +584,7 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
-            <label>Wash Sale Rate</label>
+            <label><InfoText contentKey="edi-wash-sale-rate">Wash Sale Rate</InfoText></label>
             <div className="input-with-suffix editable-cell">
               <input
                 type="number"
@@ -558,7 +613,7 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
-            <label>Advisory Fee Rate</label>
+            <label><InfoText contentKey="edi-advisory-fee">Advisory Fee Rate</InfoText></label>
             <div className="input-with-suffix editable-cell">
               <input
                 type="number"
@@ -575,7 +630,7 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
-            <label>Broker Margin Rate</label>
+            <label><InfoText contentKey="edi-broker-margin-rate">Broker Margin Rate</InfoText></label>
             <div className="input-with-suffix editable-cell">
               <input
                 type="number"
@@ -592,7 +647,7 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
-            <label>Short Borrow Rate</label>
+            <label><InfoText contentKey="edi-short-borrow-rate">Short Borrow Rate</InfoText></label>
             <div className="input-with-suffix editable-cell">
               <input
                 type="number"
@@ -609,7 +664,7 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
-            <label>Short Dividend Cost</label>
+            <label><InfoText contentKey="edi-short-dividend-cost">Short Dividend Cost</InfoText></label>
             <div className="input-with-suffix editable-cell">
               <input
                 type="number"
@@ -626,7 +681,7 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
-            <label>Incremental Financing Cost</label>
+            <label><InfoText contentKey="edi-incremental-financing">Incremental Financing Cost</InfoText></label>
             <div className="edi-computed-value">
               {(incrementalFinancingCost * 100).toFixed(2)}%
               <span className="computed-label">(computed)</span>
@@ -675,7 +730,7 @@ export function EdiOnlyTab({
             </thead>
             <tbody>
               <tr>
-                <td className="row-label">Cumulative Financing Cost</td>
+                <td className="row-label"><InfoText contentKey="edi-cumulative-financing">Cumulative Financing Cost</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     <span className="edi-cell-negative">{formatCurrency(y.cumulativeIncrementalCost)}</span>
@@ -686,7 +741,7 @@ export function EdiOnlyTab({
                 </td>
               </tr>
               <tr>
-                <td className="row-label">CF Protection Built</td>
+                <td className="row-label"><InfoText contentKey="edi-cf-protection-built">CF Protection Built</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     <span className="edi-cell-positive">{formatCurrency(y.cumulativeCfProtection)}</span>
@@ -697,7 +752,7 @@ export function EdiOnlyTab({
                 </td>
               </tr>
               <tr className="row-highlight">
-                <td className="row-label">Protection Ratio</td>
+                <td className="row-label"><InfoText contentKey="edi-protection-ratio-row">Protection Ratio</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     <span className={y.protectionToCostRatio >= 1 ? 'edi-cell-positive' : ''}>
@@ -710,7 +765,7 @@ export function EdiOnlyTab({
                 </td>
               </tr>
               <tr>
-                <td className="row-label">Break-Even Gain Event</td>
+                <td className="row-label"><InfoText contentKey="edi-break-even-row">Break-Even Gain Event</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     {formatCurrency(y.breakEvenGainEvent)}
@@ -792,19 +847,19 @@ export function EdiOnlyTab({
         {customScenarioResult && (
           <div className="edi-summary-cards">
             <div className="edi-summary-card">
-              <div className="card-label">Tax Without CF</div>
+              <div className="card-label"><InfoText contentKey="edi-tax-without-cf">Tax Without CF</InfoText></div>
               <div className="card-value">{formatCurrency(customScenarioResult.taxWithoutCarryforward)}</div>
             </div>
             <div className="edi-summary-card">
-              <div className="card-label">CF Used</div>
+              <div className="card-label"><InfoText contentKey="edi-cf-used">CF Used</InfoText></div>
               <div className="card-value highlight">{formatCurrency(customScenarioResult.carryforwardUsed)}</div>
             </div>
             <div className="edi-summary-card">
-              <div className="card-label">Tax With CF</div>
+              <div className="card-label"><InfoText contentKey="edi-tax-with-cf">Tax With CF</InfoText></div>
               <div className="card-value">{formatCurrency(customScenarioResult.taxWithCarryforward)}</div>
             </div>
             <div className="edi-summary-card">
-              <div className="card-label">Tax Saved</div>
+              <div className="card-label"><InfoText contentKey="edi-tax-saved">Tax Saved</InfoText></div>
               <div className="card-value positive">{formatCurrency(customScenarioResult.taxSaved)}</div>
             </div>
           </div>
@@ -826,20 +881,20 @@ export function EdiOnlyTab({
               </p>
               <div className="scenario-metrics">
                 <div className="scenario-metric">
-                  <span className="metric-label">Tax Without CF</span>
+                  <span className="metric-label"><InfoText contentKey="edi-tax-without-cf">Tax Without CF</InfoText></span>
                   <span className="metric-value">{formatCurrency(result.taxWithoutCarryforward)}</span>
                 </div>
                 <div className="scenario-metric">
-                  <span className="metric-label">CF Used</span>
+                  <span className="metric-label"><InfoText contentKey="edi-cf-used">CF Used</InfoText></span>
                   <span className="metric-value">{formatCurrency(result.carryforwardUsed)}</span>
                 </div>
                 <div className="scenario-metric">
-                  <span className="metric-label">Tax With CF</span>
+                  <span className="metric-label"><InfoText contentKey="edi-tax-with-cf">Tax With CF</InfoText></span>
                   <span className="metric-value">{formatCurrency(result.taxWithCarryforward)}</span>
                 </div>
                 <hr className="scenario-metric-divider" />
                 <div className="scenario-metric">
-                  <span className="metric-label">Tax Saved</span>
+                  <span className="metric-label"><InfoText contentKey="edi-tax-saved">Tax Saved</InfoText></span>
                   <span className="metric-value saved">{formatCurrency(result.taxSaved)}</span>
                 </div>
               </div>
@@ -858,11 +913,11 @@ export function EdiOnlyTab({
           <thead>
             <tr>
               <th>Gain Amount</th>
-              <th>CF Used</th>
-              <th>Tax Without CF</th>
-              <th>Tax With CF</th>
-              <th>Tax Saved</th>
-              <th>Effective Rate</th>
+              <th><InfoText contentKey="edi-cf-used">CF Used</InfoText></th>
+              <th><InfoText contentKey="edi-tax-without-cf">Tax Without CF</InfoText></th>
+              <th><InfoText contentKey="edi-tax-with-cf">Tax With CF</InfoText></th>
+              <th><InfoText contentKey="edi-tax-saved">Tax Saved</InfoText></th>
+              <th><InfoText contentKey="edi-effective-rate">Effective Rate</InfoText></th>
             </tr>
           </thead>
           <tbody>
@@ -898,7 +953,7 @@ export function EdiOnlyTab({
         {sensitivityProjection && (
           <div className="edi-summary-cards">
             <div className="edi-summary-card">
-              <div className="card-label">Total Tax Savings (Shifted)</div>
+              <div className="card-label"><InfoText contentKey="edi-potential-tax-protection">Total Tax Savings (Shifted)</InfoText></div>
               <div className="card-value positive">
                 {formatCurrency(sensitivityProjection.summary.totalRealizedBenefit + sensitivityProjection.summary.carryforwardTaxShield)}
               </div>
@@ -907,7 +962,7 @@ export function EdiOnlyTab({
               </div>
             </div>
             <div className="edi-summary-card">
-              <div className="card-label">CF Shield (Shifted)</div>
+              <div className="card-label"><InfoText contentKey="edi-potential-tax-protection">CF Shield (Shifted)</InfoText></div>
               <div className="card-value highlight">
                 {formatCurrency(sensitivityProjection.summary.carryforwardTaxShield)}
               </div>
@@ -968,7 +1023,7 @@ export function EdiOnlyTab({
             <tbody>
               {ROW_DEFINITIONS.map(rowDef => (
                 <tr key={rowDef.key} className={rowDef.rowClass ?? ''}>
-                  <td className="row-label">{rowDef.label}</td>
+                  <td className="row-label">{rowDef.infoKey ? <InfoText contentKey={rowDef.infoKey}>{rowDef.label}</InfoText> : rowDef.label}</td>
                   {projection.years.map(year => (
                     <td key={year.year} className="cell-value">
                       {formatCellValue(rowDef.format, rowDef.getValue(year))}
@@ -1004,20 +1059,20 @@ export function EdiOnlyTab({
         {selectedUnwind && (
           <div className="edi-summary-cards">
             <div className="edi-summary-card">
-              <div className="card-label">Portfolio Value</div>
+              <div className="card-label"><InfoText contentKey="edi-portfolio-value-unwind">Portfolio Value</InfoText></div>
               <div className="card-value">{formatCurrency(selectedUnwind.portfolioValueAtUnwind)}</div>
             </div>
             <div className="edi-summary-card">
-              <div className="card-label">Embedded Gain</div>
+              <div className="card-label"><InfoText contentKey="edi-embedded-gain">Embedded Gain</InfoText></div>
               <div className="card-value">{formatCurrency(selectedUnwind.embeddedGainEstimate)}</div>
               <div className="card-detail">{(selectedUnwind.embeddedGainPct * 100).toFixed(1)}% of portfolio</div>
             </div>
             <div className="edi-summary-card">
-              <div className="card-label">CF Available</div>
+              <div className="card-label"><InfoText contentKey="edi-cf-available">CF Available</InfoText></div>
               <div className="card-value highlight">{formatCurrency(selectedUnwind.availableCarryforward)}</div>
             </div>
             <div className="edi-summary-card">
-              <div className="card-label">Net Unwind Tax</div>
+              <div className="card-label"><InfoText contentKey="edi-net-unwind-tax">Net Unwind Tax</InfoText></div>
               <div className="card-value positive">{formatCurrency(selectedUnwind.netUnwindTax)}</div>
               <div className="card-detail">Saved: {formatCurrency(selectedUnwind.taxSavedByCf)}</div>
             </div>
@@ -1029,12 +1084,12 @@ export function EdiOnlyTab({
           <thead>
             <tr>
               <th>Year</th>
-              <th>Portfolio Value</th>
-              <th>Embedded Gain</th>
-              <th>CF Available</th>
-              <th>Gross Unwind Tax</th>
-              <th>Net Unwind Tax</th>
-              <th>Tax Saved by CF</th>
+              <th><InfoText contentKey="edi-portfolio-value-unwind">Portfolio Value</InfoText></th>
+              <th><InfoText contentKey="edi-embedded-gain">Embedded Gain</InfoText></th>
+              <th><InfoText contentKey="edi-cf-available">CF Available</InfoText></th>
+              <th><InfoText contentKey="edi-gross-unwind-tax">Gross Unwind Tax</InfoText></th>
+              <th><InfoText contentKey="edi-net-unwind-tax">Net Unwind Tax</InfoText></th>
+              <th><InfoText contentKey="edi-tax-saved-cf">Tax Saved by CF</InfoText></th>
             </tr>
           </thead>
           <tbody>
@@ -1070,11 +1125,11 @@ export function EdiOnlyTab({
             <div className={`estate-option ${estateResult.recommendation === 'continue' ? 'recommended' : ''}`}>
               <h4>Hold for Step-Up</h4>
               <div className="estate-metric">
-                <span className="estate-label">Step-up value</span>
+                <span className="estate-label"><InfoText contentKey="edi-step-up-value">Step-up value</InfoText></span>
                 <span className="estate-value">{formatCurrency(estateResult.continueAndDie.stepUpValue)}</span>
               </div>
               <div className="estate-metric">
-                <span className="estate-label">CF lost at death</span>
+                <span className="estate-label"><InfoText contentKey="edi-cf-lost-death">CF lost at death</InfoText></span>
                 <span className="estate-value">{formatCurrency(estateResult.continueAndDie.carryforwardValueLost)}</span>
               </div>
               <div className="estate-metric">
@@ -1086,11 +1141,11 @@ export function EdiOnlyTab({
             <div className={`estate-option ${estateResult.recommendation === 'unwind' ? 'recommended' : ''}`}>
               <h4>Full Unwind</h4>
               <div className="estate-metric">
-                <span className="estate-label">Embedded gains</span>
+                <span className="estate-label"><InfoText contentKey="edi-embedded-gain">Embedded gains</InfoText></span>
                 <span className="estate-value">{formatCurrency(estateResult.unwindBeforeDeath.embeddedGains)}</span>
               </div>
               <div className="estate-metric">
-                <span className="estate-label">CF used</span>
+                <span className="estate-label"><InfoText contentKey="edi-cf-used">CF used</InfoText></span>
                 <span className="estate-value">{formatCurrency(estateResult.unwindBeforeDeath.carryforwardUsed)}</span>
               </div>
               <div className="estate-metric">
@@ -1102,7 +1157,7 @@ export function EdiOnlyTab({
             <div className={`estate-option ${estateResult.recommendation === 'partial_unwind' ? 'recommended' : ''}`}>
               <h4>Partial Unwind</h4>
               <div className="estate-metric">
-                <span className="estate-label">Optimal unwind</span>
+                <span className="estate-label"><InfoText contentKey="edi-optimal-unwind">Optimal unwind</InfoText></span>
                 <span className="estate-value">{(estateResult.optimalUnwindPct * 100).toFixed(0)}%</span>
               </div>
               <div className="estate-metric">
@@ -1110,7 +1165,7 @@ export function EdiOnlyTab({
                 <span className="estate-value">{formatCurrency(estateResult.unwindBeforeDeath.carryforwardUsed)}</span>
               </div>
               <div className="estate-metric">
-                <span className="estate-label">Keep for step-up</span>
+                <span className="estate-label"><InfoText contentKey="edi-step-up-value">Keep for step-up</InfoText></span>
                 <span className="estate-value">{(100 - estateResult.optimalUnwindPct * 100).toFixed(0)}%</span>
               </div>
             </div>
@@ -1138,19 +1193,19 @@ export function EdiOnlyTab({
         <h3>Strategy Cost &amp; Protection Build</h3>
         <div className="edi-summary-cards">
           <div className="edi-summary-card">
-            <div className="card-label">Total Incremental Cost ({state.assumptions.projectionYears}yr)</div>
+            <div className="card-label"><InfoText contentKey="edi-cumulative-financing">Total Incremental Cost ({state.assumptions.projectionYears}yr)</InfoText></div>
             <div className="card-value">{formatCurrency(economics.summary.totalIncrementalCost)}</div>
             <div className="card-detail">
               Financing only ({(incrementalFinancingCost * 100).toFixed(2)}%) — advisory excluded
             </div>
           </div>
           <div className="edi-summary-card">
-            <div className="card-label">Total CF Protection Built</div>
+            <div className="card-label"><InfoText contentKey="edi-cumulative-cf">Total CF Protection Built</InfoText></div>
             <div className="card-value positive">{formatCurrency(economics.summary.totalCfProtection)}</div>
             <div className="card-detail">Tax shield: {formatCurrency(economics.summary.totalCfProtection * combinedLtRate)}</div>
           </div>
           <div className="edi-summary-card">
-            <div className="card-label">Protection Ratio</div>
+            <div className="card-label"><InfoText contentKey="edi-protection-cost-ratio">Protection Ratio</InfoText></div>
             <div className="card-value positive">
               {economics.summary.protectionToCostRatio.toFixed(1)}x
             </div>
@@ -1172,7 +1227,7 @@ export function EdiOnlyTab({
             </thead>
             <tbody>
               <tr>
-                <td className="row-label">Annual Financing Cost (Incremental)</td>
+                <td className="row-label"><InfoText contentKey="edi-annual-financing-cost">Annual Financing Cost (Incremental)</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     <span className="edi-cell-negative">{formatCurrency(y.financingCost)}</span>
@@ -1183,7 +1238,7 @@ export function EdiOnlyTab({
                 </td>
               </tr>
               <tr className="row-muted">
-                <td className="row-label">Advisory Fee <span className="muted-note">(paid regardless)</span></td>
+                <td className="row-label"><InfoText contentKey="edi-advisory-fee-row">Advisory Fee</InfoText> <span className="muted-note">(paid regardless)</span></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value cell-muted">
                     {formatCurrency(y.advisoryFee)}
@@ -1194,7 +1249,7 @@ export function EdiOnlyTab({
                 </td>
               </tr>
               <tr>
-                <td className="row-label">CF Protection Built</td>
+                <td className="row-label"><InfoText contentKey="edi-cf-protection-built">CF Protection Built</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     <span className="edi-cell-positive">{formatCurrency(y.cfProtectionBuilt)}</span>
@@ -1205,7 +1260,7 @@ export function EdiOnlyTab({
                 </td>
               </tr>
               <tr className="row-highlight">
-                <td className="row-label">Cumulative CF Protection</td>
+                <td className="row-label"><InfoText contentKey="edi-cumulative-cf">Cumulative CF Protection</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     <span className="edi-cell-highlight">{formatCurrency(y.cumulativeCfProtection)}</span>
@@ -1214,7 +1269,7 @@ export function EdiOnlyTab({
                 <td className="cell-total">—</td>
               </tr>
               <tr>
-                <td className="row-label">Protection-to-Cost Ratio</td>
+                <td className="row-label"><InfoText contentKey="edi-protection-cost-ratio">Protection-to-Cost Ratio</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     <span className={y.protectionToCostRatio >= 1 ? 'edi-cell-positive' : ''}>
@@ -1227,7 +1282,7 @@ export function EdiOnlyTab({
                 </td>
               </tr>
               <tr>
-                <td className="row-label">Break-Even Gain Event</td>
+                <td className="row-label"><InfoText contentKey="edi-break-even-row">Break-Even Gain Event</InfoText></td>
                 {economics.years.map(y => (
                   <td key={y.year} className="cell-value">
                     {formatCurrency(y.breakEvenGainEvent)}
@@ -1240,6 +1295,123 @@ export function EdiOnlyTab({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Strategy × Scenario Matrix */}
+      <div className="edi-scenario-matrix-section">
+        <h3>
+          Best Strategy Per Life Event
+          <button
+            className="toggle-btn"
+            onClick={() => setShowScenarioMatrix(!showScenarioMatrix)}
+          >
+            {showScenarioMatrix ? 'Hide' : 'Show'}
+          </button>
+        </h3>
+        <p className="section-subtitle">
+          Compares all 10 strategies across life-event scenarios.{' '}
+          <InfoText contentKey="edi-scenario-net-value">Net Value</InfoText> = Tax Saved − Financing Cost through event year. Higher is better.
+        </p>
+        {showScenarioMatrix && scenarioMatrix && (
+          <>
+            {/* Winner summary cards */}
+            <div className="edi-summary-cards">
+              {scenarioMatrix.scenarios.map((sc, scIdx) => {
+                const winnerId = scenarioMatrix.bestPerScenario[scIdx];
+                const winner = scenarioMatrix.strategies.find(s => s.id === winnerId);
+                const winnerNet = winner?.scenarioTaxSaved[scIdx].netValue ?? 0;
+                return (
+                  <div key={scIdx} className="edi-summary-card scenario-winner-card">
+                    <div className="card-label"><InfoText contentKey="edi-best-strategy">{sc.label}</InfoText></div>
+                    <div className="card-value positive">{winner?.name ?? '—'}</div>
+                    <div className="card-detail">
+                      Net value: {formatCurrency(winnerNet)}
+                    </div>
+                    <div className="card-detail muted">
+                      {sc.isMultiYear
+                        ? `${formatCurrency(sc.annualGainAmount!)}/yr × ${sc.durationYears}yr`
+                        : `${formatCurrency(sc.gainAmount)} ${sc.gainCharacter.toUpperCase()}, Year ${sc.yearOfEvent}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Full matrix table */}
+            <div className="edi-table-container">
+              <table className="edi-table scenario-matrix-table">
+                <thead>
+                  <tr>
+                    <th className="col-label">Strategy</th>
+                    <th className="col-label">Financing</th>
+                    {scenarioMatrix.scenarios.map((sc, i) => (
+                      <th key={i} className="col-scenario">
+                        {sc.label}
+                        <span className="scenario-col-detail">
+                          {sc.isMultiYear
+                            ? `${formatCurrency(sc.annualGainAmount!)}/yr`
+                            : formatCurrency(sc.gainAmount)}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Core strategies */}
+                  <tr className="tier-header-row">
+                    <td colSpan={2 + scenarioMatrix.scenarios.length} className="tier-header">Core Strategies (Cash-Funded)</td>
+                  </tr>
+                  {scenarioMatrix.strategies.filter(s => s.type === 'core').map(sr => (
+                    <tr
+                      key={sr.id}
+                      className={sr.id === state.assumptions.strategyId ? 'current-strategy-row' : ''}
+                    >
+                      <td className="row-label">
+                        {sr.name}{sr.id === state.assumptions.strategyId ? ' *' : ''}
+                      </td>
+                      <td className="cell-value">{(sr.financingRate * 100).toFixed(1)}%</td>
+                      {sr.scenarioTaxSaved.map((sc, scIdx) => (
+                        <td
+                          key={scIdx}
+                          className={`cell-value ${scenarioMatrix.bestPerScenario[scIdx] === sr.id ? 'best-strategy-cell' : ''}`}
+                        >
+                          {formatCurrency(sc.netValue)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {/* Overlay strategies */}
+                  <tr className="tier-header-row">
+                    <td colSpan={2 + scenarioMatrix.scenarios.length} className="tier-header">Overlay Strategies (Collateral-Based)</td>
+                  </tr>
+                  {scenarioMatrix.strategies.filter(s => s.type === 'overlay').map(sr => (
+                    <tr
+                      key={sr.id}
+                      className={sr.id === state.assumptions.strategyId ? 'current-strategy-row' : ''}
+                    >
+                      <td className="row-label">
+                        {sr.name}{sr.id === state.assumptions.strategyId ? ' *' : ''}
+                      </td>
+                      <td className="cell-value">{(sr.financingRate * 100).toFixed(1)}%</td>
+                      {sr.scenarioTaxSaved.map((sc, scIdx) => (
+                        <td
+                          key={scIdx}
+                          className={`cell-value ${scenarioMatrix.bestPerScenario[scIdx] === sr.id ? 'best-strategy-cell' : ''}`}
+                        >
+                          {formatCurrency(sc.netValue)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="matrix-footnote">
+              * = currently selected strategy. Core strategies have no incremental financing cost.
+              Net value accounts for cumulative financing drag through each scenario's event year.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Strategy Comparison */}
@@ -1313,29 +1485,29 @@ export function EdiOnlyTab({
           <>
             <div className="edi-summary-cards">
               <div className="edi-summary-card">
-                <div className="card-label">Passive After-Tax</div>
+                <div className="card-label"><InfoText contentKey="edi-passive-after-tax">Passive After-Tax</InfoText></div>
                 <div className="card-value">{formatCurrency(baseline.terminalPassive)}</div>
                 <div className="card-detail">Year {state.assumptions.projectionYears} — no TLH</div>
               </div>
               <div className="edi-summary-card">
-                <div className="card-label">Traditional DI After-Tax</div>
+                <div className="card-label"><InfoText contentKey="edi-trad-di-after-tax">Traditional DI After-Tax</InfoText></div>
                 <div className="card-value">{formatCurrency(baseline.terminalTradDi)}</div>
                 <div className="card-detail">Long-only TLH (industry benchmark)</div>
               </div>
               <div className="edi-summary-card">
-                <div className="card-label">EDI After-Tax</div>
+                <div className="card-label"><InfoText contentKey="edi-edi-after-tax">EDI After-Tax</InfoText></div>
                 <div className="card-value">{formatCurrency(baseline.terminalEdi)}</div>
                 <div className="card-detail">Overlay + financing drag</div>
               </div>
               <div className="edi-summary-card">
-                <div className="card-label">TLH Benefit</div>
+                <div className="card-label"><InfoText contentKey="edi-tlh-benefit">TLH Benefit</InfoText></div>
                 <div className={`card-value ${baseline.tradDiAdvantage >= 0 ? 'positive' : ''}`}>
                   {formatCurrency(baseline.tradDiAdvantage)}
                 </div>
                 <div className="card-detail">Trad DI vs Passive — basic TLH value</div>
               </div>
               <div className="edi-summary-card">
-                <div className="card-label">EDI Upgrade Value</div>
+                <div className="card-label"><InfoText contentKey="edi-upgrade-value">EDI Upgrade Value</InfoText></div>
                 <div className={`card-value ${baseline.ediAdvantageVsTradDi >= 0 ? 'positive' : ''}`}>
                   {formatCurrency(baseline.ediAdvantageVsTradDi)}
                 </div>
@@ -1391,7 +1563,7 @@ export function EdiOnlyTab({
                     ))}
                   </tr>
                   <tr>
-                    <td className="row-label">CF Built</td>
+                    <td className="row-label"><InfoText contentKey="edi-trad-di-cf-built">CF Built</InfoText></td>
                     {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">
                         <span className="edi-cell-positive">{formatCurrency(y.tradDiCfBuilt)}</span>
@@ -1457,7 +1629,7 @@ export function EdiOnlyTab({
 
                   {/* Bottom line: EDI vs Trad DI */}
                   <tr className="row-positive">
-                    <td className="row-label">EDI vs Trad DI</td>
+                    <td className="row-label"><InfoText contentKey="edi-edi-vs-trad-di">EDI vs Trad DI</InfoText></td>
                     {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">
                         <span className={(y.ediAfterTax - y.tradDiAfterTax) >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
@@ -1556,21 +1728,21 @@ export function EdiOnlyTab({
         </p>
         <div className="edi-summary-cards">
           <div className="edi-summary-card">
-            <div className="card-label">Combined ST Rate (incl. NIIT)</div>
+            <div className="card-label"><InfoText contentKey="edi-niit-combined-st">Combined ST Rate (incl. NIIT)</InfoText></div>
             <div className="card-value">{(combinedStRate * 100).toFixed(1)}%</div>
             <div className="card-detail">Includes 3.8% NIIT + state rate</div>
           </div>
           <div className="edi-summary-card">
-            <div className="card-label">Combined LT Rate (incl. NIIT)</div>
+            <div className="card-label"><InfoText contentKey="edi-niit-combined-lt">Combined LT Rate (incl. NIIT)</InfoText></div>
             <div className="card-value">{(combinedLtRate * 100).toFixed(1)}%</div>
           </div>
           <div className="edi-summary-card">
-            <div className="card-label">$3K Deduction Effective Rate</div>
+            <div className="card-label"><InfoText contentKey="edi-niit-deduction-rate">$3K Deduction Effective Rate</InfoText></div>
             <div className="card-value">{((combinedStRate - 0.038) * 100).toFixed(1)}%</div>
             <div className="card-detail">Excludes 3.8% NIIT (offsets ordinary income only)</div>
           </div>
           <div className="edi-summary-card">
-            <div className="card-label">Annual NIIT Exclusion Benefit</div>
+            <div className="card-label"><InfoText contentKey="edi-niit-exclusion-benefit">Annual NIIT Exclusion Benefit</InfoText></div>
             <div className="card-value positive">{formatCurrency(3000 * 0.038)}</div>
             <div className="card-detail">Per-year savings from correct NIIT treatment</div>
           </div>
