@@ -284,13 +284,13 @@ export function EdiOnlyTab({
           <div className="card-label">Total Potential Tax Savings</div>
           <div className="card-value positive">{formatCurrency(totalPotentialSavings)}</div>
           <div className="card-detail">
-            CF shield: {formatCurrency(projection.summary.carryforwardTaxShield)} + realized: {formatCurrency(projection.summary.totalRealizedBenefit)}
+            CF shield (at LT rate): {formatCurrency(projection.summary.carryforwardTaxShield)} + realized: {formatCurrency(projection.summary.totalRealizedBenefit)}
           </div>
         </div>
         <div className="edi-summary-card">
           <div className="card-label">Final Carryforward (Year {state.assumptions.projectionYears})</div>
           <div className="card-value highlight">{formatCurrency(projection.summary.finalCarryforward)}</div>
-          <div className="card-detail">Shelters gains at {(combinedLtRate * 100).toFixed(1)}% LT rate</div>
+          <div className="card-detail">Min. value at {(combinedLtRate * 100).toFixed(1)}% LT rate; higher if sheltering ST gains</div>
         </div>
         <div className="edi-summary-card">
           <div className="card-label">Total ST Losses Harvested</div>

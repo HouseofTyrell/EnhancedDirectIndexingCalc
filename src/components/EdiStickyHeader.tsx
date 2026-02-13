@@ -96,7 +96,7 @@ export const EdiStickyHeader = React.memo(function EdiStickyHeader({
             {formatCurrency(totalTaxSavings)}
             <DeltaBadge delta={savingsDelta} />
           </span>
-          {isExpanded && <span className="sticky-header__subtext">CF shield + realized</span>}
+          {isExpanded && <span className="sticky-header__subtext">CF shield (LT rate) + realized</span>}
           {pinnedValues && <PinnedDelta current={totalTaxSavings} pinned={pinnedValues.totalTaxSavings} />}
         </div>
         <div className="sticky-header__metric sticky-header__metric--primary">

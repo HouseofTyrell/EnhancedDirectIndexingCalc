@@ -40,13 +40,14 @@ describe('computeEdiYear', () => {
     // Excess ST losses become carryforward
     expect(result.excessStLossAfterOffset).toBeCloseTo(1_510_000, -2);
 
-    // $3K deduction against ordinary income
+    // $3K deduction against ordinary income (excludes NIIT — offsets ordinary, not NII)
+    // Rate = combinedStRate (0.541) - niitRate (0.038) = 0.503
     expect(result.capitalLossDeduction).toBe(3000);
-    expect(result.taxSavedByCapitalLossDeduction).toBeCloseTo(1623, -1);
+    expect(result.taxSavedByCapitalLossDeduction).toBeCloseTo(1509, -1);
 
     // Net annual benefit is POSITIVE (not $0, not negative)
     expect(result.annualRealizedBenefit).toBeGreaterThan(0);
-    expect(result.annualRealizedBenefit).toBeCloseTo(1623, -1);
+    expect(result.annualRealizedBenefit).toBeCloseTo(1509, -1);
 
     // Carryforward = excess - $3K deduction
     expect(result.endingStCarryforward).toBeCloseTo(1_507_000, -2);

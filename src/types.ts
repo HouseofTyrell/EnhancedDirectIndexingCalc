@@ -293,7 +293,7 @@ export const DEFAULT_QFAF_TEST_YEAR: Omit<QfafTestYearInput, 'year'> = {
   marginalTaxRate: 0.45, // ~45% combined federal + state
   managementFeeRate: 0.01, // 1% management fee
   qfafFeeRate: 0.015, // 1.5% QFAF fee
-  section461Limit: 640000, // 2026 projected MFJ limit
+  section461Limit: 512000, // 2026 MFJ limit per Rev. Proc. 2025-32
 };
 
 // ============================================
@@ -363,12 +363,14 @@ export interface EdiPinnedScenario {
   results: EdiPinnedResults;
 }
 
-// Section 461(l) limits by filing status for 2026 (projected)
+// Section 461(l) limits by filing status for 2026
+// OBBBA reset base to $250K/$500K with inflation indexing from 2024 base year
+// Matches SECTION_461L_LIMITS in strategyData.ts (per Rev. Proc. 2025-32)
 export const SECTION_461_LIMITS_2026: Record<FilingStatus, number> = {
-  single: 320000,
-  mfj: 640000,
-  mfs: 320000,
-  hoh: 320000,
+  single: 256000,
+  mfj: 512000,
+  mfs: 256000,
+  hoh: 256000,
 };
 
 // Summary totals for the QFAF Test table

@@ -16,6 +16,7 @@ export interface EdiYearInput {
   washSaleRate: number;
   priorStCarryforward: number;
   priorLtCarryforward: number;
+  niitRate?: number; // Default 0.038; excluded from $3K deduction (offsets ordinary income, not NII)
 }
 
 export interface EdiYearResult {
@@ -116,7 +117,11 @@ export function computeEdiYear(input: EdiYearInput): EdiYearResult {
 
   // --- Step 6: Tax calculations ---
   const taxOnRemainingLtGains = safeNumber(remainingLtGain * combinedLtRate);
-  const taxSavedByCapitalLossDeduction = safeNumber(capitalLossDeduction * combinedStRate);
+  // $3K capital loss deduction offsets ordinary income, NOT net investment income,
+  // so NIIT (3.8%) does not apply. Use combined rate minus NIIT for this deduction.
+  const effectiveNiitRate = input.niitRate ?? 0.038;
+  const deductionRate = combinedStRate - effectiveNiitRate;
+  const taxSavedByCapitalLossDeduction = safeNumber(capitalLossDeduction * deductionRate);
   const annualRealizedBenefit = safeNumber(taxSavedByCapitalLossDeduction - taxOnRemainingLtGains);
 
   // --- Step 7: Harvesting efficiency ---
@@ -390,26 +395,46 @@ export function computeScenarioResults(
     };
   }
 
-  // Multi-year realization
+  // Multi-year realization with ongoing CF replenishment from EDI harvesting
   const yearDetails: NonNullable<ScenarioResult['yearDetails']> = [];
   let totalTaxWithout = 0;
   let totalTaxWith = 0;
 
+  // Track cumulative CF consumed by the scenario across years.
+  // Each year, available CF = projection ending CF for that year minus
+  // what this scenario has already consumed in prior years.
+  let cumulativeStConsumed = 0;
+  let cumulativeLtConsumed = 0;
+
   for (let i = 0; i < (scenario.durationYears ?? 1); i++) {
     const annualGain = scenario.annualGainAmount ?? scenario.gainAmount;
-    const cfAvailable = stCf + ltCf;
+    const currentYear = scenario.yearOfEvent + i;
+    const currentYearIdx = Math.min(currentYear - 1, projection.years.length - 1);
+    const projYear = projection.years[currentYearIdx];
+
+    // Available CF = projection ending CF (includes new harvesting) minus what
+    // this scenario has already consumed in prior iteration years
+    const availStCf = Math.max(0, projYear.endingStCarryforward - cumulativeStConsumed);
+    const availLtCf = Math.max(0, projYear.endingLtCarryforward - cumulativeLtConsumed);
+    const cfAvailable = availStCf + availLtCf;
 
     const result = calculateRealizationScenario({
       gainAmount: annualGain,
       gainCharacter: scenario.gainCharacter,
-      availableStCarryforward: stCf,
-      availableLtCarryforward: ltCf,
+      availableStCarryforward: availStCf,
+      availableLtCarryforward: availLtCf,
       combinedStRate,
       combinedLtRate,
     });
 
+    // Track how much CF was consumed this year
+    const stConsumedThisYear = availStCf - result.remainingStCarryforward;
+    const ltConsumedThisYear = availLtCf - result.remainingLtCarryforward;
+    cumulativeStConsumed += stConsumedThisYear;
+    cumulativeLtConsumed += ltConsumedThisYear;
+
     yearDetails.push({
-      year: scenario.yearOfEvent + i,
+      year: currentYear,
       gainThisYear: annualGain,
       cfAvailable,
       cfUsed: result.carryforwardUsed,
@@ -421,19 +446,25 @@ export function computeScenarioResults(
 
     totalTaxWithout += result.taxWithoutCarryforward;
     totalTaxWith += result.taxWithCarryforward;
-    stCf = result.remainingStCarryforward;
-    ltCf = result.remainingLtCarryforward;
   }
+
+  // Total CF used = cumulative consumed across all years
+  const totalCfUsed = cumulativeStConsumed + cumulativeLtConsumed;
+  // Remaining CF after the final year of the scenario
+  const finalYearIdx = Math.min(scenario.yearOfEvent + (scenario.durationYears ?? 1) - 2, projection.years.length - 1);
+  const finalProjYear = projection.years[finalYearIdx];
+  const remainingCf = Math.max(0,
+    (finalProjYear.endingStCarryforward - cumulativeStConsumed) +
+    (finalProjYear.endingLtCarryforward - cumulativeLtConsumed)
+  );
 
   return {
     scenario,
     taxWithoutCarryforward: safeNumber(totalTaxWithout),
     taxWithCarryforward: safeNumber(totalTaxWith),
     taxSaved: safeNumber(totalTaxWithout - totalTaxWith),
-    carryforwardUsed: safeNumber(
-      (cfAtEvent.endingStCarryforward + cfAtEvent.endingLtCarryforward) - (stCf + ltCf)
-    ),
-    remainingCarryforward: safeNumber(stCf + ltCf),
+    carryforwardUsed: safeNumber(totalCfUsed),
+    remainingCarryforward: safeNumber(remainingCf),
     yearDetails,
   };
 }
