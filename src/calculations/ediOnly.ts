@@ -163,6 +163,8 @@ export interface EdiProjectionInput {
   existingLtCarryforward: number;
   annualReturn: number;
   projectionYears: number;
+  /** Incremental financing cost rate. When provided, collateral growth is reduced by this rate. */
+  financingCostRate?: number;
 }
 
 export interface EdiProjectionSummary {
@@ -203,7 +205,9 @@ export function computeEdiProjection(input: EdiProjectionInput): EdiProjectionRe
     // Thread state forward
     stCf = yearResult.endingStCarryforward;
     ltCf = yearResult.endingLtCarryforward;
-    collateralValue = safeNumber(collateralValue * (1 + input.annualReturn));
+    // Grow collateral net of financing drag when provided (PM review: 30% overstatement at year 10 without this)
+    const netGrowthRate = input.annualReturn - (input.financingCostRate ?? 0);
+    collateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
   }
 
   // Compute summary
@@ -339,9 +343,17 @@ export function getDefaultScenarios(collateralValue: number): RealizationScenari
     {
       label: 'Concentrated Stock Exit',
       description: 'Client sells appreciated stock position',
-      gainAmount: collateralValue * 0.5,
+      gainAmount: collateralValue * 1.0,
       gainCharacter: 'lt',
       yearOfEvent: 5,
+      isMultiYear: false,
+    },
+    {
+      label: 'Business Sale',
+      description: 'Owner sells business, realizes large capital gain',
+      gainAmount: collateralValue * 2.0,
+      gainCharacter: 'lt',
+      yearOfEvent: 7,
       isMultiYear: false,
     },
     {
@@ -349,6 +361,14 @@ export function getDefaultScenarios(collateralValue: number): RealizationScenari
       description: 'Client moves to new advisor, realizes embedded gains',
       gainAmount: collateralValue * 0.2,
       gainCharacter: 'lt',
+      yearOfEvent: 3,
+      isMultiYear: false,
+    },
+    {
+      label: 'RSU/IPO Vest',
+      description: 'Short-term gains from RSU vest or IPO lockup sale',
+      gainAmount: collateralValue * 0.3,
+      gainCharacter: 'st',
       yearOfEvent: 3,
       isMultiYear: false,
     },
@@ -477,6 +497,7 @@ export function estimateEmbeddedGainPct(
   strategyId: string,
   year: number,
   annualReturn: number,
+  washSaleRate: number = 0,
 ): number {
   const strategy = STRATEGIES.find(s => s.id === strategyId);
   if (!strategy) return 0;
@@ -487,15 +508,15 @@ export function estimateEmbeddedGainPct(
   for (let y = 1; y <= year; y++) {
     const stLossRate = getStLossRateForYear(strategy, y);
     const ltGainRate = strategy.ltGainRate;
-    // Net basis reduction: harvesting lowers basis, LT realization raises it
-    const netStLoss = Math.max(0, stLossRate - ltGainRate);
+    // Net basis reduction: harvesting lowers basis (adjusted for wash sales), LT realization raises it
+    // Allow negative values when ltGainRate > stLossRate (PM Issue 1)
+    const netStLoss = stLossRate * (1 - washSaleRate) - ltGainRate;
 
     cumulativeBasisReduction += portfolioValue * netStLoss;
     portfolioValue *= (1 + annualReturn);
   }
 
   // Embedded gain = unrealized appreciation + cumulative net basis reduction
-  // cumulativeBasisReduction is already net of LT gain realization (stLoss - ltGain)
   const cumulativeAppreciation = portfolioValue - 1.0;
   const embeddedGain = cumulativeAppreciation + cumulativeBasisReduction;
   return Math.max(0, embeddedGain / portfolioValue);
@@ -507,6 +528,9 @@ export interface UnwindInput {
   strategyId: string;
   annualReturn: number;
   combinedLtRate: number;
+  washSaleRate?: number;
+  /** Financing cost rate — used to compute net growth rate for embedded gain consistency */
+  financingCostRate?: number;
 }
 
 export interface UnwindResult {
@@ -524,14 +548,16 @@ export interface UnwindResult {
 }
 
 export function calculateUnwindAnalysis(input: UnwindInput): UnwindResult {
-  const { unwindYear, projection, strategyId, annualReturn, combinedLtRate } = input;
+  const { unwindYear, projection, strategyId, annualReturn, combinedLtRate, washSaleRate = 0, financingCostRate = 0 } = input;
   const yearIdx = Math.min(unwindYear - 1, projection.years.length - 1);
   const yearData = projection.years[yearIdx];
 
+  // Use net growth rate consistent with projection's financing drag
+  const netGrowthRate = annualReturn - financingCostRate;
   // Use end-of-year portfolio value to match estimateEmbeddedGainPct's denominator
   // and endingCarryforward timing (both are end-of-year values)
-  const portfolioValue = yearData.collateralValue * (1 + annualReturn);
-  const embeddedGainPct = estimateEmbeddedGainPct(strategyId, unwindYear, annualReturn);
+  const portfolioValue = yearData.collateralValue * (1 + netGrowthRate);
+  const embeddedGainPct = estimateEmbeddedGainPct(strategyId, unwindYear, netGrowthRate, washSaleRate);
   const embeddedGain = safeNumber(portfolioValue * embeddedGainPct);
 
   const totalCf = yearData.endingStCarryforward + yearData.endingLtCarryforward;
@@ -592,22 +618,22 @@ export interface StrategyEconomicsYear {
   collateralValue: number;
   financingCost: number;
   advisoryFee: number;
-  totalCost: number;
+  totalIncrementalCost: number; // Financing only (advisory excluded)
   realizedBenefit: number;
-  cfTaxShieldDelta: number;
-  totalBenefit: number;
-  netBenefit: number;
-  cumulativeNetBenefit: number;
-  taxAlphaBps: number;
+  cfProtectionBuilt: number; // CF added this year (ST + LT delta)
+  cumulativeCfProtection: number;
+  cumulativeIncrementalCost: number;
+  protectionToCostRatio: number; // cumCfProtection / cumCost
+  breakEvenGainEvent: number; // Gain needed to recover cumulative cost
 }
 
 export interface StrategyEconomicsSummary {
-  totalCost: number;
-  totalBenefit: number;
-  netBenefit: number;
-  roi: number;
-  avgTaxAlphaBps: number;
-  paybackYear: number; // Year where cumulative net becomes positive (0 = never)
+  totalIncrementalCost: number; // Financing only
+  totalAdvisoryFee: number;
+  totalCfProtection: number;
+  protectionToCostRatio: number;
+  breakEvenGainEvent: number;
+  totalRealizedBenefit: number;
 }
 
 export interface StrategyEconomicsResult {
@@ -622,12 +648,12 @@ export function computeStrategyEconomics(
   combinedLtRate: number,
 ): StrategyEconomicsResult {
   const years: StrategyEconomicsYear[] = [];
-  let cumulativeNet = 0;
-  let totalCost = 0;
-  let totalBenefit = 0;
-  let paybackYear = 0;
+  let cumulativeCost = 0;
+  let cumulativeCfProtection = 0;
+  let totalAdvisoryFee = 0;
+  let totalRealizedBenefit = 0;
 
-  let prevCfShield = 0;
+  let prevTotalCf = 0;
 
   for (let i = 0; i < projection.years.length; i++) {
     const yr = projection.years[i];
@@ -635,55 +661,61 @@ export function computeStrategyEconomics(
 
     const financingCost = safeNumber(cv * financingCostRate);
     const advisoryFee = safeNumber(cv * advisoryFeeRate);
-    const cost = safeNumber(financingCost + advisoryFee);
 
-    const currentCfShield = safeNumber(
-      (yr.endingStCarryforward + yr.endingLtCarryforward) * combinedLtRate
-    );
-    const cfTaxShieldDelta = safeNumber(currentCfShield - prevCfShield);
-    prevCfShield = currentCfShield;
+    cumulativeCost += financingCost;
+    totalAdvisoryFee += advisoryFee;
+    totalRealizedBenefit += yr.annualRealizedBenefit;
 
-    const benefit = safeNumber(yr.annualRealizedBenefit + cfTaxShieldDelta);
-    const net = safeNumber(benefit - cost);
-    cumulativeNet += net;
-    totalCost += cost;
-    totalBenefit += benefit;
+    const currentTotalCf = yr.endingStCarryforward + yr.endingLtCarryforward;
+    const cfProtectionBuilt = safeNumber(currentTotalCf - prevTotalCf);
+    prevTotalCf = currentTotalCf;
 
-    if (paybackYear === 0 && cumulativeNet > 0) {
-      paybackYear = yr.year;
-    }
+    cumulativeCfProtection += cfProtectionBuilt;
 
-    const taxAlphaBps = cv > 0 ? safeNumber((net / cv) * 10000) : 0;
+    const protectionToCostRatio = cumulativeCost > 0
+      ? safeNumber(cumulativeCfProtection * combinedLtRate / cumulativeCost)
+      : 0;
+
+    // Break-even gain event: how much gain must be realized to recover cumulative cost via CF tax savings
+    // Credits realized benefits already banked ($3K deductions) per standard break-even methodology
+    const netUnrecoveredCost = Math.max(0, cumulativeCost - totalRealizedBenefit);
+    const breakEvenGainEvent = combinedLtRate > 0
+      ? safeNumber(netUnrecoveredCost / combinedLtRate)
+      : 0;
 
     years.push({
       year: yr.year,
       collateralValue: cv,
       financingCost,
       advisoryFee,
-      totalCost: cost,
+      totalIncrementalCost: financingCost,
       realizedBenefit: yr.annualRealizedBenefit,
-      cfTaxShieldDelta,
-      totalBenefit: benefit,
-      netBenefit: net,
-      cumulativeNetBenefit: safeNumber(cumulativeNet),
-      taxAlphaBps,
+      cfProtectionBuilt,
+      cumulativeCfProtection: safeNumber(cumulativeCfProtection),
+      cumulativeIncrementalCost: safeNumber(cumulativeCost),
+      protectionToCostRatio,
+      breakEvenGainEvent,
     });
   }
 
-  const totalYears = projection.years.length;
-  const avgAlpha = totalYears > 0
-    ? safeNumber(years.reduce((s, y) => s + y.taxAlphaBps, 0) / totalYears)
+  const totalProtectionValue = safeNumber(cumulativeCfProtection * combinedLtRate);
+  const finalProtectionRatio = cumulativeCost > 0
+    ? safeNumber(totalProtectionValue / cumulativeCost)
+    : 0;
+  const netUnrecoveredCostFinal = Math.max(0, cumulativeCost - totalRealizedBenefit);
+  const finalBreakEven = combinedLtRate > 0
+    ? safeNumber(netUnrecoveredCostFinal / combinedLtRate)
     : 0;
 
   return {
     years,
     summary: {
-      totalCost: safeNumber(totalCost),
-      totalBenefit: safeNumber(totalBenefit),
-      netBenefit: safeNumber(cumulativeNet),
-      roi: totalCost > 0 ? safeNumber(cumulativeNet / totalCost) : 0,
-      avgTaxAlphaBps: avgAlpha,
-      paybackYear,
+      totalIncrementalCost: safeNumber(cumulativeCost),
+      totalAdvisoryFee: safeNumber(totalAdvisoryFee),
+      totalCfProtection: safeNumber(cumulativeCfProtection),
+      protectionToCostRatio: finalProtectionRatio,
+      breakEvenGainEvent: finalBreakEven,
+      totalRealizedBenefit: safeNumber(totalRealizedBenefit),
     },
   };
 }
@@ -699,7 +731,8 @@ export interface BaselineComparisonYear {
   passiveExitTax: number;
   passiveAfterTax: number;
   ediValue: number;
-  ediCosts: number;
+  ediEmbeddedGain: number;
+  ediExitTax: number;
   ediTaxBenefit: number;
   ediAfterTax: number;
   ediAdvantage: number;
@@ -720,34 +753,40 @@ export function computeBaselineComparison(
   financingCostRate: number,
   combinedLtRate: number,
   strategyId: string,
+  washSaleRate: number = 0,
 ): BaselineComparisonResult {
   const years: BaselineComparisonYear[] = [];
-  let cumulativeEdiIncrementalCost = 0;
+
+  // Track EDI portfolio separately with financing drag
+  let ediPortfolioValue = initialCollateral;
 
   for (let i = 0; i < projection.years.length; i++) {
     const yr = projection.years[i];
     const yearNum = i + 1;
 
-    // Passive: buy-and-hold at same return, both strategies pay same advisory fee
-    // so we only compare the INCREMENTAL cost/benefit of EDI (financing costs)
+    // Passive: buy-and-hold at same return, advisory fee common to both
     const passiveValue = safeNumber(initialCollateral * Math.pow(1 + annualReturn, yearNum));
     const passiveEmbeddedGain = Math.max(0, passiveValue - initialCollateral);
     const passiveExitTax = safeNumber(passiveEmbeddedGain * combinedLtRate);
     const passiveAfterTax = safeNumber(passiveValue - passiveExitTax);
 
-    // EDI: same gross return, but incurs INCREMENTAL financing costs (advisory fee is common)
-    const ediIncrementalCostThisYear = safeNumber(yr.collateralValue * financingCostRate);
-    cumulativeEdiIncrementalCost += ediIncrementalCostThisYear;
+    // EDI: grows at annualReturn minus financing drag (compound effect)
+    ediPortfolioValue = safeNumber(ediPortfolioValue * (1 + annualReturn - financingCostRate));
 
-    // EDI after-tax terminal wealth if liquidated this year:
-    // Same gross portfolio value, but lower embedded gain tax (CF shelter) minus incremental costs
-    const ediPortfolioValue = safeNumber(yr.collateralValue * (1 + annualReturn));
-    const embGainPct = estimateEmbeddedGainPct(strategyId, yearNum, annualReturn);
+    // EDI embedded gain and CF shelter
+    // Use net growth rate (annualReturn - financingCostRate) for consistency with EDI portfolio value
+    const ediGrowthRate = annualReturn - financingCostRate;
+    const embGainPct = estimateEmbeddedGainPct(strategyId, yearNum, ediGrowthRate, washSaleRate);
     const ediEmbeddedGain = safeNumber(ediPortfolioValue * embGainPct);
     const totalCf = yr.endingStCarryforward + yr.endingLtCarryforward;
     const cfUsedAtExit = Math.min(totalCf, ediEmbeddedGain);
     const ediExitTax = safeNumber(Math.max(0, ediEmbeddedGain - cfUsedAtExit) * combinedLtRate);
-    const ediAfterTax = safeNumber(ediPortfolioValue - ediExitTax - cumulativeEdiIncrementalCost);
+    const ediAfterTax = safeNumber(ediPortfolioValue - ediExitTax);
+
+    const ediTaxBenefit = safeNumber(
+      projection.years.slice(0, i + 1).reduce((s, y) => s + y.annualRealizedBenefit, 0)
+      + cfUsedAtExit * combinedLtRate
+    );
 
     years.push({
       year: yearNum,
@@ -756,11 +795,9 @@ export function computeBaselineComparison(
       passiveExitTax,
       passiveAfterTax,
       ediValue: safeNumber(ediPortfolioValue),
-      ediCosts: safeNumber(cumulativeEdiIncrementalCost),
-      ediTaxBenefit: safeNumber(
-        projection.years.slice(0, i + 1).reduce((s, y) => s + y.annualRealizedBenefit, 0)
-        + cfUsedAtExit * combinedLtRate
-      ),
+      ediEmbeddedGain: safeNumber(ediEmbeddedGain),
+      ediExitTax,
+      ediTaxBenefit,
       ediAfterTax,
       ediAdvantage: safeNumber(ediAfterTax - passiveAfterTax),
     });

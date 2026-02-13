@@ -272,3 +272,24 @@ export function getShortRatio(strategy: Strategy): number {
   const shortPct = parseInt(match[2], 10);
   return shortPct / 100;
 }
+
+/**
+ * Compute the incremental financing cost for a strategy (excludes advisory fee).
+ * This is the margin+borrow cost only — the cost that is unique to EDI vs passive.
+ * Advisory fee is excluded because it's common to both EDI and passive strategies.
+ * @param strategy - The strategy to compute financing for
+ * @param brokerMarginRate - Margin rate charged on long leverage (default 4.25%)
+ * @param shortBorrowRate - Stock borrow fee on short positions (default 0.5%)
+ * @param shortDividendRate - Dividend cost on short positions (default 1.5%)
+ * @returns The incremental financing cost rate as a decimal
+ */
+export function computeIncrementalFinancingCost(
+  strategy: Strategy,
+  brokerMarginRate: number,
+  shortBorrowRate: number,
+  shortDividendRate: number,
+): number {
+  const longLeverage = getLongLeverageRatio(strategy);
+  const shortRatio = getShortRatio(strategy);
+  return brokerMarginRate * longLeverage + (shortBorrowRate + shortDividendRate) * shortRatio;
+}

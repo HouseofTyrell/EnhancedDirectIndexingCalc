@@ -11,6 +11,7 @@ import {
   computeStrategyEconomics,
   computeBaselineComparison,
 } from './calculations/ediOnly';
+import { computeIncrementalFinancingCost, STRATEGIES } from './strategyData';
 
 describe('computeEdiYear', () => {
   const defaults = {
@@ -196,15 +197,21 @@ describe('calculateRealizationScenario', () => {
 });
 
 describe('default realization scenarios', () => {
-  it('should provide 3 pre-built scenarios', () => {
+  it('should provide 5 pre-built scenarios including ST gain', () => {
     const scenarios = getDefaultScenarios(10_000_000);
-    expect(scenarios).toHaveLength(3);
+    expect(scenarios).toHaveLength(5);
     expect(scenarios[0].label).toBe('Concentrated Stock Exit');
-    expect(scenarios[1].label).toBe('Portfolio Transition');
-    expect(scenarios[2].label).toBe('Retirement Liquidation');
+    expect(scenarios[0].gainAmount).toBe(10_000_000); // 100% of collateral
+    expect(scenarios[1].label).toBe('Business Sale');
+    expect(scenarios[1].gainAmount).toBe(20_000_000); // 200% of collateral
+    expect(scenarios[2].label).toBe('Portfolio Transition');
+    expect(scenarios[3].label).toBe('RSU/IPO Vest');
+    expect(scenarios[3].gainCharacter).toBe('st'); // ST gain scenario per Wealth Advisor review
+    expect(scenarios[3].gainAmount).toBe(3_000_000); // 30% of collateral
+    expect(scenarios[4].label).toBe('Retirement Liquidation');
   });
 
-  it('should compute concentrated stock exit at Year 5', () => {
+  it('should compute concentrated stock exit at Year 5 (100% of collateral)', () => {
     const projection = computeEdiProjection({
       strategyId: 'overlay-45-45',
       collateralValue: 10_000_000,
@@ -221,7 +228,7 @@ describe('default realization scenarios', () => {
     const scenarios = getDefaultScenarios(10_000_000);
     const results = computeScenarioResults(scenarios[0], projection, 0.541, 0.371);
 
-    // At Year 5, should have substantial CF to shelter the $5M gain
+    // At Year 5, should have substantial CF to shelter the $10M gain
     expect(results.taxSaved).toBeGreaterThan(1_000_000);
   });
 
@@ -240,7 +247,7 @@ describe('default realization scenarios', () => {
     });
 
     const scenarios = getDefaultScenarios(10_000_000);
-    const results = computeScenarioResults(scenarios[2], projection, 0.541, 0.371);
+    const results = computeScenarioResults(scenarios[4], projection, 0.541, 0.371);
 
     // Multi-year scenario should have year-by-year details
     expect(results.yearDetails).toBeDefined();
@@ -362,50 +369,55 @@ describe('strategy economics', () => {
     projectionYears: 10,
   });
 
-  it('should compute annual costs from financing + advisory', () => {
+  it('should compute annual incremental cost (financing only, advisory separate)', () => {
     const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
 
     expect(result.years).toHaveLength(10);
-    // Year 1: $10M * (1.5% + 0.75%) = $225K
-    expect(result.years[0].totalCost).toBeCloseTo(225_000, -3);
+    // Year 1: $10M * 1.5% = $150K financing (incremental)
+    expect(result.years[0].totalIncrementalCost).toBeCloseTo(150_000, -3);
     expect(result.years[0].financingCost).toBeCloseTo(150_000, -3);
+    // Advisory is tracked separately, not included in incremental cost
     expect(result.years[0].advisoryFee).toBeCloseTo(75_000, -3);
   });
 
-  it('should compute positive net benefit from tax alpha exceeding costs', () => {
+  it('should compute CF protection built per year', () => {
     const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
 
-    // CF tax shield delta in Year 1 should be substantial (>$500K)
-    expect(result.years[0].cfTaxShieldDelta).toBeGreaterThan(400_000);
-    // Net benefit should be positive in Year 1
-    expect(result.years[0].netBenefit).toBeGreaterThan(0);
+    // Year 1 generates massive CF from harvesting
+    expect(result.years[0].cfProtectionBuilt).toBeGreaterThan(1_000_000);
+    // Cumulative CF protection should grow
+    expect(result.years[9].cumulativeCfProtection).toBeGreaterThan(result.years[0].cumulativeCfProtection);
+  });
+
+  it('should compute protection-to-cost ratio', () => {
+    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
+
+    // Protection ratio = cumulative CF tax shield / cumulative financing cost
+    // Should be > 1 (strategy generates more protection value than cost)
+    expect(result.summary.protectionToCostRatio).toBeGreaterThan(1);
+    // Early years should have very high ratio (big CF generation, small cost)
+    expect(result.years[0].protectionToCostRatio).toBeGreaterThan(2);
+  });
+
+  it('should compute break-even gain event crediting realized benefits', () => {
+    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
+
+    // Break-even = max(0, cumulativeCost - cumulativeRealizedBenefit) / combinedLtRate
+    // Year 1: cost = $150K, realizedBenefit is small ($3K deduction savings ≈ $1.5K)
+    // So break-even < $150K / 0.371 = $404K (slightly less due to realized benefit credit)
+    expect(result.years[0].breakEvenGainEvent).toBeLessThan(150_000 / 0.371);
+    expect(result.years[0].breakEvenGainEvent).toBeGreaterThan(0);
+    // Terminal break-even should be larger (more cumulative cost, though more realized benefit too)
+    expect(result.summary.breakEvenGainEvent).toBeGreaterThan(result.years[0].breakEvenGainEvent);
   });
 
   it('should compute summary totals correctly', () => {
     const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
 
-    expect(result.summary.totalCost).toBeGreaterThan(2_000_000);
-    expect(result.summary.totalBenefit).toBeGreaterThan(0);
-    // ROI is meaningful (can be positive or negative depending on strategy economics)
-    expect(result.summary.roi).toBeDefined();
-    expect(result.summary.avgTaxAlphaBps).toBeDefined();
-  });
-
-  it('should find early payback when early-year CF delta exceeds costs', () => {
-    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
-
-    // Year 1 generates massive CF ($1.5M+), so Year 1 net benefit is large and positive
-    expect(result.years[0].netBenefit).toBeGreaterThan(0);
-    expect(result.summary.paybackYear).toBe(1);
-  });
-
-  it('should show declining tax alpha as harvesting rates decay', () => {
-    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
-
-    // Year 1 should have high tax alpha (large CF delta)
-    expect(result.years[0].taxAlphaBps).toBeGreaterThan(100);
-    // Later years should have lower (possibly negative) alpha as loss rates decline
-    expect(result.years[0].taxAlphaBps).toBeGreaterThan(result.years[9].taxAlphaBps);
+    expect(result.summary.totalIncrementalCost).toBeGreaterThan(1_500_000);
+    expect(result.summary.totalCfProtection).toBeGreaterThan(4_000_000);
+    expect(result.summary.totalAdvisoryFee).toBeGreaterThan(0);
+    expect(result.summary.totalRealizedBenefit).toBeGreaterThan(0);
   });
 });
 
@@ -433,7 +445,7 @@ describe('baseline comparison', () => {
     expect(result.terminalEdi).toBeGreaterThan(10_000_000);
   });
 
-  it('should compute EDI vs passive comparison with incremental costs', () => {
+  it('should apply compound financing drag to EDI portfolio', () => {
     const result = computeBaselineComparison(
       baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
     );
@@ -442,8 +454,8 @@ describe('baseline comparison', () => {
     // The comparison is meaningful: advisory fees are excluded (common to both)
     expect(result.ediAdvantage).toBeDefined();
     expect(result.ediAdvantagePct).toBeDefined();
-    // EDI cumulative costs should grow over time
-    expect(result.years[9].ediCosts).toBeGreaterThan(result.years[0].ediCosts);
+    // EDI value should be less than passive (financing drag)
+    expect(result.years[9].ediValue).toBeLessThan(result.years[9].passiveValue);
     // EDI tax benefit should be positive
     expect(result.years[9].ediTaxBenefit).toBeGreaterThan(0);
   });
@@ -457,5 +469,64 @@ describe('baseline comparison', () => {
     expect(result.years[9].passiveEmbeddedGain).toBeGreaterThan(result.years[0].passiveEmbeddedGain);
     // Passive exit tax should be substantial by Year 10
     expect(result.years[9].passiveExitTax).toBeGreaterThan(1_000_000);
+  });
+
+  it('should track EDI embedded gain and CF shelter', () => {
+    const result = computeBaselineComparison(
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+    );
+
+    // EDI embedded gain should exist
+    expect(result.years[9].ediEmbeddedGain).toBeGreaterThan(0);
+    // EDI exit tax should be lower than passive (CF shelter)
+    expect(result.years[9].ediExitTax).toBeLessThan(result.years[9].passiveExitTax);
+  });
+});
+
+describe('computeIncrementalFinancingCost', () => {
+  it('should compute Overlay 45/45 financing at ~2.81%', () => {
+    const strategy = STRATEGIES.find(s => s.id === 'overlay-45-45')!;
+    const cost = computeIncrementalFinancingCost(strategy, 0.0425, 0.005, 0.015);
+    // 4.25% × 0.45 + (0.5% + 1.5%) × 0.45 = 1.9125% + 0.9% = 2.8125%
+    expect(cost).toBeCloseTo(0.028125, 5);
+  });
+
+  it('should compute Core 145/45 financing correctly', () => {
+    const strategy = STRATEGIES.find(s => s.id === 'core-145-45')!;
+    const cost = computeIncrementalFinancingCost(strategy, 0.0425, 0.005, 0.015);
+    // Core 145/45: long leverage = (145-100)/100 = 0.45, short = 0.45
+    // 4.25% × 0.45 + (0.5% + 1.5%) × 0.45 = 1.9125% + 0.9% = 2.8125%
+    expect(cost).toBeCloseTo(0.028125, 5);
+  });
+
+  it('should compute different costs for different leverage levels', () => {
+    const s30 = STRATEGIES.find(s => s.id === 'overlay-30-30')!;
+    const s125 = STRATEGIES.find(s => s.id === 'overlay-125-125')!;
+    const cost30 = computeIncrementalFinancingCost(s30, 0.0425, 0.005, 0.015);
+    const cost125 = computeIncrementalFinancingCost(s125, 0.0425, 0.005, 0.015);
+    // Higher leverage = higher financing cost
+    expect(cost125).toBeGreaterThan(cost30);
+  });
+});
+
+describe('estimateEmbeddedGainPct with wash sale rate', () => {
+  it('should reduce embedded gain when wash sale rate > 0', () => {
+    const pctNoWash = estimateEmbeddedGainPct('overlay-45-45', 5, 0.07, 0);
+    const pctWithWash = estimateEmbeddedGainPct('overlay-45-45', 5, 0.07, 0.15);
+    // Wash sales reduce effective harvesting, so less basis reduction → lower embedded gain
+    expect(pctWithWash).toBeLessThan(pctNoWash);
+  });
+
+  it('should return same result at 0% wash sale rate', () => {
+    const pctDefault = estimateEmbeddedGainPct('overlay-45-45', 5, 0.07);
+    const pctExplicit = estimateEmbeddedGainPct('overlay-45-45', 5, 0.07, 0);
+    expect(pctExplicit).toBe(pctDefault);
+  });
+
+  it('should allow negative netStLoss when ltGainRate > effective stLossRate', () => {
+    // With very high wash sale rate, effective ST loss could be less than LT gain
+    const pct = estimateEmbeddedGainPct('overlay-30-30', 10, 0.07, 0.90);
+    // Should still return a non-negative embedded gain pct (outer Math.max(0,...) applies)
+    expect(pct).toBeGreaterThanOrEqual(0);
   });
 });

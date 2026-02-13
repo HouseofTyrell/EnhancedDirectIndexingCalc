@@ -338,6 +338,9 @@ export interface EdiPinnedAssumptions {
   existingLtCarryforward: number;
   projectionYears: number;
   advisoryFeeRate?: number;
+  brokerMarginRate?: number;
+  shortBorrowRate?: number;
+  shortDividendRate?: number;
 }
 
 export interface EdiPinnedTaxRates {

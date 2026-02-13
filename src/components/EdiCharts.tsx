@@ -21,6 +21,7 @@ interface EdiChartsProps {
   data: EdiYearResult[];
   strategyId: string;
   annualReturn: number;
+  washSaleRate?: number;
 }
 
 export const EdiTaxSavingsChart = React.memo(function EdiTaxSavingsChart({ data }: EdiChartsProps) {
@@ -101,19 +102,20 @@ export const EdiEmbeddedGainChart = React.memo(function EdiEmbeddedGainChart({
   data,
   strategyId,
   annualReturn,
+  washSaleRate = 0,
 }: EdiChartsProps) {
   const { isDark } = useDarkMode();
 
   const chartData = useMemo(() => {
     return data.map(year => {
-      const embeddedGainPct = estimateEmbeddedGainPct(strategyId, year.year, annualReturn);
+      const embeddedGainPct = estimateEmbeddedGainPct(strategyId, year.year, annualReturn, washSaleRate);
       return {
         year: `Year ${year.year}`,
         'Portfolio Value': year.collateralValue,
         'Embedded Gain %': +(embeddedGainPct * 100).toFixed(1),
       };
     });
-  }, [data, strategyId, annualReturn]);
+  }, [data, strategyId, annualReturn, washSaleRate]);
 
   const CustomTooltip = ({
     active,
@@ -201,6 +203,7 @@ interface EdiCrossoverChartProps {
   strategyId: string;
   annualReturn: number;
   combinedLtRate: number;
+  washSaleRate?: number;
 }
 
 export const EdiCrossoverChart = React.memo(function EdiCrossoverChart({
@@ -208,13 +211,14 @@ export const EdiCrossoverChart = React.memo(function EdiCrossoverChart({
   strategyId,
   annualReturn,
   combinedLtRate,
+  washSaleRate = 0,
 }: EdiCrossoverChartProps) {
   const { isDark } = useDarkMode();
 
   const chartData = useMemo(() => {
     let crossoverYear = 0;
     const points = data.map(year => {
-      const embGainPct = estimateEmbeddedGainPct(strategyId, year.year, annualReturn);
+      const embGainPct = estimateEmbeddedGainPct(strategyId, year.year, annualReturn, washSaleRate);
       const portfolioValue = year.collateralValue * (1 + annualReturn);
       const embeddedGain = portfolioValue * embGainPct;
       const totalCf = year.endingStCarryforward + year.endingLtCarryforward;
@@ -234,7 +238,7 @@ export const EdiCrossoverChart = React.memo(function EdiCrossoverChart({
       };
     });
     return { points, crossoverYear };
-  }, [data, strategyId, annualReturn, combinedLtRate]);
+  }, [data, strategyId, annualReturn, combinedLtRate, washSaleRate]);
 
   return (
     <div className="chart-container">
