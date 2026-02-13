@@ -220,6 +220,17 @@
   background: #bbf7d0;
 }
 
+.tier-header-row td {
+  background: #f1f5f9;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+  padding: 6px 10px;
+  border-top: 2px solid #cbd5e1;
+}
+
 .edi-table tr.row-negative td {
   background: #fee2e2;
 }

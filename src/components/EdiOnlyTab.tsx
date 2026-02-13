@@ -21,6 +21,7 @@ import {
   type EdiYearResult,
   type EdiProjectionInput,
   type GainCharacter,
+  type BaselineComparisonYear,
 } from '../calculations/ediOnly';
 import { useScrollHeader } from '../hooks/useScrollHeader';
 import { EdiStickyHeader } from './EdiStickyHeader';
@@ -245,7 +246,7 @@ export function EdiOnlyTab({
     [projection, incrementalFinancingCost, state.assumptions.advisoryFeeRate, combinedLtRate]
   );
 
-  // Baseline comparison (passive vs EDI, advisory fee excluded as common to both)
+  // Baseline comparison (passive vs trad DI vs EDI, advisory fee excluded as common to all)
   const baseline = useMemo(
     () => computeBaselineComparison(
       projection,
@@ -255,8 +256,9 @@ export function EdiOnlyTab({
       combinedLtRate,
       state.assumptions.strategyId,
       state.assumptions.washSaleRate,
+      filingStatus,
     ),
-    [projection, state.assumptions, incrementalFinancingCost, combinedLtRate]
+    [projection, state.assumptions, incrementalFinancingCost, combinedLtRate, filingStatus]
   );
 
   // Strategy comparison across all strategies
@@ -1292,10 +1294,10 @@ export function EdiOnlyTab({
         )}
       </div>
 
-      {/* Baseline Comparison — collapsed by default */}
+      {/* Liquidation Comparison — collapsed by default */}
       <div className="edi-baseline-section">
         <h3>
-          Worst-Case: No Gain Event (Full Liquidation)
+          Liquidation Comparison: Passive vs Traditional DI vs EDI
           <button
             className="toggle-btn"
             onClick={() => setShowBaselineComparison(!showBaselineComparison)}
@@ -1304,25 +1306,40 @@ export function EdiOnlyTab({
           </button>
         </h3>
         <p className="section-subtitle">
-          Compares after-tax wealth at full liquidation. EDI return reduced by financing drag. Advisory fee excluded (common).
-          <strong> Note: EDI value is in tax protection for external events, not terminal wealth.</strong>
+          Compares after-tax wealth if the entire portfolio is liquidated.
+          Traditional DI = long-only tax-loss harvesting (industry benchmarks). EDI includes financing drag. Advisory fee excluded (common to all).
         </p>
         {showBaselineComparison && (
           <>
             <div className="edi-summary-cards">
               <div className="edi-summary-card">
-                <div className="card-label">Passive After-Tax (Year {state.assumptions.projectionYears})</div>
+                <div className="card-label">Passive After-Tax</div>
                 <div className="card-value">{formatCurrency(baseline.terminalPassive)}</div>
+                <div className="card-detail">Year {state.assumptions.projectionYears} — no TLH</div>
               </div>
               <div className="edi-summary-card">
-                <div className="card-label">EDI After-Tax (Year {state.assumptions.projectionYears})</div>
+                <div className="card-label">Traditional DI After-Tax</div>
+                <div className="card-value">{formatCurrency(baseline.terminalTradDi)}</div>
+                <div className="card-detail">Long-only TLH (industry benchmark)</div>
+              </div>
+              <div className="edi-summary-card">
+                <div className="card-label">EDI After-Tax</div>
                 <div className="card-value">{formatCurrency(baseline.terminalEdi)}</div>
+                <div className="card-detail">Overlay + financing drag</div>
               </div>
               <div className="edi-summary-card">
-                <div className="card-label">EDI Advantage</div>
-                <div className={`card-value ${baseline.ediAdvantage >= 0 ? 'positive' : ''}`}>
-                  {formatCurrency(baseline.ediAdvantage)} ({baseline.ediAdvantage >= 0 ? '+' : ''}{(baseline.ediAdvantagePct * 100).toFixed(1)}%)
+                <div className="card-label">TLH Benefit</div>
+                <div className={`card-value ${baseline.tradDiAdvantage >= 0 ? 'positive' : ''}`}>
+                  {formatCurrency(baseline.tradDiAdvantage)}
                 </div>
+                <div className="card-detail">Trad DI vs Passive — basic TLH value</div>
+              </div>
+              <div className="edi-summary-card">
+                <div className="card-label">EDI Upgrade Value</div>
+                <div className={`card-value ${baseline.ediAdvantageVsTradDi >= 0 ? 'positive' : ''}`}>
+                  {formatCurrency(baseline.ediAdvantageVsTradDi)}
+                </div>
+                <div className="card-detail">EDI vs Trad DI — why pay for the overlay</div>
               </div>
             </div>
             <div className="edi-table-container">
@@ -1330,68 +1347,121 @@ export function EdiOnlyTab({
                 <thead>
                   <tr>
                     <th className="col-label"></th>
-                    {baseline.years.map(y => (
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <th key={y.year} className="col-year">Year {y.year}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Passive tier */}
+                  <tr className="tier-header-row">
+                    <td colSpan={baseline.years.length + 1} className="tier-header">Passive (Buy &amp; Hold)</td>
+                  </tr>
                   <tr>
-                    <td className="row-label">Passive Gross Value</td>
-                    {baseline.years.map(y => (
+                    <td className="row-label">Gross Value</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">{formatCurrency(y.passiveValue)}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="row-label">Passive Exit Tax</td>
-                    {baseline.years.map(y => (
+                    <td className="row-label">Exit Tax</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">
                         <span className="edi-cell-negative">{formatCurrency(y.passiveExitTax)}</span>
                       </td>
                     ))}
                   </tr>
                   <tr className="row-highlight">
-                    <td className="row-label">Passive After-Tax</td>
-                    {baseline.years.map(y => (
+                    <td className="row-label">After-Tax</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">
                         <span className="edi-cell-highlight">{formatCurrency(y.passiveAfterTax)}</span>
                       </td>
                     ))}
                   </tr>
+
+                  {/* Traditional DI tier */}
+                  <tr className="tier-header-row">
+                    <td colSpan={baseline.years.length + 1} className="tier-header">Traditional DI (Long-Only TLH)</td>
+                  </tr>
                   <tr>
-                    <td className="row-label">EDI Value (after financing drag)</td>
-                    {baseline.years.map(y => (
+                    <td className="row-label">Gross Value</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
+                      <td key={y.year} className="cell-value">{formatCurrency(y.tradDiValue)}</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="row-label">CF Built</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
+                      <td key={y.year} className="cell-value">
+                        <span className="edi-cell-positive">{formatCurrency(y.tradDiCfBuilt)}</span>
+                      </td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="row-label">Exit Tax</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
+                      <td key={y.year} className="cell-value">
+                        <span className="edi-cell-negative">{formatCurrency(y.tradDiExitTax)}</span>
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="row-highlight">
+                    <td className="row-label">After-Tax</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
+                      <td key={y.year} className="cell-value">
+                        <span className="edi-cell-highlight">{formatCurrency(y.tradDiAfterTax)}</span>
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* EDI tier */}
+                  <tr className="tier-header-row">
+                    <td colSpan={baseline.years.length + 1} className="tier-header">EDI (Overlay)</td>
+                  </tr>
+                  <tr>
+                    <td className="row-label">Value (w/ drag)</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">{formatCurrency(y.ediValue)}</td>
                     ))}
                   </tr>
                   <tr>
-                    <td className="row-label">EDI Embedded Gain</td>
-                    {baseline.years.map(y => (
-                      <td key={y.year} className="cell-value">{formatCurrency(y.ediEmbeddedGain)}</td>
-                    ))}
+                    <td className="row-label">CF Built</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => {
+                      const ediCf = projection.years[y.year - 1]
+                        ? projection.years[y.year - 1].endingStCarryforward + projection.years[y.year - 1].endingLtCarryforward
+                        : 0;
+                      return (
+                        <td key={y.year} className="cell-value">
+                          <span className="edi-cell-positive">{formatCurrency(ediCf)}</span>
+                        </td>
+                      );
+                    })}
                   </tr>
                   <tr>
-                    <td className="row-label">EDI Exit Tax (after CF shelter)</td>
-                    {baseline.years.map(y => (
+                    <td className="row-label">Exit Tax</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">
                         <span className="edi-cell-negative">{formatCurrency(y.ediExitTax)}</span>
                       </td>
                     ))}
                   </tr>
                   <tr className="row-highlight">
-                    <td className="row-label">EDI After-Tax</td>
-                    {baseline.years.map(y => (
+                    <td className="row-label">After-Tax</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">
                         <span className="edi-cell-highlight">{formatCurrency(y.ediAfterTax)}</span>
                       </td>
                     ))}
                   </tr>
+
+                  {/* Bottom line: EDI vs Trad DI */}
                   <tr className="row-positive">
-                    <td className="row-label">EDI Advantage</td>
-                    {baseline.years.map(y => (
+                    <td className="row-label">EDI vs Trad DI</td>
+                    {baseline.years.map((y: BaselineComparisonYear) => (
                       <td key={y.year} className="cell-value">
-                        <span className={y.ediAdvantage >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
-                          {formatCurrency(y.ediAdvantage)}
+                        <span className={(y.ediAfterTax - y.tradDiAfterTax) >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
+                          {formatCurrency(y.ediAfterTax - y.tradDiAfterTax)}
                         </span>
                       </td>
                     ))}
@@ -1539,7 +1609,7 @@ export function EdiOnlyTab({
             <strong>Carryforwards Lost at Death:</strong> Per IRC Section 1212(b), capital loss carryforwards expire at death and cannot be transferred. Positions receive step-up in basis per IRC Section 1014(a).
           </li>
           <li>
-            <strong>Baseline Comparison:</strong> Passive baseline assumes identical return with no TLH, no financing costs. Advisory fee excluded from both (common expense). EDI incremental cost = financing cost only.
+            <strong>Liquidation Comparison:</strong> Three tiers: Passive (no TLH), Traditional DI (long-only TLH at industry benchmarks), and EDI (overlay). All share identical gross returns; Traditional DI has no financing drag; EDI is reduced by financing cost. Advisory fee excluded from all three (common expense).
           </li>
           <li>
             <strong>Not Tax Advice:</strong> This calculator is for informational purposes only. Tax calculations are estimates based on stated assumptions. Consult a qualified tax advisor for individual tax planning.

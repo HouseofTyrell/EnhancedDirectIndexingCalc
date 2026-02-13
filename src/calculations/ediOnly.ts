@@ -3,6 +3,16 @@ import type { FilingStatus } from '../types';
 import { safeNumber } from '../utils/formatters';
 
 // ============================================
+// TRADITIONAL DI BENCHMARKS
+// ============================================
+
+/** Industry-standard long-only TLH rates (Parametric/Aperio/Wealthfront-style), indexed by year (0-based). */
+export const TRAD_DI_ST_LOSS_RATES = [0.050, 0.035, 0.025, 0.020, 0.015, 0.015, 0.015, 0.015, 0.015, 0.015];
+
+/** Occasional rebalancing LT gain rate for traditional DI (no overlay). */
+export const TRAD_DI_LT_GAIN_RATE = 0.005;
+
+// ============================================
 // TYPES
 // ============================================
 
@@ -730,6 +740,12 @@ export interface BaselineComparisonYear {
   passiveEmbeddedGain: number;
   passiveExitTax: number;
   passiveAfterTax: number;
+  tradDiValue: number;
+  tradDiEmbeddedGain: number;
+  tradDiCfBuilt: number;
+  tradDiExitTax: number;
+  tradDiAfterTax: number;
+  tradDiAdvantageVsPassive: number;
   ediValue: number;
   ediEmbeddedGain: number;
   ediExitTax: number;
@@ -741,9 +757,12 @@ export interface BaselineComparisonYear {
 export interface BaselineComparisonResult {
   years: BaselineComparisonYear[];
   terminalPassive: number;
+  terminalTradDi: number;
+  tradDiAdvantage: number;
   terminalEdi: number;
   ediAdvantage: number;
   ediAdvantagePct: number;
+  ediAdvantageVsTradDi: number;
 }
 
 export function computeBaselineComparison(
@@ -754,27 +773,83 @@ export function computeBaselineComparison(
   combinedLtRate: number,
   strategyId: string,
   washSaleRate: number = 0,
+  filingStatus: FilingStatus = 'mfj',
 ): BaselineComparisonResult {
   const years: BaselineComparisonYear[] = [];
 
   // Track EDI portfolio separately with financing drag
   let ediPortfolioValue = initialCollateral;
 
+  // Traditional DI state: long-only TLH, no leverage, no shorts
+  let tradDiStCf = 0;
+  let tradDiLtCf = 0;
+  let tradDiCumulativeBasisReduction = 0;
+
   for (let i = 0; i < projection.years.length; i++) {
     const yr = projection.years[i];
     const yearNum = i + 1;
 
-    // Passive: buy-and-hold at same return, advisory fee common to both
+    // === Passive: buy-and-hold at same return, advisory fee common to all ===
     const passiveValue = safeNumber(initialCollateral * Math.pow(1 + annualReturn, yearNum));
     const passiveEmbeddedGain = Math.max(0, passiveValue - initialCollateral);
     const passiveExitTax = safeNumber(passiveEmbeddedGain * combinedLtRate);
     const passiveAfterTax = safeNumber(passiveValue - passiveExitTax);
 
-    // EDI: grows at annualReturn minus financing drag (compound effect)
+    // === Traditional DI: same gross return as passive (no financing drag) ===
+    const tradDiValue = passiveValue; // no leverage = no financing drag
+    const tradDiStLossRate = TRAD_DI_ST_LOSS_RATES[Math.min(i, TRAD_DI_ST_LOSS_RATES.length - 1)];
+    const tradDiStLosses = safeNumber(tradDiValue * tradDiStLossRate);
+    const tradDiLtGains = safeNumber(tradDiValue * TRAD_DI_LT_GAIN_RATE);
+
+    // IRC netting: ST losses offset LT gains
+    const tradDiStUsedForLt = Math.min(tradDiStLosses, tradDiLtGains);
+    const tradDiNetLtGain = safeNumber(tradDiLtGains - tradDiStUsedForLt);
+    const tradDiExcessSt = safeNumber(tradDiStLosses - tradDiStUsedForLt);
+
+    // Prior CF offsets remaining LT gains
+    let tradDiRemainingLt = tradDiNetLtGain;
+    const tradDiLtCfUsed = Math.min(tradDiLtCf, tradDiRemainingLt);
+    tradDiRemainingLt -= tradDiLtCfUsed;
+    tradDiLtCf -= tradDiLtCfUsed;
+    const tradDiStCfUsedForLt = Math.min(tradDiStCf, tradDiRemainingLt);
+    tradDiRemainingLt -= tradDiStCfUsedForLt;
+    tradDiStCf -= tradDiStCfUsedForLt;
+
+    // Add excess ST to carryforward
+    tradDiStCf += tradDiExcessSt;
+
+    // $3K deduction
+    const tradDiCapLossLimit = CAPITAL_LOSS_LIMITS[filingStatus];
+    const tradDiTotalCfAvail = tradDiStCf + tradDiLtCf;
+    const tradDiDeduction = Math.min(tradDiTotalCfAvail, tradDiCapLossLimit);
+    let tradDiDeductionRemaining = tradDiDeduction;
+    if (tradDiDeductionRemaining > 0 && tradDiStCf > 0) {
+      const used = Math.min(tradDiDeductionRemaining, tradDiStCf);
+      tradDiStCf -= used;
+      tradDiDeductionRemaining -= used;
+    }
+    if (tradDiDeductionRemaining > 0 && tradDiLtCf > 0) {
+      const used = Math.min(tradDiDeductionRemaining, tradDiLtCf);
+      tradDiLtCf -= used;
+      tradDiDeductionRemaining -= used;
+    }
+
+    const tradDiTotalCf = safeNumber(tradDiStCf + tradDiLtCf);
+
+    // Embedded gain: market appreciation + cumulative basis reduction
+    tradDiCumulativeBasisReduction += safeNumber(tradDiValue * (tradDiStLossRate - TRAD_DI_LT_GAIN_RATE));
+    const tradDiMarketGain = Math.max(0, tradDiValue - initialCollateral);
+    const tradDiEmbeddedGain = safeNumber(Math.max(0, tradDiMarketGain + tradDiCumulativeBasisReduction));
+
+    // Exit tax: embedded gain sheltered by CF
+    const tradDiCfUsedAtExit = Math.min(tradDiTotalCf, tradDiEmbeddedGain);
+    const tradDiExitTax = safeNumber(Math.max(0, tradDiEmbeddedGain - tradDiCfUsedAtExit) * combinedLtRate);
+    const tradDiAfterTax = safeNumber(tradDiValue - tradDiExitTax);
+
+    // === EDI: grows at annualReturn minus financing drag (compound effect) ===
     ediPortfolioValue = safeNumber(ediPortfolioValue * (1 + annualReturn - financingCostRate));
 
     // EDI embedded gain and CF shelter
-    // Use net growth rate (annualReturn - financingCostRate) for consistency with EDI portfolio value
     const ediGrowthRate = annualReturn - financingCostRate;
     const embGainPct = estimateEmbeddedGainPct(strategyId, yearNum, ediGrowthRate, washSaleRate);
     const ediEmbeddedGain = safeNumber(ediPortfolioValue * embGainPct);
@@ -794,6 +869,12 @@ export function computeBaselineComparison(
       passiveEmbeddedGain: safeNumber(passiveEmbeddedGain),
       passiveExitTax,
       passiveAfterTax,
+      tradDiValue: safeNumber(tradDiValue),
+      tradDiEmbeddedGain: safeNumber(tradDiEmbeddedGain),
+      tradDiCfBuilt: tradDiTotalCf,
+      tradDiExitTax,
+      tradDiAfterTax,
+      tradDiAdvantageVsPassive: safeNumber(tradDiAfterTax - passiveAfterTax),
       ediValue: safeNumber(ediPortfolioValue),
       ediEmbeddedGain: safeNumber(ediEmbeddedGain),
       ediExitTax,
@@ -807,11 +888,14 @@ export function computeBaselineComparison(
   return {
     years,
     terminalPassive: lastYear?.passiveAfterTax ?? initialCollateral,
+    terminalTradDi: lastYear?.tradDiAfterTax ?? initialCollateral,
+    tradDiAdvantage: (lastYear?.tradDiAfterTax ?? 0) - (lastYear?.passiveAfterTax ?? 0),
     terminalEdi: lastYear?.ediAfterTax ?? initialCollateral,
     ediAdvantage: lastYear?.ediAdvantage ?? 0,
     ediAdvantagePct: lastYear && lastYear.passiveAfterTax > 0
       ? safeNumber(lastYear.ediAdvantage / lastYear.passiveAfterTax)
       : 0,
+    ediAdvantageVsTradDi: (lastYear?.ediAfterTax ?? 0) - (lastYear?.tradDiAfterTax ?? 0),
   };
 }
 

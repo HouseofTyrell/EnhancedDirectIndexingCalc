@@ -10,6 +10,8 @@ import {
   calculateEstateComparison,
   computeStrategyEconomics,
   computeBaselineComparison,
+  TRAD_DI_ST_LOSS_RATES,
+  TRAD_DI_LT_GAIN_RATE,
 } from './calculations/ediOnly';
 import { computeIncrementalFinancingCost, STRATEGIES } from './strategyData';
 
@@ -437,21 +439,22 @@ describe('baseline comparison', () => {
 
   it('should compute passive vs EDI terminal values', () => {
     const result = computeBaselineComparison(
-      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45', 0, 'mfj'
     );
 
     expect(result.years).toHaveLength(10);
     expect(result.terminalPassive).toBeGreaterThan(10_000_000);
     expect(result.terminalEdi).toBeGreaterThan(10_000_000);
+    expect(result.terminalTradDi).toBeGreaterThan(10_000_000);
   });
 
   it('should apply compound financing drag to EDI portfolio', () => {
     const result = computeBaselineComparison(
-      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45', 0, 'mfj'
     );
 
     // EDI advantage can be positive or negative depending on strategy economics
-    // The comparison is meaningful: advisory fees are excluded (common to both)
+    // The comparison is meaningful: advisory fees are excluded (common to all)
     expect(result.ediAdvantage).toBeDefined();
     expect(result.ediAdvantagePct).toBeDefined();
     // EDI value should be less than passive (financing drag)
@@ -462,7 +465,7 @@ describe('baseline comparison', () => {
 
   it('should track passive embedded gain growing over time', () => {
     const result = computeBaselineComparison(
-      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45', 0, 'mfj'
     );
 
     // Passive embedded gain should grow
@@ -473,13 +476,97 @@ describe('baseline comparison', () => {
 
   it('should track EDI embedded gain and CF shelter', () => {
     const result = computeBaselineComparison(
-      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45', 0, 'mfj'
     );
 
     // EDI embedded gain should exist
     expect(result.years[9].ediEmbeddedGain).toBeGreaterThan(0);
     // EDI exit tax should be lower than passive (CF shelter)
     expect(result.years[9].ediExitTax).toBeLessThan(result.years[9].passiveExitTax);
+  });
+});
+
+describe('Traditional DI in baseline comparison', () => {
+  const baseProjection = computeEdiProjection({
+    strategyId: 'overlay-45-45',
+    collateralValue: 10_000_000,
+    combinedStRate: 0.541,
+    combinedLtRate: 0.371,
+    filingStatus: 'mfj',
+    washSaleRate: 0,
+    existingStCarryforward: 0,
+    existingLtCarryforward: 0,
+    annualReturn: 0.07,
+    projectionYears: 10,
+  });
+
+  const baseline = computeBaselineComparison(
+    baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45', 0, 'mfj'
+  );
+
+  it('should have trad DI value equal to passive value (no financing drag)', () => {
+    for (const yr of baseline.years) {
+      expect(yr.tradDiValue).toBe(yr.passiveValue);
+    }
+  });
+
+  it('should build trad DI CF over time', () => {
+    // CF should grow over the projection
+    expect(baseline.years[9].tradDiCfBuilt).toBeGreaterThan(baseline.years[0].tradDiCfBuilt);
+    // Should have non-trivial CF by year 10
+    expect(baseline.years[9].tradDiCfBuilt).toBeGreaterThan(100_000);
+  });
+
+  it('should have trad DI CF significantly less than EDI CF at year 10', () => {
+    const ediCf = baseProjection.years[9].endingStCarryforward + baseProjection.years[9].endingLtCarryforward;
+    expect(baseline.years[9].tradDiCfBuilt).toBeLessThan(ediCf);
+  });
+
+  it('should have trad DI after-tax close to passive in forced liquidation', () => {
+    // In forced liquidation, TLH basis reduction creates extra exit tax that mostly offsets CF.
+    // The net difference is small (driven by $3K/year CF consumption at LT rate).
+    // Real TLH value is in CF for external gain events, not terminal liquidation.
+    const diff = Math.abs(baseline.terminalTradDi - baseline.terminalPassive);
+    const pctDiff = diff / baseline.terminalPassive;
+    expect(pctDiff).toBeLessThan(0.01); // Within 1%
+    expect(baseline.tradDiAdvantage).toBeDefined();
+  });
+
+  it('should show EDI below trad DI in forced liquidation (financing drag)', () => {
+    // In forced liquidation, EDI has financing drag that reduces terminal value.
+    // EDI value is in CF for external events, not terminal wealth.
+    expect(baseline.terminalEdi).toBeLessThan(baseline.terminalTradDi);
+    expect(baseline.ediAdvantageVsTradDi).toBeDefined();
+  });
+
+  it('should compute ediAdvantageVsTradDi consistently', () => {
+    expect(baseline.ediAdvantageVsTradDi).toBeCloseTo(
+      baseline.terminalEdi - baseline.terminalTradDi, 0
+    );
+  });
+});
+
+describe('Traditional DI constants', () => {
+  it('should have 10 ST loss rate entries', () => {
+    expect(TRAD_DI_ST_LOSS_RATES).toHaveLength(10);
+  });
+
+  it('should have declining rates from Year 1 to Year 5', () => {
+    expect(TRAD_DI_ST_LOSS_RATES[0]).toBeGreaterThan(TRAD_DI_ST_LOSS_RATES[1]);
+    expect(TRAD_DI_ST_LOSS_RATES[1]).toBeGreaterThan(TRAD_DI_ST_LOSS_RATES[2]);
+    expect(TRAD_DI_ST_LOSS_RATES[2]).toBeGreaterThan(TRAD_DI_ST_LOSS_RATES[3]);
+    expect(TRAD_DI_ST_LOSS_RATES[3]).toBeGreaterThan(TRAD_DI_ST_LOSS_RATES[4]);
+  });
+
+  it('should have all rates between 0 and 0.10', () => {
+    for (const rate of TRAD_DI_ST_LOSS_RATES) {
+      expect(rate).toBeGreaterThan(0);
+      expect(rate).toBeLessThanOrEqual(0.10);
+    }
+  });
+
+  it('should have a reasonable LT gain rate', () => {
+    expect(TRAD_DI_LT_GAIN_RATE).toBe(0.005);
   });
 });
 
