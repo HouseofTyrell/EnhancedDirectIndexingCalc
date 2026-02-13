@@ -583,6 +583,201 @@ export interface EstateComparisonResult {
   explanation: string;
 }
 
+// ============================================
+// STRATEGY ECONOMICS & TAX ALPHA
+// ============================================
+
+export interface StrategyEconomicsYear {
+  year: number;
+  collateralValue: number;
+  financingCost: number;
+  advisoryFee: number;
+  totalCost: number;
+  realizedBenefit: number;
+  cfTaxShieldDelta: number;
+  totalBenefit: number;
+  netBenefit: number;
+  cumulativeNetBenefit: number;
+  taxAlphaBps: number;
+}
+
+export interface StrategyEconomicsSummary {
+  totalCost: number;
+  totalBenefit: number;
+  netBenefit: number;
+  roi: number;
+  avgTaxAlphaBps: number;
+  paybackYear: number; // Year where cumulative net becomes positive (0 = never)
+}
+
+export interface StrategyEconomicsResult {
+  years: StrategyEconomicsYear[];
+  summary: StrategyEconomicsSummary;
+}
+
+export function computeStrategyEconomics(
+  projection: EdiProjectionResult,
+  financingCostRate: number,
+  advisoryFeeRate: number,
+  combinedLtRate: number,
+): StrategyEconomicsResult {
+  const years: StrategyEconomicsYear[] = [];
+  let cumulativeNet = 0;
+  let totalCost = 0;
+  let totalBenefit = 0;
+  let paybackYear = 0;
+
+  let prevCfShield = 0;
+
+  for (let i = 0; i < projection.years.length; i++) {
+    const yr = projection.years[i];
+    const cv = yr.collateralValue;
+
+    const financingCost = safeNumber(cv * financingCostRate);
+    const advisoryFee = safeNumber(cv * advisoryFeeRate);
+    const cost = safeNumber(financingCost + advisoryFee);
+
+    const currentCfShield = safeNumber(
+      (yr.endingStCarryforward + yr.endingLtCarryforward) * combinedLtRate
+    );
+    const cfTaxShieldDelta = safeNumber(currentCfShield - prevCfShield);
+    prevCfShield = currentCfShield;
+
+    const benefit = safeNumber(yr.annualRealizedBenefit + cfTaxShieldDelta);
+    const net = safeNumber(benefit - cost);
+    cumulativeNet += net;
+    totalCost += cost;
+    totalBenefit += benefit;
+
+    if (paybackYear === 0 && cumulativeNet > 0) {
+      paybackYear = yr.year;
+    }
+
+    const taxAlphaBps = cv > 0 ? safeNumber((net / cv) * 10000) : 0;
+
+    years.push({
+      year: yr.year,
+      collateralValue: cv,
+      financingCost,
+      advisoryFee,
+      totalCost: cost,
+      realizedBenefit: yr.annualRealizedBenefit,
+      cfTaxShieldDelta,
+      totalBenefit: benefit,
+      netBenefit: net,
+      cumulativeNetBenefit: safeNumber(cumulativeNet),
+      taxAlphaBps,
+    });
+  }
+
+  const totalYears = projection.years.length;
+  const avgAlpha = totalYears > 0
+    ? safeNumber(years.reduce((s, y) => s + y.taxAlphaBps, 0) / totalYears)
+    : 0;
+
+  return {
+    years,
+    summary: {
+      totalCost: safeNumber(totalCost),
+      totalBenefit: safeNumber(totalBenefit),
+      netBenefit: safeNumber(cumulativeNet),
+      roi: totalCost > 0 ? safeNumber(cumulativeNet / totalCost) : 0,
+      avgTaxAlphaBps: avgAlpha,
+      paybackYear,
+    },
+  };
+}
+
+// ============================================
+// BASELINE COMPARISON ("DOING NOTHING")
+// ============================================
+
+export interface BaselineComparisonYear {
+  year: number;
+  passiveValue: number;
+  passiveEmbeddedGain: number;
+  passiveExitTax: number;
+  passiveAfterTax: number;
+  ediValue: number;
+  ediCosts: number;
+  ediTaxBenefit: number;
+  ediAfterTax: number;
+  ediAdvantage: number;
+}
+
+export interface BaselineComparisonResult {
+  years: BaselineComparisonYear[];
+  terminalPassive: number;
+  terminalEdi: number;
+  ediAdvantage: number;
+  ediAdvantagePct: number;
+}
+
+export function computeBaselineComparison(
+  projection: EdiProjectionResult,
+  initialCollateral: number,
+  annualReturn: number,
+  financingCostRate: number,
+  combinedLtRate: number,
+  strategyId: string,
+): BaselineComparisonResult {
+  const years: BaselineComparisonYear[] = [];
+  let cumulativeEdiIncrementalCost = 0;
+
+  for (let i = 0; i < projection.years.length; i++) {
+    const yr = projection.years[i];
+    const yearNum = i + 1;
+
+    // Passive: buy-and-hold at same return, both strategies pay same advisory fee
+    // so we only compare the INCREMENTAL cost/benefit of EDI (financing costs)
+    const passiveValue = safeNumber(initialCollateral * Math.pow(1 + annualReturn, yearNum));
+    const passiveEmbeddedGain = Math.max(0, passiveValue - initialCollateral);
+    const passiveExitTax = safeNumber(passiveEmbeddedGain * combinedLtRate);
+    const passiveAfterTax = safeNumber(passiveValue - passiveExitTax);
+
+    // EDI: same gross return, but incurs INCREMENTAL financing costs (advisory fee is common)
+    const ediIncrementalCostThisYear = safeNumber(yr.collateralValue * financingCostRate);
+    cumulativeEdiIncrementalCost += ediIncrementalCostThisYear;
+
+    // EDI after-tax terminal wealth if liquidated this year:
+    // Same gross portfolio value, but lower embedded gain tax (CF shelter) minus incremental costs
+    const ediPortfolioValue = safeNumber(yr.collateralValue * (1 + annualReturn));
+    const embGainPct = estimateEmbeddedGainPct(strategyId, yearNum, annualReturn);
+    const ediEmbeddedGain = safeNumber(ediPortfolioValue * embGainPct);
+    const totalCf = yr.endingStCarryforward + yr.endingLtCarryforward;
+    const cfUsedAtExit = Math.min(totalCf, ediEmbeddedGain);
+    const ediExitTax = safeNumber(Math.max(0, ediEmbeddedGain - cfUsedAtExit) * combinedLtRate);
+    const ediAfterTax = safeNumber(ediPortfolioValue - ediExitTax - cumulativeEdiIncrementalCost);
+
+    years.push({
+      year: yearNum,
+      passiveValue: safeNumber(passiveValue),
+      passiveEmbeddedGain: safeNumber(passiveEmbeddedGain),
+      passiveExitTax,
+      passiveAfterTax,
+      ediValue: safeNumber(ediPortfolioValue),
+      ediCosts: safeNumber(cumulativeEdiIncrementalCost),
+      ediTaxBenefit: safeNumber(
+        projection.years.slice(0, i + 1).reduce((s, y) => s + y.annualRealizedBenefit, 0)
+        + cfUsedAtExit * combinedLtRate
+      ),
+      ediAfterTax,
+      ediAdvantage: safeNumber(ediAfterTax - passiveAfterTax),
+    });
+  }
+
+  const lastYear = years[years.length - 1];
+  return {
+    years,
+    terminalPassive: lastYear?.passiveAfterTax ?? initialCollateral,
+    terminalEdi: lastYear?.ediAfterTax ?? initialCollateral,
+    ediAdvantage: lastYear?.ediAdvantage ?? 0,
+    ediAdvantagePct: lastYear && lastYear.passiveAfterTax > 0
+      ? safeNumber(lastYear.ediAdvantage / lastYear.passiveAfterTax)
+      : 0,
+  };
+}
+
 export function calculateEstateComparison(input: EstateComparisonInput): EstateComparisonResult {
   const {
     portfolioValue, embeddedGainPct, availableStCarryforward,

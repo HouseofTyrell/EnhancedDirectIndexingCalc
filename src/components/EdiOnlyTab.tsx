@@ -15,13 +15,17 @@ import {
   calculateUnwindAnalysis,
   calculateEstateComparison,
   estimateEmbeddedGainPct,
+  computeStrategyEconomics,
+  computeBaselineComparison,
+  calculateRealizationScenario,
   type EdiYearResult,
   type EdiProjectionInput,
+  type GainCharacter,
 } from '../calculations/ediOnly';
 import { useScrollHeader } from '../hooks/useScrollHeader';
 import { EdiStickyHeader } from './EdiStickyHeader';
 import { EdiComparisonPanel } from './EdiComparisonPanel';
-import { EdiTaxSavingsChart, EdiEmbeddedGainChart } from './EdiCharts';
+import { EdiTaxSavingsChart, EdiEmbeddedGainChart, EdiCrossoverChart } from './EdiCharts';
 import './EdiOnlyTab.css';
 
 interface EdiOnlyTabProps {
@@ -44,6 +48,7 @@ interface EdiAssumptions {
   existingStCarryforward: number;
   existingLtCarryforward: number;
   projectionYears: number;
+  advisoryFeeRate: number;
 }
 
 const DEFAULT_ASSUMPTIONS: EdiAssumptions = {
@@ -54,6 +59,7 @@ const DEFAULT_ASSUMPTIONS: EdiAssumptions = {
   existingStCarryforward: 0,
   existingLtCarryforward: 0,
   projectionYears: 10,
+  advisoryFeeRate: 0.0075,
 };
 
 type State = { assumptions: EdiAssumptions };
@@ -86,11 +92,15 @@ const ROW_DEFINITIONS: RowDef[] = [
   { key: 'stLosses', label: 'ST Losses Harvested', getValue: r => r.stLossesHarvested, format: 'negative' },
   { key: 'ltGains', label: 'LT Gains Realized', getValue: r => r.ltGainsRealized, format: 'currency' },
   { key: 'stUsed', label: 'ST Losses Offsetting LT Gains', getValue: r => r.stLossesUsedToOffsetLtGains, format: 'currency' },
+  { key: 'priorCfUsed', label: 'Prior CF Used vs LT Gains', getValue: r => r.priorCfUsedAgainstLtGains, format: 'currency' },
+  { key: 'ltGainsTax', label: 'Tax on Remaining LT Gains', getValue: r => r.taxOnRemainingLtGains, format: 'negative' },
   { key: 'excess', label: 'Excess ST Loss to CF', getValue: r => r.excessStLossAfterOffset, format: 'highlight', rowClass: 'row-highlight' },
   { key: 'deduction', label: '$3K Capital Loss Deduction', getValue: r => r.capitalLossDeduction, format: 'currency' },
   { key: 'taxSaved', label: 'Tax Saved (Deduction)', getValue: r => r.taxSavedByCapitalLossDeduction, format: 'positive', rowClass: 'row-positive' },
   { key: 'benefit', label: 'Net Annual Realized Benefit', getValue: r => r.annualRealizedBenefit, format: 'positive', rowClass: 'row-positive' },
-  { key: 'cfEnding', label: 'Cumulative Carryforward', getValue: r => r.endingStCarryforward + r.endingLtCarryforward, format: 'highlight', rowClass: 'row-highlight' },
+  { key: 'stCf', label: 'ST Carryforward', getValue: r => r.endingStCarryforward, format: 'highlight', rowClass: 'row-highlight' },
+  { key: 'ltCf', label: 'LT Carryforward', getValue: r => r.endingLtCarryforward, format: 'currency' },
+  { key: 'cfEnding', label: 'Total Carryforward', getValue: r => r.endingStCarryforward + r.endingLtCarryforward, format: 'highlight', rowClass: 'row-highlight' },
   { key: 'efficiency', label: 'Harvesting Efficiency (ST/LT)', getValue: r => r.harvestingEfficiency, format: 'ratio' },
 ];
 
@@ -123,6 +133,10 @@ export function EdiOnlyTab({
     assumptions: { ...DEFAULT_ASSUMPTIONS },
   }));
   const [unwindYear, setUnwindYear] = useState(5);
+  const [customGainAmount, setCustomGainAmount] = useState(5_000_000);
+  const [customGainCharacter, setCustomGainCharacter] = useState<GainCharacter>('lt');
+  const [customGainYear, setCustomGainYear] = useState(5);
+  const [sensitivityRateShift, setSensitivityRateShift] = useState(0);
   const { isExpanded } = useScrollHeader('edi-scroll-sentinel');
 
   const handleChange = useCallback((field: keyof EdiAssumptions, value: number | string) => {
@@ -191,6 +205,104 @@ export function EdiOnlyTab({
 
   const strategy = STRATEGIES.find(s => s.id === state.assumptions.strategyId);
 
+  // Strategy economics (net-of-fee ROI, tax alpha, cash flow)
+  const economics = useMemo(
+    () => computeStrategyEconomics(
+      projection,
+      strategy?.financingCostRate ?? 0.015,
+      state.assumptions.advisoryFeeRate,
+      combinedLtRate,
+    ),
+    [projection, strategy, state.assumptions.advisoryFeeRate, combinedLtRate]
+  );
+
+  // Baseline comparison (passive vs EDI, advisory fee excluded as common to both)
+  const baseline = useMemo(
+    () => computeBaselineComparison(
+      projection,
+      state.assumptions.collateralValue,
+      state.assumptions.annualReturn,
+      strategy?.financingCostRate ?? 0.015,
+      combinedLtRate,
+      state.assumptions.strategyId,
+    ),
+    [projection, state.assumptions, strategy, combinedLtRate]
+  );
+
+  // Strategy comparison across all strategies
+  const [showStrategyComparison, setShowStrategyComparison] = useState(false);
+  const strategyComparison = useMemo(() => {
+    if (!showStrategyComparison) return [];
+    return STRATEGIES.map(s => {
+      const proj = computeEdiProjection({
+        ...projectionInput,
+        strategyId: s.id,
+      });
+      const econ = computeStrategyEconomics(proj, s.financingCostRate, state.assumptions.advisoryFeeRate, combinedLtRate);
+      const lastYr = proj.years[proj.years.length - 1];
+      return {
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        financingRate: s.financingCostRate,
+        totalTaxSavings: proj.summary.totalRealizedBenefit + proj.summary.carryforwardTaxShield,
+        finalCf: proj.summary.finalCarryforward,
+        totalCost: econ.summary.totalCost,
+        netBenefit: econ.summary.netBenefit,
+        avgAlphaBps: econ.summary.avgTaxAlphaBps,
+        breakEven: proj.years.findIndex((_, i) => {
+          const u = calculateUnwindAnalysis({ unwindYear: i + 1, projection: proj, strategyId: s.id, annualReturn: state.assumptions.annualReturn, combinedLtRate });
+          return u.availableCarryforward >= u.embeddedGainEstimate;
+        }) + 1,
+        embeddedGainPct: lastYr ? estimateEmbeddedGainPct(s.id, state.assumptions.projectionYears, state.assumptions.annualReturn) : 0,
+      };
+    });
+  }, [showStrategyComparison, projectionInput, state.assumptions, combinedLtRate]);
+
+  // Custom realization scenario result
+  const customScenarioResult = useMemo(() => {
+    const yearIdx = Math.min(customGainYear - 1, projection.years.length - 1);
+    const yr = projection.years[yearIdx];
+    if (!yr) return null;
+    return calculateRealizationScenario({
+      gainAmount: customGainAmount,
+      gainCharacter: customGainCharacter,
+      availableStCarryforward: yr.endingStCarryforward,
+      availableLtCarryforward: yr.endingLtCarryforward,
+      combinedStRate,
+      combinedLtRate,
+    });
+  }, [customGainAmount, customGainCharacter, customGainYear, projection, combinedStRate, combinedLtRate]);
+
+  // Realization size sensitivity table (at selected unwind year)
+  const realizationSensitivity = useMemo(() => {
+    const yearIdx = Math.min(unwindYear - 1, projection.years.length - 1);
+    const yr = projection.years[yearIdx];
+    if (!yr) return [];
+    const gainAmounts = [500_000, 1_000_000, 2_000_000, 3_000_000, 5_000_000, 10_000_000];
+    return gainAmounts.map(amount => {
+      const result = calculateRealizationScenario({
+        gainAmount: amount,
+        gainCharacter: 'lt',
+        availableStCarryforward: yr.endingStCarryforward,
+        availableLtCarryforward: yr.endingLtCarryforward,
+        combinedStRate,
+        combinedLtRate,
+      });
+      return { amount, ...result };
+    });
+  }, [unwindYear, projection, combinedStRate, combinedLtRate]);
+
+  // Tax rate sensitivity: projection at shifted rates
+  const sensitivityProjection = useMemo(() => {
+    if (sensitivityRateShift === 0) return null;
+    return computeEdiProjection({
+      ...projectionInput,
+      combinedStRate: combinedStRate + sensitivityRateShift,
+      combinedLtRate: combinedLtRate + sensitivityRateShift,
+    });
+  }, [projectionInput, sensitivityRateShift, combinedStRate, combinedLtRate]);
+
   // Build pin data from current state
   const currentAssumptions: EdiPinnedAssumptions = useMemo(() => ({
     strategyId: state.assumptions.strategyId,
@@ -200,6 +312,7 @@ export function EdiOnlyTab({
     existingStCarryforward: state.assumptions.existingStCarryforward,
     existingLtCarryforward: state.assumptions.existingLtCarryforward,
     projectionYears: state.assumptions.projectionYears,
+    advisoryFeeRate: state.assumptions.advisoryFeeRate,
   }), [state.assumptions]);
 
   const currentTaxRates: EdiPinnedTaxRates = useMemo(() => ({
@@ -266,12 +379,19 @@ export function EdiOnlyTab({
         />
       )}
 
-      {/* PA State Warning */}
+      {/* State-Specific Warnings */}
       {stateCode === 'PA' && (
         <div className="state-warning-banner">
           <strong>Pennsylvania Note:</strong> PA does not conform to federal capital loss
           carryforward rules. Accumulated carryforwards provide no PA state tax benefit.
           The federal benefit calculations shown here do not include PA state savings.
+        </div>
+      )}
+      {stateCode === 'WA' && (
+        <div className="state-warning-banner">
+          <strong>Washington Note:</strong> WA imposes a 7% excise tax on long-term capital gains
+          exceeding $250K (effective 2022, upheld by WA Supreme Court). Capital loss carryforwards
+          may reduce WA-taxable gains. Consult WA tax advisor for applicability.
         </div>
       )}
 
@@ -290,12 +410,24 @@ export function EdiOnlyTab({
         <div className="edi-summary-card">
           <div className="card-label">Final Carryforward (Year {state.assumptions.projectionYears})</div>
           <div className="card-value highlight">{formatCurrency(projection.summary.finalCarryforward)}</div>
-          <div className="card-detail">Min. value at {(combinedLtRate * 100).toFixed(1)}% LT rate; higher if sheltering ST gains</div>
+          <div className="card-detail">
+            ST: {formatCurrency(lastYear?.endingStCarryforward ?? 0)} | LT: {formatCurrency(lastYear?.endingLtCarryforward ?? 0)}
+          </div>
+          <div className="card-detail">Min. value at {(combinedLtRate * 100).toFixed(1)}% LT rate</div>
         </div>
         <div className="edi-summary-card">
           <div className="card-label">Total ST Losses Harvested</div>
           <div className="card-value">{formatCurrency(projection.summary.totalStLossesHarvested)}</div>
           <div className="card-detail">Efficiency: {projection.summary.cumulativeHarvestingEfficiency.toFixed(1)}x</div>
+        </div>
+        <div className="edi-summary-card">
+          <div className="card-label">Tax Alpha</div>
+          <div className="card-value positive">
+            {economics.summary.avgTaxAlphaBps >= 0 ? '+' : ''}{economics.summary.avgTaxAlphaBps.toFixed(0)} bps
+          </div>
+          <div className="card-detail">
+            Avg annual, net of {((strategy?.financingCostRate ?? 0.015) * 100).toFixed(1)}% financing + {(state.assumptions.advisoryFeeRate * 100).toFixed(2)}% advisory
+          </div>
         </div>
         <div className="edi-summary-card">
           <div className="card-label">Break-Even Year</div>
@@ -382,13 +514,30 @@ export function EdiOnlyTab({
             </div>
           </div>
           <div className="edi-assumption-row">
+            <label>Advisory Fee Rate</label>
+            <div className="input-with-suffix editable-cell">
+              <input
+                type="number"
+                min={0}
+                max={3}
+                step={0.05}
+                value={(state.assumptions.advisoryFeeRate * 100).toFixed(2)}
+                onChange={e => {
+                  const v = parseFloat(e.target.value);
+                  if (Number.isFinite(v)) handleChange('advisoryFeeRate', v / 100);
+                }}
+              />
+              <span className="suffix">%</span>
+            </div>
+          </div>
+          <div className="edi-assumption-row">
             <label>Projection Years</label>
             <div className="editable-cell select-cell">
               <select
                 value={state.assumptions.projectionYears}
                 onChange={e => handleChange('projectionYears', parseInt(e.target.value, 10))}
               >
-                {[5, 7, 10].map(n => (
+                {[5, 7, 10, 15, 20, 30].map(n => (
                   <option key={n} value={n}>{n} years</option>
                 ))}
               </select>
@@ -398,7 +547,7 @@ export function EdiOnlyTab({
         <div className="edi-assumptions-footer">
           <button type="button" onClick={handleReset} className="btn-reset">Reset to Defaults</button>
           <span className="filing-status-note">
-            Strategy: {strategy?.name ?? '—'} | Combined ST Rate: {(combinedStRate * 100).toFixed(1)}% | LT Rate: {(combinedLtRate * 100).toFixed(1)}%
+            Strategy: {strategy?.name ?? '—'} | Financing: {((strategy?.financingCostRate ?? 0) * 100).toFixed(1)}% | ST Rate: {(combinedStRate * 100).toFixed(1)}% | LT Rate: {(combinedLtRate * 100).toFixed(1)}%
           </span>
         </div>
       </div>
@@ -410,11 +559,247 @@ export function EdiOnlyTab({
           strategyId={state.assumptions.strategyId}
           annualReturn={state.assumptions.annualReturn}
         />
+        <EdiCrossoverChart
+          data={projection.years}
+          strategyId={state.assumptions.strategyId}
+          annualReturn={state.assumptions.annualReturn}
+          combinedLtRate={combinedLtRate}
+        />
         <EdiEmbeddedGainChart
           data={projection.years}
           strategyId={state.assumptions.strategyId}
           annualReturn={state.assumptions.annualReturn}
         />
+      </div>
+
+      {/* Strategy Economics */}
+      <div className="edi-economics-section">
+        <h3>Strategy Economics — Net-of-Fee Analysis</h3>
+        <div className="edi-summary-cards">
+          <div className="edi-summary-card">
+            <div className="card-label">Total Strategy Cost ({state.assumptions.projectionYears}yr)</div>
+            <div className="card-value">{formatCurrency(economics.summary.totalCost)}</div>
+            <div className="card-detail">
+              {((strategy?.financingCostRate ?? 0) * 100).toFixed(1)}% financing + {(state.assumptions.advisoryFeeRate * 100).toFixed(2)}% advisory
+            </div>
+          </div>
+          <div className="edi-summary-card">
+            <div className="card-label">Total Tax Benefit</div>
+            <div className="card-value positive">{formatCurrency(economics.summary.totalBenefit)}</div>
+            <div className="card-detail">Realized + CF shield growth</div>
+          </div>
+          <div className="edi-summary-card">
+            <div className="card-label">Net Benefit</div>
+            <div className={`card-value ${economics.summary.netBenefit >= 0 ? 'positive' : ''}`}>
+              {formatCurrency(economics.summary.netBenefit)}
+            </div>
+            <div className="card-detail">
+              ROI: {(economics.summary.roi * 100).toFixed(0)}%
+              {economics.summary.paybackYear > 0 && ` | Payback: Year ${economics.summary.paybackYear}`}
+            </div>
+          </div>
+        </div>
+        <div className="edi-table-container">
+          <table className="edi-table">
+            <thead>
+              <tr>
+                <th className="col-label"></th>
+                {economics.years.map(y => (
+                  <th key={y.year} className="col-year">Year {y.year}</th>
+                ))}
+                <th className="col-total">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="row-label">Financing Cost</td>
+                {economics.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-negative">{formatCurrency(y.financingCost)}</span>
+                  </td>
+                ))}
+                <td className="cell-total">
+                  <span className="edi-cell-negative">{formatCurrency(economics.years.reduce((s, y) => s + y.financingCost, 0))}</span>
+                </td>
+              </tr>
+              <tr>
+                <td className="row-label">Advisory Fee</td>
+                {economics.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-negative">{formatCurrency(y.advisoryFee)}</span>
+                  </td>
+                ))}
+                <td className="cell-total">
+                  <span className="edi-cell-negative">{formatCurrency(economics.years.reduce((s, y) => s + y.advisoryFee, 0))}</span>
+                </td>
+              </tr>
+              <tr className="row-highlight">
+                <td className="row-label">Total Cost</td>
+                {economics.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-negative">{formatCurrency(y.totalCost)}</span>
+                  </td>
+                ))}
+                <td className="cell-total">
+                  <span className="edi-cell-negative">{formatCurrency(economics.summary.totalCost)}</span>
+                </td>
+              </tr>
+              <tr>
+                <td className="row-label">Realized Benefit ($3K ded.)</td>
+                {economics.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-positive">{formatCurrency(y.realizedBenefit)}</span>
+                  </td>
+                ))}
+                <td className="cell-total">
+                  <span className="edi-cell-positive">{formatCurrency(economics.years.reduce((s, y) => s + y.realizedBenefit, 0))}</span>
+                </td>
+              </tr>
+              <tr>
+                <td className="row-label">CF Shield Growth</td>
+                {economics.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-positive">{formatCurrency(y.cfTaxShieldDelta)}</span>
+                  </td>
+                ))}
+                <td className="cell-total">
+                  <span className="edi-cell-positive">{formatCurrency(economics.years.reduce((s, y) => s + y.cfTaxShieldDelta, 0))}</span>
+                </td>
+              </tr>
+              <tr className="row-positive">
+                <td className="row-label">Net Benefit</td>
+                {economics.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className={y.netBenefit >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
+                      {formatCurrency(y.netBenefit)}
+                    </span>
+                  </td>
+                ))}
+                <td className="cell-total">
+                  <span className={economics.summary.netBenefit >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
+                    {formatCurrency(economics.summary.netBenefit)}
+                  </span>
+                </td>
+              </tr>
+              <tr className="row-highlight">
+                <td className="row-label">Tax Alpha (bps)</td>
+                {economics.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className={y.taxAlphaBps >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
+                      {y.taxAlphaBps >= 0 ? '+' : ''}{y.taxAlphaBps.toFixed(0)}
+                    </span>
+                  </td>
+                ))}
+                <td className="cell-total">
+                  <span className={economics.summary.avgTaxAlphaBps >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
+                    {economics.summary.avgTaxAlphaBps >= 0 ? '+' : ''}{economics.summary.avgTaxAlphaBps.toFixed(0)} avg
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Baseline Comparison */}
+      <div className="edi-baseline-section">
+        <h3>After-Tax Wealth Comparison — EDI vs. Passive</h3>
+        <p className="section-subtitle">
+          Compares terminal after-tax wealth if you liquidate each year. Passive = buy-and-hold ETF (same return, no TLH).
+          Advisory fee excluded (common to both).
+        </p>
+        <div className="edi-summary-cards">
+          <div className="edi-summary-card">
+            <div className="card-label">Passive After-Tax (Year {state.assumptions.projectionYears})</div>
+            <div className="card-value">{formatCurrency(baseline.terminalPassive)}</div>
+          </div>
+          <div className="edi-summary-card">
+            <div className="card-label">EDI After-Tax (Year {state.assumptions.projectionYears})</div>
+            <div className="card-value">{formatCurrency(baseline.terminalEdi)}</div>
+          </div>
+          <div className="edi-summary-card">
+            <div className="card-label">EDI Advantage</div>
+            <div className={`card-value ${baseline.ediAdvantage >= 0 ? 'positive' : ''}`}>
+              {formatCurrency(baseline.ediAdvantage)} ({baseline.ediAdvantage >= 0 ? '+' : ''}{(baseline.ediAdvantagePct * 100).toFixed(1)}%)
+            </div>
+          </div>
+        </div>
+        <div className="edi-table-container">
+          <table className="edi-table">
+            <thead>
+              <tr>
+                <th className="col-label"></th>
+                {baseline.years.map(y => (
+                  <th key={y.year} className="col-year">Year {y.year}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="row-label">Passive Gross Value</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">{formatCurrency(y.passiveValue)}</td>
+                ))}
+              </tr>
+              <tr>
+                <td className="row-label">Passive Exit Tax</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-negative">{formatCurrency(y.passiveExitTax)}</span>
+                  </td>
+                ))}
+              </tr>
+              <tr className="row-highlight">
+                <td className="row-label">Passive After-Tax</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-highlight">{formatCurrency(y.passiveAfterTax)}</span>
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="row-label">EDI Gross Value</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">{formatCurrency(y.ediValue)}</td>
+                ))}
+              </tr>
+              <tr>
+                <td className="row-label">EDI Incremental Costs</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-negative">{formatCurrency(y.ediCosts)}</span>
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="row-label">EDI Tax Benefit (CF shelter)</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-positive">{formatCurrency(y.ediTaxBenefit)}</span>
+                  </td>
+                ))}
+              </tr>
+              <tr className="row-highlight">
+                <td className="row-label">EDI After-Tax</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className="edi-cell-highlight">{formatCurrency(y.ediAfterTax)}</span>
+                  </td>
+                ))}
+              </tr>
+              <tr className="row-positive">
+                <td className="row-label">EDI Advantage</td>
+                {baseline.years.map(y => (
+                  <td key={y.year} className="cell-value">
+                    <span className={y.ediAdvantage >= 0 ? 'edi-cell-positive' : 'edi-cell-negative'}>
+                      {formatCurrency(y.ediAdvantage)}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Year-by-Year Table */}
@@ -441,7 +826,7 @@ export function EdiOnlyTab({
                     </td>
                   ))}
                   <td className="cell-total">
-                    {rowDef.key === 'cfEnding' || rowDef.key === 'collateral' || rowDef.key === 'efficiency'
+                    {['cfEnding', 'stCf', 'ltCf', 'collateral', 'efficiency'].includes(rowDef.key)
                       ? '—'
                       : formatCellValue(rowDef.format, projection.years.reduce((s, y) => s + rowDef.getValue(y), 0))}
                   </td>
@@ -487,6 +872,172 @@ export function EdiOnlyTab({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Custom Realization Scenario */}
+      <div className="edi-custom-scenario-section">
+        <h3>Custom Realization Scenario</h3>
+        <div className="life-event-templates">
+          <span className="template-label">Templates:</span>
+          {[
+            { label: 'IPO/RSU Vest', amount: state.assumptions.collateralValue * 0.3, char: 'st' as GainCharacter, yr: 3 },
+            { label: 'Concentrated Stock Exit', amount: state.assumptions.collateralValue * 0.5, char: 'lt' as GainCharacter, yr: 5 },
+            { label: 'Real Estate Sale', amount: 2_000_000, char: 'lt' as GainCharacter, yr: 5 },
+            { label: 'Business Sale', amount: state.assumptions.collateralValue, char: 'lt' as GainCharacter, yr: 7 },
+            { label: 'Divorce Settlement', amount: state.assumptions.collateralValue * 0.5, char: 'lt' as GainCharacter, yr: 3 },
+          ].map(t => (
+            <button
+              key={t.label}
+              className="template-btn"
+              onClick={() => {
+                setCustomGainAmount(t.amount);
+                setCustomGainCharacter(t.char);
+                setCustomGainYear(Math.min(t.yr, state.assumptions.projectionYears));
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="custom-scenario-inputs">
+          <div className="edi-assumption-row">
+            <label>Gain Amount</label>
+            <div className="input-with-prefix editable-cell">
+              <span className="prefix">$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatWithCommas(customGainAmount)}
+                onChange={e => setCustomGainAmount(parseFormattedNumber(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="edi-assumption-row">
+            <label>Character</label>
+            <div className="editable-cell select-cell">
+              <select
+                value={customGainCharacter}
+                onChange={e => setCustomGainCharacter(e.target.value as GainCharacter)}
+              >
+                <option value="lt">Long-Term</option>
+                <option value="st">Short-Term</option>
+              </select>
+            </div>
+          </div>
+          <div className="edi-assumption-row">
+            <label>Year of Event</label>
+            <div className="editable-cell select-cell">
+              <select
+                value={customGainYear}
+                onChange={e => setCustomGainYear(parseInt(e.target.value, 10))}
+              >
+                {Array.from({ length: state.assumptions.projectionYears }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>Year {i + 1}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+        {customScenarioResult && (
+          <div className="edi-summary-cards">
+            <div className="edi-summary-card">
+              <div className="card-label">Tax Without CF</div>
+              <div className="card-value">{formatCurrency(customScenarioResult.taxWithoutCarryforward)}</div>
+            </div>
+            <div className="edi-summary-card">
+              <div className="card-label">CF Used</div>
+              <div className="card-value highlight">{formatCurrency(customScenarioResult.carryforwardUsed)}</div>
+            </div>
+            <div className="edi-summary-card">
+              <div className="card-label">Tax With CF</div>
+              <div className="card-value">{formatCurrency(customScenarioResult.taxWithCarryforward)}</div>
+            </div>
+            <div className="edi-summary-card">
+              <div className="card-label">Tax Saved</div>
+              <div className="card-value positive">{formatCurrency(customScenarioResult.taxSaved)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Realization Size Sensitivity */}
+      <div className="edi-sensitivity-section">
+        <h3>Realization Size Sensitivity (Year {unwindYear})</h3>
+        <p className="section-subtitle">
+          How much tax you save at different gain sizes with Year {unwindYear} carryforward.
+        </p>
+        <table className="edi-table sensitivity-table">
+          <thead>
+            <tr>
+              <th>Gain Amount</th>
+              <th>CF Used</th>
+              <th>Tax Without CF</th>
+              <th>Tax With CF</th>
+              <th>Tax Saved</th>
+              <th>Effective Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {realizationSensitivity.map(row => (
+              <tr key={row.amount}>
+                <td>{formatCurrency(row.amount)}</td>
+                <td>{formatCurrency(row.carryforwardUsed)}</td>
+                <td>{formatCurrency(row.taxWithoutCarryforward)}</td>
+                <td>{formatCurrency(row.taxWithCarryforward)}</td>
+                <td className="cell-positive">{formatCurrency(row.taxSaved)}</td>
+                <td>{row.amount > 0 ? ((row.taxWithCarryforward / row.amount) * 100).toFixed(1) : '0.0'}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Tax Rate Sensitivity */}
+      <div className="edi-rate-sensitivity-section">
+        <h3>Tax Rate Sensitivity</h3>
+        <div className="rate-sensitivity-toggle">
+          <label>Rate Shift:</label>
+          {[-0.05, -0.03, 0, 0.03, 0.05].map(shift => (
+            <button
+              key={shift}
+              className={`rate-btn ${sensitivityRateShift === shift ? 'rate-btn--active' : ''}`}
+              onClick={() => setSensitivityRateShift(shift)}
+            >
+              {shift === 0 ? 'Current' : `${shift > 0 ? '+' : ''}${(shift * 100).toFixed(0)}%`}
+            </button>
+          ))}
+        </div>
+        {sensitivityProjection && (
+          <div className="edi-summary-cards">
+            <div className="edi-summary-card">
+              <div className="card-label">Total Tax Savings (Shifted)</div>
+              <div className="card-value positive">
+                {formatCurrency(sensitivityProjection.summary.totalRealizedBenefit + sensitivityProjection.summary.carryforwardTaxShield)}
+              </div>
+              <div className="card-detail">
+                vs. {formatCurrency(totalPotentialSavings)} at current rates
+              </div>
+            </div>
+            <div className="edi-summary-card">
+              <div className="card-label">CF Shield (Shifted)</div>
+              <div className="card-value highlight">
+                {formatCurrency(sensitivityProjection.summary.carryforwardTaxShield)}
+              </div>
+              <div className="card-detail">
+                vs. {formatCurrency(projection.summary.carryforwardTaxShield)} at current rates
+              </div>
+            </div>
+            <div className="edi-summary-card">
+              <div className="card-label">Delta</div>
+              <div className={`card-value ${(sensitivityProjection.summary.totalRealizedBenefit + sensitivityProjection.summary.carryforwardTaxShield) >= totalPotentialSavings ? 'positive' : ''}`}>
+                {formatCurrency(
+                  (sensitivityProjection.summary.totalRealizedBenefit + sensitivityProjection.summary.carryforwardTaxShield)
+                  - totalPotentialSavings
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Unwind Analysis */}
@@ -620,31 +1171,171 @@ export function EdiOnlyTab({
           </div>
 
           <div className="estate-explanation">{estateResult.explanation}</div>
+
+          {estateResult.recommendation === 'partial_unwind' && (
+            <div className="estate-detail-callout">
+              <strong>Optimal Strategy:</strong> Unwind {formatCurrency(selectedUnwind!.portfolioValueAtUnwind * estateResult.optimalUnwindPct)} of portfolio
+              using {formatCurrency(estateResult.unwindBeforeDeath.carryforwardUsed)} in CF.
+              Remaining {formatCurrency(selectedUnwind!.portfolioValueAtUnwind * (1 - estateResult.optimalUnwindPct))} gets step-up at death.
+            </div>
+          )}
+
           <p className="estate-disclaimer">
             Carryforwards are lost at death (IRC Section 1212(b)). Positions receive step-up in basis (IRC Section 1014).
-            Consult estate planning attorney before making decisions.
+            Federal estate tax exclusion ($13.99M per individual, 2026) not modeled. Consult estate planning attorney before making decisions.
           </p>
         </div>
       )}
 
-      {/* Notes */}
+      {/* Strategy Comparison */}
+      <div className="edi-strategy-comparison-section">
+        <h3>
+          Strategy Comparison
+          <button
+            className="toggle-btn"
+            onClick={() => setShowStrategyComparison(!showStrategyComparison)}
+          >
+            {showStrategyComparison ? 'Hide' : 'Show All Strategies'}
+          </button>
+        </h3>
+        {showStrategyComparison && strategyComparison.length > 0 && (
+          <div className="edi-table-container">
+            <table className="edi-table strategy-comparison-table">
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Type</th>
+                  <th>Financing</th>
+                  <th>Tax Savings</th>
+                  <th>Final CF</th>
+                  <th>Total Cost</th>
+                  <th>Net Benefit</th>
+                  <th>Alpha (bps)</th>
+                  <th>Break-Even</th>
+                </tr>
+              </thead>
+              <tbody>
+                {strategyComparison.map(s => (
+                  <tr
+                    key={s.id}
+                    className={s.id === state.assumptions.strategyId ? 'current-strategy-row' : ''}
+                  >
+                    <td>{s.name}{s.id === state.assumptions.strategyId ? ' *' : ''}</td>
+                    <td>{s.type === 'core' ? 'Core' : 'Overlay'}</td>
+                    <td>{(s.financingRate * 100).toFixed(1)}%</td>
+                    <td>{formatCurrency(s.totalTaxSavings)}</td>
+                    <td>{formatCurrency(s.finalCf)}</td>
+                    <td>{formatCurrency(s.totalCost)}</td>
+                    <td className={s.netBenefit >= 0 ? 'cell-positive' : 'cell-negative'}>
+                      {formatCurrency(s.netBenefit)}
+                    </td>
+                    <td className={s.avgAlphaBps >= 0 ? 'cell-positive' : 'cell-negative'}>
+                      {s.avgAlphaBps >= 0 ? '+' : ''}{s.avgAlphaBps.toFixed(0)}
+                    </td>
+                    <td>{s.breakEven > 0 ? `Year ${s.breakEven}` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Export */}
+      <div className="edi-export-section">
+        <button
+          className="btn-export"
+          onClick={() => {
+            const lines: string[] = [];
+            lines.push(`EDI-Only Analysis Summary`);
+            lines.push(`Strategy: ${strategy?.name ?? state.assumptions.strategyId}`);
+            lines.push(`Collateral: ${formatCurrency(state.assumptions.collateralValue)}`);
+            lines.push(`Annual Return: ${(state.assumptions.annualReturn * 100).toFixed(1)}%`);
+            lines.push(`Projection: ${state.assumptions.projectionYears} years`);
+            lines.push(`Combined ST Rate: ${(combinedStRate * 100).toFixed(1)}% | LT Rate: ${(combinedLtRate * 100).toFixed(1)}%`);
+            lines.push('');
+            lines.push(`Total Potential Tax Savings: ${formatCurrency(totalPotentialSavings)}`);
+            lines.push(`Final Carryforward: ${formatCurrency(projection.summary.finalCarryforward)}`);
+            lines.push(`  ST: ${formatCurrency(lastYear?.endingStCarryforward ?? 0)} | LT: ${formatCurrency(lastYear?.endingLtCarryforward ?? 0)}`);
+            lines.push(`Tax Alpha: ${economics.summary.avgTaxAlphaBps.toFixed(0)} bps avg`);
+            lines.push(`Net Benefit (${state.assumptions.projectionYears}yr): ${formatCurrency(economics.summary.netBenefit)}`);
+            lines.push(`Break-Even Year: ${breakEvenYear > 0 ? `Year ${breakEvenYear}` : 'Not reached'}`);
+            lines.push('');
+            lines.push('Year-by-Year:');
+            lines.push('Year | Collateral | ST Losses | LT Gains | CF | Net Benefit');
+            projection.years.forEach((yr, i) => {
+              const econ = economics.years[i];
+              lines.push(`${yr.year} | ${formatCurrency(yr.collateralValue)} | ${formatCurrency(yr.stLossesHarvested)} | ${formatCurrency(yr.ltGainsRealized)} | ${formatCurrency(yr.endingStCarryforward + yr.endingLtCarryforward)} | ${formatCurrency(econ?.netBenefit ?? 0)}`);
+            });
+            navigator.clipboard.writeText(lines.join('\n'));
+          }}
+        >
+          Copy Summary to Clipboard
+        </button>
+      </div>
+
+      {/* NIIT Impact Breakout */}
+      <div className="edi-niit-section">
+        <h4>NIIT Impact Breakout</h4>
+        <p className="section-subtitle">
+          The 3.8% Net Investment Income Tax (NIIT) applies to capital gains but NOT to the $3K ordinary income deduction.
+        </p>
+        <div className="edi-summary-cards">
+          <div className="edi-summary-card">
+            <div className="card-label">Combined ST Rate (incl. NIIT)</div>
+            <div className="card-value">{(combinedStRate * 100).toFixed(1)}%</div>
+            <div className="card-detail">Includes 3.8% NIIT + state rate</div>
+          </div>
+          <div className="edi-summary-card">
+            <div className="card-label">Combined LT Rate (incl. NIIT)</div>
+            <div className="card-value">{(combinedLtRate * 100).toFixed(1)}%</div>
+          </div>
+          <div className="edi-summary-card">
+            <div className="card-label">$3K Deduction Effective Rate</div>
+            <div className="card-value">{((combinedStRate - 0.038) * 100).toFixed(1)}%</div>
+            <div className="card-detail">Excludes 3.8% NIIT (offsets ordinary income only)</div>
+          </div>
+          <div className="edi-summary-card">
+            <div className="card-label">Annual NIIT Exclusion Benefit</div>
+            <div className="card-value positive">{formatCurrency(3000 * 0.038)}</div>
+            <div className="card-detail">Per-year savings from correct NIIT treatment</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Notes & Disclosures */}
       <div className="edi-notes">
-        <h4>Calculation Notes</h4>
+        <h4>Calculation Notes &amp; Disclosures</h4>
         <ul>
           <li>
             <strong>ST Losses Shelter LT Gains:</strong> Under IRC netting rules, short-term losses offset long-term gains before contributing to carryforward.
           </li>
           <li>
-            <strong>$3K Deduction:</strong> Only excess capital losses (after netting) can offset ordinary income, limited to $3K/year ($1.5K for MFS).
+            <strong>$3K Deduction:</strong> Only excess capital losses (after netting) can offset ordinary income, limited to $3K/year ($1.5K for MFS). NIIT (3.8%) is excluded from this deduction rate since it offsets ordinary income, not net investment income.
           </li>
           <li>
-            <strong>No Annual Limit on CF vs Gains:</strong> A $5M carryforward can shelter $5M in realized gains in a single year.
+            <strong>No Annual Limit on CF vs Gains:</strong> A $5M carryforward can shelter $5M in realized gains in a single year. There is no annual limit on using carryforwards to offset capital gains.
           </li>
           <li>
-            <strong>Carryforwards Retain Character:</strong> ST stays ST, LT stays LT. Same-character offsets first, then cross-applies.
+            <strong>Carryforwards Retain Character:</strong> ST stays ST, LT stays LT. Same-character offsets first, then cross-applies per IRC Section 1212(b).
           </li>
           <li>
-            <strong>Embedded Gain:</strong> Grows from market appreciation plus basis reduction from harvesting. Estimated using strategy loss rates.
+            <strong>Embedded Gain:</strong> Grows from market appreciation plus basis reduction from harvesting. Estimated using strategy loss rates. Actual embedded gain may differ based on individual lot selection and market conditions.
+          </li>
+          <li>
+            <strong>Tax Rates:</strong> Combined rates include federal ({combinedStRate > 0.5 ? '37%' : '≤37%'} ordinary / {combinedLtRate > 0.3 ? '20%' : '≤20%'} LTCG), 3.8% NIIT, and state tax. Rates assume income above NIIT thresholds.
+          </li>
+          <li>
+            <strong>Strategy Costs:</strong> Financing cost ({((strategy?.financingCostRate ?? 0) * 100).toFixed(1)}%) includes margin interest, stock borrow fees, and short dividend costs. Advisory fee is user-adjustable and represents the wealth management fee on NAV.
+          </li>
+          <li>
+            <strong>Carryforwards Lost at Death:</strong> Per IRC Section 1212(b), capital loss carryforwards expire at death and cannot be transferred. Positions receive step-up in basis per IRC Section 1014(a).
+          </li>
+          <li>
+            <strong>Baseline Comparison:</strong> Passive baseline assumes identical return with no TLH, no financing costs. Advisory fee excluded from both (common expense). EDI incremental cost = financing cost only.
+          </li>
+          <li>
+            <strong>Not Tax Advice:</strong> This calculator is for informational purposes only. Tax calculations are estimates based on stated assumptions. Consult a qualified tax advisor for individual tax planning.
           </li>
         </ul>
       </div>

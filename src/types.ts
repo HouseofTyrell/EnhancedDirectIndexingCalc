@@ -337,6 +337,7 @@ export interface EdiPinnedAssumptions {
   existingStCarryforward: number;
   existingLtCarryforward: number;
   projectionYears: number;
+  advisoryFeeRate?: number;
 }
 
 export interface EdiPinnedTaxRates {

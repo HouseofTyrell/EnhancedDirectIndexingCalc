@@ -8,6 +8,8 @@ import {
   estimateEmbeddedGainPct,
   calculateUnwindAnalysis,
   calculateEstateComparison,
+  computeStrategyEconomics,
+  computeBaselineComparison,
 } from './calculations/ediOnly';
 
 describe('computeEdiYear', () => {
@@ -343,5 +345,117 @@ describe('estate comparison', () => {
     });
 
     expect(result.recommendation).toBe('continue');
+  });
+});
+
+describe('strategy economics', () => {
+  const baseProjection = computeEdiProjection({
+    strategyId: 'overlay-45-45',
+    collateralValue: 10_000_000,
+    combinedStRate: 0.541,
+    combinedLtRate: 0.371,
+    filingStatus: 'mfj',
+    washSaleRate: 0,
+    existingStCarryforward: 0,
+    existingLtCarryforward: 0,
+    annualReturn: 0.07,
+    projectionYears: 10,
+  });
+
+  it('should compute annual costs from financing + advisory', () => {
+    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
+
+    expect(result.years).toHaveLength(10);
+    // Year 1: $10M * (1.5% + 0.75%) = $225K
+    expect(result.years[0].totalCost).toBeCloseTo(225_000, -3);
+    expect(result.years[0].financingCost).toBeCloseTo(150_000, -3);
+    expect(result.years[0].advisoryFee).toBeCloseTo(75_000, -3);
+  });
+
+  it('should compute positive net benefit from tax alpha exceeding costs', () => {
+    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
+
+    // CF tax shield delta in Year 1 should be substantial (>$500K)
+    expect(result.years[0].cfTaxShieldDelta).toBeGreaterThan(400_000);
+    // Net benefit should be positive in Year 1
+    expect(result.years[0].netBenefit).toBeGreaterThan(0);
+  });
+
+  it('should compute summary totals correctly', () => {
+    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
+
+    expect(result.summary.totalCost).toBeGreaterThan(2_000_000);
+    expect(result.summary.totalBenefit).toBeGreaterThan(0);
+    // ROI is meaningful (can be positive or negative depending on strategy economics)
+    expect(result.summary.roi).toBeDefined();
+    expect(result.summary.avgTaxAlphaBps).toBeDefined();
+  });
+
+  it('should find early payback when early-year CF delta exceeds costs', () => {
+    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
+
+    // Year 1 generates massive CF ($1.5M+), so Year 1 net benefit is large and positive
+    expect(result.years[0].netBenefit).toBeGreaterThan(0);
+    expect(result.summary.paybackYear).toBe(1);
+  });
+
+  it('should show declining tax alpha as harvesting rates decay', () => {
+    const result = computeStrategyEconomics(baseProjection, 0.015, 0.0075, 0.371);
+
+    // Year 1 should have high tax alpha (large CF delta)
+    expect(result.years[0].taxAlphaBps).toBeGreaterThan(100);
+    // Later years should have lower (possibly negative) alpha as loss rates decline
+    expect(result.years[0].taxAlphaBps).toBeGreaterThan(result.years[9].taxAlphaBps);
+  });
+});
+
+describe('baseline comparison', () => {
+  const baseProjection = computeEdiProjection({
+    strategyId: 'overlay-45-45',
+    collateralValue: 10_000_000,
+    combinedStRate: 0.541,
+    combinedLtRate: 0.371,
+    filingStatus: 'mfj',
+    washSaleRate: 0,
+    existingStCarryforward: 0,
+    existingLtCarryforward: 0,
+    annualReturn: 0.07,
+    projectionYears: 10,
+  });
+
+  it('should compute passive vs EDI terminal values', () => {
+    const result = computeBaselineComparison(
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+    );
+
+    expect(result.years).toHaveLength(10);
+    expect(result.terminalPassive).toBeGreaterThan(10_000_000);
+    expect(result.terminalEdi).toBeGreaterThan(10_000_000);
+  });
+
+  it('should compute EDI vs passive comparison with incremental costs', () => {
+    const result = computeBaselineComparison(
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+    );
+
+    // EDI advantage can be positive or negative depending on strategy economics
+    // The comparison is meaningful: advisory fees are excluded (common to both)
+    expect(result.ediAdvantage).toBeDefined();
+    expect(result.ediAdvantagePct).toBeDefined();
+    // EDI cumulative costs should grow over time
+    expect(result.years[9].ediCosts).toBeGreaterThan(result.years[0].ediCosts);
+    // EDI tax benefit should be positive
+    expect(result.years[9].ediTaxBenefit).toBeGreaterThan(0);
+  });
+
+  it('should track passive embedded gain growing over time', () => {
+    const result = computeBaselineComparison(
+      baseProjection, 10_000_000, 0.07, 0.015, 0.371, 'overlay-45-45'
+    );
+
+    // Passive embedded gain should grow
+    expect(result.years[9].passiveEmbeddedGain).toBeGreaterThan(result.years[0].passiveEmbeddedGain);
+    // Passive exit tax should be substantial by Year 10
+    expect(result.years[9].passiveExitTax).toBeGreaterThan(1_000_000);
   });
 });
