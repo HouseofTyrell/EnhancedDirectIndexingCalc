@@ -410,7 +410,7 @@
   white-space: nowrap;
 }
 
-.unwind-slider-row input[type="range"] {
+.unwind-slider-row input[type='range'] {
   flex: 1;
   accent-color: var(--primary, #2563eb);
   cursor: pointer;
@@ -649,6 +649,45 @@
 }
 
 /* Responsive */
+/* Financing toggle button */
+.financing-toggle {
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  vertical-align: middle;
+}
+
+/* Cost card (red accent) */
+.edi-summary-card.card-cost {
+  border-left: 3px solid #dc2626;
+}
+
+.edi-summary-card .card-value.negative {
+  color: #dc2626;
+}
+
+/* Subsection headings within merged sections */
+.subsection-heading {
+  color: var(--text, #1f2937);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.subsection-heading:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* Muted detail row */
+.card-detail.muted {
+  color: var(--text-light, #9ca3af);
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   .edi-assumptions-grid {
     grid-template-columns: 1fr;
