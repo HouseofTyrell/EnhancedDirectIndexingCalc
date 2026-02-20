@@ -263,4 +263,7 @@ export const DEFAULTS: CalculatorInputs = {
 
   // QFAF sizing cushion: 0% reduction by default
   qfafSizingCushion: 0,
+
+  // QFAF duration: 5 years default
+  qfafDuration: 5,
 };

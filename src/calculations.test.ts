@@ -33,6 +33,7 @@ function createInputs(overrides: Partial<CalculatorInputs> = {}): CalculatorInpu
     qfafEnabled: true,
     qfafSizingYears: 1, // Year 1 only for backwards-compatible test assertions
     qfafSizingCushion: 0,
+    qfafDuration: 10,
     ...overrides,
   };
 }

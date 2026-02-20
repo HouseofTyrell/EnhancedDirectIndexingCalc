@@ -23,6 +23,7 @@ const baseClient: CalculatorInputs = {
   qfafEnabled: true,
   qfafSizingYears: 1,
   qfafSizingCushion: 0,
+  qfafDuration: 10,
 };
 
 // Generate default overrides (no changes)
@@ -227,6 +228,7 @@ describe('Advanced Features - Income Overrides', () => {
         annualIncome: 500000, // $500K base
         existingNolCarryforward: 1000000, // $1M existing NOL
         qfafSizingCushion: 0,
+        qfafDuration: 10,
       };
 
       const overrides = generateDefaultOverrides(lowerIncomeClient.annualIncome);
@@ -315,6 +317,7 @@ describe('Advanced Features - Income Overrides', () => {
         annualIncome: 300000, // Starting income
         collateralAmount: 1000000, // Smaller starting portfolio
         qfafSizingCushion: 0,
+        qfafDuration: 10,
       };
 
       const overrides = generateDefaultOverrides(youngProfessional.annualIncome);

@@ -22,6 +22,7 @@ function createClientProfile(overrides: Partial<CalculatorInputs> = {}): Calcula
     qfafEnabled: true,
     qfafSizingYears: 1, // Year 1 only for backwards-compatible test assertions
     qfafSizingCushion: 0,
+    qfafDuration: 10,
     existingStLossCarryforward: 0,
     existingLtLossCarryforward: 0,
     existingNolCarryforward: 0,

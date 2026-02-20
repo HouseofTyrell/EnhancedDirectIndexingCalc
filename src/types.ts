@@ -36,6 +36,9 @@ export interface CalculatorInputs {
 
   // QFAF sizing cushion: reduces auto-sized QFAF by this percentage (0–0.10 = 0–10%)
   qfafSizingCushion: number;
+
+  // QFAF duration: years QFAF runs before breakeven unwind (1–10, default 5)
+  qfafDuration: number;
 }
 
 export interface CalculatedSizing {
