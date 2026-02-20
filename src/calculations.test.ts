@@ -550,4 +550,36 @@ describe('QFAF Duration', () => {
     // Sizing should use 3-year average (capped to duration), not 10-year
     expect(result.sizing.sizingYears).toBe(3);
   });
+
+  it('should combine duration, cushion, and sizing cap correctly', () => {
+    const inputs = createInputs({
+      qfafDuration: 5,
+      qfafSizingYears: 10, // will be capped to 5
+      qfafSizingCushion: 0.05, // 5% reduction
+    });
+    const settings = { ...DEFAULT_SETTINGS, projectionYears: 10 };
+    const result = calculate(inputs, settings);
+
+    // Sizing window should be capped to 5
+    expect(result.sizing.sizingYears).toBe(5);
+
+    // QFAF value should be 95% of un-cushioned value
+    const inputsNoCushion = createInputs({
+      qfafDuration: 5,
+      qfafSizingYears: 10,
+      qfafSizingCushion: 0,
+    });
+    const resultNoCushion = calculate(inputsNoCushion, settings);
+    expect(result.sizing.qfafValue).toBeCloseTo(
+      resultNoCushion.sizing.qfafValue * 0.95,
+      0
+    );
+
+    // Year 5 should have QFAF, year 6 should not
+    expect(result.years[4].stGainsGenerated).toBeGreaterThan(0);
+    expect(result.years[5].stGainsGenerated).toBe(0);
+
+    // Projection should be at least 10 years (projectionYears already >= duration + 2)
+    expect(result.years.length).toBe(10);
+  });
 });
