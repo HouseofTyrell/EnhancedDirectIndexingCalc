@@ -98,7 +98,7 @@ export function calculateWithOverrides(
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0) {
       const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-      const neededQfaf = collateralValue * yearStLossRate / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      const neededQfaf = collateralValue * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
       // Can only shrink, never grow beyond initial or current value
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);

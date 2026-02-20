@@ -731,6 +731,55 @@ describe('Dynamic vs Fixed QFAF Comparison', () => {
     expect(totalCashReturned).toBeGreaterThan(0);
   });
 
+  it('dynamic mode should size QFAF smaller when wash sale rate is non-zero', () => {
+    const baseInputs = {
+      strategyId: 'overlay-45-45' as const,
+      collateralAmount: 1000000,
+      qfafSizingYears: 1,
+      qfafSizingMode: 'dynamic' as const,
+      qfafDuration: 5,
+    };
+
+    const noWash = calculate(createInputs(baseInputs));
+    const withWash = calculate(createInputs(baseInputs), {
+      ...DEFAULT_SETTINGS,
+      washSaleDisallowanceRate: 0.10,
+    });
+
+    // With 10% wash sale, dynamic sizing should produce smaller QFAF (less ST gains)
+    // in Year 2+ when resizing kicks in
+    const y3NoWash = noWash.years[2].stGainsGenerated;
+    const y3WithWash = withWash.years[2].stGainsGenerated;
+    expect(y3WithWash).toBeLessThan(y3NoWash);
+    // Specifically, should be ~10% smaller
+    expect(y3WithWash).toBeCloseTo(y3NoWash * 0.9, -2);
+  });
+
+  it('dynamic mode should cap QFAF at initial value even with growth enabled', () => {
+    const inputs = createInputs({
+      qfafSizingMode: 'dynamic',
+      qfafSizingYears: 1,
+      strategyId: 'overlay-45-45',
+      qfafDuration: 5,
+    });
+    const settings: AdvancedSettings = {
+      ...DEFAULT_SETTINGS,
+      growthEnabled: true,
+      defaultAnnualReturn: 0.08,
+      qfafGrowthEnabled: true,
+    };
+    const result = calculate(inputs, settings);
+    const initialQfaf = result.sizing.qfafValue;
+
+    // Even with 8% annual growth, QFAF should never exceed initial sizing
+    for (const year of result.years) {
+      if (year.stGainsGenerated > 0) {
+        const impliedQfaf = year.stGainsGenerated / 1.5;
+        expect(impliedQfaf).toBeLessThanOrEqual(initialQfaf + 1);
+      }
+    }
+  });
+
   it('dynamic mode should produce different year-by-year tax profiles than fixed', () => {
     const baseInputs = {
       strategyId: 'overlay-45-45' as const,
