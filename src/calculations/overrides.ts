@@ -14,7 +14,7 @@ import {
   SECTION_461L_LIMITS,
 } from '../strategyData';
 import { TaxRates } from './types';
-import { calculateSummary } from './helpers';
+import { getEffectiveStLossRate, calculateSummary } from './helpers';
 import { calculateSizing } from './sizing';
 import { calculateYear } from './core';
 
@@ -60,6 +60,8 @@ export function calculateWithOverrides(
 
   // Track cumulative infusions for sizing recalculation
   let cumulativeInfusion = 0;
+  const initialQfafValue = baseSizing.qfafValue;
+  const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
 
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
@@ -90,7 +92,18 @@ export function calculateWithOverrides(
     }
 
     // Zero out QFAF after duration expires (breakeven unwind)
-    const effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+    let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+
+    // Dynamic resizing: shrink QFAF to match this year's collateral ST losses
+    let cashReturned = 0;
+    if (isDynamic && effectiveQfafValue > 0) {
+      const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
+      const neededQfaf = collateralValue * yearStLossRate / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      // Can only shrink, never grow beyond initial or current value
+      const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
+      cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
+      effectiveQfafValue = cappedQfaf;
+    }
 
     // Calculate tax rates for this year's income
     // (Tax brackets may differ based on income level)
@@ -117,7 +130,7 @@ export function calculateWithOverrides(
       yearIncome // Pass the year-specific income
     );
 
-    years.push(result);
+    years.push({ ...result, qfafCashReturned: cashReturned });
 
     // Update state for next year
     // Don't track QFAF growth after unwind

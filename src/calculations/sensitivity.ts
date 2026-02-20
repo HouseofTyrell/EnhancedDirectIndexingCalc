@@ -121,6 +121,8 @@ export function calculateWithSensitivity(
   let stCarryforward = inputs.existingStLossCarryforward;
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
+  const initialQfafValue = sizing.qfafValue;
+  const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
 
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
@@ -132,7 +134,18 @@ export function calculateWithSensitivity(
 
   for (let year = 1; year <= effectiveProjectionYears; year++) {
     // Zero out QFAF after duration expires (breakeven unwind)
-    const effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+    let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+
+    // Dynamic resizing: shrink QFAF to match this year's collateral ST losses
+    let cashReturned = 0;
+    if (isDynamic && effectiveQfafValue > 0) {
+      const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
+      const neededQfaf = collateralValue * yearStLossRate / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      // Can only shrink, never grow beyond initial or current value
+      const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
+      cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
+      effectiveQfafValue = cappedQfaf;
+    }
 
     // Calculate tax rates with sensitivity adjustments
     const baseFederalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
@@ -170,7 +183,7 @@ export function calculateWithSensitivity(
       strategy // Pass full strategy for financing cost calculation
     );
 
-    years.push(result);
+    years.push({ ...result, qfafCashReturned: cashReturned });
 
     // Update state for next year
     // Don't track QFAF growth after unwind
