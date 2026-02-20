@@ -370,5 +370,7 @@ function calculateYearWithSensitivity(
     maxIncomeOffsetCapacity,
     qfafTaxBenefit,
     collateralTaxBenefit,
+    stGainLeakage: Math.max(0, stGainsGenerated - stLossesHarvested),
+    qfafCashReturned: 0,
   };
 }

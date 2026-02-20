@@ -246,6 +246,9 @@ export function calculateYear(
       remainingStGainCost
   );
 
+  // ST gain leakage: excess QFAF ST gains not offset by collateral losses
+  const stGainLeakage = Math.max(0, stGainsGenerated - stLossesHarvested);
+
   // Component-specific benefits for view mode breakdown
   // QFAF benefit: ordinary loss offset + NOL usage + ST→LT conversion (what QFAF enables)
   const qfafTaxBenefit = safeNumber(ordinaryLossBenefit + nolUsageBenefit + stToLtConversionBenefit);
@@ -331,5 +334,7 @@ export function calculateYear(
     maxIncomeOffsetCapacity,
     qfafTaxBenefit,
     collateralTaxBenefit,
+    stGainLeakage,
+    qfafCashReturned: 0, // Set by the calling loop in dynamic mode
   };
 }

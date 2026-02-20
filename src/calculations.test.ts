@@ -584,3 +584,25 @@ describe('QFAF Duration', () => {
     expect(result.years.length).toBe(10);
   });
 });
+
+describe('ST Gain Leakage', () => {
+  it('should report zero leakage when QFAF is properly sized (Year 1)', () => {
+    const inputs = createInputs({ qfafSizingYears: 1 });
+    const result = calculate(inputs);
+    expect(result.years[0].stGainLeakage).toBeCloseTo(0, -2);
+  });
+
+  it('should report positive leakage in later years with fixed sizing', () => {
+    const inputs = createInputs({ qfafSizingYears: 1, qfafSizingMode: 'fixed' });
+    const result = calculate(inputs);
+    expect(result.years[4].stGainLeakage).toBeGreaterThan(0);
+  });
+
+  it('should default qfafCashReturned to 0 in fixed mode', () => {
+    const inputs = createInputs({ qfafSizingMode: 'fixed' });
+    const result = calculate(inputs);
+    for (const year of result.years) {
+      expect(year.qfafCashReturned).toBe(0);
+    }
+  });
+});
