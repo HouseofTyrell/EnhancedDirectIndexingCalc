@@ -23,7 +23,8 @@ export function calculateSizing(inputs: CalculatorInputs, qfafMultiplier?: numbe
   }
 
   const collateralValue = inputs.collateralAmount;
-  const sizingYears = inputs.qfafSizingYears ?? 10;
+  const maxSizingYears = inputs.qfafDuration ?? 10;
+  const sizingYears = Math.min(inputs.qfafSizingYears ?? 10, maxSizingYears);
   const stGainRate = qfafMultiplier ?? QFAF_ST_GAIN_RATE;
   const ordLossRate = qfafMultiplier ?? QFAF_ORDINARY_LOSS_RATE;
 

@@ -542,4 +542,12 @@ describe('QFAF Duration', () => {
     // Should stay at 10 (no extension needed)
     expect(result.years.length).toBe(10);
   });
+
+  it('should cap sizing window to duration when sizingYears > duration', () => {
+    const inputs = createInputs({ qfafDuration: 3, qfafSizingYears: 10 });
+    const result = calculate(inputs);
+
+    // Sizing should use 3-year average (capped to duration), not 10-year
+    expect(result.sizing.sizingYears).toBe(3);
+  });
 });
