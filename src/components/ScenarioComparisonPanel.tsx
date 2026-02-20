@@ -166,6 +166,14 @@ function detectInputChanges(
     });
   }
 
+  if (pinned.qfafSizingMode !== current.qfafSizingMode) {
+    changes.push({
+      label: 'QFAF Sizing Mode',
+      pinnedDisplay: pinned.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed',
+      currentDisplay: current.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed',
+    });
+  }
+
   // --- AdvancedSettings: QFAF mechanics ---
 
   if (pinnedSettings.qfafMultiplier !== currentSettings.qfafMultiplier) {

@@ -410,6 +410,11 @@ export function StrategySelectionInputs({
               <h4>QFAF Configuration</h4>
               <InfoPopup title="QFAF Overlay Parameters">
                 <p>
+                  <strong>Sizing Mode:</strong> Dynamic (default) resizes QFAF each year to match
+                  decaying EDI losses — minimizes ST gain leakage. Fixed holds QFAF constant
+                  through the full duration.
+                </p>
+                <p>
                   <strong>QFAF Multiplier:</strong> Controls the size of the QFAF overlay relative to the
                   collateral. Historical range: 1.31x to 1.58x (avg 1.42x).
                 </p>
@@ -426,6 +431,35 @@ export function StrategySelectionInputs({
                   Default: 0% (no cushion). Range: 0-10%.
                 </p>
               </InfoPopup>
+            </div>
+
+            <div className="qfaf-sizing-mode-toggle">
+              <label className="qfaf-sizing-mode-label">Sizing Mode</label>
+              <div className="btn-group btn-group--compact" role="radiogroup" aria-label="QFAF sizing mode">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={inputs.qfafSizingMode === 'dynamic'}
+                  className={`btn-group__btn${inputs.qfafSizingMode === 'dynamic' ? ' btn-group__btn--active' : ''}`}
+                  onClick={() => onUpdateInput('qfafSizingMode', 'dynamic')}
+                >
+                  Dynamic
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={inputs.qfafSizingMode === 'fixed'}
+                  className={`btn-group__btn${inputs.qfafSizingMode === 'fixed' ? ' btn-group__btn--active' : ''}`}
+                  onClick={() => onUpdateInput('qfafSizingMode', 'fixed')}
+                >
+                  Fixed
+                </button>
+              </div>
+              <span className="input-hint">
+                {inputs.qfafSizingMode === 'dynamic'
+                  ? 'QFAF resizes each year to match decaying EDI losses — reduces ST gain leakage'
+                  : 'QFAF sized once at inception, held constant through duration'}
+              </span>
             </div>
 
             <div className="input-pair">
