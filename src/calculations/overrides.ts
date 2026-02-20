@@ -144,6 +144,6 @@ export function calculateWithOverrides(
   return {
     sizing: adjustedSizing,
     years,
-    summary: calculateSummary(years, adjustedSizing),
+    summary: calculateSummary(years, adjustedSizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined),
   };
 }

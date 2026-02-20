@@ -544,12 +544,14 @@ describe('Combined Settings', () => {
     expect(shortResult.summary.effectiveTaxAlpha).toBeGreaterThan(0);
     expect(longResult.summary.effectiveTaxAlpha).toBeGreaterThan(0);
 
-    // Annualized alpha should use the actual number of years (auto-extended)
-    // Tax alpha = totalTaxSavings / totalExposure / years.length
+    // Annualized alpha should use QFAF duration (not projection length)
+    // Tax alpha = totalTaxSavings / totalExposure / qfafDuration
+    // This measures per-year efficiency of the QFAF program specifically
+    const qfafDuration = baseClient.qfafDuration ?? 10;
     const expectedShortAlpha =
-      shortResult.summary.totalTaxSavings / shortResult.sizing.totalExposure / shortResult.years.length;
+      shortResult.summary.totalTaxSavings / shortResult.sizing.totalExposure / qfafDuration;
     const expectedLongAlpha =
-      longResult.summary.totalTaxSavings / longResult.sizing.totalExposure / longResult.years.length;
+      longResult.summary.totalTaxSavings / longResult.sizing.totalExposure / qfafDuration;
 
     expect(shortResult.summary.effectiveTaxAlpha).toBeCloseTo(expectedShortAlpha, 4);
     expect(longResult.summary.effectiveTaxAlpha).toBeCloseTo(expectedLongAlpha, 4);

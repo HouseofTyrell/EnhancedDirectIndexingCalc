@@ -130,14 +130,15 @@ export function calculateCarryforwards(
   };
 }
 
-export function calculateSummary(years: YearResult[], sizing: CalculatedSizing) {
+export function calculateSummary(years: YearResult[], sizing: CalculatedSizing, qfafDuration?: number) {
   const totalTaxSavings = years.reduce((sum, y) => sum + y.taxSavings, 0);
   const totalNolGenerated = years.reduce((sum, y) => sum + y.excessToNol, 0);
   // Safe array access (005 - fix unchecked array access)
   const lastYear = years.length > 0 ? years[years.length - 1] : undefined;
   const finalPortfolioValue = lastYear?.totalValue ?? 0;
-  // Annualize tax alpha using actual number of projection years
-  const numYears = years.length || 1; // Avoid division by zero
+  // Annualize tax alpha over QFAF duration (not full projection length)
+  // This measures per-year efficiency of the QFAF program specifically
+  const numYears = qfafDuration ?? (years.length || 1);
   const effectiveTaxAlpha =
     sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / numYears : 0;
 
