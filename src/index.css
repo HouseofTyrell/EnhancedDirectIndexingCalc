@@ -481,6 +481,33 @@ body {
   flex-shrink: 0;
 }
 
+/* Reset to Defaults button in sticky header */
+.sticky-header__reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sticky-header__reset-btn:hover {
+  background: var(--danger, #ef4444);
+  color: white;
+  border-color: var(--danger, #ef4444);
+}
+
+.sticky-header__reset-btn svg {
+  flex-shrink: 0;
+}
+
 /* Pin scenario button in sticky header */
 .sticky-header__pin-btn {
   display: flex;
@@ -607,12 +634,14 @@ body {
   /* Compact buttons on mobile */
   .sticky-header__advanced-btn,
   .sticky-header__pin-btn,
-  .sticky-header__compare-link {
+  .sticky-header__compare-link,
+  .sticky-header__reset-btn {
     padding: 0.4rem;
   }
 
   .sticky-header__advanced-btn span,
-  .sticky-header__pin-btn span {
+  .sticky-header__pin-btn span,
+  .sticky-header__reset-btn span {
     display: none;
   }
 
@@ -5911,7 +5940,8 @@ select:focus:not(:focus-visible) {
 }
 
 /* Sticky header advanced button */
-[data-theme='dark'] .sticky-header__advanced-btn {
+[data-theme='dark'] .sticky-header__advanced-btn,
+[data-theme='dark'] .sticky-header__reset-btn {
   background: rgba(255, 255, 255, 0.1);
 }
 

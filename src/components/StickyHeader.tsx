@@ -68,6 +68,8 @@ interface StickyHeaderProps {
   isExpanded: boolean;
   /** Callback when advanced settings button is clicked */
   onOpenAdvanced?: () => void;
+  /** Callback to reset all inputs to defaults */
+  onReset?: () => void;
   /** Whether a scenario is currently pinned */
   hasPinnedScenario?: boolean;
   /** Callback to pin the current scenario */
@@ -125,6 +127,7 @@ export const StickyHeader = React.memo(function StickyHeader({
   year2TaxSavings,
   isExpanded,
   onOpenAdvanced,
+  onReset,
   hasPinnedScenario,
   onPinScenario,
   onUnpinScenario,
@@ -234,6 +237,24 @@ export const StickyHeader = React.memo(function StickyHeader({
           >
             <SettingsIcon />
             {isExpanded && <span>Advanced</span>}
+          </button>
+        )}
+        {onReset && (
+          <button
+            className="sticky-header__reset-btn"
+            onClick={() => {
+              if (window.confirm('Reset all inputs to defaults? This cannot be undone.')) {
+                onReset();
+              }
+            }}
+            aria-label="Reset to defaults"
+            title="Reset all inputs to defaults"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+            {isExpanded && <span>Reset</span>}
           </button>
         )}
       </div>

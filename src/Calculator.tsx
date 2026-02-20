@@ -285,6 +285,13 @@ export function Calculator() {
         }
         isExpanded={isExpanded}
         onOpenAdvanced={undefined}
+        onReset={() => {
+          setInputs(DEFAULTS);
+          setYearOverrides(generateDefaultOverrides(DEFAULTS.annualIncome));
+          setAdvancedSettings(DEFAULT_SETTINGS);
+          setSensitivityParams(DEFAULT_SENSITIVITY);
+          setComparisonStrategies([STRATEGIES[1].id, STRATEGIES[0].id]);
+        }}
         hasPinnedScenario={pinnedScenario.hasPinned}
         onPinScenario={() => pinnedScenario.pin(inputs, advancedSettings, results)}
         onUnpinScenario={pinnedScenario.unpin}
