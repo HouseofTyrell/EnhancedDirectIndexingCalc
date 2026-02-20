@@ -414,8 +414,16 @@ export function StrategySelectionInputs({
                   collateral. Historical range: 1.31x to 1.58x (avg 1.42x).
                 </p>
                 <p>
-                  <strong>Sizing Window:</strong> Number of days for QFAF sizing window. Default: 5 days
-                  (matches current production behavior).
+                  <strong>Sizing Window:</strong> Number of years averaged for QFAF sizing. Default: 5 years
+                  (conservative multi-year average). Capped by Duration.
+                </p>
+                <p>
+                  <strong>Duration:</strong> Years QFAF runs before breakeven unwind. Default: 5 years.
+                  Reducing duration auto-caps the sizing window.
+                </p>
+                <p>
+                  <strong>Sizing Cushion:</strong> Reduces auto-sized QFAF for conservative sizing.
+                  Default: 0% (no cushion). Range: 0-10%.
                 </p>
               </InfoPopup>
             </div>
@@ -453,7 +461,7 @@ export function StrategySelectionInputs({
                   id="qfafSizingYears"
                   type="range"
                   min={1}
-                  max={10}
+                  max={inputs.qfafDuration}
                   step={1}
                   value={inputs.qfafSizingYears}
                   onChange={e => {
@@ -466,10 +474,42 @@ export function StrategySelectionInputs({
                 <div className="slider-labels">
                   <span>1 year</span>
                   <span className="current-value">{inputs.qfafSizingYears} {inputs.qfafSizingYears === 1 ? 'year' : 'years'}</span>
+                  <span>{inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}</span>
+                </div>
+                <span className="input-hint">
+                  Years averaged for QFAF sizing — Default: 5 (capped by duration)
+                </span>
+              </div>
+            </div>
+
+            <div className="input-pair">
+              <div className="input-group">
+                <label htmlFor="qfafDuration">QFAF Duration</label>
+                <input
+                  id="qfafDuration"
+                  type="range"
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={inputs.qfafDuration}
+                  onChange={e => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      onUpdateInput('qfafDuration', val);
+                      // Auto-cap sizing window if it exceeds new duration
+                      if (inputs.qfafSizingYears > val) {
+                        onUpdateInput('qfafSizingYears', val);
+                      }
+                    }
+                  }}
+                />
+                <div className="slider-labels">
+                  <span>1 year</span>
+                  <span className="current-value">{inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}</span>
                   <span>10 years</span>
                 </div>
                 <span className="input-hint">
-                  Years averaged for QFAF sizing — Default: 5 (conservative multi-year average)
+                  Years QFAF runs before breakeven unwind — default: 5
                 </span>
               </div>
             </div>
