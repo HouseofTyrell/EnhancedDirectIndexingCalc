@@ -458,26 +458,32 @@ export function StrategySelectionInputs({
 
               <div className="input-group">
                 <label htmlFor="qfafSizingYears">Sizing Window (years)</label>
-                <input
-                  id="qfafSizingYears"
-                  type="range"
-                  min={1}
-                  max={inputs.qfafDuration}
-                  step={1}
-                  value={inputs.qfafSizingYears}
-                  aria-valuetext={`${inputs.qfafSizingYears} ${inputs.qfafSizingYears === 1 ? 'year' : 'years'}`}
-                  onChange={e => {
-                    const val = parseInt(e.target.value, 10);
-                    if (!isNaN(val)) {
-                      onUpdateInput('qfafSizingYears', val);
-                    }
-                  }}
-                />
-                <div className="slider-labels">
-                  <span>1 year</span>
-                  <span className="current-value">{inputs.qfafSizingYears} {inputs.qfafSizingYears === 1 ? 'year' : 'years'}</span>
-                  <span>{inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}</span>
-                </div>
+                {inputs.qfafDuration <= 1 ? (
+                  <span className="static-value">1 year (determined by duration)</span>
+                ) : (
+                  <>
+                    <input
+                      id="qfafSizingYears"
+                      type="range"
+                      min={1}
+                      max={inputs.qfafDuration}
+                      step={1}
+                      value={inputs.qfafSizingYears}
+                      aria-valuetext={`${inputs.qfafSizingYears} ${inputs.qfafSizingYears === 1 ? 'year' : 'years'}`}
+                      onChange={e => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) {
+                          onUpdateInput('qfafSizingYears', val);
+                        }
+                      }}
+                    />
+                    <div className="slider-labels">
+                      <span>1 year</span>
+                      <span className="current-value">{inputs.qfafSizingYears} {inputs.qfafSizingYears === 1 ? 'year' : 'years'}</span>
+                      <span>{inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}</span>
+                    </div>
+                  </>
+                )}
                 <span className="input-hint">
                   Years averaged for QFAF sizing — Default: 5 (capped by duration)
                 </span>
