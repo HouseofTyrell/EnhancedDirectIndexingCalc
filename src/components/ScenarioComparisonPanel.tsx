@@ -158,6 +158,14 @@ function detectInputChanges(
     });
   }
 
+  if (pinned.qfafDuration !== current.qfafDuration) {
+    changes.push({
+      label: 'QFAF Duration',
+      pinnedDisplay: `${pinned.qfafDuration} yr`,
+      currentDisplay: `${current.qfafDuration} yr`,
+    });
+  }
+
   // --- AdvancedSettings: QFAF mechanics ---
 
   if (pinnedSettings.qfafMultiplier !== currentSettings.qfafMultiplier) {
