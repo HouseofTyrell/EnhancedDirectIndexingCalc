@@ -402,9 +402,9 @@ describe('UI Display Verification', () => {
     });
   });
 
-  it('should have 10 years of projections', () => {
+  it('should have 12 years of projections (qfafDuration=10 → auto-extended to 10+2)', () => {
     const result = calculate(createClientProfile(), DEFAULT_SETTINGS);
-    expect(result.years).toHaveLength(10);
+    expect(result.years).toHaveLength(12);
   });
 
   it('should show cumulative tax savings increasing', () => {

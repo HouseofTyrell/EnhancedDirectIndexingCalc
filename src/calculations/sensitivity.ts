@@ -125,7 +125,15 @@ export function calculateWithSensitivity(
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
 
-  for (let year = 1; year <= projectionYears; year++) {
+  // Auto-extend projection to show at least 2 post-QFAF years
+  const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
+  const minProjection = qfafDuration > 0 ? qfafDuration + 2 : projectionYears;
+  const effectiveProjectionYears = Math.max(projectionYears, minProjection);
+
+  for (let year = 1; year <= effectiveProjectionYears; year++) {
+    // Zero out QFAF after duration expires (breakeven unwind)
+    const effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+
     // Calculate tax rates with sensitivity adjustments
     const baseFederalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const baseFederalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
@@ -147,7 +155,7 @@ export function calculateWithSensitivity(
 
     const result = calculateYearWithSensitivity(
       year,
-      qfafValue,
+      effectiveQfafValue,
       collateralValue,
       stCarryforward,
       ltCarryforward,
@@ -165,7 +173,8 @@ export function calculateWithSensitivity(
     years.push(result);
 
     // Update state for next year
-    qfafValue = result.qfafValue;
+    // Don't track QFAF growth after unwind
+    qfafValue = (qfafDuration > 0 && year >= qfafDuration) ? 0 : result.qfafValue;
     collateralValue = result.collateralValue;
     stCarryforward = result.stLossCarryforward;
     ltCarryforward = result.ltLossCarryforward;

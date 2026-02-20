@@ -64,7 +64,12 @@ export function calculateWithOverrides(
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
 
-  for (let year = 1; year <= projectionYears; year++) {
+  // Auto-extend projection to show at least 2 post-QFAF years
+  const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
+  const minProjection = qfafDuration > 0 ? qfafDuration + 2 : projectionYears;
+  const effectiveProjectionYears = Math.max(projectionYears, minProjection);
+
+  for (let year = 1; year <= effectiveProjectionYears; year++) {
     const override = overrideMap.get(year);
 
     // Get effective income for this year
@@ -84,6 +89,9 @@ export function calculateWithOverrides(
       }
     }
 
+    // Zero out QFAF after duration expires (breakeven unwind)
+    const effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+
     // Calculate tax rates for this year's income
     // (Tax brackets may differ based on income level)
     const yearTaxRates: TaxRates = {
@@ -97,7 +105,7 @@ export function calculateWithOverrides(
 
     const result = calculateYear(
       year,
-      qfafValue,
+      effectiveQfafValue,
       collateralValue,
       stCarryforward,
       ltCarryforward,
@@ -112,7 +120,8 @@ export function calculateWithOverrides(
     years.push(result);
 
     // Update state for next year
-    qfafValue = result.qfafValue;
+    // Don't track QFAF growth after unwind
+    qfafValue = (qfafDuration > 0 && year >= qfafDuration) ? 0 : result.qfafValue;
     collateralValue = result.collateralValue;
     stCarryforward = result.stLossCarryforward;
     ltCarryforward = result.ltLossCarryforward;

@@ -79,11 +79,12 @@ describe('calculateSizing', () => {
 });
 
 describe('calculate - basic behavior', () => {
-  it('returns 10 years of results', () => {
+  it('returns at least projectionYears of results (auto-extended by QFAF duration + 2)', () => {
     const result = calculate(createInputs());
-    expect(result.years).toHaveLength(10);
+    // Default qfafDuration=10, projectionYears=10 → max(10, 10+2) = 12
+    expect(result.years).toHaveLength(12);
     expect(result.years[0].year).toBe(1);
-    expect(result.years[9].year).toBe(10);
+    expect(result.years[11].year).toBe(12);
   });
 
   it('grows portfolio value over time with growth enabled', () => {
@@ -439,7 +440,8 @@ describe('calculate - edge cases', () => {
       const inputs = createInputs({ filingStatus: status });
       const result = calculate(inputs);
 
-      expect(result.years).toHaveLength(10);
+      // Default qfafDuration=10, projectionYears=10 → auto-extended to 12
+      expect(result.years).toHaveLength(12);
       expect(Number.isFinite(result.summary.totalTaxSavings)).toBe(true);
     }
   });
@@ -475,5 +477,69 @@ describe('fixed issues', () => {
 
     // Excess ST losses should appear in carryforward
     expect(result.years[0].stLossCarryforward).toBeGreaterThan(0);
+  });
+});
+
+describe('QFAF Duration', () => {
+  it('should zero out QFAF contributions after duration expires', () => {
+    const inputs = createInputs({ qfafDuration: 3 });
+    const settings = { ...DEFAULT_SETTINGS, projectionYears: 5 };
+    const result = calculate(inputs, settings);
+
+    // Years 1-3 should have QFAF ST gains
+    expect(result.years[0].stGainsGenerated).toBeGreaterThan(0);
+    expect(result.years[1].stGainsGenerated).toBeGreaterThan(0);
+    expect(result.years[2].stGainsGenerated).toBeGreaterThan(0);
+
+    // Years 4-5 should have zero QFAF ST gains (QFAF unwound)
+    expect(result.years[3].stGainsGenerated).toBe(0);
+    expect(result.years[4].stGainsGenerated).toBe(0);
+
+    // Years 4-5 should also have zero ordinary losses from QFAF
+    expect(result.years[3].ordinaryLossesGenerated).toBe(0);
+    expect(result.years[4].ordinaryLossesGenerated).toBe(0);
+  });
+
+  it('should continue collateral ST losses after QFAF expires', () => {
+    const inputs = createInputs({ qfafDuration: 2 });
+    const settings = { ...DEFAULT_SETTINGS, projectionYears: 5 };
+    const result = calculate(inputs, settings);
+
+    // Collateral ST losses should still be generated in post-QFAF years
+    expect(result.years[3].stLossesHarvested).toBeGreaterThan(0);
+    expect(result.years[4].stLossesHarvested).toBeGreaterThan(0);
+  });
+
+  it('should carry forward losses built during QFAF years into post-QFAF years', () => {
+    // Use large collateral to generate ordinary losses exceeding 461(l) limit,
+    // which produces NOL carryforward that persists after QFAF unwind
+    const inputs = createInputs({ qfafDuration: 1, collateralAmount: 10000000 });
+    const settings = { ...DEFAULT_SETTINGS, projectionYears: 5 };
+    const result = calculate(inputs, settings);
+
+    // NOL generated in year 1 should persist into later years
+    const year1Nol = result.years[0].nolCarryforward;
+    expect(year1Nol).toBeGreaterThan(0);
+
+    // Year 2+ should still have NOL carryforward (may decrease as it's used)
+    expect(result.years[1].nolCarryforward).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should auto-extend projection when duration + 2 > projectionYears', () => {
+    const inputs = createInputs({ qfafDuration: 9 });
+    const settings = { ...DEFAULT_SETTINGS, projectionYears: 5 };
+    const result = calculate(inputs, settings);
+
+    // Should extend to at least duration + 2 = 11 years
+    expect(result.years.length).toBeGreaterThanOrEqual(11);
+  });
+
+  it('should not extend projection when projectionYears already exceeds duration + 2', () => {
+    const inputs = createInputs({ qfafDuration: 3 });
+    const settings = { ...DEFAULT_SETTINGS, projectionYears: 10 };
+    const result = calculate(inputs, settings);
+
+    // Should stay at 10 (no extension needed)
+    expect(result.years.length).toBe(10);
   });
 });

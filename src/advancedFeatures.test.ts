@@ -340,7 +340,7 @@ describe('Advanced Features - Income Overrides', () => {
       );
 
       // Should complete 10-year projection
-      expect(result.years.length).toBe(10);
+      expect(result.years.length).toBe(12);
 
       // Higher income in later years should affect 461(l) usage
       const year1 = result.years[0];
@@ -406,7 +406,7 @@ describe('Advanced Features - Edge Cases', () => {
     const result = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, []);
 
     // Should fall back to default calculation
-    expect(result.years.length).toBe(10);
+    expect(result.years.length).toBe(12);
     expect(result.summary.totalTaxSavings).toBeGreaterThan(0);
   });
 
@@ -426,7 +426,7 @@ describe('Advanced Features - Edge Cases', () => {
     );
 
     // Should still calculate all 10 years
-    expect(result.years.length).toBe(10);
+    expect(result.years.length).toBe(12);
 
     // Year 3 infusion should still be applied
     const year3 = result.years[2];

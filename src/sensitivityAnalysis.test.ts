@@ -316,7 +316,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, taxSunset);
 
       // Should complete calculation
-      expect(result.years.length).toBe(10);
+      expect(result.years.length).toBe(12);
       expect(result.summary.totalTaxSavings).toBeGreaterThan(0);
     });
   });
@@ -346,7 +346,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
 
       // Should still calculate without errors
-      expect(result.years.length).toBe(10);
+      expect(result.years.length).toBe(12);
       expect(result.summary.finalPortfolioValue).toBeGreaterThan(0);
     });
 
@@ -360,7 +360,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
 
       // Should calculate without errors
-      expect(result.years.length).toBe(10);
+      expect(result.years.length).toBe(12);
     });
   });
 
@@ -408,7 +408,7 @@ describe('Sensitivity Analysis', () => {
       // With multiplier = 1.0, should apply normal tracking error amplification
       // Core 145/45 has 1.9% tracking error
       // effectiveVariance = 0.1 * (1 + 0.019 * 1.0) = 0.1019
-      expect(result.years.length).toBe(10);
+      expect(result.years.length).toBe(12);
       expect(result.summary.totalTaxSavings).toBeGreaterThan(0);
     });
 
@@ -430,7 +430,7 @@ describe('Sensitivity Analysis', () => {
 
       // With multiplier = 0, tracking error has no effect
       // effectiveVariance = 0.1 * (1 + 0) = 0.1 exactly
-      expect(zeroResult.years.length).toBe(10);
+      expect(zeroResult.years.length).toBe(12);
 
       // Results should differ when tracking error is applied vs not applied
       expect(zeroResult.summary.totalTaxSavings).not.toBeCloseTo(
@@ -508,8 +508,8 @@ describe('Sensitivity Analysis', () => {
       const negativeResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, negativeVarianceParams);
 
       // Both should calculate successfully
-      expect(positiveResult.years.length).toBe(10);
-      expect(negativeResult.years.length).toBe(10);
+      expect(positiveResult.years.length).toBe(12);
+      expect(negativeResult.years.length).toBe(12);
 
       // Positive variance scenario should have higher tax savings
       expect(positiveResult.summary.totalTaxSavings).toBeGreaterThan(
