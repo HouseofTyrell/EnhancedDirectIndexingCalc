@@ -320,7 +320,7 @@ export function calculateYear(
     stateTax,
     totalTax: federalTax + stateTax,
     baselineTax,
-    taxSavings: Math.max(0, taxSavings),
+    taxSavings,
     stLossCarryforward: newStCarryforward,
     ltLossCarryforward: newLtCarryforward,
     nolCarryforward: newNolCarryforward,
