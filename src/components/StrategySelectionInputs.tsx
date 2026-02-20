@@ -438,6 +438,7 @@ export function StrategySelectionInputs({
                   max={1.75}
                   step={0.01}
                   value={advancedSettings.qfafMultiplier}
+                  aria-valuetext={`${(advancedSettings.qfafMultiplier * 100).toFixed(0)} percent`}
                   onChange={e => {
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val)) {
@@ -464,6 +465,7 @@ export function StrategySelectionInputs({
                   max={inputs.qfafDuration}
                   step={1}
                   value={inputs.qfafSizingYears}
+                  aria-valuetext={`${inputs.qfafSizingYears} ${inputs.qfafSizingYears === 1 ? 'year' : 'years'}`}
                   onChange={e => {
                     const val = parseInt(e.target.value, 10);
                     if (!isNaN(val)) {
@@ -492,6 +494,7 @@ export function StrategySelectionInputs({
                   max={10}
                   step={1}
                   value={inputs.qfafDuration}
+                  aria-valuetext={`${inputs.qfafDuration} ${inputs.qfafDuration === 1 ? 'year' : 'years'}`}
                   onChange={e => {
                     const val = parseInt(e.target.value, 10);
                     if (!isNaN(val)) {
@@ -514,14 +517,15 @@ export function StrategySelectionInputs({
               </div>
 
               <div className="input-group">
-                <label htmlFor="sizingCushion">Sizing Cushion</label>
+                <label htmlFor="qfafSizingCushion">Sizing Cushion</label>
                 <input
-                  id="sizingCushion"
+                  id="qfafSizingCushion"
                   type="range"
                   min={0}
                   max={0.10}
                   step={0.01}
                   value={inputs.qfafSizingCushion}
+                  aria-valuetext={`${(inputs.qfafSizingCushion * 100).toFixed(0)} percent`}
                   onChange={e => {
                     const val = parseFloat(e.target.value);
                     if (!isNaN(val)) {
