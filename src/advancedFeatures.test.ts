@@ -24,6 +24,7 @@ const baseClient: CalculatorInputs = {
   qfafSizingYears: 1,
   qfafSizingCushion: 0,
   qfafDuration: 10,
+  qfafSizingMode: 'fixed',
 };
 
 // Generate default overrides (no changes)

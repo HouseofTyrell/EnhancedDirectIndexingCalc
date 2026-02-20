@@ -24,6 +24,7 @@ const baseClient: CalculatorInputs = {
   qfafSizingYears: 1,
   qfafSizingCushion: 0,
   qfafDuration: 10,
+  qfafSizingMode: 'fixed',
 };
 
 describe('Projection Years Setting', () => {

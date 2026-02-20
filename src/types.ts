@@ -39,6 +39,9 @@ export interface CalculatorInputs {
 
   // QFAF duration: years QFAF runs before breakeven unwind (1–10, default 5)
   qfafDuration: number;
+
+  // QFAF sizing mode: 'fixed' = sized once at inception, 'dynamic' = resized each year to match EDI losses
+  qfafSizingMode: 'fixed' | 'dynamic';
 }
 
 export interface CalculatedSizing {
@@ -108,6 +111,11 @@ export interface YearResult {
   // Component-specific tax benefits (for view mode breakdown)
   qfafTaxBenefit: number; // Ordinary loss + NOL usage + ST→LT conversion benefit
   collateralTaxBenefit: number; // Capital loss benefit - LT gain cost - remaining ST cost
+
+  // ST gain leakage: excess QFAF ST gains not offset by collateral ST losses (QFAF oversized)
+  stGainLeakage: number;
+  // Cash returned from QFAF resizing (dynamic mode only, 0 in fixed mode)
+  qfafCashReturned: number;
 }
 
 export interface CalculationResult {

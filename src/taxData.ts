@@ -266,4 +266,7 @@ export const DEFAULTS: CalculatorInputs = {
 
   // QFAF duration: 5 years default
   qfafDuration: 5,
+
+  // QFAF sizing mode: dynamic resizes each year (recommended)
+  qfafSizingMode: 'dynamic' as const,
 };
