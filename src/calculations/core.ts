@@ -92,6 +92,8 @@ export function calculate(
   const years: YearResult[] = [];
 
   let qfafValue = sizing.qfafValue;
+  const initialQfafValue = sizing.qfafValue;
+  const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
   let collateralValue = sizing.collateralValue;
   let stCarryforward = inputs.existingStLossCarryforward;
   let ltCarryforward = inputs.existingLtLossCarryforward;
@@ -107,7 +109,18 @@ export function calculate(
 
   for (let year = 1; year <= effectiveProjectionYears; year++) {
     // Zero out QFAF after duration expires (breakeven unwind)
-    const effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+    let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+
+    // Dynamic resizing: shrink QFAF to match this year's collateral ST losses
+    let cashReturned = 0;
+    if (isDynamic && effectiveQfafValue > 0) {
+      const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
+      const neededQfaf = collateralValue * yearStLossRate / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      // Can only shrink, never grow beyond initial or current value
+      const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
+      cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
+      effectiveQfafValue = cappedQfaf;
+    }
 
     const result = calculateYear(
       year,
@@ -124,7 +137,7 @@ export function calculate(
       strategy // Pass full strategy for financing cost calculation
     );
 
-    years.push(result);
+    years.push({ ...result, qfafCashReturned: cashReturned });
     // Don't track QFAF growth after unwind
     qfafValue = (qfafDuration > 0 && year >= qfafDuration) ? 0 : result.qfafValue;
     collateralValue = result.collateralValue;

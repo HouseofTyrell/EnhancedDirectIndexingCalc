@@ -606,3 +606,96 @@ describe('ST Gain Leakage', () => {
     }
   });
 });
+
+describe('Dynamic QFAF Resizing', () => {
+  it('should resize QFAF each year to match decaying ST losses', () => {
+    const inputs = createInputs({
+      qfafSizingMode: 'dynamic',
+      qfafSizingYears: 1,
+      strategyId: 'overlay-45-45',
+    });
+    const result = calculate(inputs);
+
+    // Year 1: QFAF should match Year-1 losses (full size)
+    const y1StGains = result.years[0].stGainsGenerated;
+    const y1StLosses = result.years[0].stLossesHarvested;
+    expect(y1StGains).toBeCloseTo(y1StLosses, -2);
+
+    // Year 5: QFAF should be smaller (matching Year-5 rate)
+    const y5StGains = result.years[4].stGainsGenerated;
+    const y5StLosses = result.years[4].stLossesHarvested;
+    expect(y5StGains).toBeCloseTo(y5StLosses, -2);
+    expect(y5StGains).toBeLessThan(y1StGains);
+  });
+
+  it('should never increase QFAF beyond initial sizing', () => {
+    const inputs = createInputs({
+      qfafSizingMode: 'dynamic',
+      qfafSizingYears: 10,
+      strategyId: 'core-130-30',
+    });
+    const result = calculate(inputs);
+    const initialQfaf = result.sizing.qfafValue;
+
+    for (const year of result.years) {
+      if (year.stGainsGenerated > 0) {
+        const impliedQfaf = year.stGainsGenerated / 1.5;
+        expect(impliedQfaf).toBeLessThanOrEqual(initialQfaf + 1);
+      }
+    }
+  });
+
+  it('should record cash returned when QFAF shrinks', () => {
+    const inputs = createInputs({
+      qfafSizingMode: 'dynamic',
+      qfafSizingYears: 1,
+      strategyId: 'overlay-45-45',
+    });
+    const result = calculate(inputs);
+
+    expect(result.years[0].qfafCashReturned).toBeCloseTo(0, -2);
+    expect(result.years[1].qfafCashReturned).toBeGreaterThan(0);
+  });
+
+  it('should have near-zero ST gain leakage in dynamic mode', () => {
+    const inputs = createInputs({
+      qfafSizingMode: 'dynamic',
+      qfafSizingYears: 1,
+      strategyId: 'overlay-45-45',
+    });
+    const result = calculate(inputs);
+
+    for (const year of result.years) {
+      if (year.stGainsGenerated > 0) {
+        expect(year.stGainLeakage).toBeLessThan(year.stGainsGenerated * 0.05);
+      }
+    }
+  });
+
+  it('should still respect duration cutoff in dynamic mode', () => {
+    const inputs = createInputs({
+      qfafSizingMode: 'dynamic',
+      qfafDuration: 3,
+    });
+    const settings = { ...DEFAULT_SETTINGS, projectionYears: 6 };
+    const result = calculate(inputs, settings);
+
+    expect(result.years[0].stGainsGenerated).toBeGreaterThan(0);
+    expect(result.years[2].stGainsGenerated).toBeGreaterThan(0);
+    expect(result.years[3].stGainsGenerated).toBe(0);
+    expect(result.years[3].qfafCashReturned).toBe(0);
+  });
+
+  it('fixed mode should behave identically to current behavior', () => {
+    const inputsFixed = createInputs({ qfafSizingMode: 'fixed' });
+    const inputsDefault = createInputs();
+
+    const resultFixed = calculate(inputsFixed);
+    const resultDefault = calculate(inputsDefault);
+
+    for (let i = 0; i < resultFixed.years.length; i++) {
+      expect(resultFixed.years[i].taxSavings).toBe(resultDefault.years[i].taxSavings);
+      expect(resultFixed.years[i].stGainsGenerated).toBe(resultDefault.years[i].stGainsGenerated);
+    }
+  });
+});
