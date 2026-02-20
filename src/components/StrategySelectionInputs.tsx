@@ -512,6 +512,32 @@ export function StrategySelectionInputs({
                   Years QFAF runs before breakeven unwind — default: 5
                 </span>
               </div>
+
+              <div className="input-group">
+                <label htmlFor="sizingCushion">Sizing Cushion</label>
+                <input
+                  id="sizingCushion"
+                  type="range"
+                  min={0}
+                  max={0.10}
+                  step={0.01}
+                  value={inputs.qfafSizingCushion}
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                      onUpdateInput('qfafSizingCushion', val);
+                    }
+                  }}
+                />
+                <div className="slider-labels">
+                  <span>0%</span>
+                  <span className="current-value">{(inputs.qfafSizingCushion * 100).toFixed(0)}%</span>
+                  <span>10%</span>
+                </div>
+                <span className="input-hint">
+                  Reduces auto-sized QFAF for conservative sizing
+                </span>
+              </div>
             </div>
 
             {/* QFAF Annual Return (separate from collateral growth rate) */}
