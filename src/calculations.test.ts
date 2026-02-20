@@ -699,3 +699,54 @@ describe('Dynamic QFAF Resizing', () => {
     }
   });
 });
+
+describe('Dynamic vs Fixed QFAF Comparison', () => {
+  it('dynamic mode should produce less cumulative ST gain leakage than fixed', () => {
+    const baseInputs = {
+      strategyId: 'overlay-45-45' as const,
+      collateralAmount: 1000000,
+      qfafSizingYears: 1,
+      qfafDuration: 5,
+    };
+
+    const dynamicResult = calculate(createInputs({ ...baseInputs, qfafSizingMode: 'dynamic' }));
+    const fixedResult = calculate(createInputs({ ...baseInputs, qfafSizingMode: 'fixed' }));
+
+    const dynamicLeakage = dynamicResult.years.reduce((sum, y) => sum + y.stGainLeakage, 0);
+    const fixedLeakage = fixedResult.years.reduce((sum, y) => sum + y.stGainLeakage, 0);
+
+    expect(dynamicLeakage).toBeLessThan(fixedLeakage);
+  });
+
+  it('dynamic mode should return cash from QFAF over time', () => {
+    const inputs = createInputs({
+      qfafSizingMode: 'dynamic',
+      qfafSizingYears: 1,
+      strategyId: 'overlay-45-45',
+      qfafDuration: 5,
+    });
+    const result = calculate(inputs);
+
+    const totalCashReturned = result.years.reduce((sum, y) => sum + y.qfafCashReturned, 0);
+    expect(totalCashReturned).toBeGreaterThan(0);
+  });
+
+  it('dynamic mode should produce different year-by-year tax profiles than fixed', () => {
+    const baseInputs = {
+      strategyId: 'overlay-45-45' as const,
+      collateralAmount: 1000000,
+      qfafSizingYears: 1,
+      qfafDuration: 5,
+    };
+
+    const dynamicResult = calculate(createInputs({ ...baseInputs, qfafSizingMode: 'dynamic' }));
+    const fixedResult = calculate(createInputs({ ...baseInputs, qfafSizingMode: 'fixed' }));
+
+    // Dynamic resizing changes the QFAF ST gains each year, so at least some
+    // individual years should have different ST gains than fixed mode
+    const yearsDifferent = dynamicResult.years.filter(
+      (dy, i) => Math.abs(dy.stGainsGenerated - fixedResult.years[i].stGainsGenerated) > 1
+    );
+    expect(yearsDifferent.length).toBeGreaterThan(0);
+  });
+});
