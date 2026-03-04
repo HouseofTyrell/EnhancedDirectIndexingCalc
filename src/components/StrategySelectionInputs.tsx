@@ -87,6 +87,42 @@ export function StrategySelectionInputs({
         </div>
       </div>
 
+      <div className="input-pair">
+        <div className="input-group">
+          <label htmlFor="startMonth">Start Month</label>
+          <select
+            id="startMonth"
+            value={inputs.startMonth}
+            onChange={e => onUpdateInput('startMonth', parseInt(e.target.value, 10))}
+          >
+            {[
+              { value: 1, label: 'January', months: 12 },
+              { value: 2, label: 'February', months: 11 },
+              { value: 3, label: 'March', months: 10 },
+              { value: 4, label: 'April', months: 9 },
+              { value: 5, label: 'May', months: 8 },
+              { value: 6, label: 'June', months: 7 },
+              { value: 7, label: 'July', months: 6 },
+              { value: 8, label: 'August', months: 5 },
+              { value: 9, label: 'September', months: 4 },
+              { value: 10, label: 'October', months: 3 },
+              { value: 11, label: 'November', months: 2 },
+              { value: 12, label: 'December', months: 1 },
+            ].map(m => (
+              <option key={m.value} value={m.value}>
+                {m.label} ({m.months} {m.months === 1 ? 'month' : 'months'})
+              </option>
+            ))}
+          </select>
+          <span className="input-hint">
+            {inputs.startMonth === 1
+              ? 'Full calendar year'
+              : `Year 1 pro-rated to ${13 - inputs.startMonth} months`}
+          </span>
+        </div>
+        <div className="input-group" />
+      </div>
+
       {/* Strategy Rate Info - shows Year 1 effective rates (includes custom overrides) */}
       {currentStrategy && results.years[0] && (
         <div className="strategy-rates-info">

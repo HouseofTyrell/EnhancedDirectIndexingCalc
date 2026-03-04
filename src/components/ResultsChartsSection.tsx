@@ -28,6 +28,7 @@ interface ResultsChartsSectionProps {
   currentStrategy?: Strategy;
   taxRates: TaxRates;
   projectionYears: number;
+  startMonth?: number;
   onPrintRef?: (handler: () => void) => void;
   onExportRef?: (handler: () => void) => void;
 }
@@ -39,6 +40,7 @@ export function ResultsChartsSection({
   currentStrategy,
   taxRates,
   projectionYears,
+  startMonth,
   onPrintRef,
   onExportRef,
 }: ResultsChartsSectionProps) {
@@ -66,7 +68,7 @@ export function ResultsChartsSection({
     <>
       {/* Tax Benefits Chart */}
       <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
-        <TaxSavingsChart data={results.years} />
+        <TaxSavingsChart data={results.years} startMonth={startMonth} />
       </Suspense>
 
       {/* Table */}
@@ -82,6 +84,7 @@ export function ResultsChartsSection({
         <PortfolioValueChart
           data={results.years}
           trackingError={currentStrategy?.trackingError}
+          startMonth={startMonth}
         />
       </Suspense>
 

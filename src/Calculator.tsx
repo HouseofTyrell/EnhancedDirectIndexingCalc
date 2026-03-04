@@ -489,6 +489,7 @@ export function Calculator() {
           currentStrategy={currentStrategy}
           taxRates={taxRates}
           projectionYears={advancedSettings.projectionYears}
+          startMonth={inputs.startMonth}
           onPrintRef={(handler) => setPrintHandler(() => handler)}
           onExportRef={(handler) => setExportHandler(() => handler)}
         />
@@ -680,6 +681,7 @@ export function Calculator() {
                 currentStrategy={currentStrategy}
                 taxRates={taxRates}
                 projectionYears={advancedSettings.projectionYears}
+                startMonth={inputs.startMonth}
               />
             ),
           }] : []),

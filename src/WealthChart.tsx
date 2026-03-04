@@ -17,10 +17,19 @@ import { useDarkMode } from './hooks/useDarkMode';
 interface WealthChartProps {
   data: YearResult[];
   trackingError?: number; // Annual tracking error for confidence bands
+  startMonth?: number; // 1=January (full year), 2-12 = partial first year
+}
+
+function getYearLabel(yearNum: number, startMonth?: number): string {
+  if (yearNum === 1 && startMonth && startMonth > 1) {
+    const months = 13 - startMonth;
+    return `Year 1 (${months} mo)`;
+  }
+  return `Year ${yearNum}`;
 }
 
 // Memoized chart component to prevent unnecessary re-renders (016)
-export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: WealthChartProps) {
+export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data, startMonth }: WealthChartProps) {
   const { isDark } = useDarkMode();
 
   // Memoize chart data transformation with O(n) cumulative calculation (007)
@@ -29,14 +38,14 @@ export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: Wea
     return data.map(year => {
       cumulativeSavings += year.taxSavings;
       return {
-        year: `Year ${year.year}`,
+        year: getYearLabel(year.year, startMonth),
         'Tax Savings': year.taxSavings,
         'Cumulative Tax Savings': cumulativeSavings,
         'Usable Ordinary Loss': year.usableOrdinaryLoss,
         'NOL Carryforward': year.nolCarryforward,
       };
     });
-  }, [data]);
+  }, [data, startMonth]);
 
   return (
     <div className="chart-container">
@@ -98,6 +107,7 @@ export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data }: Wea
 export const PortfolioValueChart = React.memo(function PortfolioValueChart({
   data,
   trackingError = 0.02,
+  startMonth,
 }: WealthChartProps) {
   const { isDark } = useDarkMode();
 
@@ -112,7 +122,7 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
         const lowerBound = year.totalValue * (1 - annualizedError);
 
         return {
-          year: `Year ${year.year}`,
+          year: getYearLabel(year.year, startMonth),
           'Total Value': year.totalValue,
           'QFAF Value': year.qfafValue,
           'Collateral Value': year.collateralValue,
@@ -121,7 +131,7 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
           bandSize: upperBound - lowerBound,
         };
       }),
-    [data, trackingError]
+    [data, trackingError, startMonth]
   );
 
   // Custom tooltip to format values cleanly
@@ -233,6 +243,6 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
 });
 
 // Keep the old export for backwards compatibility
-export const WealthChart = React.memo(function WealthChart({ data }: WealthChartProps) {
-  return <TaxSavingsChart data={data} />;
+export const WealthChart = React.memo(function WealthChart({ data, startMonth }: WealthChartProps) {
+  return <TaxSavingsChart data={data} startMonth={startMonth} />;
 });
