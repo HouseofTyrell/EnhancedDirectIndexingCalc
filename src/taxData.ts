@@ -269,4 +269,7 @@ export const DEFAULTS: CalculatorInputs = {
 
   // QFAF sizing mode: dynamic resizes each year (recommended)
   qfafSizingMode: 'dynamic' as const,
+
+  // Start month: January by default (full year)
+  startMonth: 1,
 };

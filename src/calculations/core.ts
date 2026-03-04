@@ -107,6 +107,9 @@ export function calculate(
   const minProjection = qfafDuration > 0 ? qfafDuration + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
 
+  // Partial year: month 1 = full year (12/12), month 4 = 9/12, month 12 = 1/12
+  const yearFraction = (13 - (inputs.startMonth ?? 1)) / 12;
+
   for (let year = 1; year <= effectiveProjectionYears; year++) {
     // Zero out QFAF after duration expires (breakeven unwind)
     let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
@@ -115,7 +118,8 @@ export function calculate(
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0) {
       const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-      const neededQfaf = collateralValue * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      const effectiveYearFraction = year === 1 ? yearFraction : 1.0;
+      const neededQfaf = collateralValue * yearStLossRate * effectiveYearFraction * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
       // Can only shrink, never grow beyond initial or current value
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -134,7 +138,8 @@ export function calculate(
       taxRates,
       settings,
       undefined, // yearIncome (not overridden)
-      strategy // Pass full strategy for financing cost calculation
+      strategy, // Pass full strategy for financing cost calculation
+      year === 1 ? yearFraction : 1.0 // Partial year applies to Year 1 only
     );
 
     years.push({ ...result, qfafCashReturned: cashReturned });
@@ -165,23 +170,24 @@ export function calculateYear(
   taxRates: TaxRates,
   settings: AdvancedSettings,
   yearIncome?: number, // Optional income override for this year
-  fullStrategy?: Strategy // Full strategy object for financing cost calculation
+  fullStrategy?: Strategy, // Full strategy object for financing cost calculation
+  yearFraction: number = 1.0 // Partial year: (13 - startMonth) / 12, applied to Year 1 only
 ): YearResult {
   // Use year income override if provided, otherwise use base annual income
   const effectiveIncome = yearIncome ?? inputs.annualIncome;
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate (default 150% of MV each)
   // Use safeNumber to prevent NaN/Infinity propagation (004)
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
-  const stGainsGenerated = safeNumber(qfafValue * qfafMultiplier);
-  const ordinaryLossesGenerated = safeNumber(qfafValue * qfafMultiplier);
+  const stGainsGenerated = safeNumber(qfafValue * qfafMultiplier * yearFraction);
+  const ordinaryLossesGenerated = safeNumber(qfafValue * qfafMultiplier * yearFraction);
 
   // Collateral generates ST losses and LT gains per strategy rates
   // Uses custom rates if set, otherwise applies 7% annual decay
   // Also applies wash sale disallowance (typically 5-15% disallowed)
   const effectiveStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-  const grossStLosses = collateralValue * effectiveStLossRate;
+  const grossStLosses = collateralValue * effectiveStLossRate * yearFraction;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = safeNumber(collateralValue * strategy.ltGainRate);
+  const ltGainsRealized = safeNumber(collateralValue * strategy.ltGainRate * yearFraction);
 
   // Net ST position (should be ~0 with proper auto-sizing)
   const grossNetSt = stGainsGenerated - stLossesHarvested;
@@ -297,8 +303,8 @@ export function calculateYear(
     : 0;
   const qfafGrowthRateWithFees = qfafBaseReturn - totalFinancingCost;
   const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafGrowthRateWithFees : 0;
-  const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate));
-  const newCollateralValue = safeNumber(collateralValue * (1 + growthRate));
+  const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
+  const newCollateralValue = safeNumber(collateralValue * (1 + growthRate * yearFraction));
 
   // Calculate total income offset for this year
   // This is the sum of all deductions that reduce taxable income

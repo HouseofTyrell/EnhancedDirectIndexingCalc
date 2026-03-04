@@ -42,6 +42,9 @@ export interface CalculatorInputs {
 
   // QFAF sizing mode: 'fixed' = sized once at inception, 'dynamic' = resized each year to match EDI losses
   qfafSizingMode: 'fixed' | 'dynamic';
+
+  // Partial year start: month the strategy begins (1=January=full year, 4=April=9 months)
+  startMonth: number;
 }
 
 export interface CalculatedSizing {
