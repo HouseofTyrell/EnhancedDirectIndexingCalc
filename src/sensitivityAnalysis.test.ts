@@ -278,9 +278,9 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, worstCase);
 
       // Should still have positive savings, but much lower
-      // With year-by-year rates, the worst case produces ~51% of base
+      // With year-by-year rates and strategy wind-down, the worst case produces ~55% of base
       expect(result.summary.totalTaxSavings).toBeLessThan(
-        baseResult.summary.totalTaxSavings * 0.55
+        baseResult.summary.totalTaxSavings * 0.56
       );
       expect(result.summary.totalTaxSavings).toBeGreaterThan(0);
     });

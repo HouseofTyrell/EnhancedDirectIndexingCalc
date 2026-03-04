@@ -119,6 +119,9 @@ export function calculateWithOverrides(
         SECTION_461L_LIMITS[inputs.filingStatus],
     };
 
+    // After strategy duration, zero out tax-harvesting activity
+    const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
+
     const result = calculateYear(
       year,
       effectiveQfafValue,
@@ -132,7 +135,8 @@ export function calculateWithOverrides(
       settings,
       yearIncome, // Pass the year-specific income
       undefined, // fullStrategy
-      year === 1 ? yearFraction : 1.0
+      year === 1 ? yearFraction : 1.0,
+      strategyActive
     );
 
     years.push({ ...result, qfafCashReturned: cashReturned });

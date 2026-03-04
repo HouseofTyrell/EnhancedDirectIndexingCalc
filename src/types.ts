@@ -111,6 +111,14 @@ export interface YearResult {
   incomeOffsetAmount: number; // Total income offset: ordinary loss + NOL used + capital loss used
   maxIncomeOffsetCapacity: number; // Max income that could be offset (useful for option exercise planning)
 
+  // Tax benefit breakdown (gross benefits and costs)
+  ordinaryLossBenefit: number; // usableOrdinaryLoss × combined ST rate
+  nolUsageBenefit: number; // nolUsed × combined ST rate
+  stToLtConversionBenefit: number; // min(ST gains, ST losses) × (ST rate - LT rate)
+  capitalLossBenefit: number; // capitalLossUsedAgainstIncome × combined ST rate
+  ltGainCost: number; // ltGainsRealized × combined LT rate
+  remainingStGainCost: number; // max(0, netStGainLoss) × combined ST rate
+
   // Component-specific tax benefits (for view mode breakdown)
   qfafTaxBenefit: number; // Ordinary loss + NOL usage + ST→LT conversion benefit
   collateralTaxBenefit: number; // Capital loss benefit - LT gain cost - remaining ST cost
@@ -119,6 +127,8 @@ export interface YearResult {
   stGainLeakage: number;
   // Cash returned from QFAF resizing (dynamic mode only, 0 in fixed mode)
   qfafCashReturned: number;
+  // Whether the strategy is actively generating new tax events this year
+  strategyActive: boolean;
 }
 
 export interface CalculationResult {
