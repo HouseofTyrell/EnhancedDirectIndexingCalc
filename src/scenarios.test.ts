@@ -24,6 +24,7 @@ function createClientProfile(overrides: Partial<CalculatorInputs> = {}): Calcula
     qfafSizingCushion: 0,
     qfafDuration: 10,
     qfafSizingMode: 'fixed',
+    startMonth: 1,
     existingStLossCarryforward: 0,
     existingLtLossCarryforward: 0,
     existingNolCarryforward: 0,

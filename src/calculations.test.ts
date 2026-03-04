@@ -35,6 +35,7 @@ function createInputs(overrides: Partial<CalculatorInputs> = {}): CalculatorInpu
     qfafSizingCushion: 0,
     qfafDuration: 10,
     qfafSizingMode: 'fixed',
+    startMonth: 1,
     ...overrides,
   };
 }
