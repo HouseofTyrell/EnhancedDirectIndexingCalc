@@ -76,6 +76,15 @@ function detectInputChanges(
     });
   }
 
+  if (pinned.startMonth !== current.startMonth) {
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    changes.push({
+      label: 'Start Month',
+      pinnedDisplay: MONTH_NAMES[pinned.startMonth - 1] ?? `${pinned.startMonth}`,
+      currentDisplay: MONTH_NAMES[current.startMonth - 1] ?? `${current.startMonth}`,
+    });
+  }
+
   if (pinned.qfafEnabled !== current.qfafEnabled) {
     changes.push({
       label: 'QFAF',
