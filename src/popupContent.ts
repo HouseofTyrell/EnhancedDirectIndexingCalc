@@ -325,10 +325,12 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 
   'col-nol-used': {
-    title: 'NOL Used',
-    definition: 'Net Operating Loss carryforward applied this year.',
-    formula: 'min(NOL Carryforward, 80% × Taxable Income)',
-    impact: 'Reduces taxable income, but limited to 80% of pre-NOL taxable income per TCJA rules.',
+    title: 'NOL Applied',
+    definition:
+      'Amount of prior-year NOL carryforward applied against this year\'s taxable income. Year 1 is always $0 because NOL generated in the current year cannot be used until the following year.',
+    formula: 'min(Start-of-Year NOL Balance, 80% × Pre-NOL Taxable Income)',
+    impact:
+      'Reduces taxable income, but limited to 80% of pre-NOL taxable income per TCJA rules. When ordinary losses already reduce income near zero, little NOL can be applied.',
   },
 
   'col-tax-savings': {
@@ -374,6 +376,15 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     formula: 'QFAF ST Gains - Collateral ST Losses + Collateral LT Gains',
     impact:
       'With proper auto-sizing, net capital ≈ LT gains only (ST gains and losses offset). This is what flows to your tax return.',
+  },
+
+  'col-max-offset': {
+    title: 'Max Offset Capacity',
+    definition:
+      'Theoretical maximum income that could be sheltered from tax this year if you had a large income event (e.g., stock option exercise). Useful for planning when to realize additional income.',
+    formula: '§461(l) Limit + Start-of-Year NOL Balance + Capital Loss Limit ($3K/$1.5K)',
+    impact:
+      'Higher values indicate better years to exercise stock options or realize other taxable income. The §461(l) limit renews annually; the NOL balance accumulates over time.',
   },
 
   'col-nol-activity': {

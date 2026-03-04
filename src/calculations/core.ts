@@ -313,17 +313,16 @@ export function calculateYear(
   );
 
   // Calculate maximum income offset capacity for this year
-  // This shows how much income COULD be offset if the taxpayer had additional income
-  // (useful for planning stock option exercises or vesting)
+  // This shows the theoretical max income that COULD be sheltered if the taxpayer
+  // had unlimited additional income (useful for planning stock option exercises)
   // Components:
-  // 1. Ordinary loss (up to 461(l) limit)
-  // 2. NOL carryforward (can offset 80% of additional taxable income)
-  // 3. Capital loss carryforward (up to $3k or remaining carryforward)
+  // 1. Section 461(l) limit: max ordinary loss deductible (annual renewable capacity)
+  // 2. Start-of-year NOL carryforward: banked NOL available this year
+  //    (with unlimited income, 80% rule is not binding since 80% of ∞ > any NOL balance)
+  // 3. Capital loss limit: statutory $3k/$1.5k annual deduction
   const capitalLossLimit = CAPITAL_LOSS_LIMITS[inputs.filingStatus];
-  const remainingCapitalLoss = newStCarryforward + newLtCarryforward;
-  const maxCapitalLossOffset = Math.min(capitalLossLimit, remainingCapitalLoss);
   const maxIncomeOffsetCapacity = safeNumber(
-    usableOrdinaryLoss + newNolCarryforward + maxCapitalLossOffset
+    taxRates.section461Limit + nolCarryforward + capitalLossLimit
   );
 
   return {
