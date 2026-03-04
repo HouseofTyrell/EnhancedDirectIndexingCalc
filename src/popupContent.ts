@@ -407,19 +407,19 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 
   'col-max-offset': {
-    title: 'Max Offset Capacity',
+    title: 'Offset Capacity',
     definition:
-      'Theoretical maximum income that could be sheltered from tax this year if you had a large income event (e.g., stock option exercise). Useful for planning when to realize additional income.',
+      'Maximum income that could be sheltered from tax this year. Useful for planning when to exercise stock options or realize other taxable income. Click to expand for NOL details.',
     formula: '§461(l) Limit + Start-of-Year NOL Balance + Capital Loss Limit ($3K/$1.5K)',
     impact:
-      'Higher values indicate better years to exercise stock options or realize other taxable income. The §461(l) limit renews annually; the NOL balance accumulates over time.',
+      'Higher values indicate better years to realize additional taxable income. The §461(l) limit renews annually; the NOL balance accumulates over time.',
   },
 
   'col-nol-activity': {
-    title: 'NOL Activity',
+    title: 'NOL Change',
     definition:
-      'Net change in NOL for the year. Shows whether NOL is building (+) or being used (−). Click to expand for details.',
-    formula: 'NOL Generated (Excess Ordinary Loss) - NOL Used This Year',
+      'Net change in NOL for the year. Shows whether NOL is building (+) or being used (−).',
+    formula: 'NOL Generated (Excess Ordinary Loss) − NOL Used This Year',
     impact:
       'Positive values mean NOL is accumulating faster than it can be used. NOL usage is limited to 80% of taxable income per year.',
   },
