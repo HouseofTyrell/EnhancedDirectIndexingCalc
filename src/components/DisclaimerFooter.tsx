@@ -54,6 +54,7 @@ export function DisclaimerFooter() {
         investment, tax, or legal advice. Past performance does not guarantee future results.
       </p>
 
+      <div className="version-indicator">v1.1.0</div>
     </footer>
   );
 }

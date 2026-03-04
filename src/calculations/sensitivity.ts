@@ -355,11 +355,11 @@ function calculateYearWithSensitivity(
   );
 
   // Calculate maximum income offset capacity for this year
+  // Uses section 461(l) limit + start-of-year NOL + capital loss limit
+  // (see core.ts calculateYear for detailed explanation)
   const capitalLossLimit = CAPITAL_LOSS_LIMITS[inputs.filingStatus];
-  const remainingCapitalLoss = newStCarryforward + newLtCarryforward;
-  const maxCapitalLossOffset = Math.min(capitalLossLimit, remainingCapitalLoss);
   const maxIncomeOffsetCapacity = safeNumber(
-    usableOrdinaryLoss + newNolCarryforward + maxCapitalLossOffset
+    taxRates.section461Limit + nolCarryforward + capitalLossLimit
   );
 
   return {

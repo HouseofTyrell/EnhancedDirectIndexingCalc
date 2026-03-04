@@ -458,6 +458,15 @@ describe('Income Offset Tracking', () => {
       }
     });
 
+    it('should equal section461Limit + startOfYearNOL + capitalLossLimit', () => {
+      // Formula: section461Limit + start-of-year NOL + capitalLossLimit
+      // For MFJ: 461(l) = $512K, capital loss limit = $3K
+      const result = calculate(baseClient, DEFAULT_SETTINGS);
+
+      // Year 1: no prior NOL, so capacity = 461 limit + 0 + 3000
+      expect(result.years[0].maxIncomeOffsetCapacity).toBe(512000 + 0 + 3000);
+    });
+
     it('should show higher capacity in years with NOL carryforward buildup', () => {
       // High collateral generates NOL that builds up over time
       const highCollateral: CalculatorInputs = {
@@ -467,17 +476,17 @@ describe('Income Offset Tracking', () => {
 
       const result = calculate(highCollateral, DEFAULT_SETTINGS);
 
-      // Year 1 capacity is mainly from ordinary losses
+      // Year 1 capacity: 461 limit + 0 NOL + 3K capital loss
       const year1Capacity = result.years[0].maxIncomeOffsetCapacity;
 
-      // Year 3+ should have accumulated NOL increasing capacity
+      // Year 3 should have accumulated NOL from years 1-2, increasing capacity
       const year3Capacity = result.years[2].maxIncomeOffsetCapacity;
 
-      // Later years typically have higher capacity due to NOL buildup
-      expect(year3Capacity).toBeGreaterThan(year1Capacity * 0.5); // At least meaningful
+      // Later years have higher capacity due to NOL buildup in prior years
+      expect(year3Capacity).toBeGreaterThan(year1Capacity);
     });
 
-    it('should include NOL carryforward in max capacity calculation', () => {
+    it('should include existing NOL carryforward in max capacity', () => {
       // Start with existing NOL
       const withNol: CalculatorInputs = {
         ...baseClient,
@@ -486,10 +495,9 @@ describe('Income Offset Tracking', () => {
 
       const result = calculate(withNol, DEFAULT_SETTINGS);
 
-      // Year 1 capacity should include the existing NOL
-      expect(result.years[0].maxIncomeOffsetCapacity).toBeGreaterThan(
-        result.years[0].usableOrdinaryLoss
-      );
+      // Year 1 capacity should include the existing $500K NOL
+      // = 461 limit ($512K) + existing NOL ($500K) + capital loss ($3K)
+      expect(result.years[0].maxIncomeOffsetCapacity).toBe(512000 + 500000 + 3000);
     });
 
     it('should help identify optimal years for option exercise', () => {

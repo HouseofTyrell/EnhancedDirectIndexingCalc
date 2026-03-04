@@ -244,13 +244,13 @@ export function ResultsTable({
                   {expandNOL && (
                     <>
                       <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-nol-used">Used</InfoText>
+                        <InfoText contentKey="col-nol-used">Applied</InfoText>
                       </th>
                       <th className="col-detail qfaf-col">
                         <InfoText contentKey="col-nol-carryforward">Carryover</InfoText>
                       </th>
                       <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-max-offset">Max Offset</InfoText>
+                        <InfoText contentKey="col-max-offset">Max Capacity</InfoText>
                       </th>
                     </>
                   )}
