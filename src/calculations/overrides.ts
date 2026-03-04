@@ -71,6 +71,8 @@ export function calculateWithOverrides(
   const minProjection = qfafDuration > 0 ? qfafDuration + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
 
+  const yearFraction = (13 - (inputs.startMonth ?? 1)) / 12;
+
   for (let year = 1; year <= effectiveProjectionYears; year++) {
     const override = overrideMap.get(year);
 
@@ -97,8 +99,9 @@ export function calculateWithOverrides(
     // Dynamic resizing: shrink QFAF to match this year's collateral ST losses
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0) {
+      const effectiveYearFraction = year === 1 ? yearFraction : 1.0;
       const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-      const neededQfaf = collateralValue * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      const neededQfaf = collateralValue * yearStLossRate * effectiveYearFraction * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
       // Can only shrink, never grow beyond initial or current value
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -127,7 +130,9 @@ export function calculateWithOverrides(
       strategy,
       yearTaxRates,
       settings,
-      yearIncome // Pass the year-specific income
+      yearIncome, // Pass the year-specific income
+      undefined, // fullStrategy
+      year === 1 ? yearFraction : 1.0
     );
 
     years.push({ ...result, qfafCashReturned: cashReturned });
