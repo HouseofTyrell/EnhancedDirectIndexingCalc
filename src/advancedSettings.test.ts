@@ -102,56 +102,51 @@ describe('Projection Years Setting', () => {
 
   describe('Tax alpha calculation with different projection periods', () => {
     it('should adjust tax alpha calculation for different projection periods', () => {
-      // Both 5yr and 10yr auto-extend to 12 with qfafDuration=10, so use 15yr vs 20yr
-      const settings15yr: AdvancedSettings = {
+      // Tax alpha = totalTaxSavings / totalExposure / qfafDuration
+      // With strategy wind-down, post-QFAF years only have carryforward usage
+      const settings12yr: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
-        projectionYears: 15,
-      };
-      const settings20yr: AdvancedSettings = {
-        ...DEFAULT_SETTINGS,
-        projectionYears: 20,
+        projectionYears: 12, // auto-extended from qfafDuration=10+2
       };
 
-      const result15yr = calculate(baseClient, settings15yr);
-      const result20yr = calculate(baseClient, settings20yr);
+      const result = calculate(baseClient, settings12yr);
 
-      // Tax alpha is annualized, so should be similar but may differ due to compounding
-      expect(result15yr.summary.effectiveTaxAlpha).toBeGreaterThan(0);
-      expect(result20yr.summary.effectiveTaxAlpha).toBeGreaterThan(0);
+      // Tax alpha should be positive and meaningful
+      expect(result.summary.effectiveTaxAlpha).toBeGreaterThan(0);
 
-      // Verify they're different (different time periods should give different annualized results)
-      expect(result15yr.summary.effectiveTaxAlpha).not.toBeCloseTo(
-        result20yr.summary.effectiveTaxAlpha,
-        5
-      );
+      // Post-strategy years (11-12) should have no new tax events
+      expect(result.years[10].strategyActive).toBe(false);
+      expect(result.years[11].strategyActive).toBe(false);
+      expect(result.years[10].stGainsGenerated).toBe(0);
+      expect(result.years[10].stLossesHarvested).toBe(0);
     });
 
-    it('should produce different total tax savings with different projection lengths', () => {
-      // Use short qfafDuration so both projections run QFAF for the same duration
-      // but 10yr captures more post-QFAF collateral activity
+    it('should produce different total tax savings with different QFAF durations', () => {
+      // Use different QFAF durations to get different active strategy periods
       const shortDurationClient: CalculatorInputs = {
         ...baseClient,
-        qfafDuration: 3, // Short QFAF → min projection = 5
+        qfafDuration: 3,
+      };
+      const longDurationClient: CalculatorInputs = {
+        ...baseClient,
+        qfafDuration: 5,
       };
 
-      const settings5yr: AdvancedSettings = {
-        ...DEFAULT_SETTINGS,
-        projectionYears: 5,
-      };
-      const settings10yr: AdvancedSettings = {
+      const settings: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
         projectionYears: 10,
       };
 
-      const result5yr = calculate(shortDurationClient, settings5yr);
-      const result10yr = calculate(shortDurationClient, settings10yr);
+      const result3yr = calculate(shortDurationClient, settings);
+      const result5yr = calculate(longDurationClient, settings);
 
-      // Both have QFAF for 3 years. Post-QFAF years may produce negative taxSavings
-      // (tax drag from collateral LT gains exceeding available offsets), so the
-      // 10yr total can be lower than the 5yr total. The key assertion is that the
-      // projection lengths produce different totals due to the extra years.
-      expect(result5yr.summary.totalTaxSavings).not.toEqual(
-        result10yr.summary.totalTaxSavings
+      // More QFAF years = more active strategy years = different total savings
+      expect(result3yr.summary.totalTaxSavings).not.toEqual(
+        result5yr.summary.totalTaxSavings
+      );
+      // 5-year QFAF should produce more savings than 3-year
+      expect(result5yr.summary.totalTaxSavings).toBeGreaterThan(
+        result3yr.summary.totalTaxSavings
       );
     });
   });

@@ -48,6 +48,7 @@ export function ResultsTable({
   const [expandPortfolio, setExpandPortfolio] = useState(false);
   const [expandCapital, setExpandCapital] = useState(false);
   const [expandNOL, setExpandNOL] = useState(false);
+  const [expandSavings, setExpandSavings] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('combined');
 
@@ -61,6 +62,7 @@ export function ResultsTable({
     setExpandPortfolio(newState);
     setExpandCapital(newState);
     setExpandNOL(newState);
+    setExpandSavings(newState);
   };
 
   // View mode helpers
@@ -98,8 +100,12 @@ export function ResultsTable({
     }
 
     cols += 1; // Tax Savings column
+    if (expandSavings) cols += 4; // Ord Loss Benefit, NOL Benefit, Conversion, LT Cost
     return cols;
   };
+
+  // Savings breakdown columns count for starting row
+  const savingsDetailCols = expandSavings ? 4 : 0;
 
   return (
     <div className="table-container">
@@ -257,11 +263,38 @@ export function ResultsTable({
                 </>
               )}
 
-              <th className="col-savings">
-                <InfoText contentKey="col-tax-savings">
-                  {viewMode === 'qfaf-only' ? 'QFAF Benefit' : viewMode === 'collateral-only' ? 'Coll. Benefit' : 'Savings'}
-                </InfoText>
+              {/* Tax Savings - Collapsible to show benefit breakdown */}
+              <th
+                className="col-expandable col-savings"
+                onClick={() => setExpandSavings(!expandSavings)}
+              >
+                <span className="expandable-header">
+                  <span className="expand-icon">
+                    {expandSavings ? <ChevronDown /> : <ChevronRight />}
+                  </span>
+                  <InfoText contentKey="col-tax-savings">
+                    {viewMode === 'qfaf-only' ? 'QFAF Benefit' : viewMode === 'collateral-only' ? 'Coll. Benefit' : 'Savings'}
+                  </InfoText>
+                </span>
               </th>
+
+              {/* Expanded Savings Breakdown */}
+              {expandSavings && (
+                <>
+                  <th className="col-detail benefit-col">
+                    <InfoText contentKey="col-ord-loss-benefit">Ord. Loss</InfoText>
+                  </th>
+                  <th className="col-detail benefit-col">
+                    <InfoText contentKey="col-nol-benefit">NOL</InfoText>
+                  </th>
+                  <th className="col-detail benefit-col">
+                    <InfoText contentKey="col-conversion-benefit">ST→LT</InfoText>
+                  </th>
+                  <th className="col-detail cost-col">
+                    <InfoText contentKey="col-lt-gain-cost">LT Cost</InfoText>
+                  </th>
+                </>
+              )}
             </tr>
           </thead>
 
@@ -309,6 +342,13 @@ export function ResultsTable({
                 </>
               )}
               <td className="starting-note">—</td>
+              {expandSavings && (
+                <>
+                  {Array.from({ length: savingsDetailCols }).map((_, i) => (
+                    <td key={i} className="starting-note">—</td>
+                  ))}
+                </>
+              )}
             </tr>
 
             {data.map(year => {
@@ -336,9 +376,15 @@ export function ResultsTable({
                     ? year.collateralValue
                     : year.totalValue;
 
+              // Post-strategy wind-down: dim rows where strategy is no longer active
+              const isWindDown = !year.strategyActive;
+
               return (
-                <tr key={year.year}>
-                  <td className="year-cell">{year.year}</td>
+                <tr key={year.year} className={isWindDown ? 'wind-down-row' : ''}>
+                  <td className="year-cell">
+                    {year.year}
+                    {isWindDown && <span className="wind-down-badge" title="Strategy ended — carryforward usage only">CF</span>}
+                  </td>
                   <td>{formatCurrency(portfolioValue)}</td>
 
                   {/* Expanded Portfolio Details - only in combined mode */}
@@ -352,9 +398,11 @@ export function ResultsTable({
                   {/* Net Capital - show in combined and collateral-only */}
                   {showCollateral && (
                     <td className={netCapital >= 0 ? 'positive' : 'negative'}>
-                      {netCapital >= 0
-                        ? formatCurrency(netCapital)
-                        : `(${formatCurrency(Math.abs(netCapital))})`}
+                      {isWindDown
+                        ? '—'
+                        : netCapital >= 0
+                          ? formatCurrency(netCapital)
+                          : `(${formatCurrency(Math.abs(netCapital))})`}
                     </td>
                   )}
 
@@ -362,28 +410,32 @@ export function ResultsTable({
                   {expandCapital && showCollateral && (
                     <>
                       <td className="negative collateral-col">
-                        ({formatCurrency(year.stLossesHarvested)})
+                        {isWindDown ? '—' : `(${formatCurrency(year.stLossesHarvested)})`}
                       </td>
-                      <td className="collateral-col">{formatCurrency(year.ltGainsRealized)}</td>
+                      <td className="collateral-col">
+                        {isWindDown ? '—' : formatCurrency(year.ltGainsRealized)}
+                      </td>
                     </>
                   )}
 
                   {/* QFAF ST Gains - show in qfaf-only OR expanded in combined */}
                   {viewMode === 'qfaf-only' && (
                     <td className="positive qfaf-col">
-                      {formatCurrency(year.stGainsGenerated)}
+                      {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
                     </td>
                   )}
                   {expandCapital && viewMode === 'combined' && qfafEnabled && (
                     <td className="positive qfaf-col">
-                      {formatCurrency(year.stGainsGenerated)}
+                      {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
                     </td>
                   )}
 
                   {/* QFAF columns - show in combined and qfaf-only */}
                   {showQfaf && qfafEnabled && (
                     <>
-                      <td className="positive">{formatCurrency(year.usableOrdinaryLoss)}</td>
+                      <td className="negative">
+                        {isWindDown ? '—' : `(${formatCurrency(year.usableOrdinaryLoss)})`}
+                      </td>
 
                       {/* NOL Activity (collapsed view) */}
                       <td className={nolNet > 0 ? 'nol-generated' : nolNet < 0 ? 'nol-used' : ''}>
@@ -397,8 +449,8 @@ export function ResultsTable({
                       {/* Expanded NOL Details */}
                       {expandNOL && (
                         <>
-                          <td className="positive qfaf-col">
-                            {formatCurrency(year.nolUsedThisYear)}
+                          <td className={year.nolUsedThisYear > 0 ? 'positive qfaf-col' : 'qfaf-col'}>
+                            {year.nolUsedThisYear > 0 ? formatCurrency(year.nolUsedThisYear) : '—'}
                           </td>
                           <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
                           <td className="qfaf-col highlight">
@@ -409,11 +461,42 @@ export function ResultsTable({
                     </>
                   )}
 
+                  {/* Tax Savings (collapsed: net number) */}
                   <td className={`highlight ${displayedBenefit < 0 ? 'negative' : ''}`}>
                     {displayedBenefit < 0
                       ? `(${formatCurrency(Math.abs(displayedBenefit))})`
                       : formatCurrency(displayedBenefit)}
                   </td>
+
+                  {/* Expanded Savings Breakdown */}
+                  {expandSavings && (
+                    <>
+                      {/* Ordinary Loss Benefit */}
+                      <td className="positive benefit-col">
+                        {year.ordinaryLossBenefit > 0
+                          ? formatCurrency(year.ordinaryLossBenefit)
+                          : '—'}
+                      </td>
+                      {/* NOL Usage Benefit */}
+                      <td className="positive benefit-col">
+                        {year.nolUsageBenefit > 0
+                          ? formatCurrency(year.nolUsageBenefit)
+                          : '—'}
+                      </td>
+                      {/* ST→LT Conversion Benefit */}
+                      <td className="positive benefit-col">
+                        {year.stToLtConversionBenefit > 0
+                          ? formatCurrency(year.stToLtConversionBenefit)
+                          : '—'}
+                      </td>
+                      {/* LT Gain Cost */}
+                      <td className="negative cost-col">
+                        {year.ltGainCost > 0
+                          ? `(${formatCurrency(year.ltGainCost)})`
+                          : '—'}
+                      </td>
+                    </>
+                  )}
                 </tr>
               );
             })}
@@ -453,7 +536,8 @@ export function ResultsTable({
             <em>
               Note: NOL appears to accumulate because new excess ordinary losses are generated each
               year. Check the "NOL Used" column to see how much NOL offsets income annually (up to
-              80% of taxable income).
+              80% of taxable income). Rows marked "CF" are post-strategy wind-down years where only
+              carryforward usage continues.
             </em>
           </p>
         )}

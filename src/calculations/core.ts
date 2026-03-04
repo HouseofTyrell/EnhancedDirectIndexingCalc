@@ -126,6 +126,10 @@ export function calculate(
       effectiveQfafValue = cappedQfaf;
     }
 
+    // After strategy duration, zero out collateral tax-harvesting activity
+    // Portfolio still grows but no new ST losses or LT gains are generated
+    const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
+
     const result = calculateYear(
       year,
       effectiveQfafValue,
@@ -139,7 +143,8 @@ export function calculate(
       settings,
       undefined, // yearIncome (not overridden)
       strategy, // Pass full strategy for financing cost calculation
-      year === 1 ? yearFraction : 1.0 // Partial year applies to Year 1 only
+      year === 1 ? yearFraction : 1.0, // Partial year applies to Year 1 only
+      strategyActive
     );
 
     years.push({ ...result, qfafCashReturned: cashReturned });
@@ -171,23 +176,25 @@ export function calculateYear(
   settings: AdvancedSettings,
   yearIncome?: number, // Optional income override for this year
   fullStrategy?: Strategy, // Full strategy object for financing cost calculation
-  yearFraction: number = 1.0 // Partial year: (13 - startMonth) / 12, applied to Year 1 only
+  yearFraction: number = 1.0, // Partial year: (13 - startMonth) / 12, applied to Year 1 only
+  strategyActive: boolean = true // Whether the strategy is actively generating tax events
 ): YearResult {
   // Use year income override if provided, otherwise use base annual income
   const effectiveIncome = yearIncome ?? inputs.annualIncome;
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate (default 150% of MV each)
   // Use safeNumber to prevent NaN/Infinity propagation (004)
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
-  const stGainsGenerated = safeNumber(qfafValue * qfafMultiplier * yearFraction);
-  const ordinaryLossesGenerated = safeNumber(qfafValue * qfafMultiplier * yearFraction);
+  const stGainsGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
+  const ordinaryLossesGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
 
   // Collateral generates ST losses and LT gains per strategy rates
   // Uses custom rates if set, otherwise applies 7% annual decay
   // Also applies wash sale disallowance (typically 5-15% disallowed)
+  // When strategy is inactive (post-duration), no new harvesting occurs
   const effectiveStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-  const grossStLosses = collateralValue * effectiveStLossRate * yearFraction;
+  const grossStLosses = strategyActive ? collateralValue * effectiveStLossRate * yearFraction : 0;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = safeNumber(collateralValue * strategy.ltGainRate * yearFraction);
+  const ltGainsRealized = strategyActive ? safeNumber(collateralValue * strategy.ltGainRate * yearFraction) : 0;
 
   // Net ST position (should be ~0 with proper auto-sizing)
   const grossNetSt = stGainsGenerated - stLossesHarvested;
@@ -350,9 +357,16 @@ export function calculateYear(
     effectiveStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
+    ordinaryLossBenefit,
+    nolUsageBenefit,
+    stToLtConversionBenefit,
+    capitalLossBenefit,
+    ltGainCost,
+    remainingStGainCost,
     qfafTaxBenefit,
     collateralTaxBenefit,
     stGainLeakage,
     qfafCashReturned: 0, // Set by the calling loop in dynamic mode
+    strategyActive,
   };
 }

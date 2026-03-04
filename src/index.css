@@ -4588,6 +4588,54 @@ tfoot td {
   font-weight: 500;
 }
 
+/* Benefit/Cost breakdown columns */
+.benefit-col {
+  background: rgba(240, 253, 244, 0.4);
+}
+
+.cost-col {
+  background: rgba(254, 242, 242, 0.4);
+}
+
+th.benefit-col {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+th.cost-col {
+  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
+}
+
+/* Wind-down (post-strategy) rows */
+.wind-down-row {
+  opacity: 0.65;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 0, 0, 0.015) 10px,
+    rgba(0, 0, 0, 0.015) 20px
+  );
+}
+
+.wind-down-row td {
+  font-style: italic;
+}
+
+.wind-down-badge {
+  display: inline-block;
+  font-size: 0.55rem;
+  font-weight: 600;
+  font-style: normal;
+  color: var(--text-light);
+  background: var(--border);
+  border-radius: 3px;
+  padding: 0 3px;
+  margin-left: 3px;
+  vertical-align: super;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
 /* Year cell */
 .year-breakdown-table--compact .year-cell {
   font-weight: 600;

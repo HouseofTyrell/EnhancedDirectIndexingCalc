@@ -170,6 +170,9 @@ export function calculateWithSensitivity(
       section461Limit,
     };
 
+    // After strategy duration, zero out tax-harvesting activity
+    const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
+
     const result = calculateYearWithSensitivity(
       year,
       effectiveQfafValue,
@@ -185,7 +188,8 @@ export function calculateWithSensitivity(
       sensitivity.ltGainRateVariance,
       scaledTrackingError,
       strategy, // Pass full strategy for financing cost calculation
-      year === 1 ? yearFraction : 1.0 // Partial year applies to Year 1 only
+      year === 1 ? yearFraction : 1.0, // Partial year applies to Year 1 only
+      strategyActive
     );
 
     years.push({ ...result, qfafCashReturned: cashReturned });
@@ -226,12 +230,13 @@ function calculateYearWithSensitivity(
   ltGainVariance: number,
   scaledTrackingError: number,
   fullStrategy?: Strategy, // Full strategy object for financing cost calculation
-  yearFraction: number = 1.0 // Partial year: (13 - startMonth) / 12, applied to Year 1 only
+  yearFraction: number = 1.0, // Partial year: (13 - startMonth) / 12, applied to Year 1 only
+  strategyActive: boolean = true // Whether the strategy is actively generating tax events
 ): YearResult {
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
-  const stGainsGenerated = safeNumber(qfafValue * qfafMultiplier * yearFraction);
-  const ordinaryLossesGenerated = safeNumber(qfafValue * qfafMultiplier * yearFraction);
+  const stGainsGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
+  const ordinaryLossesGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
 
   // Get base rates with decay (same as normal calculation)
   const baseStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
@@ -248,9 +253,9 @@ function calculateYearWithSensitivity(
   const adjustedStLossRate = baseStLossRate * (1 + effectiveStVariance);
   const adjustedLtGainRate = strategy.ltGainRate * (1 + effectiveLtVariance);
 
-  const grossStLosses = collateralValue * adjustedStLossRate * yearFraction;
+  const grossStLosses = strategyActive ? collateralValue * adjustedStLossRate * yearFraction : 0;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = safeNumber(collateralValue * adjustedLtGainRate * yearFraction);
+  const ltGainsRealized = strategyActive ? safeNumber(collateralValue * adjustedLtGainRate * yearFraction) : 0;
 
   // Net ST position
   const grossNetSt = stGainsGenerated - stLossesHarvested;
@@ -387,9 +392,16 @@ function calculateYearWithSensitivity(
     effectiveStLossRate: adjustedStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
+    ordinaryLossBenefit,
+    nolUsageBenefit,
+    stToLtConversionBenefit,
+    capitalLossBenefit,
+    ltGainCost,
+    remainingStGainCost,
     qfafTaxBenefit,
     collateralTaxBenefit,
     stGainLeakage: Math.max(0, stGainsGenerated - stLossesHarvested),
     qfafCashReturned: 0,
+    strategyActive,
   };
 }

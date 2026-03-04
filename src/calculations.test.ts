@@ -502,14 +502,22 @@ describe('QFAF Duration', () => {
     expect(result.years[4].ordinaryLossesGenerated).toBe(0);
   });
 
-  it('should continue collateral ST losses after QFAF expires', () => {
+  it('should stop all strategy activity after QFAF duration expires', () => {
     const inputs = createInputs({ qfafDuration: 2 });
     const settings = { ...DEFAULT_SETTINGS, projectionYears: 5 };
     const result = calculate(inputs, settings);
 
-    // Collateral ST losses should still be generated in post-QFAF years
-    expect(result.years[3].stLossesHarvested).toBeGreaterThan(0);
-    expect(result.years[4].stLossesHarvested).toBeGreaterThan(0);
+    // Post-duration years should have no new tax events (full strategy wind-down)
+    expect(result.years[3].stLossesHarvested).toBe(0);
+    expect(result.years[4].stLossesHarvested).toBe(0);
+    expect(result.years[3].ltGainsRealized).toBe(0);
+    expect(result.years[4].ltGainsRealized).toBe(0);
+
+    // Strategy active flag should be false for post-duration years
+    expect(result.years[0].strategyActive).toBe(true);
+    expect(result.years[1].strategyActive).toBe(true);
+    expect(result.years[2].strategyActive).toBe(false);
+    expect(result.years[3].strategyActive).toBe(false);
   });
 
   it('should carry forward losses built during QFAF years into post-QFAF years', () => {

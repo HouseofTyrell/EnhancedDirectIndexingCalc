@@ -335,9 +335,37 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'col-tax-savings': {
     title: 'Tax Savings',
-    definition: 'Net tax benefit for this year.',
-    formula: 'Baseline Tax - Actual Tax',
+    definition: 'Net tax benefit for this year. Click to expand and see the gross benefits and costs that make up this number.',
+    formula: 'Ord. Loss Benefit + NOL Benefit + ST→LT Conversion + Cap Loss Benefit − LT Gain Cost − ST Gain Cost',
     impact: 'Annual value extracted from the tax optimization strategy.',
+  },
+
+  'col-ord-loss-benefit': {
+    title: 'Ordinary Loss Benefit',
+    definition: 'Tax savings from deducting the usable ordinary loss against W-2/ordinary income.',
+    formula: 'Usable Ordinary Loss × Combined Ordinary Rate',
+    impact: 'Usually the largest single benefit component. Capped by §461(l) limit.',
+  },
+
+  'col-nol-benefit': {
+    title: 'NOL Usage Benefit',
+    definition: 'Tax savings from applying prior-year NOL carryforward against this year\'s taxable income.',
+    formula: 'NOL Applied × Combined Ordinary Rate',
+    impact: 'Converts banked NOL into actual tax reduction. Limited to 80% of pre-NOL taxable income.',
+  },
+
+  'col-conversion-benefit': {
+    title: 'ST→LT Conversion Benefit',
+    definition: 'Tax savings from converting short-term gains (taxed at ordinary rates) into long-term gains (taxed at lower rates).',
+    formula: 'min(ST Gains, ST Losses) × (Ordinary Rate − LT Rate)',
+    impact: 'Captures the rate differential between ordinary and LT rates.',
+  },
+
+  'col-lt-gain-cost': {
+    title: 'LT Gain Cost',
+    definition: 'Tax liability from long-term capital gains realized by the collateral portfolio.',
+    formula: 'LT Gains Realized × Combined LT Rate',
+    impact: 'The primary cost of the strategy. Offset by the benefits above.',
   },
 
   'col-cumulative-savings': {
