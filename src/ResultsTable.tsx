@@ -233,7 +233,7 @@ export function ResultsTable({
                     <InfoText contentKey="col-usable-loss">Ord. Loss</InfoText>
                   </th>
 
-                  {/* NOL - Collapsible */}
+                  {/* Offset Capacity - Collapsible (headline column) */}
                   <th
                     className={`col-expandable col-nol-activity ${viewMode === 'qfaf-only' ? 'qfaf-col' : ''}`}
                     onClick={() => setExpandNOL(!expandNOL)}
@@ -242,7 +242,7 @@ export function ResultsTable({
                       <span className="expand-icon">
                         {expandNOL ? <ChevronDown /> : <ChevronRight />}
                       </span>
-                      <InfoText contentKey="col-nol-activity">NOL</InfoText>
+                      <InfoText contentKey="col-max-offset">Offset Cap.</InfoText>
                     </span>
                   </th>
 
@@ -250,13 +250,13 @@ export function ResultsTable({
                   {expandNOL && (
                     <>
                       <th className="col-detail qfaf-col">
+                        <InfoText contentKey="col-nol-activity">NOL Chg.</InfoText>
+                      </th>
+                      <th className="col-detail qfaf-col">
                         <InfoText contentKey="col-nol-used">Applied</InfoText>
                       </th>
                       <th className="col-detail qfaf-col">
                         <InfoText contentKey="col-nol-carryforward">Carryover</InfoText>
-                      </th>
-                      <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-max-offset">Max Capacity</InfoText>
                       </th>
                     </>
                   )}
@@ -437,25 +437,28 @@ export function ResultsTable({
                         {isWindDown ? '—' : `(${formatCurrency(year.usableOrdinaryLoss)})`}
                       </td>
 
-                      {/* NOL Activity (collapsed view) */}
-                      <td className={nolNet > 0 ? 'nol-generated' : nolNet < 0 ? 'nol-used' : ''}>
-                        {nolNet > 0
-                          ? `+${formatCurrency(nolNet)}`
-                          : nolNet < 0
-                            ? `−${formatCurrency(Math.abs(nolNet))}`
-                            : '—'}
+                      {/* Offset Capacity (collapsed headline) */}
+                      <td className="highlight">
+                        {formatCurrency(year.maxIncomeOffsetCapacity)}
                       </td>
 
                       {/* Expanded NOL Details */}
                       {expandNOL && (
                         <>
+                          {/* NOL Change (+/-) */}
+                          <td className={nolNet > 0 ? 'nol-generated qfaf-col' : nolNet < 0 ? 'nol-used qfaf-col' : 'qfaf-col'}>
+                            {nolNet > 0
+                              ? `+${formatCurrency(nolNet)}`
+                              : nolNet < 0
+                                ? `−${formatCurrency(Math.abs(nolNet))}`
+                                : '—'}
+                          </td>
+                          {/* NOL Applied */}
                           <td className={year.nolUsedThisYear > 0 ? 'positive qfaf-col' : 'qfaf-col'}>
                             {year.nolUsedThisYear > 0 ? formatCurrency(year.nolUsedThisYear) : '—'}
                           </td>
+                          {/* NOL Carryover */}
                           <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
-                          <td className="qfaf-col highlight">
-                            {formatCurrency(year.maxIncomeOffsetCapacity)}
-                          </td>
                         </>
                       )}
                     </>
@@ -534,9 +537,9 @@ export function ResultsTable({
         {qfafEnabled && (
           <p className="carryforward-explanation">
             <em>
-              Note: NOL appears to accumulate because new excess ordinary losses are generated each
-              year. Check the "NOL Used" column to see how much NOL offsets income annually (up to
-              80% of taxable income). Rows marked "CF" are post-strategy wind-down years where only
+              Note: "Offset Cap." shows the maximum income you could shelter from tax each year
+              (§461(l) limit + accumulated NOL). Expand for NOL details: change, applied, and
+              carryover. Rows marked "CF" are post-strategy wind-down years where only
               carryforward usage continues.
             </em>
           </p>
