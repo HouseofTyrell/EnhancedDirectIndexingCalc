@@ -39,15 +39,16 @@ Example ($3M MFJ):
   = 23.8% Federal LT Rate`}
       </pre>
 
-      <h4>Rate Arbitrage (ST→LT)</h4>
+      <h4>Rate Differential (ST vs LT)</h4>
       <pre>
-        {`Benefit = Combined Ordinary Rate - Combined LT Rate
+        {`Differential = Combined Ordinary Rate - Combined LT Rate
 
-This is the tax savings per dollar when short-term
-gains are converted to long-term treatment.
+This shows the difference between ordinary/ST and LT
+tax rates. QFAF ST gains are offset by collateral ST
+losses (by design), so this differential is informational.
 
 Example:
-  54.1% (Ordinary) - 37.1% (LT) = 17.0% benefit`}
+  54.1% (Ordinary) - 37.1% (LT) = 17.0% differential`}
       </pre>
     </div>
   );

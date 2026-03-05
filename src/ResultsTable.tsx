@@ -104,12 +104,12 @@ export function ResultsTable({
 
     cols += 1; // Tax Savings column
     cols += 1; // Cumulative column
-    if (expandSavings) cols += 4; // Ord Ded., NOL Ben., Rate Arb., LT Cost
+    if (expandSavings) cols += 3; // Ord Ded., NOL Ben., LT Cost
     return cols;
   };
 
   // Savings breakdown columns count for starting row
-  const savingsDetailCols = expandSavings ? 4 : 0;
+  const savingsDetailCols = expandSavings ? 3 : 0;
 
   // Determine if this is the first wind-down row for divider
   const firstWindDownIndex = data.findIndex(y => !y.strategyActive);
@@ -314,9 +314,6 @@ export function ResultsTable({
                   </th>
                   <th className="col-detail benefit-col">
                     <InfoText contentKey="col-nol-benefit">NOL Ben.</InfoText>
-                  </th>
-                  <th className="col-detail benefit-col">
-                    <InfoText contentKey="col-conversion-benefit">Rate Arb.</InfoText>
                   </th>
                   <th className="col-detail cost-col">
                     <InfoText contentKey="col-lt-gain-cost">LT Cost</InfoText>
@@ -555,12 +552,6 @@ export function ResultsTable({
                         <td className="positive benefit-col">
                           {year.nolUsageBenefit > 0
                             ? formatCurrency(year.nolUsageBenefit)
-                            : '—'}
-                        </td>
-                        {/* Rate Arbitrage (ST→LT Conversion) */}
-                        <td className="positive benefit-col">
-                          {year.stToLtConversionBenefit > 0
-                            ? formatCurrency(year.stToLtConversionBenefit)
                             : '—'}
                         </td>
                         {/* LT Gain Cost */}
