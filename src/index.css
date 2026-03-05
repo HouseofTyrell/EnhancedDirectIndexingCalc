@@ -325,11 +325,18 @@ body {
   }
 }
 
-/* Calculator container — no fixed max-width, grows with content */
+/* Calculator container — constrained for readability on wide displays */
 .calculator {
-  max-width: none;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem 3rem;
+}
+
+/* Extra breathing room on ultra-wide displays */
+@media (min-width: 1800px) {
+  .calculator {
+    padding: 2rem 4rem;
+  }
 }
 
 /* Header */

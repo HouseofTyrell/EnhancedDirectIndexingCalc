@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react';
 import { ResultsTable } from '../ResultsTable';
 import { CalculatorInputs, AdvancedSettings, CalculationResult } from '../types';
 import { Strategy } from '../strategyData';
@@ -44,6 +44,12 @@ export function ResultsChartsSection({
   onPrintRef,
   onExportRef,
 }: ResultsChartsSectionProps) {
+  // Filter chart data to only show strategy-active years (no wind-down)
+  const activeYears = useMemo(
+    () => results.years.filter(y => y.strategyActive),
+    [results.years]
+  );
+
   const handlePrint = useCallback(() => {
     window.print();
   }, []);
@@ -66,12 +72,12 @@ export function ResultsChartsSection({
 
   return (
     <>
-      {/* Tax Benefits Chart */}
+      {/* Tax Benefits Chart — only active strategy years */}
       <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
-        <TaxSavingsChart data={results.years} startMonth={startMonth} />
+        <TaxSavingsChart data={activeYears} startMonth={startMonth} />
       </Suspense>
 
-      {/* Table */}
+      {/* Table — shows all years including wind-down */}
       <ResultsTable
         data={results.years}
         sizing={results.sizing}
@@ -79,10 +85,10 @@ export function ResultsChartsSection({
         projectionYears={projectionYears}
       />
 
-      {/* Portfolio Value Chart */}
+      {/* Portfolio Value Chart — only active strategy years */}
       <Suspense fallback={<div className="chart-loading">Loading chart...</div>}>
         <PortfolioValueChart
-          data={results.years}
+          data={activeYears}
           trackingError={currentStrategy?.trackingError}
           startMonth={startMonth}
         />

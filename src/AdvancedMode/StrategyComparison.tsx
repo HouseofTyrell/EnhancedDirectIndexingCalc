@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { STRATEGIES, getStrategy } from '../strategyData';
 import { calculate } from '../calculations';
 import { CalculatorInputs, ComparisonResult } from '../types';
@@ -17,7 +17,9 @@ export const StrategyComparison = memo(function StrategyComparison({
   selectedStrategies,
   onChange,
 }: StrategyComparisonProps) {
-  // Calculate results for each selected strategy
+  const [sizingMode, setSizingMode] = useState<'fixed' | 'dynamic'>(baseInputs.qfafSizingMode);
+
+  // Calculate results for each selected strategy using the selected sizing mode
   const comparisonResults = useMemo((): ComparisonResult[] => {
     return selectedStrategies
       .map(strategyId => {
@@ -26,8 +28,8 @@ export const StrategyComparison = memo(function StrategyComparison({
           return null;
         }
 
-        // Calculate with this strategy
-        const inputs = { ...baseInputs, strategyId };
+        // Calculate with this strategy and the selected sizing mode
+        const inputs = { ...baseInputs, strategyId, qfafSizingMode: sizingMode };
         const results = calculate(inputs);
 
         return {
@@ -43,7 +45,7 @@ export const StrategyComparison = memo(function StrategyComparison({
         };
       })
       .filter((r): r is ComparisonResult => r !== null);
-  }, [baseInputs, selectedStrategies]);
+  }, [baseInputs, selectedStrategies, sizingMode]);
 
   // Find the best strategy for each metric
   const getBest = (metric: keyof ComparisonResult): string | null => {
@@ -133,6 +135,29 @@ export const StrategyComparison = memo(function StrategyComparison({
           </div>
         </div>
       </div>
+
+      {/* Sizing Mode Toggle */}
+      {baseInputs.qfafEnabled && (
+        <div className="sizing-mode-toggle">
+          <span className="sizing-mode-label">QFAF Sizing:</span>
+          <div className="view-mode-selector">
+            <button
+              type="button"
+              className={`view-mode-btn ${sizingMode === 'fixed' ? 'active' : ''}`}
+              onClick={() => setSizingMode('fixed')}
+            >
+              Fixed
+            </button>
+            <button
+              type="button"
+              className={`view-mode-btn ${sizingMode === 'dynamic' ? 'active' : ''}`}
+              onClick={() => setSizingMode('dynamic')}
+            >
+              Dynamic
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Comparison Table */}
       {comparisonResults.length > 0 && (
