@@ -52,14 +52,6 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     impact: 'This is the effective rate paid on strategy LT gains.',
   },
 
-  'st-lt-benefit': {
-    title: 'ST→LT Conversion Benefit',
-    definition: 'Tax savings per dollar when converting short-term gains to long-term treatment.',
-    formula: 'Combined Ordinary Rate - Combined LT Rate',
-    impact:
-      'This differential drives the core value of matching QFAF ST gains with collateral ST losses.',
-  },
-
   // ============================================
   // STRATEGY SIZING SECTION
   // ============================================

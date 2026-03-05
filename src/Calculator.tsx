@@ -167,7 +167,6 @@ export function Calculator() {
     stateRate,
     combinedStRate,
     combinedLtRate,
-    rateDifferential,
   } = taxRates;
 
   const updateInput = useCallback(
@@ -414,7 +413,6 @@ export function Calculator() {
         stateRate={stateRate}
         combinedStRate={combinedStRate}
         combinedLtRate={combinedLtRate}
-        rateDifferential={rateDifferential}
       />
       </PinnableSection>
 
@@ -619,7 +617,6 @@ export function Calculator() {
                 stateRate={stateRate}
                 combinedStRate={combinedStRate}
                 combinedLtRate={combinedLtRate}
-                rateDifferential={rateDifferential}
               />
             ),
           }] : []),
