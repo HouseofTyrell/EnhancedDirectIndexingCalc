@@ -41,7 +41,7 @@ QFAF = (Collateral × ST_Loss_Rate) / 150%
 
 ### `calculate(inputs, settings)`
 
-Main calculation entry point. Generates 10-year projections.
+Main calculation entry point. Generates N-year projections (configurable via `settings.projectionYears`, default 10).
 
 **Parameters:**
 - `inputs: CalculatorInputs` - User inputs
@@ -52,7 +52,7 @@ Main calculation entry point. Generates 10-year projections.
 ```typescript
 interface CalculationResult {
   sizing: CalculatedSizing;     // Strategy sizing details
-  years: YearResult[];          // 10 years of projections
+  years: YearResult[];          // N years of projections
   summary: {
     totalTaxSavings: number;    // Sum of all years
     finalPortfolioValue: number; // Year 10 portfolio value
@@ -214,7 +214,7 @@ Get effective net capital loss rate for a strategy and year.
 
 **Parameters:**
 - `strategyId: string` - Strategy ID
-- `year: number` - Year number (1-10)
+- `year: number` - Year number (1-N, where N = projectionYears)
 
 **Returns:** `number` - Net capital loss rate (ST loss - LT gain)
 
@@ -292,17 +292,31 @@ const { isExpanded } = useScrollHeader('scroll-sentinel');
 
 ```typescript
 interface CalculatorInputs {
-  strategyId: string;
-  collateralAmount: number;
-  annualIncome: number;
+  // Client profile
   filingStatus: FilingStatus;
   stateCode: string;
-  stateRate: number;           // Custom rate when stateCode='OTHER'
+  stateRate: number;              // Custom rate when stateCode='OTHER'
+  annualIncome: number;
+
+  // Strategy selection
+  strategyId: string;
+  collateralAmount: number;
+
+  // Existing carryforwards
+  existingStLossCarryforward: number;
+  existingLtLossCarryforward: number;
+  existingNolCarryforward: number;
+
+  // QFAF configuration
   qfafEnabled: boolean;
-  qfafOverride?: number;       // Manual QFAF override
-  stLossCarryforward: number;
-  ltLossCarryforward: number;
-  nolCarryforward: number;
+  qfafOverride?: number;          // Manual QFAF override
+  qfafSizingYears: number;        // Years to average for sizing (1-10)
+  qfafSizingCushion: number;      // Reduce auto-sized QFAF (0-10%)
+  qfafDuration: number;           // Years QFAF runs (1-10, default 5)
+  qfafSizingMode: 'fixed' | 'dynamic'; // Fixed at inception vs. resized each year
+
+  // Partial year
+  startMonth: number;             // Month strategy begins (1=Jan, 4=Apr)
 }
 ```
 
@@ -311,22 +325,42 @@ interface CalculatorInputs {
 ```typescript
 interface YearResult {
   year: number;
+  strategyActive: boolean;        // Whether strategy is generating new tax events
+
+  // Portfolio values
   collateralValue: number;
   qfafValue: number;
   totalValue: number;
-  stLossesGenerated: number;
+
+  // QFAF tax events
+  stGainsGenerated: number;       // 150% of QFAF MV
+  ordinaryLossesGenerated: number; // 150% of QFAF MV
+  usableOrdinaryLoss: number;     // Capped by §461(l)
+  excessToNol: number;            // Above limit → NOL
+
+  // Collateral tax events
+  stLossesHarvested: number;
   ltGainsRealized: number;
-  stGainsGenerated: number;
-  ordinaryLossGenerated: number;
+
+  // Tax savings
   taxSavings: number;
-  cumulativeTaxSavings: number;
+  baselineTax: number;
+
+  // Carryforwards
   stLossCarryforward: number;
   ltLossCarryforward: number;
   nolCarryforward: number;
-  nolUsed: number;
+  nolUsedThisYear: number;
+  capitalLossUsedAgainstIncome: number; // Up to $3K per §1211(b)
+
+  // Tax benefit breakdown
+  ordinaryLossBenefit: number;
+  nolUsageBenefit: number;
+  ltGainCost: number;
+  qfafTaxBenefit: number;
+  collateralTaxBenefit: number;
+
   effectiveStLossRate: number;
-  financingCost: number;
-  baselineTax: number;
 }
 ```
 
@@ -340,14 +374,28 @@ type FilingStatus = 'single' | 'mfj' | 'mfs' | 'hoh';
 
 ```typescript
 interface AdvancedSettings {
-  annualReturn: number;        // Default: 0.07 (7%)
-  projectionYears: number;     // Default: 10
-  inflationRate: number;       // Default: 0.02
-  qfafMultiplier: number;      // Default: 1.5
-  nolOffsetLimit: number;      // Default: 0.80
-  capitalLossLimit: number;    // Default: 3000
-  defaultAnnualReturn: number; // Default: 0.07
-  trackingErrorMultiplier: number; // Default: 1.0
-  niitRate: number;            // Default: 0.038
+  // QFAF mechanics
+  qfafMultiplier: number;          // Default: 1.50 (150% ST gains and ordinary losses)
+  qfafGrowthEnabled: boolean;      // Default: true
+
+  // Tax rules
+  washSaleDisallowanceRate: number; // Default: 0
+  nolOffsetLimit: number;          // Default: 0.80 (80% of taxable income)
+  niitRate: number;                // Default: 0.038
+  ltcgRate: number;                // Default: 0.20
+  stcgRate: number;                // Default: 0.37
+
+  // Portfolio assumptions
+  growthEnabled: boolean;          // Default: false
+  defaultAnnualReturn: number;     // Default: 0.07
+  qfafAnnualReturn: number | null; // Default: null (uses defaultAnnualReturn)
+
+  // Financing
+  financingFeesEnabled: boolean;   // Default: false
+  financingMode: 'simple' | 'detailed';
+  simpleFinancingRate: number;     // Default: 0.035625
+
+  // Projection
+  projectionYears: number;        // Default: 10 (configurable 1-30)
 }
 ```

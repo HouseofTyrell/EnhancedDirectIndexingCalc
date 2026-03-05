@@ -100,7 +100,7 @@ export const ScenarioAnalysis = memo(function ScenarioAnalysis({ inputs, setting
           </thead>
           <tbody>
             <tr>
-              <td>10-Year Tax Savings</td>
+              <td>{settings.projectionYears}-Year Tax Savings</td>
               {scenarios.map(s => (
                 <td key={s.type} className={`scenario-${s.type}`}>
                   {formatCurrency(s.totalTaxSavings)}

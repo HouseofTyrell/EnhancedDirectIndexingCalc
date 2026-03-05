@@ -438,7 +438,37 @@ export function Calculator() {
       <div className="section-group section-group--results">
         <div className="section-group__label">Results</div>
 
-      {/* Results Summary - headline metrics */}
+      {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
+      <PinnableSection id="charts" label="Charts & Table" isPinned={pinnedElements.isPinned('charts')} onTogglePin={() => pinnedElements.togglePin('charts')}>
+      <CollapsibleSection
+        sectionKey="yearByYear"
+        step="4"
+        stepLabel="Year-by-Year Breakdown"
+        title="Estimated Detailed Projections"
+        headerAction={
+          <InfoPopup title="Projection Methodology">
+            <ProjectionFormula qfafMultiplier={advancedSettings.qfafMultiplier} projectionYears={advancedSettings.projectionYears} />
+          </InfoPopup>
+        }
+        guidance={`Estimated year-by-year breakdown showing how tax benefits compound over the ${advancedSettings.projectionYears}-year projection period.`}
+        className="results-section"
+      >
+        {/* Charts and Export Actions */}
+        <ResultsChartsSection
+          results={results}
+          inputs={inputs}
+          advancedSettings={advancedSettings}
+          currentStrategy={currentStrategy}
+          taxRates={taxRates}
+          projectionYears={advancedSettings.projectionYears}
+          startMonth={inputs.startMonth}
+          onPrintRef={(handler) => setPrintHandler(() => handler)}
+          onExportRef={(handler) => setExportHandler(() => handler)}
+        />
+      </CollapsibleSection>
+      </PinnableSection>
+
+      {/* Results Summary - headline metrics (Step 5) */}
       <PinnableSection id="results" label="Results Summary" isPinned={pinnedElements.isPinned('results')} onTogglePin={() => pinnedElements.togglePin('results')}>
       <ResultsSummary
         totalTaxSavings={results.summary.totalTaxSavings}
@@ -464,36 +494,6 @@ export function Calculator() {
           onReplacePin={() => pinnedScenario.replacePin(inputs, advancedSettings, results)}
         />
       )}
-
-      {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
-      <PinnableSection id="charts" label="Charts & Table" isPinned={pinnedElements.isPinned('charts')} onTogglePin={() => pinnedElements.togglePin('charts')}>
-      <CollapsibleSection
-        sectionKey="yearByYear"
-        step="4"
-        stepLabel="Year-by-Year Breakdown"
-        title="Estimated Detailed Projections"
-        headerAction={
-          <InfoPopup title="Projection Methodology">
-            <ProjectionFormula qfafMultiplier={advancedSettings.qfafMultiplier} />
-          </InfoPopup>
-        }
-        guidance={`Estimated year-by-year breakdown showing how tax benefits compound over the ${advancedSettings.projectionYears}-year projection period.`}
-        className="results-section"
-      >
-        {/* Charts and Export Actions */}
-        <ResultsChartsSection
-          results={results}
-          inputs={inputs}
-          advancedSettings={advancedSettings}
-          currentStrategy={currentStrategy}
-          taxRates={taxRates}
-          projectionYears={advancedSettings.projectionYears}
-          startMonth={inputs.startMonth}
-          onPrintRef={(handler) => setPrintHandler(() => handler)}
-          onExportRef={(handler) => setExportHandler(() => handler)}
-        />
-      </CollapsibleSection>
-      </PinnableSection>
 
       </div>{/* end section-group--results */}
 
@@ -555,6 +555,7 @@ export function Calculator() {
                 baseInputs={inputs}
                 selectedStrategies={comparisonStrategies}
                 onChange={setComparisonStrategies}
+                projectionYears={advancedSettings.projectionYears}
               />
             </CollapsibleSection>
           </div>

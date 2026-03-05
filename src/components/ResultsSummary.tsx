@@ -65,7 +65,7 @@ export const ResultsSummary = React.memo(function ResultsSummary({
   return (
     <CollapsibleSection
       sectionKey="results"
-      step="1"
+      step="5"
       stepLabel="Estimated Results"
       title={`Estimated ${projectionYears}-Year Tax Savings`}
       guidance="Based on the inputs and assumptions below. Adjust values to see updated projections."

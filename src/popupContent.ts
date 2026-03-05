@@ -190,22 +190,22 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'total-tax-savings': {
     title: 'Total Tax Savings',
-    definition: 'Cumulative tax benefit over the 10-year projection period.',
+    definition: 'Cumulative tax benefit over the full projection period.',
     formula: 'Sum of (Baseline Tax - Actual Tax) for each year',
     impact: 'Represents the total value extracted from the strategy versus passive investing.',
   },
 
   'final-portfolio-value': {
     title: 'Final Portfolio Value',
-    definition: 'Projected total value of collateral + QFAF at the end of year 10.',
-    formula: 'Initial Investment × (1 + annual return)^10',
+    definition: 'Projected total value of collateral + QFAF at the end of the projection period.',
+    formula: 'Initial Investment × (1 + annual return)^N years',
     impact: 'Shows the growth of your invested capital over the projection period.',
   },
 
   'effective-tax-alpha': {
     title: 'Annualized Tax Alpha',
     definition: 'Average annual tax savings as a percentage of total exposure.',
-    formula: 'Total Tax Savings ÷ Total Exposure ÷ 10 years',
+    formula: 'Total Tax Savings ÷ Total Exposure ÷ projection years',
     impact:
       'Measures strategy efficiency - higher alpha means more tax benefit per dollar invested.',
   },
@@ -565,7 +565,7 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
       'Cumulative tax savings from the $3,000/year capital loss deduction against ordinary income (§1211(b)). This benefit is certain — it occurs every year regardless of whether a gain event happens.',
     formula: 'Sum of ($3K × (Combined ST Rate - NIIT Rate)) for each year',
     impact:
-      'Small but certain. Over 10 years at ~50% combined rate, this is roughly $15K in guaranteed savings. It compounds when considered alongside the contingent CF protection.',
+      'Small but certain. At ~50% combined rate, this generates roughly $1,500/year in guaranteed savings. It compounds when considered alongside the contingent CF protection.',
   },
 
   'edi-break-even-gain': {
@@ -1125,7 +1125,7 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
       'Per-year savings from correctly excluding NIIT from the $3K deduction calculation. This is the amount you would overstate if you incorrectly included NIIT.',
     formula: '$3,000 × 3.8% NIIT Rate = $114/year',
     impact:
-      'Small but important for accuracy. Over 10 years, this is $1,140 of avoided overstatement. Shows the calculator\'s precision in NIIT handling.',
+      'Small but important for accuracy. This is $114/year of avoided overstatement. Shows the calculator\'s precision in NIIT handling.',
   },
 
   // ============================================
