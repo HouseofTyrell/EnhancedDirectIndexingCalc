@@ -426,7 +426,6 @@ export function Calculator() {
         qfafEnabled={inputs.qfafEnabled}
         combinedStRate={combinedStRate}
         combinedLtRate={combinedLtRate}
-        rateDifferential={rateDifferential}
         qfafMultiplier={advancedSettings.qfafMultiplier}
       />
       </PinnableSection>
@@ -665,7 +664,6 @@ export function Calculator() {
                 qfafEnabled={inputs.qfafEnabled}
                 combinedStRate={combinedStRate}
                 combinedLtRate={combinedLtRate}
-                rateDifferential={rateDifferential}
                 qfafMultiplier={advancedSettings.qfafMultiplier}
               />
             ),

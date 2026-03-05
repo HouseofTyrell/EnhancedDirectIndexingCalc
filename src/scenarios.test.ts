@@ -328,7 +328,7 @@ describe('Financial Advisor Scenarios', () => {
   });
 
   describe('Tax Calculation Accuracy', () => {
-    it('should correctly calculate ST→LT conversion benefit', () => {
+    it('should not include phantom ST→LT conversion benefit', () => {
       const client = createClientProfile({
         collateralAmount: 1000000,
         annualIncome: 500000,
@@ -338,24 +338,18 @@ describe('Financial Advisor Scenarios', () => {
 
       const result = calculate(client, DEFAULT_SETTINGS);
 
-      // Get rates for verification
-      const federalStRate = getFederalStRate(500000, 'mfj');
-      const federalLtRate = getFederalLtRate(500000, 'mfj');
-      const rateDifferential = federalStRate - federalLtRate;
+      // stToLtConversionBenefit should be 0 — ST gains and losses wash by design
+      expect(result.years[0].stToLtConversionBenefit).toBe(0);
 
-      // ST→LT benefit should be rate differential * amount of ST gains offset
-      // ST gains offset = min(QFAF ST gains, collateral ST losses)
-      const stGainsOffset = Math.min(
-        result.years[0].stGainsGenerated,
-        result.years[0].stLossesHarvested
-      );
-
-      // The conversion benefit component
-      const expectedConversionBenefit = stGainsOffset * rateDifferential;
-
-      // Total savings should include this component (among others)
-      // We can't test exactly due to other components, but we can verify it's reasonable
-      expect(expectedConversionBenefit).toBeGreaterThan(0);
+      // Tax savings should equal ordinary loss benefit + NOL + capital loss - LT cost - ST cost
+      const year = result.years[0];
+      const expectedSavings =
+        year.ordinaryLossBenefit +
+        year.nolUsageBenefit +
+        year.capitalLossBenefit -
+        year.ltGainCost -
+        year.remainingStGainCost;
+      expect(year.taxSavings).toBeCloseTo(expectedSavings, 2);
     });
 
     it('should properly limit capital loss deduction to $3K', () => {

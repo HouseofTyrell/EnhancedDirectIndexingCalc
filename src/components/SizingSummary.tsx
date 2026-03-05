@@ -12,7 +12,6 @@ interface SizingSummaryProps {
   qfafEnabled: boolean;
   combinedStRate: number;
   combinedLtRate: number;
-  rateDifferential: number;
   qfafMultiplier?: number;
 }
 
@@ -22,7 +21,6 @@ export function SizingSummary({
   qfafEnabled,
   combinedStRate,
   combinedLtRate,
-  rateDifferential,
   qfafMultiplier,
 }: SizingSummaryProps) {
   const year1Savings = results.years[0]?.taxSavings ?? 0;
@@ -226,22 +224,6 @@ export function SizingSummary({
           <div className="benefit-card">
             <span className="benefit-label">
               <InfoText
-                contentKey="st-lt-conversion-benefit"
-                currentValue={formatCurrency(results.sizing.year1StLosses * rateDifferential)}
-              >
-                Rate Arbitrage
-              </InfoText>
-            </span>
-            <span className="benefit-value positive">
-              +{formatCurrency(results.sizing.year1StLosses * rateDifferential)}
-            </span>
-            <span className="benefit-formula">
-              {formatCurrency(results.sizing.year1StLosses)} × {formatPercent(rateDifferential)}
-            </span>
-          </div>
-          <div className="benefit-card">
-            <span className="benefit-label">
-              <InfoText
                 contentKey="lt-gain-cost"
                 currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)}
               >
@@ -305,20 +287,6 @@ export function SizingSummary({
               <span className="benefit-formula">
                 {formatCurrency(results.years[1]?.usableOrdinaryLoss)} ×{' '}
                 {formatPercent(combinedStRate)}
-              </span>
-            </div>
-            <div className="benefit-card">
-              <span className="benefit-label">
-                <InfoText contentKey="st-lt-conversion-benefit">
-                  Rate Arbitrage
-                </InfoText>
-              </span>
-              <span className="benefit-value positive">
-                +{formatCurrency(results.years[1]?.stLossesHarvested * rateDifferential)}
-              </span>
-              <span className="benefit-formula">
-                {formatCurrency(results.years[1]?.stLossesHarvested)} ×{' '}
-                {formatPercent(rateDifferential)}
               </span>
             </div>
             <div className="benefit-card">

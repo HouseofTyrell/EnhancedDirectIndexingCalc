@@ -296,12 +296,9 @@ function calculateYearWithSensitivity(
   const { stRate, ltRate, stateRate } = taxRates;
   const combinedStRate = stRate + stateRate;
   const combinedLtRate = ltRate + stateRate;
-  const rateDifferential = stRate - ltRate;
 
   // Benefits
   const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
-  const stGainsOffset = Math.min(stGainsGenerated, stLossesHarvested);
-  const stToLtConversionBenefit = safeNumber(stGainsOffset * rateDifferential);
   const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
   const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
 
@@ -309,10 +306,10 @@ function calculateYearWithSensitivity(
   const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
 
-  // Net tax savings
+  // Net tax savings: ordinary deductions minus capital gains costs
+  // ST gains and ST losses wash (by design) — no phantom "conversion benefit"
   const taxSavings = safeNumber(
     ordinaryLossBenefit +
-      stToLtConversionBenefit +
       capitalLossBenefit +
       nolUsageBenefit -
       ltGainCost -
@@ -320,7 +317,7 @@ function calculateYearWithSensitivity(
   );
 
   // Component-specific benefits for view mode breakdown
-  const qfafTaxBenefit = safeNumber(ordinaryLossBenefit + nolUsageBenefit + stToLtConversionBenefit);
+  const qfafTaxBenefit = safeNumber(ordinaryLossBenefit + nolUsageBenefit);
   const collateralTaxBenefit = safeNumber(capitalLossBenefit - ltGainCost - remainingStGainCost);
 
   // Tax breakdown for display
@@ -394,7 +391,7 @@ function calculateYearWithSensitivity(
     maxIncomeOffsetCapacity,
     ordinaryLossBenefit,
     nolUsageBenefit,
-    stToLtConversionBenefit,
+    stToLtConversionBenefit: 0, // Deprecated: ST gains/losses wash by design
     capitalLossBenefit,
     ltGainCost,
     remainingStGainCost,

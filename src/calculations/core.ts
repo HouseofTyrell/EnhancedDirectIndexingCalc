@@ -238,21 +238,15 @@ export function calculateYear(
   const { stRate, ltRate, stateRate } = taxRates;
   const combinedStRate = stRate + stateRate;
   const combinedLtRate = ltRate + stateRate;
-  const rateDifferential = stRate - ltRate;
 
   // Benefits:
   // 1. Ordinary loss reduces W2 income tax
   const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
 
-  // 2. ST→LT conversion: ST losses offset ST gains, converting tax treatment
-  //    The benefit is the rate differential on the amount of ST gains offset
-  const stGainsOffset = Math.min(stGainsGenerated, stLossesHarvested);
-  const stToLtConversionBenefit = safeNumber(stGainsOffset * rateDifferential);
-
-  // 3. Capital loss carryforward used against ordinary income ($3k/yr limit)
+  // 2. Capital loss carryforward used against ordinary income ($3k/yr limit)
   const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
 
-  // 4. NOL used against taxable income
+  // 3. NOL used against taxable income
   const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
 
   // Costs:
@@ -262,10 +256,10 @@ export function calculateYear(
   // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
 
-  // Net tax savings
+  // Net tax savings: ordinary deductions minus capital gains costs
+  // ST gains and ST losses wash (by design) — no phantom "conversion benefit"
   const taxSavings = safeNumber(
     ordinaryLossBenefit +
-      stToLtConversionBenefit +
       capitalLossBenefit +
       nolUsageBenefit -
       ltGainCost -
@@ -276,9 +270,9 @@ export function calculateYear(
   const stGainLeakage = Math.max(0, stGainsGenerated - stLossesHarvested);
 
   // Component-specific benefits for view mode breakdown
-  // QFAF benefit: ordinary loss offset + NOL usage + ST→LT conversion (what QFAF enables)
-  const qfafTaxBenefit = safeNumber(ordinaryLossBenefit + nolUsageBenefit + stToLtConversionBenefit);
-  // Collateral benefit: capital loss offset - LT gain cost - any remaining ST gain cost
+  // QFAF benefit: ordinary loss offset + NOL usage (what QFAF uniquely creates)
+  const qfafTaxBenefit = safeNumber(ordinaryLossBenefit + nolUsageBenefit);
+  // Collateral cost: capital loss offset - LT gain cost - any remaining ST gain cost
   const collateralTaxBenefit = safeNumber(capitalLossBenefit - ltGainCost - remainingStGainCost);
 
   // For display/debugging: calculate what taxes would be without benefits
@@ -359,7 +353,7 @@ export function calculateYear(
     maxIncomeOffsetCapacity,
     ordinaryLossBenefit,
     nolUsageBenefit,
-    stToLtConversionBenefit,
+    stToLtConversionBenefit: 0, // Deprecated: ST gains/losses wash by design, no phantom conversion benefit
     capitalLossBenefit,
     ltGainCost,
     remainingStGainCost,
