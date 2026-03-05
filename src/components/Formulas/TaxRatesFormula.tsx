@@ -39,12 +39,12 @@ Example ($3M MFJ):
   = 23.8% Federal LT Rate`}
       </pre>
 
-      <h4>ST→LT Benefit</h4>
+      <h4>Rate Arbitrage (ST→LT)</h4>
       <pre>
         {`Benefit = Combined Ordinary Rate - Combined LT Rate
 
-This is the tax savings per dollar when converting
-short-term gains to long-term gains.
+This is the tax savings per dollar when short-term
+gains are converted to long-term treatment.
 
 Example:
   54.1% (Ordinary) - 37.1% (LT) = 17.0% benefit`}

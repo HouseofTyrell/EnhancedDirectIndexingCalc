@@ -160,9 +160,9 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 
   'st-lt-conversion-benefit': {
-    title: 'ST→LT Conversion Benefit',
+    title: 'Rate Arbitrage Benefit',
     definition:
-      'Tax savings from converting short-term gains (taxed at ordinary rates) to long-term treatment.',
+      'Tax savings because gains are taxed at the lower long-term rate instead of the higher short-term/ordinary rate. QFAF short-term gains are offset by collateral short-term losses, converting them to long-term treatment.',
     formula: 'Matched ST Amount × (Ordinary Rate - LT Rate)',
     impact:
       'By matching QFAF ST gains with collateral ST losses, gains are effectively taxed at LT rates.',

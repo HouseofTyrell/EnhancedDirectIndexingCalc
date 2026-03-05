@@ -4,12 +4,12 @@ export function TaxAlphaFormula() {
       <h4>Annual Tax Alpha Calculation</h4>
       <p>Tax alpha comes from three components:</p>
       <pre>
-        {`Tax Alpha = ST→LT Conversion Benefit
+        {`Tax Alpha = Rate Arbitrage (ST→LT)
           + Ordinary Loss Benefit
           - LT Gain Cost
 
 Where:
-  ST→LT Conversion = Matched ST Amount × (ST Rate - LT Rate)
+  Rate Arbitrage = Matched ST Amount × (ST Rate - LT Rate)
   Ordinary Loss Benefit = Usable Ordinary Loss × Ordinary Rate
   LT Gain Cost = Collateral LT Gains × LT Rate`}
       </pre>
@@ -23,7 +23,7 @@ Where:
   Collateral LT Gains: $290,000
 
 Tax Alpha Components:
-  ST→LT Conversion: $1.3M × 17% = +$221,000
+  Rate Arbitrage: $1.3M × 17% = +$221,000
   Ordinary Loss: $512K × 40.8% = +$208,896
   LT Gain Cost: $290K × 23.8% = -$69,020
   ─────────────────────────────────────────

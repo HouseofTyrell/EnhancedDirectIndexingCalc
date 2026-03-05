@@ -55,7 +55,7 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
           <TaxRatesFormula />
         </InfoPopup>
       }
-      guidance="These marginal rates determine the value of each tax event. Higher ST→LT benefit means more savings from the strategy."
+      guidance="These marginal rates determine the value of each tax event. A larger rate differential means more savings from rate arbitrage."
       className="tax-rates-section"
     >
       <div className="tax-rates-rows">

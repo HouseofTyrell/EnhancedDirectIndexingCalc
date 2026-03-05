@@ -229,7 +229,7 @@ export function SizingSummary({
                 contentKey="st-lt-conversion-benefit"
                 currentValue={formatCurrency(results.sizing.year1StLosses * rateDifferential)}
               >
-                ST→LT Conversion
+                Rate Arbitrage
               </InfoText>
             </span>
             <span className="benefit-value positive">
@@ -310,7 +310,7 @@ export function SizingSummary({
             <div className="benefit-card">
               <span className="benefit-label">
                 <InfoText contentKey="st-lt-conversion-benefit">
-                  ST→LT Conversion
+                  Rate Arbitrage
                 </InfoText>
               </span>
               <span className="benefit-value positive">

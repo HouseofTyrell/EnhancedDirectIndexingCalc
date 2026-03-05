@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { YearResult, CalculatedSizing } from './types';
 import { InfoText } from './InfoPopup';
 import { formatCurrency } from './utils/formatters';
@@ -421,16 +421,16 @@ export function ResultsTable({
               const isFirstWindDown = index === firstWindDownIndex;
 
               return (
-                <>
+                <Fragment key={year.year}>
                   {/* Wind-down divider row */}
                   {isFirstWindDown && (
-                    <tr key={`wd-divider-${year.year}`} className="wind-down-divider-row">
+                    <tr className="wind-down-divider-row">
                       <td colSpan={getColSpan()}>
                         <span className="wind-down-divider-text">Strategy Ended — Wind-Down (Carryforward Usage Only)</span>
                       </td>
                     </tr>
                   )}
-                  <tr key={year.year} className={isWindDown ? 'wind-down-row' : ''}>
+                  <tr className={isWindDown ? 'wind-down-row' : ''}>
                     <td className="year-cell">
                       {year.year}
                       {isWindDown && <span className="wind-down-badge" title="Wind-down: strategy ended, carryforward usage only">W/D</span>}
@@ -577,7 +577,7 @@ export function ResultsTable({
                       {formatCurrency(cumulativeSavings)}
                     </td>
                   </tr>
-                </>
+                </Fragment>
               );
             })}
           </tbody>
