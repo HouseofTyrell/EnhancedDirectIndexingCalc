@@ -51,8 +51,19 @@ export function ResultsTable({
   const [showAllDetails, setShowAllDetails] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('combined');
 
-  // Calculate cumulative tax savings
+  // Calculate cumulative tax savings (inline, updated per rendered row)
   let cumulativeSavings = 0;
+
+  // Total savings across ALL years (including filtered-out wind-down rows)
+  const totalSavingsAllYears = data.reduce((sum, y) => {
+    const benefit =
+      viewMode === 'qfaf-only'
+        ? y.qfafTaxBenefit
+        : viewMode === 'collateral-only'
+          ? y.collateralTaxBenefit
+          : y.taxSavings;
+    return sum + benefit;
+  }, 0);
 
   // Toggle all details
   const handleToggleAll = () => {
@@ -107,16 +118,16 @@ export function ResultsTable({
   // Savings breakdown columns count for starting row
   const savingsDetailCols = expandSavings ? 3 : 0;
 
-  // Filter out empty wind-down rows (no tax savings, no NOL usage, no carryforward changes)
+  // Filter out quiet wind-down rows where only the routine $3K capital loss deduction is running.
+  // Keep wind-down rows that have meaningful activity: NOL usage, ordinary loss benefits, or
+  // significant tax savings beyond the ~$1.5K/yr capital loss deduction.
   const filteredData = data.filter(y => {
     if (y.strategyActive) return true;
-    // Keep wind-down rows that still have meaningful activity
+    // Keep wind-down rows with NOL usage or ordinary loss benefits (significant events)
     return (
-      Math.abs(y.taxSavings) > 0.01 ||
       y.nolUsedThisYear > 0.01 ||
       y.ordinaryLossBenefit > 0.01 ||
-      y.nolUsageBenefit > 0.01 ||
-      y.capitalLossUsedAgainstIncome > 0.01
+      y.nolUsageBenefit > 0.01
     );
   });
 
@@ -544,7 +555,7 @@ export function ResultsTable({
                 <strong>Total {data.length}-Year Projection</strong>
               </td>
               <td className="highlight">
-                <strong>{formatCurrency(cumulativeSavings)}</strong>
+                <strong>{formatCurrency(totalSavingsAllYears)}</strong>
               </td>
             </tr>
           </tfoot>
