@@ -325,17 +325,18 @@ body {
   }
 }
 
-/* Calculator container — constrained for readability on wide displays */
+/* Calculator container — responsive width with breathing room on wide displays */
 .calculator {
-  max-width: 1400px;
+  max-width: calc(100vw - 400px);  /* 200px margin each side on wide screens */
   margin: 0 auto;
-  padding: 2rem 3rem;
+  padding: 2rem 1.5rem;
 }
 
-/* Extra breathing room on ultra-wide displays */
-@media (min-width: 1800px) {
+/* Below 1200px, let it use most of the viewport */
+@media (max-width: 1200px) {
   .calculator {
-    padding: 2rem 4rem;
+    max-width: 100%;
+    padding: 2rem 1.5rem;
   }
 }
 
