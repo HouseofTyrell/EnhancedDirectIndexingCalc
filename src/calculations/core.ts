@@ -102,15 +102,23 @@ export function calculate(
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
 
-  // Auto-extend projection to show at least 2 post-QFAF years
+  // QFAF duration determines when strategy ends; wind-down continues until carryforwards exhausted
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
-  const minProjection = qfafDuration > 0 ? qfafDuration + 2 : projectionYears;
-  const effectiveProjectionYears = Math.max(projectionYears, minProjection);
+  const maxProjectionYears = Math.max(projectionYears, 30); // Safety cap
 
   // Partial year: month 1 = full year (12/12), month 4 = 9/12, month 12 = 1/12
   const yearFraction = (13 - (inputs.startMonth ?? 1)) / 12;
 
-  for (let year = 1; year <= effectiveProjectionYears; year++) {
+  for (let year = 1; year <= maxProjectionYears; year++) {
+    // In wind-down mode: stop if all carryforwards are exhausted
+    const inWindDown = qfafDuration > 0 && year > qfafDuration;
+    if (inWindDown && stCarryforward <= 0 && ltCarryforward <= 0 && nolCarryforward <= 0) {
+      break;
+    }
+    // If no QFAF (pure collateral), respect projectionYears as before
+    if (qfafDuration === 0 && year > projectionYears) {
+      break;
+    }
     // Zero out QFAF after duration expires (breakeven unwind)
     let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
 
