@@ -119,7 +119,7 @@ body {
 }
 
 .nav-container {
-  max-width: 1920px;
+  max-width: none;
   margin: 0 auto;
   padding: 0 2rem;
   display: flex;
@@ -325,9 +325,9 @@ body {
   }
 }
 
-/* Calculator container */
+/* Calculator container — no fixed max-width, grows with content */
 .calculator {
-  max-width: 1920px;
+  max-width: none;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -405,7 +405,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1920px;
+  max-width: none;
   margin: 0 auto;
   gap: 1.5rem;
 }
