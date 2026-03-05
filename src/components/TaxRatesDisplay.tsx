@@ -18,13 +18,11 @@ interface TaxRatesDisplayProps {
   combinedStRate: number;
   /** Combined federal + state rate for long-term gains */
   combinedLtRate: number;
-  /** Difference between ST and LT rates (the tax arbitrage benefit) */
-  rateDifferential: number;
 }
 
 /**
  * Displays the calculated marginal tax rates based on client profile.
- * Shows federal, state, and combined rates with ST→LT benefit analysis.
+ * Shows federal, state, and combined rates.
  */
 export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
   federalStRate,
@@ -32,7 +30,6 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
   stateRate,
   combinedStRate,
   combinedLtRate,
-  rateDifferential,
 }: TaxRatesDisplayProps) {
   const formatRate = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 
@@ -42,7 +39,6 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
   const stateFlash = useValueFlash(stateRate);
   const combStFlash = useValueFlash(combinedStRate);
   const combLtFlash = useValueFlash(combinedLtRate);
-  const diffFlash = useValueFlash(rateDifferential);
 
   return (
     <CollapsibleSection
@@ -55,7 +51,7 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
           <TaxRatesFormula />
         </InfoPopup>
       }
-      guidance="These marginal rates determine the value of each tax event. A larger rate differential means more savings from rate arbitrage."
+      guidance="These marginal rates determine the value of each tax event. Higher ordinary rates increase the value of QFAF ordinary loss deductions."
       className="tax-rates-section"
     >
       <div className="tax-rates-rows">
@@ -89,7 +85,7 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
           </div>
         </div>
         <div className="tax-rates-row">
-          <span className="tax-rates-row__heading">Combined &amp; Benefit</span>
+          <span className="tax-rates-row__heading">Combined Rates</span>
           <div className="tax-rates-row__items">
             <div className="tax-rate-item highlight">
               <span className="rate-label">
@@ -106,14 +102,6 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
                 </InfoText>
               </span>
               <span className="rate-value" ref={combLtFlash}>{formatRate(combinedLtRate)}</span>
-            </div>
-            <div className="tax-rate-item accent">
-              <span className="rate-label">
-                <InfoText contentKey="st-lt-benefit" currentValue={formatRate(rateDifferential)}>
-                  ST → LT Benefit
-                </InfoText>
-              </span>
-              <span className="rate-value" ref={diffFlash}>{formatRate(rateDifferential)}</span>
             </div>
           </div>
         </div>
