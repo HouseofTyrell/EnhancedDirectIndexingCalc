@@ -282,6 +282,7 @@ export function Calculator() {
         year2TaxSavings={
           inputs.qfafEnabled && results.years.length > 1 ? results.years[1]?.taxSavings : undefined
         }
+        totalTaxSavings={results.summary.totalTaxSavings}
         isExpanded={isExpanded}
         onOpenAdvanced={undefined}
         onReset={() => {
@@ -301,6 +302,7 @@ export function Calculator() {
           year2TaxSavings: pinnedScenario.pinned.inputs.qfafEnabled && pinnedScenario.pinned.results.years.length > 1
             ? pinnedScenario.pinned.results.years[1]?.taxSavings
             : undefined,
+          totalTaxSavings: pinnedScenario.pinned.results.summary.totalTaxSavings,
         } : undefined}
       />
 

@@ -43,7 +43,6 @@ export function ResultsTable({
   data,
   sizing,
   qfafEnabled,
-  projectionYears = 10,
 }: ResultsTableProps) {
   const [expandPortfolio, setExpandPortfolio] = useState(false);
   const [expandCapital, setExpandCapital] = useState(false);
@@ -529,7 +528,7 @@ export function ResultsTable({
           <tfoot>
             <tr>
               <td colSpan={getColSpan() - 1}>
-                <strong>Total {projectionYears}-Year Tax Savings</strong>
+                <strong>Total {data.length}-Year Tax Savings</strong>
               </td>
               <td className="highlight">
                 <strong>{formatCurrency(cumulativeSavings)}</strong>
@@ -542,7 +541,7 @@ export function ResultsTable({
       {/* Carryforward Summary */}
       <div className="carryforward-note">
         <p>
-          <strong>Carryforward Summary (Year {projectionYears}):</strong>
+          <strong>Carryforward Summary (Year {data.length}):</strong>
           <br />
           ST Capital Loss:{' '}
           {formatCurrency(data.length > 0 ? data[data.length - 1].stLossCarryforward : 0)} | LT

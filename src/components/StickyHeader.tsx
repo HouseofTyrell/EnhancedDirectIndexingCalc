@@ -64,6 +64,8 @@ interface StickyHeaderProps {
   annualTaxSavings: number;
   /** Year 2+ tax savings (includes NOL usage), undefined if QFAF disabled */
   year2TaxSavings?: number;
+  /** Total estimated tax savings over the full projection period */
+  totalTaxSavings?: number;
   /** Whether the header is in expanded state (shows additional details) */
   isExpanded: boolean;
   /** Callback when advanced settings button is clicked */
@@ -82,6 +84,7 @@ interface StickyHeaderProps {
     qfafValue: number;
     annualTaxSavings: number;
     year2TaxSavings?: number;
+    totalTaxSavings?: number;
   };
 }
 
@@ -125,6 +128,7 @@ export const StickyHeader = React.memo(function StickyHeader({
   totalExposure,
   annualTaxSavings,
   year2TaxSavings,
+  totalTaxSavings,
   isExpanded,
   onOpenAdvanced,
   onReset,
@@ -141,12 +145,14 @@ export const StickyHeader = React.memo(function StickyHeader({
   const qfafFlash = useValueFlash(qfafValue);
   const savingsFlash = useValueFlash(annualTaxSavings);
   const year2Flash = useValueFlash(year2TaxSavings);
+  const totalSavingsFlash = useValueFlash(totalTaxSavings);
 
   // Delta indicators
   const collateralDelta = useDelta(collateral);
   const qfafDelta = useDelta(qfafValue);
   const savingsDelta = useDelta(annualTaxSavings);
   const year2Delta = useDelta(year2TaxSavings ?? 0);
+  const totalSavingsDelta = useDelta(totalTaxSavings ?? 0);
 
   return (
     <div
@@ -201,6 +207,19 @@ export const StickyHeader = React.memo(function StickyHeader({
             {isExpanded && <span className="sticky-header__subtext">Includes NOL usage</span>}
             {pinnedValues?.year2TaxSavings != null && (
               <PinnedDelta current={year2TaxSavings} pinned={pinnedValues.year2TaxSavings} />
+            )}
+          </div>
+        )}
+        {totalTaxSavings !== undefined && totalTaxSavings > 0 && (
+          <div className="sticky-header__metric sticky-header__metric--highlight">
+            <span className="sticky-header__label">Est. Total Savings</span>
+            <span className="sticky-header__value" aria-live="polite" ref={totalSavingsFlash}>
+              {formatCurrency(totalTaxSavings)}
+              <DeltaBadge delta={totalSavingsDelta} />
+            </span>
+            {isExpanded && <span className="sticky-header__subtext">Full projection</span>}
+            {pinnedValues?.totalTaxSavings != null && (
+              <PinnedDelta current={totalTaxSavings} pinned={pinnedValues.totalTaxSavings} />
             )}
           </div>
         )}
