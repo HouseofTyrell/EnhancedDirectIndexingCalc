@@ -6,21 +6,50 @@ import { InfoText } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 import './StrategyComparison.css';
 
+type SizingMode = 'fixed' | 'dynamic';
+
 interface StrategyComparisonProps {
   baseInputs: CalculatorInputs;
   selectedStrategies: string[];
   onChange: (strategies: string[]) => void;
+  projectionYears?: number;
+}
+
+// Extended comparison result with sizing mode info
+interface ComparisonResultWithSizing extends ComparisonResult {
+  sizingMode: SizingMode;
+  displayKey: string; // unique key: "strategyId:sizingMode"
 }
 
 export const StrategyComparison = memo(function StrategyComparison({
   baseInputs,
   selectedStrategies,
   onChange,
+  projectionYears,
 }: StrategyComparisonProps) {
-  const [sizingMode, setSizingMode] = useState<'fixed' | 'dynamic'>(baseInputs.qfafSizingMode);
+  const years = projectionYears ?? 10;
 
-  // Calculate results for each selected strategy using the selected sizing mode
-  const comparisonResults = useMemo((): ComparisonResult[] => {
+  // Per-strategy sizing modes (defaults to the base input's sizing mode)
+  const [sizingModes, setSizingModes] = useState<Record<string, SizingMode>>(() => {
+    const modes: Record<string, SizingMode> = {};
+    for (const id of selectedStrategies) {
+      modes[id] = baseInputs.qfafSizingMode;
+    }
+    return modes;
+  });
+
+  const getSizingMode = (strategyId: string): SizingMode =>
+    sizingModes[strategyId] ?? baseInputs.qfafSizingMode;
+
+  const toggleSizingMode = (strategyId: string) => {
+    setSizingModes(prev => ({
+      ...prev,
+      [strategyId]: prev[strategyId] === 'dynamic' ? 'fixed' : 'dynamic',
+    }));
+  };
+
+  // Calculate results for each selected strategy using its per-strategy sizing mode
+  const comparisonResults = useMemo((): ComparisonResultWithSizing[] => {
     return selectedStrategies
       .map(strategyId => {
         const strategy = getStrategy(strategyId);
@@ -28,14 +57,16 @@ export const StrategyComparison = memo(function StrategyComparison({
           return null;
         }
 
-        // Calculate with this strategy and the selected sizing mode
-        const inputs = { ...baseInputs, strategyId, qfafSizingMode: sizingMode };
+        const mode = getSizingMode(strategyId);
+        const inputs = { ...baseInputs, strategyId, qfafSizingMode: mode };
         const results = calculate(inputs);
 
         return {
           strategyId,
+          displayKey: `${strategyId}:${mode}`,
           strategyName: strategy.name,
           strategyType: strategy.type,
+          sizingMode: mode,
           qfafRequired: results.sizing.qfafValue,
           totalExposure: results.sizing.totalExposure,
           year1TaxSavings: results.years[0]?.taxSavings || 0,
@@ -44,8 +75,8 @@ export const StrategyComparison = memo(function StrategyComparison({
           trackingErrorDisplay: strategy.trackingErrorDisplay,
         };
       })
-      .filter((r): r is ComparisonResult => r !== null);
-  }, [baseInputs, selectedStrategies, sizingMode]);
+      .filter((r): r is ComparisonResultWithSizing => r !== null);
+  }, [baseInputs, selectedStrategies, sizingModes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Find the best strategy for each metric
   const getBest = (metric: keyof ComparisonResult): string | null => {
@@ -57,8 +88,6 @@ export const StrategyComparison = memo(function StrategyComparison({
       const bestValue = best[metric];
 
       if (typeof currentValue === 'number' && typeof bestValue === 'number') {
-        // For taxAlpha and tax savings, higher is better
-        // For qfafRequired and totalExposure, lower is better (more efficient)
         if (metric === 'qfafRequired' || metric === 'totalExposure') {
           if (currentValue < bestValue) best = result;
         } else {
@@ -72,14 +101,22 @@ export const StrategyComparison = memo(function StrategyComparison({
   // Toggle strategy selection
   const toggleStrategy = (strategyId: string) => {
     if (selectedStrategies.includes(strategyId)) {
-      // Remove if already selected (min 1)
       if (selectedStrategies.length > 1) {
         onChange(selectedStrategies.filter(id => id !== strategyId));
+        // Clean up sizing mode
+        setSizingModes(prev => {
+          const next = { ...prev };
+          delete next[strategyId];
+          return next;
+        });
       }
     } else {
-      // Add if not selected (max 3)
       if (selectedStrategies.length < 3) {
         onChange([...selectedStrategies, strategyId]);
+        setSizingModes(prev => ({
+          ...prev,
+          [strategyId]: baseInputs.qfafSizingMode,
+        }));
       }
     }
   };
@@ -92,7 +129,7 @@ export const StrategyComparison = memo(function StrategyComparison({
     <div className="strategy-comparison">
       <p className="section-description">
         Compare different strategies side-by-side to find the best fit for your situation. Select
-        2-3 strategies below.
+        2-3 strategies below.{baseInputs.qfafEnabled && ' Each strategy can use Fixed or Dynamic QFAF sizing independently.'}
       </p>
 
       {/* Strategy Selector */}
@@ -136,29 +173,6 @@ export const StrategyComparison = memo(function StrategyComparison({
         </div>
       </div>
 
-      {/* Sizing Mode Toggle */}
-      {baseInputs.qfafEnabled && (
-        <div className="sizing-mode-toggle">
-          <span className="sizing-mode-label">QFAF Sizing:</span>
-          <div className="view-mode-selector">
-            <button
-              type="button"
-              className={`view-mode-btn ${sizingMode === 'fixed' ? 'active' : ''}`}
-              onClick={() => setSizingMode('fixed')}
-            >
-              Fixed
-            </button>
-            <button
-              type="button"
-              className={`view-mode-btn ${sizingMode === 'dynamic' ? 'active' : ''}`}
-              onClick={() => setSizingMode('dynamic')}
-            >
-              Dynamic
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Comparison Table */}
       {comparisonResults.length > 0 && (
         <div className="comparison-table-container">
@@ -167,9 +181,27 @@ export const StrategyComparison = memo(function StrategyComparison({
               <tr>
                 <th>Metric</th>
                 {comparisonResults.map(result => (
-                  <th key={result.strategyId}>
+                  <th key={result.displayKey}>
                     <div className="strategy-name">{result.strategyName}</div>
                     <div className="strategy-type">{result.strategyType}</div>
+                    {baseInputs.qfafEnabled && (
+                      <div className="strategy-sizing-toggle">
+                        <button
+                          type="button"
+                          className={`sizing-toggle-btn ${result.sizingMode === 'fixed' ? 'active' : ''}`}
+                          onClick={() => toggleSizingMode(result.strategyId)}
+                        >
+                          Fixed
+                        </button>
+                        <button
+                          type="button"
+                          className={`sizing-toggle-btn ${result.sizingMode === 'dynamic' ? 'active' : ''}`}
+                          onClick={() => toggleSizingMode(result.strategyId)}
+                        >
+                          Dynamic
+                        </button>
+                      </div>
+                    )}
                   </th>
                 ))}
               </tr>
@@ -183,7 +215,7 @@ export const StrategyComparison = memo(function StrategyComparison({
                 </td>
                 {comparisonResults.map(result => (
                   <td
-                    key={result.strategyId}
+                    key={result.displayKey}
                     className={getBest('qfafRequired') === result.strategyId ? 'winner' : ''}
                   >
                     {formatCurrency(result.qfafRequired)}
@@ -199,7 +231,7 @@ export const StrategyComparison = memo(function StrategyComparison({
                 </td>
                 {comparisonResults.map(result => (
                   <td
-                    key={result.strategyId}
+                    key={result.displayKey}
                     className={getBest('totalExposure') === result.strategyId ? 'winner' : ''}
                   >
                     {formatCurrency(result.totalExposure)}
@@ -215,7 +247,7 @@ export const StrategyComparison = memo(function StrategyComparison({
                 </td>
                 {comparisonResults.map(result => (
                   <td
-                    key={result.strategyId}
+                    key={result.displayKey}
                     className={getBest('year1TaxSavings') === result.strategyId ? 'winner' : ''}
                   >
                     {formatCurrency(result.year1TaxSavings)}
@@ -226,12 +258,12 @@ export const StrategyComparison = memo(function StrategyComparison({
               <tr>
                 <td>
                   <InfoText contentKey="total-tax-savings">
-                    10-Year Tax Savings
+                    {years}-Year Tax Savings
                   </InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
-                    key={result.strategyId}
+                    key={result.displayKey}
                     className={getBest('tenYearTaxSavings') === result.strategyId ? 'winner' : ''}
                   >
                     {formatCurrency(result.tenYearTaxSavings)}
@@ -247,7 +279,7 @@ export const StrategyComparison = memo(function StrategyComparison({
                 </td>
                 {comparisonResults.map(result => (
                   <td
-                    key={result.strategyId}
+                    key={result.displayKey}
                     className={getBest('taxAlpha') === result.strategyId ? 'winner' : ''}
                   >
                     {formatPercent(result.taxAlpha)}
@@ -262,7 +294,7 @@ export const StrategyComparison = memo(function StrategyComparison({
                   </InfoText>
                 </td>
                 {comparisonResults.map(result => (
-                  <td key={result.strategyId}>{result.trackingErrorDisplay}</td>
+                  <td key={result.displayKey}>{result.trackingErrorDisplay}</td>
                 ))}
               </tr>
             </tbody>
@@ -274,11 +306,22 @@ export const StrategyComparison = memo(function StrategyComparison({
         <div className="comparison-summary">
           <p>
             <strong>Best for Tax Savings:</strong>{' '}
-            {getStrategy(getBest('tenYearTaxSavings') || '')?.name || 'N/A'}
+            {(() => {
+              const bestId = getBest('tenYearTaxSavings');
+              const best = comparisonResults.find(r => r.strategyId === bestId);
+              if (!best) return 'N/A';
+              return `${best.strategyName} (${best.sizingMode})`;
+            })()}
           </p>
           <p>
             <strong>Most Capital Efficient:</strong>{' '}
-            {getStrategy(getBest('qfafRequired') || '')?.name || 'N/A'} (lowest QFAF required)
+            {(() => {
+              const bestId = getBest('qfafRequired');
+              const best = comparisonResults.find(r => r.strategyId === bestId);
+              if (!best) return 'N/A';
+              return `${best.strategyName} (${best.sizingMode})`;
+            })()}{' '}
+            (lowest QFAF required)
           </p>
         </div>
       )}

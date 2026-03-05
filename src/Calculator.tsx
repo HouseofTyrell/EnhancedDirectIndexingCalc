@@ -438,33 +438,6 @@ export function Calculator() {
       <div className="section-group section-group--results">
         <div className="section-group__label">Results</div>
 
-      {/* Results Summary - headline metrics */}
-      <PinnableSection id="results" label="Results Summary" isPinned={pinnedElements.isPinned('results')} onTogglePin={() => pinnedElements.togglePin('results')}>
-      <ResultsSummary
-        totalTaxSavings={results.summary.totalTaxSavings}
-        finalPortfolioValue={results.summary.finalPortfolioValue}
-        effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
-        totalNolGenerated={results.summary.totalNolGenerated}
-        projectionYears={advancedSettings.projectionYears}
-        collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
-        collateralAmount={inputs.collateralAmount}
-        stateCode={inputs.stateCode}
-      />
-      </PinnableSection>
-
-      {/* Scenario comparison panel (shown when a scenario is pinned) */}
-      {pinnedScenario.pinned && (
-        <ScenarioComparisonPanel
-          pinned={pinnedScenario.pinned}
-          currentInputs={inputs}
-          currentSettings={advancedSettings}
-          currentResults={results}
-          onUnpin={pinnedScenario.unpin}
-          onRestore={handleRestorePinned}
-          onReplacePin={() => pinnedScenario.replacePin(inputs, advancedSettings, results)}
-        />
-      )}
-
       {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
       <PinnableSection id="charts" label="Charts & Table" isPinned={pinnedElements.isPinned('charts')} onTogglePin={() => pinnedElements.togglePin('charts')}>
       <CollapsibleSection
@@ -494,6 +467,33 @@ export function Calculator() {
         />
       </CollapsibleSection>
       </PinnableSection>
+
+      {/* Results Summary - headline metrics (Step 5) */}
+      <PinnableSection id="results" label="Results Summary" isPinned={pinnedElements.isPinned('results')} onTogglePin={() => pinnedElements.togglePin('results')}>
+      <ResultsSummary
+        totalTaxSavings={results.summary.totalTaxSavings}
+        finalPortfolioValue={results.summary.finalPortfolioValue}
+        effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
+        totalNolGenerated={results.summary.totalNolGenerated}
+        projectionYears={advancedSettings.projectionYears}
+        collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
+        collateralAmount={inputs.collateralAmount}
+        stateCode={inputs.stateCode}
+      />
+      </PinnableSection>
+
+      {/* Scenario comparison panel (shown when a scenario is pinned) */}
+      {pinnedScenario.pinned && (
+        <ScenarioComparisonPanel
+          pinned={pinnedScenario.pinned}
+          currentInputs={inputs}
+          currentSettings={advancedSettings}
+          currentResults={results}
+          onUnpin={pinnedScenario.unpin}
+          onRestore={handleRestorePinned}
+          onReplacePin={() => pinnedScenario.replacePin(inputs, advancedSettings, results)}
+        />
+      )}
 
       </div>{/* end section-group--results */}
 
@@ -555,6 +555,7 @@ export function Calculator() {
                 baseInputs={inputs}
                 selectedStrategies={comparisonStrategies}
                 onChange={setComparisonStrategies}
+                projectionYears={advancedSettings.projectionYears}
               />
             </CollapsibleSection>
           </div>

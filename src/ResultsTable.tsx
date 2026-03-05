@@ -107,8 +107,21 @@ export function ResultsTable({
   // Savings breakdown columns count for starting row
   const savingsDetailCols = expandSavings ? 3 : 0;
 
+  // Filter out empty wind-down rows (no tax savings, no NOL usage, no carryforward changes)
+  const filteredData = data.filter(y => {
+    if (y.strategyActive) return true;
+    // Keep wind-down rows that still have meaningful activity
+    return (
+      Math.abs(y.taxSavings) > 0.01 ||
+      y.nolUsedThisYear > 0.01 ||
+      y.ordinaryLossBenefit > 0.01 ||
+      y.nolUsageBenefit > 0.01 ||
+      y.capitalLossUsedAgainstIncome > 0.01
+    );
+  });
+
   // Determine if this is the first wind-down row for divider
-  const firstWindDownIndex = data.findIndex(y => !y.strategyActive);
+  const firstWindDownIndex = filteredData.findIndex(y => !y.strategyActive);
 
   return (
     <div className="table-container">
@@ -360,7 +373,7 @@ export function ResultsTable({
               <td className="starting-note">—</td>
             </tr>
 
-            {data.map((year, index) => {
+            {filteredData.map((year, index) => {
               // Get the appropriate benefit based on view mode
               const displayedBenefit =
                 viewMode === 'qfaf-only'
@@ -528,7 +541,7 @@ export function ResultsTable({
           <tfoot>
             <tr>
               <td colSpan={getColSpan() - 1}>
-                <strong>Total {data.length}-Year Tax Savings</strong>
+                <strong>Total {data.length}-Year Projection</strong>
               </td>
               <td className="highlight">
                 <strong>{formatCurrency(cumulativeSavings)}</strong>
