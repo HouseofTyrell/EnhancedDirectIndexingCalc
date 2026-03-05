@@ -447,7 +447,7 @@ export function Calculator() {
         title="Estimated Detailed Projections"
         headerAction={
           <InfoPopup title="Projection Methodology">
-            <ProjectionFormula qfafMultiplier={advancedSettings.qfafMultiplier} />
+            <ProjectionFormula qfafMultiplier={advancedSettings.qfafMultiplier} projectionYears={advancedSettings.projectionYears} />
           </InfoPopup>
         }
         guidance={`Estimated year-by-year breakdown showing how tax benefits compound over the ${advancedSettings.projectionYears}-year projection period.`}

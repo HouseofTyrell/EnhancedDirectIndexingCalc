@@ -1,12 +1,13 @@
 interface ProjectionFormulaProps {
   qfafMultiplier?: number;
+  projectionYears?: number;
 }
 
-export function ProjectionFormula({ qfafMultiplier = 1.5 }: ProjectionFormulaProps) {
+export function ProjectionFormula({ qfafMultiplier = 1.5, projectionYears = 10 }: ProjectionFormulaProps) {
   const pct = (qfafMultiplier * 100).toFixed(0);
   return (
     <div className="formula-doc">
-      <h4>10-Year Projection Assumptions</h4>
+      <h4>{projectionYears}-Year Projection Assumptions</h4>
       <pre>
         {`Portfolio Growth: 7% annual return (conservative)
 
@@ -34,7 +35,7 @@ Tax Savings = Baseline Tax - Actual Tax`}
 
       <h4>Effective Tax Alpha</h4>
       <pre>
-        {`Effective Tax Alpha = Total Tax Savings / Total Exposure / 10 years
+        {`Effective Tax Alpha = Total Tax Savings / Total Exposure / ${projectionYears} years
 
 This gives the annualized tax benefit as a percentage
 of your total investment.`}
