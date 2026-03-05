@@ -129,7 +129,7 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             </InfoText>
           </h3>
           <p className="big-number">{formatCurrency(totalNolGenerated)}</p>
-          <p className="subtext">Cumulative excess</p>
+          <p className="subtext">Available to offset future income (80%/yr)</p>
         </div>
         <div className="card">
           <h3>Est. Avg. Annual Savings</h3>

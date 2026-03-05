@@ -160,9 +160,9 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 
   'st-lt-conversion-benefit': {
-    title: 'ST→LT Conversion Benefit',
+    title: 'Rate Arbitrage Benefit',
     definition:
-      'Tax savings from converting short-term gains (taxed at ordinary rates) to long-term treatment.',
+      'Tax savings because gains are taxed at the lower long-term rate instead of the higher short-term/ordinary rate. QFAF short-term gains are offset by collateral short-term losses, converting them to long-term treatment.',
     formula: 'Matched ST Amount × (Ordinary Rate - LT Rate)',
     impact:
       'By matching QFAF ST gains with collateral ST losses, gains are effectively taxed at LT rates.',
@@ -297,9 +297,9 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'col-usable-loss': {
     title: 'Usable Ordinary Loss',
-    definition: 'Ordinary loss amount that can be used this year.',
-    formula: 'min(Ordinary Loss, §461(l) Limit)',
-    impact: 'Reduces taxable income at marginal ordinary rate.',
+    definition: 'Ordinary loss amount deductible this year after §461(l) cap. Click to expand and see the gross loss generated, the usable amount, and any excess flowing to NOL carryforward.',
+    formula: 'min(Gross Ordinary Loss, §461(l) Limit, Taxable Income)',
+    impact: 'Reduces taxable income at marginal ordinary rate. Excess above the cap becomes NOL for future years.',
   },
 
   'col-excess-nol': {
@@ -336,12 +336,12 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'col-tax-savings': {
     title: 'Tax Savings',
     definition: 'Net tax benefit for this year. Click to expand and see the gross benefits and costs that make up this number.',
-    formula: 'Ord. Loss Benefit + NOL Benefit + ST→LT Conversion + Cap Loss Benefit − LT Gain Cost − ST Gain Cost',
+    formula: 'Ord. Ded. + NOL Ben. + Rate Arb. + Cap Loss Benefit − LT Cost − ST Gain Cost',
     impact: 'Annual value extracted from the tax optimization strategy.',
   },
 
   'col-ord-loss-benefit': {
-    title: 'Ordinary Loss Benefit',
+    title: 'Ordinary Deduction Benefit',
     definition: 'Tax savings from deducting the usable ordinary loss against W-2/ordinary income.',
     formula: 'Usable Ordinary Loss × Combined Ordinary Rate',
     impact: 'Usually the largest single benefit component. Capped by §461(l) limit.',
@@ -355,8 +355,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 
   'col-conversion-benefit': {
-    title: 'ST→LT Conversion Benefit',
-    definition: 'Tax savings from converting short-term gains (taxed at ordinary rates) into long-term gains (taxed at lower rates).',
+    title: 'Rate Arbitrage Benefit',
+    definition: 'Tax savings because gains were taxed at the lower long-term capital gains rate instead of the higher short-term/ordinary rate. QFAF generates short-term gains that are offset by collateral short-term losses, converting them to long-term treatment.',
     formula: 'min(ST Gains, ST Losses) × (Ordinary Rate − LT Rate)',
     impact: 'Captures the rate differential between ordinary and LT rates.',
   },
@@ -407,9 +407,9 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 
   'col-max-offset': {
-    title: 'Offset Capacity',
+    title: 'Max Shelter',
     definition:
-      'Maximum income that could be sheltered from tax this year. Useful for planning when to exercise stock options or realize other taxable income. Click to expand for NOL details.',
+      'Maximum income that could be sheltered from tax this year. Useful for planning when to exercise stock options or realize other taxable income. Click to expand for NOL details. In wind-down years (marked with *), this reflects available carryforward capacity only — no new losses are generated.',
     formula: '§461(l) Limit + Start-of-Year NOL Balance + Capital Loss Limit ($3K/$1.5K)',
     impact:
       'Higher values indicate better years to realize additional taxable income. The §461(l) limit renews annually; the NOL balance accumulates over time.',

@@ -119,7 +119,7 @@ body {
 }
 
 .nav-container {
-  max-width: 1200px;
+  max-width: 1920px;
   margin: 0 auto;
   padding: 0 2rem;
   display: flex;
@@ -327,7 +327,7 @@ body {
 
 /* Calculator container */
 .calculator {
-  max-width: 1200px;
+  max-width: 1920px;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -405,7 +405,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
+  max-width: 1920px;
   margin: 0 auto;
   gap: 1.5rem;
 }
@@ -4642,6 +4642,56 @@ th.cost-col {
   color: var(--text);
 }
 
+/* Ordinary Loss column styling (now expandable) */
+.col-ordinary-loss.col-expandable {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-left: 2px solid #3b82f6;
+  cursor: pointer;
+  user-select: none;
+}
+
+.col-ordinary-loss.col-expandable:hover {
+  background: #dbeafe !important;
+}
+
+/* Cumulative column styling */
+.col-cumulative {
+  background: linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
+  border-left: 2px solid #8b5cf6;
+  min-width: 85px;
+}
+
+.cumulative-cell {
+  color: #7c3aed;
+  font-weight: 500;
+}
+
+/* Wind-down divider row */
+.wind-down-divider-row {
+  background: var(--bg) !important;
+}
+
+.wind-down-divider-row td {
+  text-align: center;
+  padding: 0.5rem 1rem !important;
+  border-top: 2px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.wind-down-divider-text {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-light);
+}
+
+/* Wind-down shelter asterisk indicator */
+.wind-down-shelter {
+  opacity: 0.7;
+  font-style: italic;
+}
+
 /* Savings column highlight */
 .col-savings {
   background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
@@ -6104,6 +6154,31 @@ select:focus:not(:focus-visible) {
 
 [data-theme='dark'] .col-nol-activity {
   background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+}
+
+[data-theme='dark'] .col-ordinary-loss.col-expandable {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+}
+
+[data-theme='dark'] .col-ordinary-loss.col-expandable:hover {
+  background: #1e40af !important;
+}
+
+[data-theme='dark'] .col-cumulative {
+  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 100%);
+}
+
+[data-theme='dark'] .cumulative-cell {
+  color: #c4b5fd;
+}
+
+[data-theme='dark'] .wind-down-divider-row {
+  background: var(--bg) !important;
+}
+
+[data-theme='dark'] .wind-down-divider-row td {
+  border-top-color: var(--border);
+  border-bottom-color: var(--border);
 }
 
 [data-theme='dark'] .col-savings {
