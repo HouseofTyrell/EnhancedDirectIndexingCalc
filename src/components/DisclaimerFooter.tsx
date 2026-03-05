@@ -1,3 +1,5 @@
+import { version } from '../../package.json';
+
 export function DisclaimerFooter() {
   return (
     <footer className="disclaimer">
@@ -54,7 +56,7 @@ export function DisclaimerFooter() {
         investment, tax, or legal advice. Past performance does not guarantee future results.
       </p>
 
-      <div className="version-indicator">v1.1.0</div>
+      <div className="version-indicator">v{version}</div>
     </footer>
   );
 }
