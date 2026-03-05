@@ -8,7 +8,7 @@ This calculator helps financial advisors and qualified purchasers evaluate the t
 
 - **Direct Indexing Strategies**: Core (cash-funded) and Overlay (appreciated stock collateral) approaches with varying leverage ratios
 - **QFAF Tax Mechanics**: 150% short-term gains offset by 150% ordinary losses
-- **Multi-Year Projections**: 10-year wealth and tax savings forecasts
+- **Multi-Year Projections**: Configurable projection horizon (default 10 years, up to 30) with wealth and tax savings forecasts
 - **Advanced Tax Rules**: Section 461(l) limits, NOL carryforwards, capital loss limitations per IRC §1211(b)
 
 ## Features
@@ -77,16 +77,18 @@ npm run test:run
 
 ```
 src/
-├── Calculator.tsx          # Main calculator component
+├── Calculator.tsx          # Main calculator component (orchestrates all sections)
 ├── ResultsTable.tsx        # Year-by-year results display
-├── WealthChart.tsx         # Portfolio growth visualization
+├── WealthChart.tsx         # Portfolio growth visualization (Tax Savings & Portfolio charts)
 ├── InfoPopup.tsx           # Field-level help popups
-├── calculations.ts         # Core tax calculation engine
-├── calculations.test.ts    # Calculation tests
+├── calculations/           # Core tax calculation engine
+│   ├── core.ts             # Main calculate() function
+│   ├── sizing.ts           # QFAF auto-sizing logic
+│   └── types.ts            # Calculation-specific types
 ├── types.ts                # TypeScript interfaces
 ├── taxData.ts              # Federal/state tax rates (2026)
 ├── strategyData.ts         # Strategy definitions and constants
-├── popupContent.ts         # UI help content
+├── popupContent.ts         # UI help content (tooltip definitions)
 ├── index.css               # Styles
 ├── main.tsx                # App entry point
 ├── hooks/
@@ -94,19 +96,23 @@ src/
 │   ├── useQualifiedPurchaser.ts # QP verification modal
 │   └── useScrollHeader.ts       # Sticky header behavior
 ├── components/
-│   ├── AdvancedModal.tsx       # Advanced mode container
-│   ├── QualifiedPurchaserModal.tsx # QP verification
-│   ├── ResultsSummary.tsx      # Summary statistics
+│   ├── ResultsSummary.tsx      # Estimated Tax Savings headline metrics (Step 5)
+│   ├── ResultsChartsSection.tsx # Charts + table container
+│   ├── SizingSummary.tsx       # Strategy sizing cards + tax benefit breakdown
 │   ├── StickyHeader.tsx        # Scroll-aware header
-│   └── Icons.tsx               # SVG icon components
+│   ├── ScenarioComparisonPanel.tsx # Pinned scenario A/B comparison
+│   ├── StrategySelectionInputs.tsx # Strategy & QFAF configuration inputs
+│   └── Formulas/               # Formula documentation components
+│       └── ProjectionFormula.tsx
 ├── AdvancedMode/
 │   ├── AdvancedModeToggle.tsx  # Mode switch control
-│   ├── SettingsPanel.tsx       # Advanced settings
-│   ├── StrategyComparison.tsx  # Compare all strategies
-│   ├── StrategyRateEditor.tsx  # Custom rate overrides
-│   ├── SensitivityAnalysis.tsx # Parameter sensitivity
-│   ├── ScenarioAnalysis.tsx    # Bull/Base/Bear scenarios
-│   ├── YearByYearPlanning.tsx  # Annual income overrides
+│   ├── SettingsPanel.tsx       # Advanced settings (projection years, growth, fees)
+│   ├── StrategyComparison.tsx  # Compare strategies with per-strategy sizing modes
+│   ├── StrategyRateEditor.tsx  # Custom rate overrides per year
+│   ├── SensitivityAnalysis.tsx # Parameter sensitivity stress testing
+│   ├── ScenarioAnalysis.tsx    # Bull/Base/Bear scenario modeling
+│   ├── YearByYearPlanning.tsx  # Annual income/infusion overrides
+│   ├── QfafTestByYear.tsx      # Standalone QFAF subscription planner
 │   └── CollapsibleSection.tsx  # Accordion UI component
 └── utils/
     ├── formatters.ts           # Number formatting utilities
@@ -156,7 +162,7 @@ The calculator uses sensible defaults that can be adjusted in Advanced Mode:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Annual Return | 7% | Expected market return |
-| Projection Years | 10 | Forecast horizon |
+| Projection Years | 10 | Forecast horizon (configurable 1–30) |
 | QFAF Multiplier | 1.50x | ST gain and ordinary loss rates |
 | NOL Offset Limit | 80% | Maximum taxable income offset |
 

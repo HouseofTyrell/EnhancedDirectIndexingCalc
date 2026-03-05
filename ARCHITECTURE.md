@@ -80,7 +80,7 @@ calculate(inputs, settings)
     │       │
     │       └── Returns: CalculatedSizing
     │
-    ├── calculateYear() × 10        # Year-by-year projections
+    ├── calculateYear() × N          # Year-by-year projections (N = projectionYears)
     │       │
     │       ├── calculateTax()      # Tax liability
     │       └── calculateCarryforwards()
@@ -97,11 +97,12 @@ calculate(inputs, settings)
 ```
 CalculationResult
     │
-    ├── ResultsSummary         ← summary
     ├── TaxRatesDisplay        ← computed tax rates
-    ├── ResultsTable           ← years[]
+    ├── SizingSummary          ← sizing + year 1/2 tax benefits
+    ├── ResultsTable           ← years[] (Step 4: Year-by-Year Breakdown)
     ├── TaxSavingsChart        ← years[]
-    └── PortfolioValueChart    ← years[]
+    ├── PortfolioValueChart    ← years[]
+    └── ResultsSummary         ← summary (Step 5: Estimated Tax Savings)
 ```
 
 ## Key Components
@@ -127,7 +128,7 @@ Pure functions for tax calculations:
 | Function | Purpose |
 |----------|---------|
 | `calculateSizing()` | Auto-size QFAF based on collateral ST losses |
-| `calculate()` | Main entry point, returns 10-year projection |
+| `calculate()` | Main entry point, returns N-year projection (configurable) |
 | `calculateYear()` | Single year tax calculation |
 | `calculateTax()` | Federal + state tax liability |
 | `calculateCarryforwards()` | Loss carryforward logic |
@@ -166,7 +167,7 @@ function isAdvancedModeState(value: unknown): value is AdvancedModeState {
 ### Year-by-Year Flow
 
 ```
-For each year 1-10:
+For each year 1-N (N = projectionYears, default 10):
     │
     ├── 1. Apply loss rate decay (7% annual, 30% floor)
     │
@@ -211,7 +212,7 @@ AdvancedModal
     ├── YearByYearPlanning     # Override income by year
     ├── SensitivityAnalysis    # Stress-test assumptions
     ├── ScenarioAnalysis       # Bull/Base/Bear scenarios
-    ├── StrategyComparison     # Compare all strategies
+    ├── StrategyComparison     # Compare strategies with per-strategy sizing modes
     └── SettingsPanel          # Formula constants
 ```
 
