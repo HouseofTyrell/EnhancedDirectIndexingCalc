@@ -48,7 +48,6 @@ export function ResultsTable({
   const [expandPortfolio, setExpandPortfolio] = useState(false);
   const [expandCapital, setExpandCapital] = useState(false);
   const [expandOrdLoss, setExpandOrdLoss] = useState(false);
-  const [expandNOL, setExpandNOL] = useState(false);
   const [expandSavings, setExpandSavings] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('combined');
@@ -63,7 +62,6 @@ export function ResultsTable({
     setExpandPortfolio(newState);
     setExpandCapital(newState);
     setExpandOrdLoss(newState);
-    setExpandNOL(newState);
     setExpandSavings(newState);
   };
 
@@ -95,11 +93,10 @@ export function ResultsTable({
     if (viewMode === 'qfaf-only') cols += 1;
     if (expandCapital && viewMode === 'combined' && qfafEnabled) cols += 1;
 
-    // QFAF columns - Ordinary Loss (expandable), NOL Activity
+    // QFAF columns - Ordinary Loss (expandable)
     if (showQfaf && qfafEnabled) {
-      cols += 2; // Ord. Loss headline + Max Shelter headline
-      if (expandOrdLoss) cols += 2; // Gross Loss, → NOL
-      if (expandNOL) cols += 3; // NOL Chg., Applied, Carryover
+      cols += 1; // Ord. Loss headline
+      if (expandOrdLoss) cols += 5; // Gross, → NOL, Max Shelter, NOL Applied, NOL Carryover
     }
 
     cols += 1; // Tax Savings column
@@ -236,7 +233,7 @@ export function ResultsTable({
               {/* QFAF columns - show in combined and qfaf-only */}
               {showQfaf && qfafEnabled && (
                 <>
-                  {/* Ordinary Loss - now expandable to show Gross / Usable / → NOL */}
+                  {/* Ordinary Loss - expandable to show Gross, → NOL, Max Shelter, NOL Applied, NOL Carryover */}
                   <th
                     className={`col-expandable col-ordinary-loss ${viewMode === 'qfaf-only' ? 'qfaf-col' : ''}`}
                     onClick={() => setExpandOrdLoss(!expandOrdLoss)}
@@ -249,7 +246,7 @@ export function ResultsTable({
                     </span>
                   </th>
 
-                  {/* Expanded Ordinary Loss Details */}
+                  {/* Expanded Ordinary Loss & NOL Details */}
                   {expandOrdLoss && (
                     <>
                       <th className="col-detail qfaf-col">
@@ -258,33 +255,14 @@ export function ResultsTable({
                       <th className="col-detail qfaf-col">
                         <InfoText contentKey="col-excess-nol">→ NOL</InfoText>
                       </th>
-                    </>
-                  )}
-
-                  {/* Max Shelter - Collapsible (headline column) */}
-                  <th
-                    className={`col-expandable col-nol-activity ${viewMode === 'qfaf-only' ? 'qfaf-col' : ''}`}
-                    onClick={() => setExpandNOL(!expandNOL)}
-                  >
-                    <span className="expandable-header">
-                      <span className="expand-icon">
-                        {expandNOL ? <ChevronDown /> : <ChevronRight />}
-                      </span>
-                      <InfoText contentKey="col-max-offset">Max Shelter</InfoText>
-                    </span>
-                  </th>
-
-                  {/* Expanded NOL Details */}
-                  {expandNOL && (
-                    <>
                       <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-nol-activity">NOL Chg.</InfoText>
+                        <InfoText contentKey="col-max-offset">Max Shelter</InfoText>
                       </th>
                       <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-nol-used">Applied</InfoText>
+                        <InfoText contentKey="col-nol-used">NOL Applied</InfoText>
                       </th>
                       <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-nol-carryforward">Carryover</InfoText>
+                        <InfoText contentKey="col-nol-carryforward">NOL Carryover</InfoText>
                       </th>
                     </>
                   )}
@@ -365,11 +343,6 @@ export function ResultsTable({
                     <>
                       <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
-                    </>
-                  )}
-                  <td className="starting-note">—</td>
-                  {expandNOL && (
-                    <>
                       <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
@@ -399,11 +372,6 @@ export function ResultsTable({
 
               cumulativeSavings += displayedBenefit;
               const netCapital = getNetCapital(year);
-
-              // NOL Activity summary: show net change or current balance
-              const nolGenerated = year.excessToNol;
-              const nolUsed = year.nolUsedThisYear;
-              const nolNet = nolGenerated - nolUsed;
 
               // Get portfolio value based on view mode
               const portfolioValue =
@@ -485,7 +453,7 @@ export function ResultsTable({
                           {isWindDown ? '—' : `(${formatCurrency(year.usableOrdinaryLoss)})`}
                         </td>
 
-                        {/* Expanded Ordinary Loss Details */}
+                        {/* Expanded Ordinary Loss & NOL Details */}
                         {expandOrdLoss && (
                           <>
                             {/* Gross Ordinary Loss (before §461(l) cap) */}
@@ -500,26 +468,11 @@ export function ResultsTable({
                                   ? formatCurrency(year.excessToNol)
                                   : '—'}
                             </td>
-                          </>
-                        )}
-
-                        {/* Max Shelter (collapsed headline) */}
-                        <td className={`highlight ${isWindDown ? 'wind-down-shelter' : ''}`}>
-                          {isWindDown && year.maxIncomeOffsetCapacity > 0
-                            ? <span title="Available capacity from carryforwards (no new losses generated)">{formatCurrency(year.maxIncomeOffsetCapacity)}*</span>
-                            : formatCurrency(year.maxIncomeOffsetCapacity)}
-                        </td>
-
-                        {/* Expanded NOL Details */}
-                        {expandNOL && (
-                          <>
-                            {/* NOL Change (+/-) — standardized to parentheses for negative */}
-                            <td className={nolNet > 0 ? 'nol-generated qfaf-col' : nolNet < 0 ? 'nol-used qfaf-col' : 'qfaf-col'}>
-                              {nolNet > 0
-                                ? `+${formatCurrency(nolNet)}`
-                                : nolNet < 0
-                                  ? `(${formatCurrency(Math.abs(nolNet))})`
-                                  : '—'}
+                            {/* Max Shelter */}
+                            <td className={`qfaf-col ${isWindDown ? 'wind-down-shelter' : ''}`}>
+                              {isWindDown && year.maxIncomeOffsetCapacity > 0
+                                ? <span title="Available capacity from carryforwards (no new losses generated)">{formatCurrency(year.maxIncomeOffsetCapacity)}*</span>
+                                : formatCurrency(year.maxIncomeOffsetCapacity)}
                             </td>
                             {/* NOL Applied */}
                             <td className={year.nolUsedThisYear > 0 ? 'positive qfaf-col' : 'qfaf-col'}>
@@ -605,12 +558,9 @@ export function ResultsTable({
         {qfafEnabled && (
           <p className="carryforward-explanation">
             <em>
-              Note: "Max Shelter" shows the maximum income you could shelter from tax each year
-              (§461(l) limit + accumulated NOL). Expand "Ord. Loss" to see gross losses vs. §461(l) cap
-              and excess flowing to NOL. Expand "Max Shelter" for NOL details: change, applied, and
-              carryover. Rows marked "W/D" are post-strategy wind-down years where only
-              carryforward usage continues — shelter values marked with * indicate available capacity
-              from carryforwards only (no new losses generated).
+              Expand "Ord. Loss" to see gross losses, §461(l) cap overflow to NOL, max shelter
+              capacity, and NOL usage details. Rows marked "W/D" are post-strategy wind-down years
+              where only carryforward usage continues.
             </em>
           </p>
         )}
