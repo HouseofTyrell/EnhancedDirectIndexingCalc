@@ -48,6 +48,7 @@ const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
     year: i + 1,
     w2Income: baseIncome,
     cashInfusion: 0,
+    cashInfusionTaxType: 'gross' as const,
     note: '',
   }));
 };
@@ -503,6 +504,10 @@ export function Calculator() {
               <YearByYearPlanning
                 baseIncome={inputs.annualIncome}
                 overrides={yearOverrides}
+                combinedTaxRate={
+                  getFederalStRate(inputs.annualIncome, inputs.filingStatus) +
+                  (inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode))
+                }
                 onChange={setYearOverrides}
                 onReset={resetYearOverrides}
               />

@@ -147,10 +147,13 @@ export interface CalculationResult {
 // ============================================
 
 // Year-by-Year Planning
+export type CashInfusionTaxType = 'gross' | 'net';
+
 export interface YearOverride {
   year: number;
   w2Income: number; // Override annual income for this year
   cashInfusion: number; // Additional capital added at year start
+  cashInfusionTaxType: CashInfusionTaxType; // 'gross' = pre-tax, 'net' = after-tax (default: 'gross')
   note: string; // User note (e.g., "Retirement", "Bonus")
 }
 

@@ -34,6 +34,7 @@ function generateDefaultOverrides(baseIncome: number): YearOverride[] {
     year: i + 1,
     w2Income: baseIncome,
     cashInfusion: 0,
+    cashInfusionTaxType: 'gross' as const,
     note: '',
   }));
 }
@@ -44,6 +45,7 @@ describe('Advanced Features - Cash Infusion', () => {
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $2M cash infusion in year 3
       overrides[2].cashInfusion = 2000000;
+      overrides[2].cashInfusionTaxType = 'net';
 
       const resultWithInfusion = calculateWithOverrides(
         baseClient,
@@ -74,6 +76,7 @@ describe('Advanced Features - Cash Infusion', () => {
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $2M cash infusion in year 3
       overrides[2].cashInfusion = 2000000;
+      overrides[2].cashInfusionTaxType = 'net';
 
       const resultWithInfusion = calculateWithOverrides(
         baseClient,
@@ -95,6 +98,7 @@ describe('Advanced Features - Cash Infusion', () => {
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $2M cash infusion in year 3
       overrides[2].cashInfusion = 2000000;
+      overrides[2].cashInfusionTaxType = 'net';
 
       const resultWithInfusion = calculateWithOverrides(
         baseClient,
@@ -117,6 +121,7 @@ describe('Advanced Features - Cash Infusion', () => {
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $1M in year 1
       overrides[0].cashInfusion = 1000000;
+      overrides[0].cashInfusionTaxType = 'net';
 
       const resultWithInfusion = calculateWithOverrides(
         baseClient,
@@ -142,7 +147,9 @@ describe('Advanced Features - Cash Infusion', () => {
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $500K in year 2 and $500K in year 5
       overrides[1].cashInfusion = 500000;
+      overrides[1].cashInfusionTaxType = 'net';
       overrides[4].cashInfusion = 500000;
+      overrides[4].cashInfusionTaxType = 'net';
 
       const resultWithInfusions = calculateWithOverrides(
         baseClient,
@@ -165,6 +172,7 @@ describe('Advanced Features - Cash Infusion', () => {
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $5M cash infusion in year 1 (doubling the portfolio)
       overrides[0].cashInfusion = 5000000;
+      overrides[0].cashInfusionTaxType = 'net';
 
       const resultWithInfusion = calculateWithOverrides(
         baseClient,
@@ -292,6 +300,7 @@ describe('Advanced Features - Income Overrides', () => {
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Year 5: Final big contribution before retirement
       overrides[4].cashInfusion = 3000000;
+      overrides[4].cashInfusionTaxType = 'net';
       overrides[4].note = 'Pre-retirement contribution';
       // Year 6: Retire with reduced income
       overrides[5].w2Income = 100000;
@@ -360,6 +369,7 @@ describe('Advanced Features - Income Overrides', () => {
       // Year 3: Business exit - big income + big contribution
       overrides[2].w2Income = 5000000; // $5M from business sale
       overrides[2].cashInfusion = 10000000; // $10M invested from proceeds
+      overrides[2].cashInfusionTaxType = 'net';
       overrides[2].note = 'Business exit';
       // Year 4+: Reduced income, living off investments
       for (let i = 3; i < 10; i++) {
@@ -418,6 +428,7 @@ describe('Advanced Features - Edge Cases', () => {
       year: i + 1,
       w2Income: baseClient.annualIncome,
       cashInfusion: i === 2 ? 1000000 : 0, // $1M in year 3
+      cashInfusionTaxType: 'net' as const,
       note: '',
     }));
 
@@ -440,6 +451,7 @@ describe('Advanced Features - Edge Cases', () => {
     const overrides = generateDefaultOverrides(baseClient.annualIncome);
     // Model a $500K withdrawal in year 5
     overrides[4].cashInfusion = -500000;
+    overrides[4].cashInfusionTaxType = 'net';
     overrides[4].note = 'Capital withdrawal';
 
     const resultWithWithdrawal = calculateWithOverrides(

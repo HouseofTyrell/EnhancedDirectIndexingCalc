@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { YearOverride } from '../types';
+import { YearOverride, CashInfusionTaxType } from '../types';
 import { InfoText } from '../InfoPopup';
 import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 import './YearByYearPlanning.css';
@@ -13,6 +13,8 @@ interface YearByYearPlanningProps {
   baseIncome: number;
   /** Per-year override data including income, cash infusions, and notes */
   overrides: YearOverride[];
+  /** Combined marginal tax rate (federal ST + state) for gross/net conversion display */
+  combinedTaxRate: number;
   /** Callback fired when any year's override values are changed */
   onChange: (overrides: YearOverride[]) => void;
   /** Callback to reset all year overrides back to defaults */
@@ -22,6 +24,7 @@ interface YearByYearPlanningProps {
 export const YearByYearPlanning = memo(function YearByYearPlanning({
   baseIncome,
   overrides,
+  combinedTaxRate,
   onChange,
   onReset,
 }: YearByYearPlanningProps) {
@@ -42,6 +45,10 @@ export const YearByYearPlanning = memo(function YearByYearPlanning({
   ) => {
     const numericValue = parseFormattedNumber(inputValue);
     handleChange(year, field, numericValue);
+  };
+
+  const handleTaxTypeChange = (year: number, taxType: CashInfusionTaxType) => {
+    handleChange(year, 'cashInfusionTaxType', taxType);
   };
 
   // Check if any year has been modified from defaults
@@ -67,53 +74,95 @@ export const YearByYearPlanning = memo(function YearByYearPlanning({
               <th className="col-infusion">
                 <InfoText contentKey="cash-infusion">Cash Infusion</InfoText>
               </th>
+              <th className="col-tax-type">Type</th>
+              <th className="col-infusion-detail">Investable</th>
               <th className="col-notes">Notes</th>
             </tr>
           </thead>
           <tbody>
-            {overrides.map(override => (
-              <tr key={override.year}>
-                <td className="year-cell">{override.year}</td>
-                <td>
-                  <div className="input-with-prefix compact">
-                    <span className="prefix">$</span>
+            {overrides.map(override => {
+              const hasInfusion = override.cashInfusion > 0;
+              const taxType = override.cashInfusionTaxType ?? 'gross';
+              const netAmount = taxType === 'gross'
+                ? override.cashInfusion * (1 - combinedTaxRate)
+                : override.cashInfusion;
+              const grossAmount = taxType === 'net'
+                ? override.cashInfusion / (1 - combinedTaxRate)
+                : override.cashInfusion;
+
+              return (
+                <tr key={override.year}>
+                  <td className="year-cell">{override.year}</td>
+                  <td>
+                    <div className="input-with-prefix compact">
+                      <span className="prefix">$</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatWithCommas(override.w2Income)}
+                        onChange={e =>
+                          handleCurrencyChange(override.year, 'w2Income', e.target.value)
+                        }
+                        className={override.w2Income !== baseIncome ? 'modified' : ''}
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <div className="input-with-prefix compact">
+                      <span className="prefix">$</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatWithCommas(override.cashInfusion)}
+                        onChange={e =>
+                          handleCurrencyChange(override.year, 'cashInfusion', e.target.value)
+                        }
+                        className={override.cashInfusion > 0 ? 'modified' : ''}
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    {hasInfusion && (
+                      <select
+                        className="tax-type-select"
+                        value={taxType}
+                        onChange={e =>
+                          handleTaxTypeChange(override.year, e.target.value as CashInfusionTaxType)
+                        }
+                      >
+                        <option value="gross">Gross</option>
+                        <option value="net">Net</option>
+                      </select>
+                    )}
+                  </td>
+                  <td className="infusion-detail-cell">
+                    {hasInfusion && (
+                      <div className="infusion-amounts">
+                        {taxType === 'gross' ? (
+                          <span className="infusion-net">
+                            ${formatWithCommas(Math.round(netAmount))} net
+                          </span>
+                        ) : (
+                          <span className="infusion-gross">
+                            ${formatWithCommas(Math.round(grossAmount))} gross
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td>
                     <input
                       type="text"
-                      inputMode="numeric"
-                      value={formatWithCommas(override.w2Income)}
-                      onChange={e =>
-                        handleCurrencyChange(override.year, 'w2Income', e.target.value)
-                      }
-                      className={override.w2Income !== baseIncome ? 'modified' : ''}
+                      value={override.note}
+                      onChange={e => handleChange(override.year, 'note', e.target.value)}
+                      maxLength={50}
+                      placeholder="Optional note"
+                      className="note-input"
                     />
-                  </div>
-                </td>
-                <td>
-                  <div className="input-with-prefix compact">
-                    <span className="prefix">$</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formatWithCommas(override.cashInfusion)}
-                      onChange={e =>
-                        handleCurrencyChange(override.year, 'cashInfusion', e.target.value)
-                      }
-                      className={override.cashInfusion > 0 ? 'modified' : ''}
-                    />
-                  </div>
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    value={override.note}
-                    onChange={e => handleChange(override.year, 'note', e.target.value)}
-                    maxLength={50}
-                    placeholder="Optional note"
-                    className="note-input"
-                  />
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
