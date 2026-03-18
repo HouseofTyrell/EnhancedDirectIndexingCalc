@@ -215,9 +215,10 @@ export function computeEdiProjection(input: EdiProjectionInput): EdiProjectionRe
     // Thread state forward
     stCf = yearResult.endingStCarryforward;
     ltCf = yearResult.endingLtCarryforward;
-    // Grow collateral net of financing drag when provided (PM review: 30% overstatement at year 10 without this)
-    const netGrowthRate = input.annualReturn - (input.financingCostRate ?? 0);
-    collateralValue = safeNumber(collateralValue * (1 + netGrowthRate));
+    // Grow collateral at full return, then deduct financing fees at end of year on the grown value
+    const financingCostRate = input.financingCostRate ?? 0;
+    const grownCollateral = safeNumber(collateralValue * (1 + input.annualReturn));
+    collateralValue = safeNumber(grownCollateral * (1 - financingCostRate));
   }
 
   // Compute summary
@@ -846,8 +847,8 @@ export function computeBaselineComparison(
     const tradDiExitTax = safeNumber(Math.max(0, tradDiEmbeddedGain - tradDiCfUsedAtExit) * combinedLtRate);
     const tradDiAfterTax = safeNumber(tradDiValue - tradDiExitTax);
 
-    // === EDI: grows at annualReturn minus financing drag (compound effect) ===
-    ediPortfolioValue = safeNumber(ediPortfolioValue * (1 + annualReturn - financingCostRate));
+    // === EDI: grows at full annualReturn, then financing fees deducted at end of year ===
+    ediPortfolioValue = safeNumber(ediPortfolioValue * (1 + annualReturn) * (1 - financingCostRate));
 
     // EDI embedded gain and CF shelter
     const ediGrowthRate = annualReturn - financingCostRate;

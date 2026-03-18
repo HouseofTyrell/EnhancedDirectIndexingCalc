@@ -297,23 +297,26 @@ export function calculateYear(
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 
-  // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
+  // Portfolio growth: apply annual return first, then deduct financing fees at end of year.
+  // This separates growth and fee timing so that fees don't reduce the growth rate directly —
+  // the portfolio grows at the full return rate, then fees are charged on the grown value.
   const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
   // Use fullStrategy if provided, otherwise lookup by ID
   const strategyForFinancing = fullStrategy || getStrategy(inputs.strategyId);
   const totalFinancingCost = strategyForFinancing
     ? getEffectiveFinancingCost(strategyForFinancing, settings)
     : 0;
-  const growthRate = baseReturn - totalFinancingCost;
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
   // QFAF can also use a separate return rate if specified (defaults to collateral growth rate)
   const qfafBaseReturn = settings.growthEnabled
     ? (settings.qfafAnnualReturn !== null ? settings.qfafAnnualReturn : settings.defaultAnnualReturn)
     : 0;
-  const qfafGrowthRateWithFees = qfafBaseReturn - totalFinancingCost;
-  const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafGrowthRateWithFees : 0;
-  const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
-  const newCollateralValue = safeNumber(collateralValue * (1 + growthRate * yearFraction));
+  const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafBaseReturn : 0;
+  // Grow at full return rate, then deduct fees at end of year on the grown value
+  const grownQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
+  const newQfafValue = safeNumber(grownQfafValue * (1 - totalFinancingCost * yearFraction));
+  const grownCollateralValue = safeNumber(collateralValue * (1 + baseReturn * yearFraction));
+  const newCollateralValue = safeNumber(grownCollateralValue * (1 - totalFinancingCost * yearFraction));
 
   // Calculate total income offset for this year
   // This is the sum of all deductions that reduce taxable income
