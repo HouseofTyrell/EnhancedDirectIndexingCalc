@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { calculate, calculateWithOverrides, calculateWithSensitivity } from './calculations';
 import { DEFAULTS, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
-import { STRATEGIES, getStrategy, getLongLeverageRatio, getShortRatio } from './strategyData';
+import { STRATEGIES, getStrategy } from './strategyData';
 import {
   CalculatorInputs,
   YearOverride,
@@ -68,19 +68,7 @@ export function Calculator() {
   // Advanced Settings state
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettings>(DEFAULT_SETTINGS);
 
-  // Auto-update simple financing rate when strategy changes (unless user is in detailed mode)
-  useEffect(() => {
-    if (advancedSettings.financingMode !== 'simple') return;
-    const strategy = getStrategy(inputs.strategyId);
-    if (!strategy) return;
-    const longLeverage = getLongLeverageRatio(strategy);
-    const shortRatio = getShortRatio(strategy);
-    const calculatedRate =
-      advancedSettings.brokerMarginRate * longLeverage +
-      (advancedSettings.shortBorrowRate + advancedSettings.shortDividendRate) * shortRatio +
-      advancedSettings.wealthManagementFeeRate;
-    setAdvancedSettings(prev => ({ ...prev, simpleFinancingRate: calculatedRate }));
-  }, [inputs.strategyId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Simple financing mode auto-calculates from strategy leverage, no manual sync needed
 
   // Sensitivity Analysis state
   const [sensitivityParams, setSensitivityParams] =

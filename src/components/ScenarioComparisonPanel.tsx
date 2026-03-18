@@ -269,11 +269,11 @@ function detectInputChanges(
     });
   }
 
-  if (pinnedSettings.simpleFinancingRate !== currentSettings.simpleFinancingRate) {
+  if (pinnedSettings.simpleWealthMgmtFee !== currentSettings.simpleWealthMgmtFee) {
     changes.push({
-      label: 'Financing Rate',
-      pinnedDisplay: formatPercent(pinnedSettings.simpleFinancingRate),
-      currentDisplay: formatPercent(currentSettings.simpleFinancingRate),
+      label: 'Wealth Mgmt Fee',
+      pinnedDisplay: formatPercent(pinnedSettings.simpleWealthMgmtFee),
+      currentDisplay: formatPercent(currentSettings.simpleWealthMgmtFee),
     });
   }
 

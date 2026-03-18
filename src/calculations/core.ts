@@ -22,8 +22,8 @@ import { calculateSizing } from './sizing';
 
 /**
  * Calculate the effective financing cost based on strategy leverage and user settings.
- * In simple mode, uses the user-specified rate directly.
- * In detailed mode, calculates cost from component rates and strategy leverage.
+ * Simple mode: wealth management fee + manager fees (base rate × leverage% + fixed component).
+ * Detailed mode: calculates cost from individual component rates and strategy leverage.
  * @param strategy - The investment strategy (determines leverage ratios)
  * @param settings - Advanced settings with financing cost configuration
  * @returns Effective financing cost as a decimal (e.g., 0.025 = 2.5% of portfolio per year)
@@ -32,8 +32,12 @@ function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSetting
   if (!settings.financingFeesEnabled) return 0;
 
   if (settings.financingMode === 'simple') {
-    // Simple mode: use the single effective rate directly
-    return settings.simpleFinancingRate;
+    // Simple mode: two components
+    // 1. Wealth management fee (flat, e.g. 55 bps)
+    // 2. Manager fees: base rate × leverage% + fixed component (e.g. 90bp × 45% + 14.2bp)
+    const leveragePct = getShortRatio(strategy);
+    const managerFee = settings.simpleManagerFeeBase * leveragePct + settings.simpleManagerFeeFixed;
+    return settings.simpleWealthMgmtFee + managerFee;
   } else {
     // Detailed mode: calculate from component rates
     const longLeverage = getLongLeverageRatio(strategy);
