@@ -34,8 +34,10 @@ function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSetting
   if (!settings.financingFeesEnabled) return 0;
 
   if (settings.financingMode === 'simple') {
-    // Simple mode: use the single effective rate directly
-    return settings.simpleFinancingRate;
+    // Simple mode: wealth management fee + manager fees (base × leverage% + fixed)
+    const leveragePct = getShortRatio(strategy);
+    const managerFee = settings.simpleManagerFeeBase * leveragePct + settings.simpleManagerFeeFixed;
+    return settings.simpleWealthMgmtFee + managerFee;
   } else {
     // Detailed mode: calculate from component rates
     const longLeverage = getLongLeverageRatio(strategy);

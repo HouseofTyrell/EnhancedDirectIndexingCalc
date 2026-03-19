@@ -147,10 +147,13 @@ export interface CalculationResult {
 // ============================================
 
 // Year-by-Year Planning
+export type CashInfusionTaxType = 'gross' | 'net';
+
 export interface YearOverride {
   year: number;
   w2Income: number; // Override annual income for this year
   cashInfusion: number; // Additional capital added at year start
+  cashInfusionTaxType: CashInfusionTaxType; // 'gross' = pre-tax, 'net' = after-tax (default: 'gross')
   note: string; // User note (e.g., "Retirement", "Bonus")
 }
 
@@ -226,10 +229,12 @@ export interface AdvancedSettings {
   defaultAnnualReturn: number; // Default: 0.07 (7% when growth enabled)
   qfafAnnualReturn: number | null; // Default: null (uses defaultAnnualReturn), allows separate QFAF growth rate
   financingFeesEnabled: boolean; // Default: false (subtract financing costs from growth)
-  financingMode: 'simple' | 'detailed'; // Default: 'simple' (show single rate vs. component breakdown)
+  financingMode: 'simple' | 'detailed'; // Default: 'simple'
 
-  // Simple financing mode (single effective rate)
-  simpleFinancingRate: number; // Default: 0.025 (2.5% of portfolio, auto-calculated in detailed mode)
+  // Simple financing mode (two components: wealth mgmt fee + manager fees)
+  simpleWealthMgmtFee: number; // Default: 0.0055 (55 bps)
+  simpleManagerFeeBase: number; // Default: 0.009 (90 bps, multiplied by leverage %)
+  simpleManagerFeeFixed: number; // Default: 0.00142 (14.2 bps, added on top)
 
   // Detailed financing mode (component rates)
   brokerMarginRate: number; // Default: 0.0425 (4.25% charged on margin debit)
@@ -262,9 +267,10 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
   financingFeesEnabled: false,
   financingMode: 'simple',
 
-  // Simple mode default (calculated for default overlay-45-45 strategy)
-  // 4.25% × 45% + (0.5% + 1.5%) × 45% + 0.75% = 3.5625%
-  simpleFinancingRate: 0.035625, // 3.5625% of portfolio
+  // Simple mode defaults (two components)
+  simpleWealthMgmtFee: 0.0055, // 55 bps
+  simpleManagerFeeBase: 0.009, // 90 bps (multiplied by leverage %)
+  simpleManagerFeeFixed: 0.00142, // 14.2 bps (added on top)
 
   // Detailed mode defaults
   brokerMarginRate: 0.0425, // 4.25%

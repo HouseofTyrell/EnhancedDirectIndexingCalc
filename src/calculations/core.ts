@@ -22,8 +22,8 @@ import { calculateSizing } from './sizing';
 
 /**
  * Calculate the effective financing cost based on strategy leverage and user settings.
- * In simple mode, uses the user-specified rate directly.
- * In detailed mode, calculates cost from component rates and strategy leverage.
+ * Simple mode: wealth management fee + manager fees (base rate × leverage% + fixed component).
+ * Detailed mode: calculates cost from individual component rates and strategy leverage.
  * @param strategy - The investment strategy (determines leverage ratios)
  * @param settings - Advanced settings with financing cost configuration
  * @returns Effective financing cost as a decimal (e.g., 0.025 = 2.5% of portfolio per year)
@@ -32,8 +32,12 @@ function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSetting
   if (!settings.financingFeesEnabled) return 0;
 
   if (settings.financingMode === 'simple') {
-    // Simple mode: use the single effective rate directly
-    return settings.simpleFinancingRate;
+    // Simple mode: two components
+    // 1. Wealth management fee (flat, e.g. 55 bps)
+    // 2. Manager fees: base rate × leverage% + fixed component (e.g. 90bp × 45% + 14.2bp)
+    const leveragePct = getShortRatio(strategy);
+    const managerFee = settings.simpleManagerFeeBase * leveragePct + settings.simpleManagerFeeFixed;
+    return settings.simpleWealthMgmtFee + managerFee;
   } else {
     // Detailed mode: calculate from component rates
     const longLeverage = getLongLeverageRatio(strategy);
@@ -297,23 +301,26 @@ export function calculateYear(
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 
-  // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
+  // Portfolio growth: apply annual return first, then deduct financing fees at end of year.
+  // This separates growth and fee timing so that fees don't reduce the growth rate directly —
+  // the portfolio grows at the full return rate, then fees are charged on the grown value.
   const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
   // Use fullStrategy if provided, otherwise lookup by ID
   const strategyForFinancing = fullStrategy || getStrategy(inputs.strategyId);
   const totalFinancingCost = strategyForFinancing
     ? getEffectiveFinancingCost(strategyForFinancing, settings)
     : 0;
-  const growthRate = baseReturn - totalFinancingCost;
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
   // QFAF can also use a separate return rate if specified (defaults to collateral growth rate)
   const qfafBaseReturn = settings.growthEnabled
     ? (settings.qfafAnnualReturn !== null ? settings.qfafAnnualReturn : settings.defaultAnnualReturn)
     : 0;
-  const qfafGrowthRateWithFees = qfafBaseReturn - totalFinancingCost;
-  const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafGrowthRateWithFees : 0;
-  const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
-  const newCollateralValue = safeNumber(collateralValue * (1 + growthRate * yearFraction));
+  const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafBaseReturn : 0;
+  // Grow at full return rate, then deduct fees at end of year on the grown value
+  const grownQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
+  const newQfafValue = safeNumber(grownQfafValue * (1 - totalFinancingCost * yearFraction));
+  const grownCollateralValue = safeNumber(collateralValue * (1 + baseReturn * yearFraction));
+  const newCollateralValue = safeNumber(grownCollateralValue * (1 - totalFinancingCost * yearFraction));
 
   // Calculate total income offset for this year
   // This is the sum of all deductions that reduce taxable income

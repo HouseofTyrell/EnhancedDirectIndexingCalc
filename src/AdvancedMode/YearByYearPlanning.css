@@ -41,8 +41,45 @@
 .year-table .col-infusion {
   width: 120px;
 }
+.year-table .col-tax-type {
+  width: 70px;
+}
+.year-table .col-infusion-detail {
+  width: 110px;
+}
 .year-table .col-notes {
   width: auto;
+}
+
+/* Tax type selector */
+.tax-type-select {
+  padding: 0.2rem 0.3rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tax-type-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* Infusion detail display */
+.infusion-detail-cell {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.infusion-amounts {
+  white-space: nowrap;
+}
+
+.infusion-net,
+.infusion-gross {
+  color: var(--text-light);
 }
 
 .year-table td {

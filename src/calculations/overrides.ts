@@ -79,8 +79,26 @@ export function calculateWithOverrides(
     // Get effective income for this year
     const yearIncome = override?.w2Income ?? inputs.annualIncome;
 
+    // Calculate tax rates for this year's income (needed for cash infusion tax adjustment)
+    const yearTaxRates: TaxRates = {
+      stRate: getFederalStRate(yearIncome, inputs.filingStatus),
+      ltRate: getFederalLtRate(yearIncome, inputs.filingStatus),
+      stateRate: baseStateRate,
+      section461Limit:
+        settings.section461Limits[inputs.filingStatus] ??
+        SECTION_461L_LIMITS[inputs.filingStatus],
+    };
+
     // Apply cash infusion at the start of the year
-    const cashInfusion = override?.cashInfusion ?? 0;
+    const rawCashInfusion = override?.cashInfusion ?? 0;
+    const cashInfusionTaxType = override?.cashInfusionTaxType ?? 'gross';
+    // If gross (pre-tax), reduce by combined tax rate to get investable amount
+    // If net (post-tax), the full amount is already investable
+    let cashInfusion = rawCashInfusion;
+    if (rawCashInfusion !== 0 && cashInfusionTaxType === 'gross') {
+      const combinedStRate = yearTaxRates.stRate + yearTaxRates.stateRate;
+      cashInfusion = rawCashInfusion * (1 - combinedStRate);
+    }
     if (cashInfusion !== 0) {
       // Add/subtract from collateral
       collateralValue += cashInfusion;
@@ -107,17 +125,6 @@ export function calculateWithOverrides(
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
       effectiveQfafValue = cappedQfaf;
     }
-
-    // Calculate tax rates for this year's income
-    // (Tax brackets may differ based on income level)
-    const yearTaxRates: TaxRates = {
-      stRate: getFederalStRate(yearIncome, inputs.filingStatus),
-      ltRate: getFederalLtRate(yearIncome, inputs.filingStatus),
-      stateRate: baseStateRate,
-      section461Limit:
-        settings.section461Limits[inputs.filingStatus] ??
-        SECTION_461L_LIMITS[inputs.filingStatus],
-    };
 
     // After strategy duration, zero out tax-harvesting activity
     const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
