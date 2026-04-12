@@ -257,7 +257,7 @@ function calculateYearWithSensitivity(
 
   const grossStLosses = strategyActive ? collateralValue * adjustedStLossRate * yearFraction : 0;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = strategyActive ? safeNumber(collateralValue * adjustedLtGainRate * yearFraction) : 0;
+  const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * adjustedLtGainRate * yearFraction) : 0;
 
   // Net ST position
   const grossNetSt = stGainsGenerated - stLossesHarvested;

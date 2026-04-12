@@ -206,7 +206,7 @@ export function calculateYear(
   const effectiveStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
   const grossStLosses = strategyActive ? collateralValue * effectiveStLossRate * yearFraction : 0;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = strategyActive ? safeNumber(collateralValue * strategy.ltGainRate * yearFraction) : 0;
+  const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * strategy.ltGainRate * yearFraction) : 0;
 
   // Net ST position (should be ~0 with proper auto-sizing)
   const grossNetSt = stGainsGenerated - stLossesHarvested;

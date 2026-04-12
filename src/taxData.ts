@@ -272,4 +272,7 @@ export const DEFAULTS: CalculatorInputs = {
 
   // Start month: January by default (full year)
   startMonth: 1,
+
+  // LT gains toggle (off by default)
+  ltGainsEnabled: false,
 };

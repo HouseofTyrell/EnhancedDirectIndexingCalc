@@ -45,6 +45,9 @@ export interface CalculatorInputs {
 
   // Partial year start: month the strategy begins (1=January=full year, 4=April=9 months)
   startMonth: number;
+
+  // Toggle LT gains on/off (when off, no LT gains are realized each year)
+  ltGainsEnabled: boolean;
 }
 
 export interface CalculatedSizing {
