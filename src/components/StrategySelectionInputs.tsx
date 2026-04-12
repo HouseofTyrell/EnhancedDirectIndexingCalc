@@ -135,13 +135,13 @@ export function StrategySelectionInputs({
           <div className="strategy-rate">
             <span className="rate-label">LT Gain Rate:</span>
             <span className="rate-value negative">
-              {formatPercent(currentStrategy.ltGainRate)}
+              {formatPercent(inputs.ltGainsEnabled ? currentStrategy.ltGainRate : 0)}
             </span>
           </div>
           <div className="strategy-rate">
             <span className="rate-label">Net Capital Loss (Y1):</span>
             <span className="rate-value highlight">
-              {formatPercent(results.years[0].effectiveStLossRate - currentStrategy.ltGainRate)}
+              {formatPercent(results.years[0].effectiveStLossRate - (inputs.ltGainsEnabled ? currentStrategy.ltGainRate : 0))}
             </span>
           </div>
           <button className="rate-editor-trigger" onClick={() => onSetRateEditorOpen(true)}>
