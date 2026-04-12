@@ -194,20 +194,11 @@ export function Calculator() {
 
   // Pin/unpin scenario handlers
   const handlePinScenario = useCallback(() => {
-    if (pinnedScenario.hasPinned) {
-      pinnedScenario.unpin();
-    } else {
-      pinnedScenario.pin(inputs, advancedSettings, results);
-    }
+    pinnedScenario.pin(inputs, advancedSettings, results);
   }, [inputs, advancedSettings, results, pinnedScenario]);
 
-  const handleRestorePinned = useCallback(() => {
-    const state = pinnedScenario.getPinnedState();
-    if (state && window.confirm('Restore pinned inputs? Current values will be replaced.')) {
-      setInputs(state.inputs);
-      setAdvancedSettings(state.advancedSettings);
-      setYearOverrides(generateDefaultOverrides(state.inputs.annualIncome));
-    }
+  const handleUnpinAll = useCallback(() => {
+    pinnedScenario.unpinAll();
   }, [pinnedScenario]);
 
   // Auto-pin comparison panel to floating panel when scenario is pinned
@@ -282,8 +273,10 @@ export function Calculator() {
           setComparisonStrategies([STRATEGIES[1].id, STRATEGIES[0].id]);
         }}
         hasPinnedScenario={pinnedScenario.hasPinned}
+        canPinScenario={pinnedScenario.canPin}
+        pinnedCount={pinnedScenario.scenarios.length}
         onPinScenario={() => pinnedScenario.pin(inputs, advancedSettings, results)}
-        onUnpinScenario={pinnedScenario.unpin}
+        onUnpinScenario={handleUnpinAll}
         pinnedValues={pinnedScenario.pinned ? {
           collateral: pinnedScenario.pinned.inputs.collateralAmount,
           qfafValue: pinnedScenario.pinned.results.sizing.qfafValue,
@@ -471,16 +464,17 @@ export function Calculator() {
       />
       </PinnableSection>
 
-      {/* Scenario comparison panel (shown when a scenario is pinned) */}
-      {pinnedScenario.pinned && (
+      {/* Scenario comparison panel (shown when scenarios are pinned) */}
+      {pinnedScenario.hasPinned && (
         <ScenarioComparisonPanel
-          pinned={pinnedScenario.pinned}
+          scenarios={pinnedScenario.scenarios}
           currentInputs={inputs}
           currentSettings={advancedSettings}
           currentResults={results}
-          onUnpin={pinnedScenario.unpin}
-          onRestore={handleRestorePinned}
-          onReplacePin={() => pinnedScenario.replacePin(inputs, advancedSettings, results)}
+          canPin={pinnedScenario.canPin}
+          onPin={handlePinScenario}
+          onUnpin={(id: string) => pinnedScenario.unpin(id)}
+          onUnpinAll={handleUnpinAll}
         />
       )}
 
@@ -632,18 +626,19 @@ export function Calculator() {
               />
             ),
           }] : []),
-          ...(pinnedElements.isPinned('comparison') && pinnedScenario.pinned ? [{
+          ...(pinnedElements.isPinned('comparison') && pinnedScenario.hasPinned ? [{
             id: 'comparison',
             label: 'Scenario Comparison',
             content: (
               <ScenarioComparisonPanel
-                pinned={pinnedScenario.pinned}
+                scenarios={pinnedScenario.scenarios}
                 currentInputs={inputs}
                 currentSettings={advancedSettings}
                 currentResults={results}
-                onUnpin={pinnedScenario.unpin}
-                onRestore={handleRestorePinned}
-                onReplacePin={() => pinnedScenario.replacePin(inputs, advancedSettings, results)}
+                canPin={pinnedScenario.canPin}
+                onPin={handlePinScenario}
+                onUnpin={(id: string) => pinnedScenario.unpin(id)}
+                onUnpinAll={handleUnpinAll}
               />
             ),
           }] : []),
@@ -679,11 +674,11 @@ export function Calculator() {
         ]}
         onUnpin={(id: string) => {
           pinnedElements.unpin(id);
-          if (id === 'comparison') pinnedScenario.unpin();
+          if (id === 'comparison') pinnedScenario.unpinAll();
         }}
         onUnpinAll={() => {
           pinnedElements.unpinAll();
-          pinnedScenario.unpin();
+          pinnedScenario.unpinAll();
         }}
         layout={pinnedElements.panelLayout}
         onLayoutChange={pinnedElements.updatePanelLayout}
