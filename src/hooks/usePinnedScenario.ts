@@ -10,6 +10,7 @@ import { getStrategy } from '../strategyData';
 import { formatCurrencyAbbreviated } from '../utils/formatters';
 
 const STORAGE_KEY = STORAGE_KEYS.PINNED_SCENARIO;
+const MAX_SCENARIOS = 4;
 
 /**
  * Type guard to validate localStorage data matches PinnedScenario shape.
@@ -40,92 +41,150 @@ function isPinnedScenario(value: unknown): value is PinnedScenario {
 }
 
 /**
+ * Load stored scenarios, handling both legacy single-object and new array formats.
+ */
+function loadStoredScenarios(): PinnedScenario[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return [];
+    const parsed: unknown = JSON.parse(stored);
+
+    // New format: array of scenarios
+    if (Array.isArray(parsed)) {
+      return parsed.filter(isPinnedScenario);
+    }
+
+    // Legacy format: single scenario object — migrate to array
+    if (isPinnedScenario(parsed)) {
+      return [parsed];
+    }
+
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    console.warn('Failed to load pinned scenarios:', e);
+  }
+  return [];
+}
+
+/**
  * Generate a human-readable label from inputs.
- * e.g. "CA $3.0M / Overlay 45/45"
+ * Includes sizing mode to distinguish fixed vs dynamic for the same strategy.
+ * e.g. "CA $3.0M / Core 130/30 (Dynamic)"
  */
 function generateLabel(inputs: CalculatorInputs): string {
   const strategy = getStrategy(inputs.strategyId);
   const strategyName = strategy?.name ?? inputs.strategyId;
   const collateral = formatCurrencyAbbreviated(inputs.collateralAmount);
-  return `${inputs.stateCode} ${collateral} / ${strategyName}`;
+  const sizingMode = inputs.qfafEnabled
+    ? ` (${inputs.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed'})`
+    : '';
+  return `${inputs.stateCode} ${collateral} / ${strategyName}${sizingMode}`;
 }
 
 export interface UsePinnedScenarioReturn {
+  /** All pinned scenarios (up to 4) */
+  scenarios: PinnedScenario[];
+  /** Legacy compat: first pinned scenario or null */
   pinned: PinnedScenario | null;
+  /** Whether any scenarios are pinned */
   hasPinned: boolean;
+  /** Whether we can pin more (< MAX_SCENARIOS) */
+  canPin: boolean;
+  /** Pin current state as a new scenario */
   pin: (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => void;
-  unpin: () => void;
+  /** Remove a specific scenario by id */
+  unpin: (id?: string) => void;
+  /** Remove all pinned scenarios */
+  unpinAll: () => void;
+  /** Replace a specific scenario by id with new state */
   replacePin: (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => void;
+  /** Get pinned state for restore (uses first scenario) */
   getPinnedState: () => { inputs: CalculatorInputs; advancedSettings: AdvancedSettings } | null;
 }
 
 export function usePinnedScenario(): UsePinnedScenarioReturn {
-  const [pinned, setPinned] = useState<PinnedScenario | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored);
-        if (isPinnedScenario(parsed)) {
-          return parsed;
-        }
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch (e) {
-      console.warn('Failed to load pinned scenario:', e);
-    }
-    return null;
-  });
+  const [scenarios, setScenarios] = useState<PinnedScenario[]>(loadStoredScenarios);
 
   useEffect(() => {
     try {
-      if (pinned) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(pinned));
+      if (scenarios.length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(scenarios));
       } else {
         localStorage.removeItem(STORAGE_KEY);
       }
     } catch (e) {
-      console.warn('Failed to save pinned scenario:', e);
+      console.warn('Failed to save pinned scenarios:', e);
     }
-  }, [pinned]);
+  }, [scenarios]);
 
   const pin = useCallback(
     (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => {
-      setPinned({
-        id: crypto.randomUUID(),
-        label: label ?? generateLabel(inputs),
-        pinnedAt: Date.now(),
-        inputs: structuredClone(inputs),
-        advancedSettings: structuredClone(settings),
-        results: structuredClone(results),
+      setScenarios(prev => {
+        if (prev.length >= MAX_SCENARIOS) return prev; // silently reject if full
+        const newScenario: PinnedScenario = {
+          id: crypto.randomUUID(),
+          label: label ?? generateLabel(inputs),
+          pinnedAt: Date.now(),
+          inputs: structuredClone(inputs),
+          advancedSettings: structuredClone(settings),
+          results: structuredClone(results),
+        };
+        return [...prev, newScenario];
       });
     },
     []
   );
 
-  const unpin = useCallback(() => {
-    setPinned(null);
+  const unpin = useCallback((id?: string) => {
+    setScenarios(prev => {
+      if (!id) {
+        // Legacy compat: remove the last scenario if no id given
+        return prev.slice(0, -1);
+      }
+      return prev.filter(s => s.id !== id);
+    });
+  }, []);
+
+  const unpinAll = useCallback(() => {
+    setScenarios([]);
   }, []);
 
   const replacePin = useCallback(
     (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => {
-      pin(inputs, settings, results, label);
+      // Replace the most recent scenario, or add if none exist
+      setScenarios(prev => {
+        const newScenario: PinnedScenario = {
+          id: crypto.randomUUID(),
+          label: label ?? generateLabel(inputs),
+          pinnedAt: Date.now(),
+          inputs: structuredClone(inputs),
+          advancedSettings: structuredClone(settings),
+          results: structuredClone(results),
+        };
+        if (prev.length === 0) return [newScenario];
+        return [...prev.slice(0, -1), newScenario];
+      });
     },
-    [pin]
+    []
   );
 
   const getPinnedState = useCallback(() => {
-    if (!pinned) return null;
+    if (scenarios.length === 0) return null;
+    const first = scenarios[0];
     return {
-      inputs: structuredClone(pinned.inputs),
-      advancedSettings: structuredClone(pinned.advancedSettings),
+      inputs: structuredClone(first.inputs),
+      advancedSettings: structuredClone(first.advancedSettings),
     };
-  }, [pinned]);
+  }, [scenarios]);
 
   return {
-    pinned,
-    hasPinned: pinned !== null,
+    scenarios,
+    pinned: scenarios.length > 0 ? scenarios[0] : null,
+    hasPinned: scenarios.length > 0,
+    canPin: scenarios.length < MAX_SCENARIOS,
     pin,
     unpin,
+    unpinAll,
     replacePin,
     getPinnedState,
   };

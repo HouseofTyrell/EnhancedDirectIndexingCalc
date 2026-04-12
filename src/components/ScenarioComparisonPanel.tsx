@@ -1,18 +1,34 @@
 import { useState } from 'react';
 import {
+  PinnedScenario,
   CalculatorInputs,
   AdvancedSettings,
   CalculationResult,
-  PinnedScenario,
-  ComparisonMetric,
-  InputChange,
-  FILING_STATUSES,
 } from '../types';
 import { getStrategy } from '../strategyData';
 import { formatCurrency, formatPercent, formatCurrencyAbbreviated } from '../utils/formatters';
 import './ScenarioComparisonPanel.css';
 
+// ============================================
+// MULTI-SCENARIO COMPARISON PANEL
+// ============================================
+
 interface ScenarioComparisonPanelProps {
+  scenarios: PinnedScenario[];
+  currentInputs: CalculatorInputs;
+  currentSettings: AdvancedSettings;
+  currentResults: CalculationResult;
+  canPin: boolean;
+  onPin: () => void;
+  onUnpin: (id: string) => void;
+  onUnpinAll: () => void;
+}
+
+// ============================================
+// LEGACY SINGLE-SCENARIO PROPS (backward compat)
+// ============================================
+
+interface LegacyScenarioComparisonPanelProps {
   pinned: PinnedScenario;
   currentInputs: CalculatorInputs;
   currentSettings: AdvancedSettings;
@@ -22,377 +38,243 @@ interface ScenarioComparisonPanelProps {
   onReplacePin: () => void;
 }
 
-function getFilingStatusLabel(value: string): string {
-  return FILING_STATUSES.find(fs => fs.value === value)?.label ?? value;
+// ============================================
+// METRIC DEFINITIONS
+// ============================================
+
+interface MetricDef {
+  label: string;
+  getValue: (results: CalculationResult) => number;
+  format: 'currency' | 'percent';
+  higherIsBetter: boolean;
 }
 
-function detectInputChanges(
-  pinned: CalculatorInputs,
-  current: CalculatorInputs,
-  pinnedSettings: AdvancedSettings,
-  currentSettings: AdvancedSettings
-): InputChange[] {
-  const changes: InputChange[] = [];
+const METRIC_DEFS: MetricDef[] = [
+  { label: 'Total Tax Savings', getValue: r => r.summary.totalTaxSavings, format: 'currency', higherIsBetter: true },
+  { label: 'Year 1 Savings', getValue: r => r.years[0]?.taxSavings ?? 0, format: 'currency', higherIsBetter: true },
+  { label: 'Year 2 Savings', getValue: r => r.years[1]?.taxSavings ?? 0, format: 'currency', higherIsBetter: true },
+  { label: 'Tax Alpha', getValue: r => r.summary.effectiveTaxAlpha, format: 'percent', higherIsBetter: true },
+  { label: 'QFAF Value', getValue: r => r.sizing.qfafValue, format: 'currency', higherIsBetter: false },
+  { label: 'Total Exposure', getValue: r => r.sizing.totalExposure, format: 'currency', higherIsBetter: false },
+  { label: 'Final Portfolio', getValue: r => r.summary.finalPortfolioValue, format: 'currency', higherIsBetter: true },
+  { label: 'Total NOL', getValue: r => r.summary.totalNolGenerated, format: 'currency', higherIsBetter: true },
+];
 
-  if (pinned.strategyId !== current.strategyId) {
-    const pinnedStrategy = getStrategy(pinned.strategyId);
-    const currentStrategy = getStrategy(current.strategyId);
-    changes.push({
-      label: 'Strategy',
-      pinnedDisplay: pinnedStrategy?.name ?? pinned.strategyId,
-      currentDisplay: currentStrategy?.name ?? current.strategyId,
-    });
-  }
+// ============================================
+// SCENARIO SUMMARY (key config for column header)
+// ============================================
 
-  if (pinned.annualIncome !== current.annualIncome) {
-    changes.push({
-      label: 'Income',
-      pinnedDisplay: formatCurrency(pinned.annualIncome),
-      currentDisplay: formatCurrency(current.annualIncome),
-    });
-  }
-
-  if (pinned.collateralAmount !== current.collateralAmount) {
-    changes.push({
-      label: 'Collateral',
-      pinnedDisplay: formatCurrency(pinned.collateralAmount),
-      currentDisplay: formatCurrency(current.collateralAmount),
-    });
-  }
-
-  if (pinned.stateCode !== current.stateCode) {
-    changes.push({
-      label: 'State',
-      pinnedDisplay: pinned.stateCode,
-      currentDisplay: current.stateCode,
-    });
-  }
-
-  if (pinned.filingStatus !== current.filingStatus) {
-    changes.push({
-      label: 'Filing Status',
-      pinnedDisplay: getFilingStatusLabel(pinned.filingStatus),
-      currentDisplay: getFilingStatusLabel(current.filingStatus),
-    });
-  }
-
-  if (pinned.startMonth !== current.startMonth) {
-    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    changes.push({
-      label: 'Start Month',
-      pinnedDisplay: MONTH_NAMES[pinned.startMonth - 1] ?? `${pinned.startMonth}`,
-      currentDisplay: MONTH_NAMES[current.startMonth - 1] ?? `${current.startMonth}`,
-    });
-  }
-
-  if (pinned.qfafEnabled !== current.qfafEnabled) {
-    changes.push({
-      label: 'QFAF',
-      pinnedDisplay: pinned.qfafEnabled ? 'Enabled' : 'Disabled',
-      currentDisplay: current.qfafEnabled ? 'Enabled' : 'Disabled',
-    });
-  }
-
-  if (pinnedSettings.projectionYears !== currentSettings.projectionYears) {
-    changes.push({
-      label: 'Years',
-      pinnedDisplay: `${pinnedSettings.projectionYears}`,
-      currentDisplay: `${currentSettings.projectionYears}`,
-    });
-  }
-
-  if (pinnedSettings.washSaleDisallowanceRate !== currentSettings.washSaleDisallowanceRate) {
-    changes.push({
-      label: 'Wash Sale',
-      pinnedDisplay: formatPercent(pinnedSettings.washSaleDisallowanceRate, 0),
-      currentDisplay: formatPercent(currentSettings.washSaleDisallowanceRate, 0),
-    });
-  }
-
-  // --- CalculatorInputs: carryforwards, QFAF sizing, custom state rate ---
-
-  if (pinned.stateCode === 'OTHER' && current.stateCode === 'OTHER' && pinned.stateRate !== current.stateRate) {
-    changes.push({
-      label: 'Custom State Rate',
-      pinnedDisplay: formatPercent(pinned.stateRate),
-      currentDisplay: formatPercent(current.stateRate),
-    });
-  }
-
-  if (pinned.existingStLossCarryforward !== current.existingStLossCarryforward) {
-    changes.push({
-      label: 'ST Loss CF',
-      pinnedDisplay: formatCurrency(pinned.existingStLossCarryforward),
-      currentDisplay: formatCurrency(current.existingStLossCarryforward),
-    });
-  }
-
-  if (pinned.existingLtLossCarryforward !== current.existingLtLossCarryforward) {
-    changes.push({
-      label: 'LT Loss CF',
-      pinnedDisplay: formatCurrency(pinned.existingLtLossCarryforward),
-      currentDisplay: formatCurrency(current.existingLtLossCarryforward),
-    });
-  }
-
-  if (pinned.existingNolCarryforward !== current.existingNolCarryforward) {
-    changes.push({
-      label: 'NOL CF',
-      pinnedDisplay: formatCurrency(pinned.existingNolCarryforward),
-      currentDisplay: formatCurrency(current.existingNolCarryforward),
-    });
-  }
-
-  if ((pinned.qfafOverride ?? 0) !== (current.qfafOverride ?? 0)) {
-    changes.push({
-      label: 'QFAF Override',
-      pinnedDisplay: pinned.qfafOverride ? formatCurrency(pinned.qfafOverride) : 'Auto',
-      currentDisplay: current.qfafOverride ? formatCurrency(current.qfafOverride) : 'Auto',
-    });
-  }
-
-  if (pinned.qfafSizingYears !== current.qfafSizingYears) {
-    changes.push({
-      label: 'Sizing Window',
-      pinnedDisplay: `${pinned.qfafSizingYears} yr`,
-      currentDisplay: `${current.qfafSizingYears} yr`,
-    });
-  }
-
-  if (pinned.qfafSizingCushion !== current.qfafSizingCushion) {
-    changes.push({
-      label: 'Sizing Cushion',
-      pinnedDisplay: formatPercent(pinned.qfafSizingCushion),
-      currentDisplay: formatPercent(current.qfafSizingCushion),
-    });
-  }
-
-  if (pinned.qfafDuration !== current.qfafDuration) {
-    changes.push({
-      label: 'QFAF Duration',
-      pinnedDisplay: `${pinned.qfafDuration} yr`,
-      currentDisplay: `${current.qfafDuration} yr`,
-    });
-  }
-
-  if (pinned.qfafSizingMode !== current.qfafSizingMode) {
-    changes.push({
-      label: 'QFAF Sizing Mode',
-      pinnedDisplay: pinned.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed',
-      currentDisplay: current.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed',
-    });
-  }
-
-  // --- AdvancedSettings: QFAF mechanics ---
-
-  if (pinnedSettings.qfafMultiplier !== currentSettings.qfafMultiplier) {
-    changes.push({
-      label: 'QFAF Multiplier',
-      pinnedDisplay: `×${pinnedSettings.qfafMultiplier}`,
-      currentDisplay: `×${currentSettings.qfafMultiplier}`,
-    });
-  }
-
-  if (pinnedSettings.qfafGrowthEnabled !== currentSettings.qfafGrowthEnabled) {
-    changes.push({
-      label: 'QFAF Growth',
-      pinnedDisplay: pinnedSettings.qfafGrowthEnabled ? 'On' : 'Off',
-      currentDisplay: currentSettings.qfafGrowthEnabled ? 'On' : 'Off',
-    });
-  }
-
-  // --- AdvancedSettings: Section 461(l) limit (compare only active filing status) ---
-
-  const activeFs = current.filingStatus;
-  const pinnedLimit = pinnedSettings.section461Limits[activeFs];
-  const currentLimit = currentSettings.section461Limits[activeFs];
-  if (pinnedLimit !== currentLimit) {
-    changes.push({
-      label: '461(l) Limit',
-      pinnedDisplay: formatCurrency(pinnedLimit),
-      currentDisplay: formatCurrency(currentLimit),
-    });
-  }
-
-  // --- AdvancedSettings: NOL rules ---
-
-  if (pinnedSettings.nolOffsetLimit !== currentSettings.nolOffsetLimit) {
-    changes.push({
-      label: 'NOL Offset',
-      pinnedDisplay: formatPercent(pinnedSettings.nolOffsetLimit, 0),
-      currentDisplay: formatPercent(currentSettings.nolOffsetLimit, 0),
-    });
-  }
-
-  // --- AdvancedSettings: Growth assumptions ---
-
-  if (pinnedSettings.growthEnabled !== currentSettings.growthEnabled) {
-    changes.push({
-      label: 'Growth',
-      pinnedDisplay: pinnedSettings.growthEnabled ? 'On' : 'Off',
-      currentDisplay: currentSettings.growthEnabled ? 'On' : 'Off',
-    });
-  }
-
-  if (pinnedSettings.defaultAnnualReturn !== currentSettings.defaultAnnualReturn) {
-    changes.push({
-      label: 'Annual Return',
-      pinnedDisplay: formatPercent(pinnedSettings.defaultAnnualReturn),
-      currentDisplay: formatPercent(currentSettings.defaultAnnualReturn),
-    });
-  }
-
-  if (pinnedSettings.qfafAnnualReturn !== currentSettings.qfafAnnualReturn) {
-    const fmtQfafReturn = (v: number | null) => v === null ? '= Portfolio' : formatPercent(v);
-    changes.push({
-      label: 'QFAF Return',
-      pinnedDisplay: fmtQfafReturn(pinnedSettings.qfafAnnualReturn),
-      currentDisplay: fmtQfafReturn(currentSettings.qfafAnnualReturn),
-    });
-  }
-
-  // --- AdvancedSettings: Financing costs ---
-
-  if (pinnedSettings.financingFeesEnabled !== currentSettings.financingFeesEnabled) {
-    changes.push({
-      label: 'Financing Fees',
-      pinnedDisplay: pinnedSettings.financingFeesEnabled ? 'On' : 'Off',
-      currentDisplay: currentSettings.financingFeesEnabled ? 'On' : 'Off',
-    });
-  }
-
-  if (pinnedSettings.financingMode !== currentSettings.financingMode) {
-    changes.push({
-      label: 'Financing Mode',
-      pinnedDisplay: pinnedSettings.financingMode === 'simple' ? 'Simple' : 'Detailed',
-      currentDisplay: currentSettings.financingMode === 'simple' ? 'Simple' : 'Detailed',
-    });
-  }
-
-  if (pinnedSettings.simpleWealthMgmtFee !== currentSettings.simpleWealthMgmtFee) {
-    changes.push({
-      label: 'Wealth Mgmt Fee',
-      pinnedDisplay: formatPercent(pinnedSettings.simpleWealthMgmtFee),
-      currentDisplay: formatPercent(currentSettings.simpleWealthMgmtFee),
-    });
-  }
-
-  if (pinnedSettings.brokerMarginRate !== currentSettings.brokerMarginRate) {
-    changes.push({
-      label: 'Margin Rate',
-      pinnedDisplay: formatPercent(pinnedSettings.brokerMarginRate),
-      currentDisplay: formatPercent(currentSettings.brokerMarginRate),
-    });
-  }
-
-  if (pinnedSettings.shortBorrowRate !== currentSettings.shortBorrowRate) {
-    changes.push({
-      label: 'Borrow Rate',
-      pinnedDisplay: formatPercent(pinnedSettings.shortBorrowRate),
-      currentDisplay: formatPercent(currentSettings.shortBorrowRate),
-    });
-  }
-
-  if (pinnedSettings.shortDividendRate !== currentSettings.shortDividendRate) {
-    changes.push({
-      label: 'Div Cost',
-      pinnedDisplay: formatPercent(pinnedSettings.shortDividendRate),
-      currentDisplay: formatPercent(currentSettings.shortDividendRate),
-    });
-  }
-
-  if (pinnedSettings.wealthManagementFeeRate !== currentSettings.wealthManagementFeeRate) {
-    changes.push({
-      label: 'Advisory Fee',
-      pinnedDisplay: formatPercent(pinnedSettings.wealthManagementFeeRate),
-      currentDisplay: formatPercent(currentSettings.wealthManagementFeeRate),
-    });
-  }
-
-  // --- AdvancedSettings: Tax rate overrides ---
-
-  if (pinnedSettings.niitRate !== currentSettings.niitRate) {
-    changes.push({
-      label: 'NIIT Rate',
-      pinnedDisplay: formatPercent(pinnedSettings.niitRate),
-      currentDisplay: formatPercent(currentSettings.niitRate),
-    });
-  }
-
-  if (pinnedSettings.ltcgRate !== currentSettings.ltcgRate) {
-    changes.push({
-      label: 'LTCG Rate',
-      pinnedDisplay: formatPercent(pinnedSettings.ltcgRate),
-      currentDisplay: formatPercent(currentSettings.ltcgRate),
-    });
-  }
-
-  if (pinnedSettings.stcgRate !== currentSettings.stcgRate) {
-    changes.push({
-      label: 'STCG Rate',
-      pinnedDisplay: formatPercent(pinnedSettings.stcgRate),
-      currentDisplay: formatPercent(currentSettings.stcgRate),
-    });
-  }
-
-  return changes;
+interface ScenarioSummary {
+  strategy: string;
+  sizingMode: string;
+  collateral: string;
+  duration: string;
+  qfafEnabled: boolean;
 }
 
-function buildMetrics(
-  pinned: CalculationResult,
-  current: CalculationResult
-): ComparisonMetric[] {
-  const metrics: { label: string; pv: number; cv: number; format: 'currency' | 'percent'; higherIsBetter: boolean }[] = [
-    { label: 'Total Tax Savings', pv: pinned.summary.totalTaxSavings, cv: current.summary.totalTaxSavings, format: 'currency', higherIsBetter: true },
-    { label: 'Year 1 Tax Savings', pv: pinned.years[0]?.taxSavings ?? 0, cv: current.years[0]?.taxSavings ?? 0, format: 'currency', higherIsBetter: true },
-    { label: 'Year 2 Tax Savings', pv: pinned.years[1]?.taxSavings ?? 0, cv: current.years[1]?.taxSavings ?? 0, format: 'currency', higherIsBetter: true },
-    { label: 'Annualized Tax Alpha', pv: pinned.summary.effectiveTaxAlpha, cv: current.summary.effectiveTaxAlpha, format: 'percent', higherIsBetter: true },
-    { label: 'QFAF Value', pv: pinned.sizing.qfafValue, cv: current.sizing.qfafValue, format: 'currency', higherIsBetter: false },
-    { label: 'Total Exposure', pv: pinned.sizing.totalExposure, cv: current.sizing.totalExposure, format: 'currency', higherIsBetter: false },
-    { label: 'Final Portfolio Value', pv: pinned.summary.finalPortfolioValue, cv: current.summary.finalPortfolioValue, format: 'currency', higherIsBetter: true },
-    { label: 'Total NOL Generated', pv: pinned.summary.totalNolGenerated, cv: current.summary.totalNolGenerated, format: 'currency', higherIsBetter: true },
-  ];
-
-  return metrics.map(m => {
-    const delta = m.cv - m.pv;
-    const deltaPercent = m.pv !== 0 ? delta / Math.abs(m.pv) : 0;
-    return {
-      label: m.label,
-      pinnedValue: m.pv,
-      currentValue: m.cv,
-      delta,
-      deltaPercent,
-      format: m.format,
-      higherIsBetter: m.higherIsBetter,
-    };
-  });
+function getScenarioSummary(inputs: CalculatorInputs): ScenarioSummary {
+  const strategy = getStrategy(inputs.strategyId);
+  return {
+    strategy: strategy?.name ?? inputs.strategyId,
+    sizingMode: inputs.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed',
+    collateral: formatCurrencyAbbreviated(inputs.collateralAmount),
+    duration: `${inputs.qfafDuration}yr`,
+    qfafEnabled: inputs.qfafEnabled,
+  };
 }
+
+// ============================================
+// HELPERS
+// ============================================
 
 function formatMetricValue(value: number, format: 'currency' | 'percent'): string {
   if (format === 'percent') return formatPercent(value);
   return formatCurrencyAbbreviated(value);
 }
 
-function formatDelta(metric: ComparisonMetric): string {
-  const sign = metric.delta > 0 ? '+' : metric.delta < 0 ? '-' : '';
-  const pctSign = metric.deltaPercent > 0 ? '+' : metric.deltaPercent < 0 ? '-' : '';
-  if (metric.format === 'percent') {
-    return `${sign}${Math.abs(metric.delta * 100).toFixed(2)}pp`;
+function getBestIndex(values: number[], higherIsBetter: boolean): number {
+  if (values.length === 0) return -1;
+  let bestIdx = 0;
+  for (let i = 1; i < values.length; i++) {
+    if (higherIsBetter ? values[i] > values[bestIdx] : values[i] < values[bestIdx]) {
+      bestIdx = i;
+    }
   }
-  const absDelta = Math.abs(metric.delta);
-  const pctStr = metric.pinnedValue !== 0
-    ? ` (${pctSign}${Math.abs(metric.deltaPercent * 100).toFixed(0)}%)`
-    : '';
-  return `${sign}${formatCurrencyAbbreviated(absDelta)}${pctStr}`;
+  return bestIdx;
 }
 
-function getDeltaClass(metric: ComparisonMetric): string {
-  if (metric.delta === 0) return '';
-  if (!metric.higherIsBetter) return 'comparison-delta--neutral';
-  return metric.delta > 0 ? 'comparison-delta--positive' : 'comparison-delta--negative';
+// ============================================
+// DETECT KEY DIFFERENCES ACROSS SCENARIOS
+// ============================================
+
+function detectKeyDifferences(scenarios: PinnedScenario[]): string[] {
+  if (scenarios.length < 2) return [];
+  const diffs: string[] = [];
+
+  const strategies = new Set(scenarios.map(s => s.inputs.strategyId));
+  if (strategies.size > 1) diffs.push('Strategy');
+
+  const modes = new Set(scenarios.map(s => s.inputs.qfafSizingMode));
+  if (modes.size > 1) diffs.push('Sizing Mode');
+
+  const durations = new Set(scenarios.map(s => s.inputs.qfafDuration));
+  if (durations.size > 1) diffs.push('Duration');
+
+  const collaterals = new Set(scenarios.map(s => s.inputs.collateralAmount));
+  if (collaterals.size > 1) diffs.push('Collateral');
+
+  const qfafStates = new Set(scenarios.map(s => s.inputs.qfafEnabled));
+  if (qfafStates.size > 1) diffs.push('QFAF');
+
+  const states = new Set(scenarios.map(s => s.inputs.stateCode));
+  if (states.size > 1) diffs.push('State');
+
+  const incomes = new Set(scenarios.map(s => s.inputs.annualIncome));
+  if (incomes.size > 1) diffs.push('Income');
+
+  const ltGains = new Set(scenarios.map(s => s.inputs.ltGainsEnabled));
+  if (ltGains.size > 1) diffs.push('LT Gains');
+
+  return diffs;
 }
 
-export function ScenarioComparisonPanel({
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
+export function ScenarioComparisonPanel(props: ScenarioComparisonPanelProps | LegacyScenarioComparisonPanelProps) {
+  // Handle legacy single-scenario props
+  if ('pinned' in props) {
+    return <LegacyPanel {...props} />;
+  }
+  return <MultiScenarioPanel {...props} />;
+}
+
+function MultiScenarioPanel({
+  scenarios,
+  currentInputs,
+  currentSettings,
+  currentResults,
+  canPin,
+  onPin,
+  onUnpin,
+  onUnpinAll,
+}: ScenarioComparisonPanelProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const keyDiffs = detectKeyDifferences(scenarios);
+  const scenarioCount = scenarios.length;
+
+  return (
+    <div className="comparison-panel">
+      <div className="comparison-panel__header">
+        <div className="comparison-panel__title">
+          <span className="comparison-panel__pin-icon">&#128204;</span>
+          <span>
+            Scenario Comparison <strong>({scenarioCount}/4)</strong>
+          </span>
+          {keyDiffs.length > 0 && (
+            <span className="comparison-panel__diffs">
+              Varying: {keyDiffs.join(', ')}
+            </span>
+          )}
+        </div>
+        <div className="comparison-panel__actions">
+          {canPin && (
+            <button className="comparison-btn comparison-btn--repin" onClick={onPin} title="Pin current state as a new scenario">
+              + Pin Current
+            </button>
+          )}
+          <button className="comparison-btn comparison-btn--clear" onClick={onUnpinAll} title="Remove all pinned scenarios">
+            Clear All
+          </button>
+          <button
+            className="comparison-btn comparison-btn--toggle"
+            onClick={() => setCollapsed(c => !c)}
+            aria-label={collapsed ? 'Expand comparison' : 'Collapse comparison'}
+          >
+            {collapsed ? '\u25BC' : '\u25B2'}
+          </button>
+        </div>
+      </div>
+
+      {!collapsed && (
+        <div className="comparison-panel__body">
+          <div className="comparison-table-wrapper">
+            <table className="comparison-table comparison-table--multi">
+              <thead>
+                <tr>
+                  <th className="comparison-table__corner">Metric</th>
+                  {scenarios.map((s, i) => {
+                    const summary = getScenarioSummary(s.inputs);
+                    return (
+                      <th key={s.id} className="comparison-table__scenario-header">
+                        <div className="scenario-header">
+                          <div className="scenario-header__number">{i + 1}</div>
+                          <div className="scenario-header__details">
+                            <div className="scenario-header__strategy">{summary.strategy}</div>
+                            <div className="scenario-header__config">
+                              {summary.qfafEnabled && (
+                                <span className={`scenario-tag scenario-tag--${summary.sizingMode.toLowerCase()}`}>
+                                  {summary.sizingMode}
+                                </span>
+                              )}
+                              {!summary.qfafEnabled && (
+                                <span className="scenario-tag scenario-tag--no-qfaf">No QFAF</span>
+                              )}
+                              <span className="scenario-header__meta">{summary.collateral}</span>
+                              {summary.qfafEnabled && (
+                                <span className="scenario-header__meta">{summary.duration}</span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            className="scenario-header__remove"
+                            onClick={() => onUnpin(s.id)}
+                            title="Remove this scenario"
+                            aria-label={`Remove scenario ${i + 1}`}
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {METRIC_DEFS.map(metric => {
+                  const values = scenarios.map(s => metric.getValue(s.results));
+                  const bestIdx = metric.higherIsBetter ? getBestIndex(values, true) : -1;
+
+                  return (
+                    <tr key={metric.label}>
+                      <td className="comparison-table__label">{metric.label}</td>
+                      {values.map((val, i) => (
+                        <td
+                          key={scenarios[i].id}
+                          className={`comparison-table__value${i === bestIdx ? ' comparison-table__value--best' : ''}`}
+                        >
+                          {formatMetricValue(val, metric.format)}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// LEGACY SINGLE-SCENARIO PANEL (backward compat)
+// ============================================
+
+function LegacyPanel({
   pinned,
   currentInputs,
   currentSettings,
@@ -400,16 +282,16 @@ export function ScenarioComparisonPanel({
   onUnpin,
   onRestore,
   onReplacePin,
-}: ScenarioComparisonPanelProps) {
+}: LegacyScenarioComparisonPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
 
-  const inputChanges = detectInputChanges(
-    pinned.inputs,
-    currentInputs,
-    pinned.advancedSettings,
-    currentSettings
-  );
-  const metrics = buildMetrics(pinned.results, currentResults);
+  const metrics = METRIC_DEFS.map(m => {
+    const pv = m.getValue(pinned.results);
+    const cv = m.getValue(currentResults);
+    const delta = cv - pv;
+    const deltaPercent = pv !== 0 ? delta / Math.abs(pv) : 0;
+    return { ...m, pinnedValue: pv, currentValue: cv, delta, deltaPercent };
+  });
 
   const pinnedAge = Date.now() - pinned.pinnedAt;
   const pinnedAgo = pinnedAge < 60_000
@@ -450,22 +332,6 @@ export function ScenarioComparisonPanel({
 
       {!collapsed && (
         <div className="comparison-panel__body">
-          {inputChanges.length > 0 && (
-            <div className="comparison-changes">
-              <span className="comparison-changes__label">Changed Inputs:</span>
-              <div className="comparison-changes__pills">
-                {inputChanges.map(change => (
-                  <span key={change.label} className="comparison-pill">
-                    <span className="comparison-pill__label">{change.label}:</span>
-                    <span className="comparison-pill__old">{change.pinnedDisplay}</span>
-                    <span className="comparison-pill__arrow">&rarr;</span>
-                    <span className="comparison-pill__new">{change.currentDisplay}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
           <table className="comparison-table">
             <thead>
               <tr>
@@ -476,16 +342,32 @@ export function ScenarioComparisonPanel({
               </tr>
             </thead>
             <tbody>
-              {metrics.map(metric => (
-                <tr key={metric.label}>
-                  <td className="comparison-table__label">{metric.label}</td>
-                  <td className="comparison-table__value">{formatMetricValue(metric.pinnedValue, metric.format)}</td>
-                  <td className="comparison-table__value">{formatMetricValue(metric.currentValue, metric.format)}</td>
-                  <td className={`comparison-table__delta ${getDeltaClass(metric)}`}>
-                    {metric.delta !== 0 ? formatDelta(metric) : '—'}
-                  </td>
-                </tr>
-              ))}
+              {metrics.map(metric => {
+                const deltaClass = metric.delta === 0 ? '' :
+                  !metric.higherIsBetter ? 'comparison-delta--neutral' :
+                  metric.delta > 0 ? 'comparison-delta--positive' : 'comparison-delta--negative';
+                const sign = metric.delta > 0 ? '+' : metric.delta < 0 ? '-' : '';
+                let deltaStr = '—';
+                if (metric.delta !== 0) {
+                  if (metric.format === 'percent') {
+                    deltaStr = `${sign}${Math.abs(metric.delta * 100).toFixed(2)}pp`;
+                  } else {
+                    const pctStr = metric.pinnedValue !== 0
+                      ? ` (${sign}${Math.abs(metric.deltaPercent * 100).toFixed(0)}%)`
+                      : '';
+                    deltaStr = `${sign}${formatCurrencyAbbreviated(Math.abs(metric.delta))}${pctStr}`;
+                  }
+                }
+
+                return (
+                  <tr key={metric.label}>
+                    <td className="comparison-table__label">{metric.label}</td>
+                    <td className="comparison-table__value">{formatMetricValue(metric.pinnedValue, metric.format)}</td>
+                    <td className="comparison-table__value">{formatMetricValue(metric.currentValue, metric.format)}</td>
+                    <td className={`comparison-table__delta ${deltaClass}`}>{deltaStr}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

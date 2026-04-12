@@ -74,9 +74,13 @@ interface StickyHeaderProps {
   onReset?: () => void;
   /** Whether a scenario is currently pinned */
   hasPinnedScenario?: boolean;
+  /** Whether more scenarios can be pinned (< 4) */
+  canPinScenario?: boolean;
+  /** Number of pinned scenarios */
+  pinnedCount?: number;
   /** Callback to pin the current scenario */
   onPinScenario?: () => void;
-  /** Callback to unpin the current scenario */
+  /** Callback to unpin all scenarios */
   onUnpinScenario?: () => void;
   /** Pinned scenario values for persistent delta display */
   pinnedValues?: {
@@ -133,6 +137,8 @@ export const StickyHeader = React.memo(function StickyHeader({
   onOpenAdvanced,
   onReset,
   hasPinnedScenario,
+  canPinScenario,
+  pinnedCount,
   onPinScenario,
   onUnpinScenario,
   pinnedValues,
@@ -225,25 +231,37 @@ export const StickyHeader = React.memo(function StickyHeader({
         )}
         {(onPinScenario || onUnpinScenario) && (
           <>
-            <button
-              className={`sticky-header__pin-btn${hasPinnedScenario ? ' sticky-header__pin-btn--active' : ''}`}
-              onClick={hasPinnedScenario ? onUnpinScenario : onPinScenario}
-              aria-label={hasPinnedScenario ? 'Unpin scenario' : 'Pin current scenario'}
-              title={hasPinnedScenario ? 'Unpin scenario' : 'Pin current scenario for comparison'}
-            >
-              <PinIcon active={hasPinnedScenario} />
-              {isExpanded && <span>{hasPinnedScenario ? 'Pinned' : 'Pin'}</span>}
-            </button>
-            {hasPinnedScenario && (
+            {canPinScenario !== false && (
               <button
-                className="sticky-header__compare-link"
-                onClick={() => {
-                  document.querySelector('.comparison-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-                title="Scroll to comparison panel"
+                className={`sticky-header__pin-btn${hasPinnedScenario ? ' sticky-header__pin-btn--active' : ''}`}
+                onClick={onPinScenario}
+                aria-label="Pin current scenario for comparison"
+                title={`Pin current scenario (${pinnedCount ?? 0}/4)`}
               >
-                {isExpanded ? 'View Comparison \u2193' : '\u2193'}
+                <PinIcon active={hasPinnedScenario} />
+                {isExpanded && <span>Pin{hasPinnedScenario ? ` (${pinnedCount}/4)` : ''}</span>}
               </button>
+            )}
+            {hasPinnedScenario && (
+              <>
+                <button
+                  className="sticky-header__compare-link"
+                  onClick={() => {
+                    document.querySelector('.comparison-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  title="Scroll to comparison panel"
+                >
+                  {isExpanded ? 'View Comparison \u2193' : '\u2193'}
+                </button>
+                <button
+                  className="sticky-header__pin-btn"
+                  onClick={onUnpinScenario}
+                  aria-label="Clear all pinned scenarios"
+                  title="Clear all pinned scenarios"
+                >
+                  {isExpanded ? 'Clear Pins' : '\u00D7'}
+                </button>
+              </>
             )}
           </>
         )}
