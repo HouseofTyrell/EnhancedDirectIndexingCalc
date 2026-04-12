@@ -228,6 +228,23 @@ export function StrategySelectionInputs({
           <label className="toggle-label">
             <input
               type="checkbox"
+              checked={inputs.ltGainsEnabled}
+              onChange={e => onUpdateInput('ltGainsEnabled', e.target.checked)}
+            />
+            <span className="toggle-switch"></span>
+            LT Gains
+          </label>
+          <span className="input-hint">
+            {inputs.ltGainsEnabled
+              ? 'Realizing LT gains annually'
+              : 'No LT gains realized'}
+          </span>
+        </div>
+
+        <div className="toggle-row-item">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
               checked={advancedSettings.financingFeesEnabled}
               onChange={e =>
                 onUpdateSettings(s => ({ ...s, financingFeesEnabled: e.target.checked }))

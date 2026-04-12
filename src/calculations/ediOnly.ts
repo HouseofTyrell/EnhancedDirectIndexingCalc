@@ -27,6 +27,7 @@ export interface EdiYearInput {
   priorStCarryforward: number;
   priorLtCarryforward: number;
   niitRate?: number; // Default 0.038; excluded from $3K deduction (offsets ordinary income, not NII)
+  ltGainsEnabled?: boolean; // Default true; when false, no LT gains are realized
 }
 
 export interface EdiYearResult {
@@ -80,7 +81,7 @@ export function computeEdiYear(input: EdiYearInput): EdiYearResult {
   const stLossRate = getStLossRateForYear(strategy, year);
   const ltGainRate = strategy.ltGainRate;
   const stLossesHarvested = safeNumber(collateralValue * stLossRate * (1 - washSaleRate));
-  const ltGainsRealized = safeNumber(collateralValue * ltGainRate);
+  const ltGainsRealized = input.ltGainsEnabled !== false ? safeNumber(collateralValue * ltGainRate) : 0;
 
   // --- Step 2: IRC netting - ST losses offset LT gains ---
   const stLossesUsedToOffsetLtGains = Math.min(stLossesHarvested, ltGainsRealized);
@@ -175,6 +176,8 @@ export interface EdiProjectionInput {
   projectionYears: number;
   /** Incremental financing cost rate. When provided, collateral growth is reduced by this rate. */
   financingCostRate?: number;
+  /** When false, no LT gains are realized. Default: true. */
+  ltGainsEnabled?: boolean;
 }
 
 export interface EdiProjectionSummary {
@@ -208,6 +211,7 @@ export function computeEdiProjection(input: EdiProjectionInput): EdiProjectionRe
       washSaleRate: input.washSaleRate,
       priorStCarryforward: stCf,
       priorLtCarryforward: ltCf,
+      ltGainsEnabled: input.ltGainsEnabled,
     });
 
     years.push(yearResult);
