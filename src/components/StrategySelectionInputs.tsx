@@ -228,16 +228,16 @@ export function StrategySelectionInputs({
           <label className="toggle-label">
             <input
               type="checkbox"
-              checked={inputs.ltGainsEnabled}
-              onChange={e => onUpdateInput('ltGainsEnabled', e.target.checked)}
+              checked={!inputs.ltGainsEnabled}
+              onChange={e => onUpdateInput('ltGainsEnabled', !e.target.checked)}
             />
             <span className="toggle-switch"></span>
-            LT Gains
+            Net Out LT Gains
           </label>
           <span className="input-hint">
             {inputs.ltGainsEnabled
-              ? 'Realizing LT gains annually'
-              : 'No LT gains realized'}
+              ? 'LT gains included in projections'
+              : 'LT gains netted out'}
           </span>
         </div>
 
