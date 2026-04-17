@@ -114,12 +114,13 @@ export function calculateWithOverrides(
     // Zero out QFAF after duration expires (breakeven unwind)
     let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
 
-    // Dynamic resizing: shrink QFAF to match this year's collateral ST losses
+    // Dynamic resizing: shrink QFAF to match this year's collateral ST losses.
+    // Size against the annual rate — yearFraction is applied to both QFAF gains
+    // and collateral losses at generation, so it cancels out of the sizing target.
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0) {
-      const effectiveYearFraction = year === 1 ? yearFraction : 1.0;
       const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-      const neededQfaf = collateralValue * yearStLossRate * effectiveYearFraction * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      const neededQfaf = collateralValue * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
       // Can only shrink, never grow beyond initial or current value
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
