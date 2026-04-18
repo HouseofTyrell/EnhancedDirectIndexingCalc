@@ -134,6 +134,35 @@ describe('Partial Year Start', () => {
     });
   });
 
+  describe('Dynamic QFAF sizing with partial year', () => {
+    it('should keep QFAF ST gains and collateral ST losses fully offsetting', () => {
+      const halfYear = calculate(createInputs({ startMonth: 7, qfafSizingMode: 'dynamic' }));
+
+      // Net ST position must be zero — any leakage means proration was applied
+      // to one side but not the other.
+      expect(halfYear.years[0].stGainsGenerated - halfYear.years[0].stLossesHarvested).toBeCloseTo(0, 0);
+      expect(halfYear.years[0].stGainLeakage).toBeCloseTo(0, 0);
+    });
+
+    it('should produce exactly 50% of Year 1 QFAF ST gains (dynamic mode)', () => {
+      const fullYear = calculate(createInputs({ startMonth: 1, qfafSizingMode: 'dynamic' }));
+      const halfYear = calculate(createInputs({ startMonth: 7, qfafSizingMode: 'dynamic' }));
+
+      expect(halfYear.years[0].stGainsGenerated).toBeCloseTo(
+        fullYear.years[0].stGainsGenerated * 0.5, 0
+      );
+    });
+
+    it('should produce exactly 50% of Year 1 tax savings (dynamic mode)', () => {
+      const fullYear = calculate(createInputs({ startMonth: 1, qfafSizingMode: 'dynamic' }));
+      const halfYear = calculate(createInputs({ startMonth: 7, qfafSizingMode: 'dynamic' }));
+
+      expect(halfYear.years[0].taxSavings).toBeCloseTo(
+        fullYear.years[0].taxSavings * 0.5, 0
+      );
+    });
+  });
+
   describe('Portfolio growth with partial year', () => {
     it('should pro-rate Year 1 growth when growth is enabled', () => {
       const settings: AdvancedSettings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.10 };
