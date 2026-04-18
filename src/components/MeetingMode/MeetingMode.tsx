@@ -5,7 +5,9 @@ import {
   AdvancedSettings,
   FILING_STATUSES,
 } from '../../types';
-import { Strategy } from '../../strategyData';
+import { Strategy, STRATEGIES } from '../../strategyData';
+import { STATES } from '../../taxData';
+import { formatWithCommas, parseFormattedNumber } from '../../utils/formatters';
 
 // Design tokens from EDI Calc Meeting Mode.html
 const M = {
@@ -50,6 +52,12 @@ interface TaxRates {
   combinedLtRate: number;
 }
 
+type UpdateInput = <K extends keyof CalculatorInputs>(
+  key: K,
+  value: CalculatorInputs[K]
+) => void;
+type UpdateSettings = (updater: (prev: AdvancedSettings) => AdvancedSettings) => void;
+
 interface MeetingModeProps {
   inputs: CalculatorInputs;
   results: CalculationResult;
@@ -61,27 +69,59 @@ interface MeetingModeProps {
   onPinScenario: () => void;
   canPin: boolean;
   onExport?: () => void;
+  onUpdateInput: UpdateInput;
+  onUpdateSettings: UpdateSettings;
 }
 
-// ═══ Slim left rail with active scenario + collapse ═══
+// Dark-rail input styling (shared across select/input)
+const railFieldStyle: CSSProperties = {
+  width: '100%',
+  padding: '8px 10px',
+  background: 'rgba(255,255,255,0.04)',
+  border: `1px solid ${M.sidebarLine}`,
+  borderRadius: 7,
+  color: 'white',
+  fontSize: 12.5,
+  fontWeight: 600,
+  fontFamily: M.sans,
+  outline: 'none',
+  appearance: 'none',
+  WebkitAppearance: 'none',
+};
+
+const railLabelStyle: CSSProperties = {
+  display: 'block',
+  fontSize: 10,
+  fontWeight: 700,
+  color: M.sidebarFaint,
+  textTransform: 'uppercase',
+  letterSpacing: 0.8,
+  marginBottom: 5,
+};
+
+// ═══ Slim left rail with active scenario + inline editing ═══
 function Rail({
   collapsed,
   onToggle,
-  onEdit,
+  onOpenFullCalculator,
   inputs,
   currentStrategy,
   taxRates,
   results,
   advancedSettings,
+  onUpdateInput,
+  onUpdateSettings,
 }: {
   collapsed: boolean;
   onToggle: () => void;
-  onEdit: () => void;
+  onOpenFullCalculator: () => void;
   inputs: CalculatorInputs;
   currentStrategy: Strategy | undefined;
   taxRates: TaxRates;
   results: CalculationResult;
   advancedSettings: AdvancedSettings;
+  onUpdateInput: UpdateInput;
+  onUpdateSettings: UpdateSettings;
 }) {
   const filingLabel =
     FILING_STATUSES.find(f => f.value === inputs.filingStatus)?.label.replace(
@@ -326,19 +366,245 @@ function Rail({
               marginBottom: 10,
             }}
           >
-            Scenario summary
+            Adjust scenario
+          </div>
+
+          {/* Strategy */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={railLabelStyle} htmlFor="mm-strategy">
+              Strategy
+            </label>
+            <select
+              id="mm-strategy"
+              value={inputs.strategyId}
+              onChange={e => onUpdateInput('strategyId', e.target.value)}
+              style={railFieldStyle}
+            >
+              <optgroup label="Core (Cash Funded)">
+                {STRATEGIES.filter(s => s.type === 'core').map(s => (
+                  <option key={s.id} value={s.id} style={{ background: M.sidebar }}>
+                    {s.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Overlay (Appreciated Stock)">
+                {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
+                  <option key={s.id} value={s.id} style={{ background: M.sidebar }}>
+                    {s.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Collateral */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={railLabelStyle} htmlFor="mm-collateral">
+              Collateral
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  left: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: M.sidebarFaint,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  pointerEvents: 'none',
+                }}
+              >
+                $
+              </span>
+              <input
+                id="mm-collateral"
+                type="text"
+                inputMode="numeric"
+                value={formatWithCommas(inputs.collateralAmount)}
+                onChange={e =>
+                  onUpdateInput('collateralAmount', parseFormattedNumber(e.target.value))
+                }
+                style={{
+                  ...railFieldStyle,
+                  paddingLeft: 22,
+                  fontFamily: M.mono,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Income */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={railLabelStyle} htmlFor="mm-income">
+              Annual income
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  left: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: M.sidebarFaint,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  pointerEvents: 'none',
+                }}
+              >
+                $
+              </span>
+              <input
+                id="mm-income"
+                type="text"
+                inputMode="numeric"
+                value={formatWithCommas(inputs.annualIncome)}
+                onChange={e =>
+                  onUpdateInput('annualIncome', parseFormattedNumber(e.target.value))
+                }
+                style={{
+                  ...railFieldStyle,
+                  paddingLeft: 22,
+                  fontFamily: M.mono,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* State + Filing side-by-side */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <label style={railLabelStyle} htmlFor="mm-state">
+                State
+              </label>
+              <select
+                id="mm-state"
+                value={inputs.stateCode}
+                onChange={e => onUpdateInput('stateCode', e.target.value)}
+                style={railFieldStyle}
+              >
+                {STATES.map(s => (
+                  <option key={s.code} value={s.code} style={{ background: M.sidebar }}>
+                    {s.code}
+                  </option>
+                ))}
+                <option value="OTHER" style={{ background: M.sidebar }}>
+                  Other
+                </option>
+              </select>
+            </div>
+            <div>
+              <label style={railLabelStyle} htmlFor="mm-filing">
+                Filing
+              </label>
+              <select
+                id="mm-filing"
+                value={inputs.filingStatus}
+                onChange={e =>
+                  onUpdateInput(
+                    'filingStatus',
+                    e.target.value as CalculatorInputs['filingStatus']
+                  )
+                }
+                style={railFieldStyle}
+              >
+                {FILING_STATUSES.map(f => (
+                  <option key={f.value} value={f.value} style={{ background: M.sidebar }}>
+                    {f.value.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Projection years */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={railLabelStyle} htmlFor="mm-years">
+              Projection years
+            </label>
+            <select
+              id="mm-years"
+              value={advancedSettings.projectionYears}
+              onChange={e => {
+                const y = parseInt(e.target.value, 10);
+                onUpdateSettings(prev => ({ ...prev, projectionYears: y }));
+              }}
+              style={railFieldStyle}
+            >
+              {[5, 7, 10, 15, 20].map(y => (
+                <option key={y} value={y} style={{ background: M.sidebar }}>
+                  {y} years
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* QFAF toggle */}
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 12px',
+              marginBottom: 14,
+              borderRadius: 7,
+              background: 'rgba(255,255,255,0.02)',
+              border: `1px solid ${M.sidebarLine}`,
+              cursor: 'pointer',
+            }}
+          >
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 12.5,
+                color: M.sidebarInk,
+                fontWeight: 600,
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: inputs.qfafEnabled ? '#4ade80' : '#f87171',
+                }}
+              />
+              QFAF overlay
+            </span>
+            <input
+              type="checkbox"
+              checked={inputs.qfafEnabled}
+              onChange={e => onUpdateInput('qfafEnabled', e.target.checked)}
+              style={{ accentColor: M.accent, cursor: 'pointer' }}
+            />
+          </label>
+
+          {/* Derived values shown as read-only tiles */}
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: M.sidebarFaint,
+              textTransform: 'uppercase',
+              letterSpacing: 1.2,
+              marginBottom: 8,
+            }}
+          >
+            Derived
           </div>
           {(
             [
-              ['Collateral', fmtCurrency(inputs.collateralAmount), '#60a5fa'],
-              ['Income', fmtCurrency(inputs.annualIncome), '#a78bfa'],
-              ['Projection', `${advancedSettings.projectionYears} yr`, '#f59e0b'],
-              [
-                'Strategy',
-                currentStrategy?.name ?? '—',
-                '#4ade80',
-              ],
               ['QFAF value', fmtCurrency(results.sizing.qfafValue), '#38bdf8'],
+              ['Total exposure', fmtCurrency(results.sizing.totalExposure), '#60a5fa'],
               ['Combined ST', fmtPercent(taxRates.combinedStRate), '#fb7185'],
             ] as const
           ).map(([k, v, dot]) => (
@@ -348,7 +614,7 @@ function Rail({
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '10px 12px',
+                padding: '8px 12px',
                 marginBottom: 4,
                 borderRadius: 7,
                 background: 'rgba(255,255,255,0.02)',
@@ -360,7 +626,7 @@ function Rail({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  fontSize: 12.5,
+                  fontSize: 11.5,
                   color: M.sidebarInk,
                 }}
               >
@@ -369,14 +635,10 @@ function Rail({
               </span>
               <span
                 style={{
-                  fontSize: 12,
+                  fontSize: 11.5,
                   color: 'white',
                   fontWeight: 600,
                   fontFamily: M.mono,
-                  maxWidth: 130,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
                 }}
               >
                 {v}
@@ -385,22 +647,22 @@ function Rail({
           ))}
 
           <button
-            onClick={onEdit}
+            onClick={onOpenFullCalculator}
             style={{
               width: '100%',
-              marginTop: 20,
-              padding: '10px 12px',
-              background: 'white',
-              color: M.ink,
-              border: 'none',
+              marginTop: 18,
+              padding: '9px 12px',
+              background: 'transparent',
+              color: M.sidebarInk,
+              border: `1px solid ${M.sidebarLine}`,
               borderRadius: 8,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
               fontFamily: M.sans,
             }}
           >
-            Edit all inputs →
+            Open full calculator →
           </button>
         </div>
       )}
@@ -1346,41 +1608,70 @@ export function MeetingMode({
   onPinScenario,
   canPin,
   onExport,
+  onUpdateInput,
+  onUpdateSettings,
 }: MeetingModeProps) {
   const [level, setLevel] = useState<Level>('high');
   const [showBaseline, setShowBaseline] = useState(true);
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [showDecomp, setShowDecomp] = useState(true);
 
-  // Build year-by-year chart data from real results
+  // core.ts may return more years than projectionYears (wind-down continues until
+  // carryforwards exhausted). Cap the view to what the user actually asked for.
+  const projectionYears = advancedSettings.projectionYears;
+  const visibleYears = useMemo(
+    () => results.years.slice(0, projectionYears),
+    [results.years, projectionYears]
+  );
+  const visibleCollateralYears = useMemo(
+    () => collateralOnlyResults.years.slice(0, projectionYears),
+    [collateralOnlyResults.years, projectionYears]
+  );
+
+  // Build year-by-year chart data from real results, bounded to projectionYears
   const yearData: ChartPoint[] = useMemo(
     () =>
-      results.years.map((y, i) => ({
+      visibleYears.map((y, i) => ({
         y: y.year,
         port: y.totalValue,
-        baseline: collateralOnlyResults.years[i]?.totalValue ?? y.totalValue,
+        baseline: visibleCollateralYears[i]?.totalValue ?? y.totalValue,
         save: y.taxSavings,
       })),
-    [results.years, collateralOnlyResults.years]
+    [visibleYears, visibleCollateralYears]
   );
 
   const detailYearData = useMemo(
     () =>
-      results.years.map(y => ({
+      visibleYears.map(y => ({
         y: y.year,
         save: y.taxSavings,
         nol: y.excessToNol,
         port: y.totalValue,
       })),
-    [results.years]
+    [visibleYears]
   );
 
-  const totalTaxSavings = results.summary.totalTaxSavings;
-  const incrementalBenefit =
-    results.summary.totalTaxSavings - collateralOnlyResults.summary.totalTaxSavings;
-  const taxAlpha = results.summary.effectiveTaxAlpha;
-  const finalPortfolio = results.summary.finalPortfolioValue;
-  const totalNol = results.summary.totalNolGenerated;
+  // Bound summary figures to the user's projection window so labels ("over N
+  // years") agree with the numbers shown — core.ts keeps running the sim past
+  // projectionYears during QFAF wind-down, which we don't want to surface here.
+  const totalTaxSavings = useMemo(
+    () => visibleYears.reduce((s, y) => s + y.taxSavings, 0),
+    [visibleYears]
+  );
+  const collateralOnlyTaxSavings = useMemo(
+    () => visibleCollateralYears.reduce((s, y) => s + y.taxSavings, 0),
+    [visibleCollateralYears]
+  );
+  const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
+  const finalPortfolio =
+    visibleYears[visibleYears.length - 1]?.totalValue ?? inputs.collateralAmount;
+  const totalNol =
+    visibleYears[visibleYears.length - 1]?.nolCarryforward ??
+    results.summary.totalNolGenerated;
+  const taxAlpha =
+    results.sizing.totalExposure > 0 && projectionYears > 0
+      ? totalTaxSavings / results.sizing.totalExposure / projectionYears
+      : 0;
 
   const [yearIdx, setYearIdx] = useState(yearData.length);
   useEffect(() => {
@@ -1392,7 +1683,7 @@ export function MeetingMode({
   const decomposition = useMemo(() => {
     const year1 = detailYearData[0]?.save ?? 0;
     const years2plus = detailYearData.slice(1).reduce((s, y) => s + y.save, 0);
-    const nolBenefit = results.years.reduce((s, y) => s + (y.nolUsageBenefit ?? 0), 0);
+    const nolBenefit = visibleYears.reduce((s, y) => s + (y.nolUsageBenefit ?? 0), 0);
     // Reinvestment compounding = total − (year1 + years2plus). NOL benefit is
     // already embedded in year savings; show it as a standalone indicator.
     const reinvest = Math.max(0, totalTaxSavings - year1 - years2plus);
@@ -1422,7 +1713,7 @@ export function MeetingMode({
         note: 'Savings compound over the projection period',
       },
     ];
-  }, [detailYearData, totalTaxSavings, totalNol, results.years, taxRates.combinedStRate]);
+  }, [detailYearData, totalTaxSavings, totalNol, visibleYears, taxRates.combinedStRate]);
 
   const filingLabel =
     FILING_STATUSES.find(f => f.value === inputs.filingStatus)?.label.replace(
@@ -1452,12 +1743,14 @@ export function MeetingMode({
       <Rail
         collapsed={railCollapsed}
         onToggle={() => setRailCollapsed(!railCollapsed)}
-        onEdit={onExitMeetingMode}
+        onOpenFullCalculator={onExitMeetingMode}
         inputs={inputs}
         currentStrategy={currentStrategy}
         taxRates={taxRates}
         results={results}
         advancedSettings={advancedSettings}
+        onUpdateInput={onUpdateInput}
+        onUpdateSettings={onUpdateSettings}
       />
 
       <main style={{ flex: 1, overflow: 'auto' }}>
