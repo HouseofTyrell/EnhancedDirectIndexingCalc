@@ -1300,12 +1300,33 @@ body {
 }
 
 .headline-metric.primary {
-  background: var(--card-bg);
-  border-left: 3px solid var(--primary);
-  box-shadow: var(--shadow-lg);
+  background: linear-gradient(135deg, var(--card-bg) 0%, rgba(37, 99, 235, 0.06) 100%);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-left: 4px solid var(--primary);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16);
+  position: relative;
+}
+
+.headline-metric.primary::before {
+  content: 'Headline';
+  position: absolute;
+  top: 0.55rem;
+  right: 0.75rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  opacity: 0.75;
 }
 
 .headline-metric.primary .headline-number {
+  color: var(--primary);
+  font-size: 2.6rem;
+}
+
+.headline-metric.primary h3 {
+  font-weight: 700;
   color: var(--primary);
 }
 
@@ -1639,6 +1660,157 @@ input[type='range']::-webkit-slider-thumb {
   gap: 0.25rem;
   min-width: 150px;
   flex: 1;
+}
+
+/* Optional Refinements — secondary assumptions (growth & fees) collapsed by default */
+.optional-refinements {
+  grid-column: 1 / -1;
+  margin-top: 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.optional-refinements[open] {
+  background: var(--bg);
+  border-style: solid;
+}
+
+.optional-refinements__summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  list-style: none;
+  font-size: 0.85rem;
+  user-select: none;
+  color: var(--text-secondary);
+}
+
+.optional-refinements__summary::-webkit-details-marker {
+  display: none;
+}
+
+.optional-refinements__summary::before {
+  content: '▸';
+  display: inline-block;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+  transform-origin: center;
+}
+
+.optional-refinements[open] > .optional-refinements__summary::before {
+  transform: rotate(90deg);
+}
+
+.optional-refinements__title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.optional-refinements__hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.optional-refinements__content {
+  padding: 0.5rem 0.9rem 0.9rem;
+}
+
+/* Offset accounting collapsible — mechanics detail below the efficacy story */
+.offset-details {
+  margin-top: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.offset-details[open] {
+  background: var(--bg);
+  border-style: solid;
+}
+
+.offset-details__summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  list-style: none;
+  font-size: 0.85rem;
+  user-select: none;
+  color: var(--text-secondary);
+}
+
+.offset-details__summary::-webkit-details-marker {
+  display: none;
+}
+
+.offset-details__summary::before {
+  content: '▸';
+  display: inline-block;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+  transform-origin: center;
+}
+
+.offset-details[open] > .offset-details__summary::before {
+  transform: rotate(90deg);
+}
+
+.offset-details__title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.offset-details__hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.offset-details .offset-status {
+  margin: 0.25rem 0.9rem 0.9rem;
+}
+
+/* Sizing Summary header toolbar — "Isolate tax mechanic" + InfoPopup */
+.sizing-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.isolate-mechanic-btn {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.isolate-mechanic-btn:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.isolate-mechanic-btn--active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.isolate-mechanic-btn--active:hover {
+  background: var(--primary);
+  opacity: 0.92;
 }
 
 .fee-inputs {

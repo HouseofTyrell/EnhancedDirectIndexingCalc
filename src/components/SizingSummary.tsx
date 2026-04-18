@@ -1,4 +1,4 @@
-import { CalculationResult } from '../types';
+import { AdvancedSettings, CalculationResult, DEFAULT_SETTINGS } from '../types';
 import { InfoPopup, InfoText, QfafSizingFormula } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -13,6 +13,10 @@ interface SizingSummaryProps {
   combinedStRate: number;
   combinedLtRate: number;
   qfafMultiplier?: number;
+  advancedSettings?: AdvancedSettings;
+  onUpdateSettings?: (
+    updater: (prev: AdvancedSettings) => AdvancedSettings
+  ) => void;
 }
 
 export function SizingSummary({
@@ -22,7 +26,35 @@ export function SizingSummary({
   combinedStRate,
   combinedLtRate,
   qfafMultiplier,
+  advancedSettings,
+  onUpdateSettings,
 }: SizingSummaryProps) {
+  // "Tax-Mechanic-Only" preset — zeroes growth, QFAF growth, and financing fees
+  // so the advisor/analyst can show the pure tax benefit with no market assumptions.
+  const isIsolated = !!advancedSettings &&
+    !advancedSettings.growthEnabled &&
+    !advancedSettings.qfafGrowthEnabled &&
+    !advancedSettings.financingFeesEnabled;
+  const canToggleIsolation = !!advancedSettings && !!onUpdateSettings;
+  const toggleIsolation = () => {
+    if (!onUpdateSettings) return;
+    if (isIsolated) {
+      onUpdateSettings(s => ({
+        ...s,
+        growthEnabled: DEFAULT_SETTINGS.growthEnabled,
+        qfafGrowthEnabled: DEFAULT_SETTINGS.qfafGrowthEnabled,
+        financingFeesEnabled: DEFAULT_SETTINGS.financingFeesEnabled,
+      }));
+    } else {
+      onUpdateSettings(s => ({
+        ...s,
+        growthEnabled: false,
+        qfafGrowthEnabled: false,
+        financingFeesEnabled: false,
+      }));
+    }
+  };
+
   const year1Savings = results.years[0]?.taxSavings ?? 0;
   const year2Savings = results.years[1]?.taxSavings ?? 0;
 
@@ -45,9 +77,26 @@ export function SizingSummary({
       stepLabel="Optimized Strategy"
       title="Strategy Sizing"
       headerAction={
-        <InfoPopup title="QFAF Auto-Sizing">
-          <QfafSizingFormula qfafMultiplier={qfafMultiplier} />
-        </InfoPopup>
+        <div className="sizing-header-actions">
+          {canToggleIsolation && (
+            <button
+              type="button"
+              className={`isolate-mechanic-btn${isIsolated ? ' isolate-mechanic-btn--active' : ''}`}
+              onClick={toggleIsolation}
+              title={
+                isIsolated
+                  ? 'Restore growth & financing fee assumptions to defaults'
+                  : 'Zero growth & financing fees to see the pure tax benefit'
+              }
+              aria-pressed={isIsolated}
+            >
+              {isIsolated ? '✓ Tax-mechanic only' : 'Isolate tax mechanic'}
+            </button>
+          )}
+          <InfoPopup title="QFAF Auto-Sizing">
+            <QfafSizingFormula qfafMultiplier={qfafMultiplier} />
+          </InfoPopup>
+        </div>
       }
       guidance="We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits."
       className="sizing-section"
@@ -106,98 +155,9 @@ export function SizingSummary({
         </div>
       </div>
 
-      <div className="offset-status">
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="year1-st-losses"
-              currentValue={formatCurrency(results.sizing.year1StLosses)}
-            >
-              {results.sizing.sizingYears === 1
-                ? 'Year 1 ST Losses (Collateral)'
-                : `Avg ST Losses, Yrs 1–${results.sizing.sizingYears} (Collateral)`}
-            </InfoText>
-          </span>
-          <span className="positive">{formatCurrency(results.sizing.year1StLosses)}</span>
-        </div>
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="year1-st-gains"
-              currentValue={formatCurrency(results.sizing.year1StGains)}
-            >
-              {results.sizing.sizingYears === 1
-                ? 'Year 1 ST Gains (QFAF)'
-                : 'Matched ST Gains (QFAF)'}
-            </InfoText>
-          </span>
-          <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
-        </div>
-        {(() => {
-          const netSt = results.sizing.year1StLosses - results.sizing.year1StGains;
-          const isMatched = Math.abs(netSt) < 1;
-          const hasExcessGains = netSt < -1; // ST gains > ST losses
-          const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
-          const statusClass = isMatched ? 'success' : hasExcessGains ? 'danger' : 'success';
-          let label: string;
-                  if (isMatched) {
-            label = `Fully Matched${avgNote}`;
-          } else if (hasExcessGains) {
-            label = `${formatCurrency(Math.abs(netSt))} excess ST gains${avgNote}`;
-          } else {
-            label = `${formatCurrency(netSt)} excess ST losses${avgNote}`;
-          }
-          return (
-            <div className={`offset-row result ${statusClass}`}>
-              <span>
-                <InfoText contentKey="net-st-position" currentValue={isMatched ? '$0 (Fully Matched)' : formatCurrency(netSt)}>
-                  Net ST Position
-                </InfoText>
-              </span>
-              <span>{label}</span>
-            </div>
-          );
-        })()}
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="year1-ordinary-losses"
-              currentValue={formatCurrency(results.sizing.year1OrdinaryLosses)}
-            >
-              Year 1 Ordinary Loss (QFAF)
-            </InfoText>
-          </span>
-          <span className="positive">{formatCurrency(results.sizing.year1OrdinaryLosses)}</span>
-        </div>
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="usable-ordinary-loss"
-              currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
-            >
-              Usable Ordinary Loss
-            </InfoText>
-          </span>
-          <span className="positive">
-            {formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
-          </span>
-        </div>
-        {results.sizing.year1ExcessToNol > 0 && (
-          <div className="offset-row">
-            <span>
-              <InfoText
-                contentKey="excess-to-nol"
-                currentValue={formatCurrency(results.sizing.year1ExcessToNol)}
-              >
-                Excess → NOL Carryforward
-              </InfoText>
-            </span>
-            <span>{formatCurrency(results.sizing.year1ExcessToNol)}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Year 1 / Year 2+ Tax Benefit Breakdown with Timeline Connector */}
+      {/* Year 1 / Year 2+ Tax Benefit Breakdown with Timeline Connector
+          Placed FIRST so the efficacy story leads. The offset ledger below
+          (collapsed by default) supports the numbers for anyone who wants the math. */}
       <div className={`tax-benefit-timeline ${!(results.years.length > 1 && qfafEnabled) ? 'tax-benefit-timeline--single' : ''}`}>
       <div className="tax-benefit-summary">
         <h3>Estimated Year 1 Tax Benefit</h3>
@@ -338,6 +298,107 @@ export function SizingSummary({
         </div>
       )}
       </div>{/* end tax-benefit-timeline */}
+
+      {/* Detailed offset accounting — secondary context for anyone who wants
+          to see how the ST gains/losses match up. Collapsed by default. */}
+      <details className="offset-details">
+        <summary className="offset-details__summary">
+          <span className="offset-details__title">Detailed offset accounting</span>
+          <span className="offset-details__hint">
+            How QFAF ST gains match collateral ST losses
+          </span>
+        </summary>
+        <div className="offset-status">
+          <div className="offset-row">
+            <span>
+              <InfoText
+                contentKey="year1-st-losses"
+                currentValue={formatCurrency(results.sizing.year1StLosses)}
+              >
+                {results.sizing.sizingYears === 1
+                  ? 'Year 1 ST Losses (Collateral)'
+                  : `Avg ST Losses, Yrs 1–${results.sizing.sizingYears} (Collateral)`}
+              </InfoText>
+            </span>
+            <span className="positive">{formatCurrency(results.sizing.year1StLosses)}</span>
+          </div>
+          <div className="offset-row">
+            <span>
+              <InfoText
+                contentKey="year1-st-gains"
+                currentValue={formatCurrency(results.sizing.year1StGains)}
+              >
+                {results.sizing.sizingYears === 1
+                  ? 'Year 1 ST Gains (QFAF)'
+                  : 'Matched ST Gains (QFAF)'}
+              </InfoText>
+            </span>
+            <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
+          </div>
+          {(() => {
+            const netSt = results.sizing.year1StLosses - results.sizing.year1StGains;
+            const isMatched = Math.abs(netSt) < 1;
+            const hasExcessGains = netSt < -1;
+            const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
+            const statusClass = isMatched ? 'success' : hasExcessGains ? 'danger' : 'success';
+            let label: string;
+            if (isMatched) {
+              label = `Fully Matched — ST gains and losses cancel out${avgNote}`;
+            } else if (hasExcessGains) {
+              label = `${formatCurrency(Math.abs(netSt))} excess ST gains${avgNote}`;
+            } else {
+              label = `${formatCurrency(netSt)} excess ST losses${avgNote}`;
+            }
+            return (
+              <div className={`offset-row result ${statusClass}`}>
+                <span>
+                  <InfoText contentKey="net-st-position" currentValue={isMatched ? '$0 (Fully Matched)' : formatCurrency(netSt)}>
+                    Net ST Position
+                  </InfoText>
+                </span>
+                <span>{label}</span>
+              </div>
+            );
+          })()}
+          <div className="offset-row">
+            <span>
+              <InfoText
+                contentKey="year1-ordinary-losses"
+                currentValue={formatCurrency(results.sizing.year1OrdinaryLosses)}
+              >
+                Year 1 Ordinary Loss (QFAF)
+              </InfoText>
+            </span>
+            <span className="positive">{formatCurrency(results.sizing.year1OrdinaryLosses)}</span>
+          </div>
+          <div className="offset-row">
+            <span>
+              <InfoText
+                contentKey="usable-ordinary-loss"
+                currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
+              >
+                Usable Ordinary Loss
+              </InfoText>
+            </span>
+            <span className="positive">
+              {formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
+            </span>
+          </div>
+          {results.sizing.year1ExcessToNol > 0 && (
+            <div className="offset-row">
+              <span>
+                <InfoText
+                  contentKey="excess-to-nol"
+                  currentValue={formatCurrency(results.sizing.year1ExcessToNol)}
+                >
+                  Excess → NOL Carryforward
+                </InfoText>
+              </span>
+              <span>{formatCurrency(results.sizing.year1ExcessToNol)}</span>
+            </div>
+          )}
+        </div>
+      </details>
     </CollapsibleSection>
   );
 }

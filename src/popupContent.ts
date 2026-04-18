@@ -113,9 +113,11 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'net-st-position': {
     title: 'Net ST Position',
-    definition: 'Result of matching QFAF ST gains against collateral ST losses.',
-    formula: 'QFAF ST Gains - Collateral ST Losses',
-    impact: 'Should be $0 or near-zero with proper auto-sizing.',
+    definition:
+      '"Fully Matched" means collateral ST losses and QFAF ST gains cancel out — no net short-term tax event. This is the goal of auto-sizing.',
+    formula: 'QFAF ST Gains − Collateral ST Losses ≈ $0',
+    impact:
+      'A matched position converts short-term tax treatment into long-term — the core of the strategy.',
   },
 
   'year1-ordinary-losses': {
@@ -190,9 +192,28 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
 
   'total-tax-savings': {
     title: 'Total Tax Savings',
-    definition: 'Cumulative tax benefit over the full projection period.',
-    formula: 'Sum of (Baseline Tax - Actual Tax) for each year',
+    definition:
+      'Cumulative tax benefit over the full projection period, versus a baseline of holding the same portfolio with no optimization strategy applied.',
+    formula: 'Sum of (Baseline Tax − Actual Tax) for each year',
     impact: 'Represents the total value extracted from the strategy versus passive investing.',
+  },
+
+  'qfaf-overlay-toggle': {
+    title: 'QFAF Overlay',
+    definition:
+      'A QFAF (Qualified Family Agricultural Fund) is a specialized investment vehicle whose leveraged swap structure generates 150% short-term capital gains and 150% ordinary losses each year. Paired with a direct-indexing collateral strategy, the ST gains are offset by collateral ST losses, leaving net ordinary losses that can offset W-2 income.',
+    formula: 'Auto-sized so QFAF ST gains ≈ Collateral ST losses',
+    impact:
+      'Turning this on adds the tax-alpha layer on top of standard direct indexing. Turning it off shows the collateral-only baseline.',
+  },
+
+  'incremental-benefit': {
+    title: 'Est. Incremental Benefit',
+    definition:
+      '"Standard direct indexing" = running the same collateral strategy without the QFAF overlay (i.e. with the QFAF Overlay toggle turned off). This card shows how much extra tax savings the QFAF layer adds on top of that baseline.',
+    formula: 'Total Tax Savings (with QFAF) − Tax Savings (collateral only)',
+    impact:
+      'Isolates the QFAF-specific contribution so you can see the value added above what direct indexing alone delivers.',
   },
 
   'final-portfolio-value': {
@@ -215,6 +236,15 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     definition: 'Cumulative Net Operating Loss created over the projection period.',
     formula: 'Sum of Excess Ordinary Losses across all years',
     impact: 'This NOL can offset future income at 80% of taxable income per year.',
+  },
+
+  'nol-carryforward': {
+    title: 'NOL Carryforward',
+    definition:
+      'Net Operating Loss (NOL) carryforward — ordinary losses that exceed the §461(l) annual cap or current-year taxable income, deferred to future tax years. Under IRC §172, NOL carries forward indefinitely and can offset up to 80% of taxable income in any given future year.',
+    formula: 'Excess Ordinary Loss = Generated Ordinary Loss − min(§461(l) Limit, Taxable Income)',
+    impact:
+      'Extends the tax benefit of the strategy beyond the year the losses are generated, smoothing savings across multiple years.',
   },
 
   // ============================================
