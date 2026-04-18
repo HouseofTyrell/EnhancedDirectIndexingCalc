@@ -342,8 +342,56 @@ body {
 
 /* Header */
 .header {
+  position: relative;
   text-align: center;
   margin-bottom: 2rem;
+}
+
+.meeting-mode-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.meeting-mode-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+}
+
+.meeting-mode-toggle:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+
+.meeting-mode-toggle svg {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .meeting-mode-toggle {
+    position: static;
+    margin-bottom: 0.75rem;
+  }
+}
+
+@media print {
+  .meeting-mode-toggle {
+    display: none;
+  }
 }
 
 .header h1 {
