@@ -457,6 +457,8 @@ export function Calculator() {
         combinedStRate={combinedStRate}
         combinedLtRate={combinedLtRate}
         qfafMultiplier={advancedSettings.qfafMultiplier}
+        advancedSettings={advancedSettings}
+        onUpdateSettings={setAdvancedSettings}
       />
       </PinnableSection>
 
@@ -701,6 +703,8 @@ export function Calculator() {
                 combinedStRate={combinedStRate}
                 combinedLtRate={combinedLtRate}
                 qfafMultiplier={advancedSettings.qfafMultiplier}
+                advancedSettings={advancedSettings}
+                onUpdateSettings={setAdvancedSettings}
               />
             ),
           }] : []),

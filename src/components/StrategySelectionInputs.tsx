@@ -2,7 +2,7 @@ import { CalculatorInputs, AdvancedSettings, CalculationResult } from '../types'
 import { STRATEGIES, Strategy, getStrategy, getLongLeverageRatio, getShortRatio } from '../strategyData';
 import { StrategyRateEditor } from '../AdvancedMode/StrategyRateEditor';
 import { formatWithCommas, parseFormattedNumber, formatPercent } from '../utils/formatters';
-import { InfoPopup } from '../InfoPopup';
+import { InfoPopup, InfoText } from '../InfoPopup';
 
 interface StrategySelectionInputsProps {
   inputs: CalculatorInputs;
@@ -157,7 +157,8 @@ export function StrategySelectionInputs({
         onRatesChanged={onRateVersionIncrement}
       />
 
-      {/* Toggle Row: QFAF + Portfolio Growth + Financing Fees */}
+      {/* Primary toggle row — strategy-defining choices only.
+          Growth & financing fees live in the "Optional Refinements" section below. */}
       <div className="input-group toggle-group toggle-row">
         <div className="toggle-row-item">
           <label className="toggle-label">
@@ -167,61 +168,13 @@ export function StrategySelectionInputs({
               onChange={e => onUpdateInput('qfafEnabled', e.target.checked)}
             />
             <span className="toggle-switch"></span>
-            QFAF Overlay
+            <InfoText contentKey="qfaf-overlay-toggle">QFAF Overlay</InfoText>
           </label>
           <span className="input-hint">
             {inputs.qfafEnabled
               ? 'ST gains + ordinary losses'
               : 'Collateral-only'}
           </span>
-        </div>
-
-        <div className="toggle-row-item">
-          {advancedSettings.growthEnabled ? (
-            <>
-              <label className="toggle-label toggle-label-slider">
-                <input
-                  type="checkbox"
-                  checked={true}
-                  onChange={() =>
-                    onUpdateSettings(s => ({ ...s, growthEnabled: false }))
-                  }
-                />
-                <span className="toggle-switch"></span>
-                Growth: {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%
-              </label>
-              <input
-                id="annualReturnInline"
-                type="range"
-                className="inline-slider"
-                min={-0.20}
-                max={0.30}
-                step={0.005}
-                value={advancedSettings.defaultAnnualReturn}
-                onChange={e => {
-                  const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) {
-                    onUpdateSettings(s => ({ ...s, defaultAnnualReturn: val }));
-                  }
-                }}
-              />
-            </>
-          ) : (
-            <>
-              <label className="toggle-label">
-                <input
-                  type="checkbox"
-                  checked={false}
-                  onChange={() =>
-                    onUpdateSettings(s => ({ ...s, growthEnabled: true }))
-                  }
-                />
-                <span className="toggle-switch"></span>
-                Portfolio Growth
-              </label>
-              <span className="input-hint">No growth (0%)</span>
-            </>
-          )}
         </div>
 
         <div className="toggle-row-item">
@@ -240,6 +193,66 @@ export function StrategySelectionInputs({
               : 'LT gains netted out'}
           </span>
         </div>
+      </div>
+
+      {/* Optional Refinements — growth and financing fees, collapsed by default.
+          These are secondary variables; they refine the mechanics but shouldn't
+          compete with the EDI+QFAF efficacy story. */}
+      <details className="optional-refinements">
+        <summary className="optional-refinements__summary">
+          <span className="optional-refinements__title">Optional Refinements</span>
+          <span className="optional-refinements__hint">
+            Growth &amp; financing fees — secondary assumptions
+          </span>
+        </summary>
+        <div className="optional-refinements__content toggle-row">
+          <div className="toggle-row-item">
+            {advancedSettings.growthEnabled ? (
+              <>
+                <label className="toggle-label toggle-label-slider">
+                  <input
+                    type="checkbox"
+                    checked={true}
+                    onChange={() =>
+                      onUpdateSettings(s => ({ ...s, growthEnabled: false }))
+                    }
+                  />
+                  <span className="toggle-switch"></span>
+                  Growth: {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%
+                </label>
+                <input
+                  id="annualReturnInline"
+                  type="range"
+                  className="inline-slider"
+                  min={-0.20}
+                  max={0.30}
+                  step={0.005}
+                  value={advancedSettings.defaultAnnualReturn}
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                      onUpdateSettings(s => ({ ...s, defaultAnnualReturn: val }));
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    onChange={() =>
+                      onUpdateSettings(s => ({ ...s, growthEnabled: true }))
+                    }
+                  />
+                  <span className="toggle-switch"></span>
+                  Portfolio Growth
+                </label>
+                <span className="input-hint">No growth (0%)</span>
+              </>
+            )}
+          </div>
 
         <div className="toggle-row-item">
           <label className="toggle-label">
@@ -455,7 +468,8 @@ export function StrategySelectionInputs({
             <span className="input-hint">No fees</span>
           )}
         </div>
-      </div>
+        </div>
+      </details>
 
       {/* QFAF-specific inputs (only shown when QFAF is enabled) */}
       {inputs.qfafEnabled && (

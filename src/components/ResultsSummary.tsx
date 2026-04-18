@@ -83,19 +83,23 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             {formatCurrency(totalTaxSavings)}
             <DeltaBadge delta={savingsDelta} />
           </p>
-          <p className="subtext">Over {projectionYears} years</p>
+          <p className="subtext">
+            Over {projectionYears} years vs. no-optimization baseline
+          </p>
         </div>
         <div className="headline-metric">
           <h3>
             <InfoText contentKey="incremental-benefit" currentValue={formatCurrency(incrementalBenefit)}>
-              Est. Incremental Benefit
+              QFAF-Specific Benefit
             </InfoText>
           </h3>
           <p className="headline-number" ref={incrementalFlash}>
             {formatCurrency(incrementalBenefit)}
             <DeltaBadge delta={incrementalDelta} />
           </p>
-          <p className="subtext">vs. standard direct indexing</p>
+          <p className="subtext">
+            Added by QFAF layer, above collateral-only direct indexing
+          </p>
         </div>
         <div className="headline-metric">
           <h3>
@@ -147,8 +151,8 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             generate approximately {formatCurrency(totalTaxSavings)} in cumulative tax savings
             over {projectionYears} years, or roughly {formatCurrency(avgAnnualSavings)} per year.
             {incrementalBenefit > 0 && (
-              <> The enhanced strategy adds an estimated {formatCurrency(incrementalBenefit)} beyond
-              what standard direct indexing alone would achieve.</>
+              <> The QFAF overlay adds an estimated {formatCurrency(incrementalBenefit)} beyond
+              what collateral-only direct indexing would achieve on its own.</>
             )}
           </>
         ) : (
