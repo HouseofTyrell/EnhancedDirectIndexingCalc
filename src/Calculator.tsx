@@ -41,6 +41,7 @@ import { YearByYearPlanning } from './AdvancedMode/YearByYearPlanning';
 import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
 import { ScenarioAnalysis } from './AdvancedMode/ScenarioAnalysis';
 import { StrategyComparison } from './AdvancedMode/StrategyComparison';
+import { MeetingMode } from './components/MeetingMode/MeetingMode';
 
 // Generate default year overrides for 10 years
 const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
@@ -89,6 +90,9 @@ export function Calculator() {
 
   // Keyboard shortcuts help modal state
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+
+  // Meeting Mode view toggle (prospect-facing presentation of current scenario)
+  const [isMeetingMode, setIsMeetingMode] = useState(false);
 
   // Handlers for keyboard shortcuts (will be set by ResultsChartsSection)
   const [printHandler, setPrintHandler] = useState<(() => void) | null>(null);
@@ -250,6 +254,25 @@ export function Calculator() {
     return <QualifiedPurchaserModal onAcknowledge={qualifiedPurchaser.acknowledge} />;
   }
 
+  // Meeting Mode: prospect-facing presentation of the current scenario.
+  // Same inputs, same calculation results — different visualization.
+  if (isMeetingMode) {
+    return (
+      <MeetingMode
+        inputs={inputs}
+        results={results}
+        collateralOnlyResults={collateralOnlyResults}
+        taxRates={taxRates}
+        advancedSettings={advancedSettings}
+        currentStrategy={currentStrategy}
+        onExitMeetingMode={() => setIsMeetingMode(false)}
+        onPinScenario={handlePinScenario}
+        canPin={pinnedScenario.canPin}
+        onExport={() => window.print()}
+      />
+    );
+  }
+
   return (
     <div className="calculator">
       <OnboardingTour />
@@ -289,6 +312,29 @@ export function Calculator() {
       />
 
       <header className="header">
+        <button
+          type="button"
+          className="meeting-mode-toggle"
+          onClick={() => setIsMeetingMode(true)}
+          title="Switch to a prospect-facing presentation of this scenario"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+          <span>Meeting Mode</span>
+        </button>
         <h1>Tax Optimization Calculator</h1>
         <p className="subtitle">QFAF + Collateral Strategy</p>
         <p className="header-description">

@@ -1,0 +1,2251 @@
+import { useState, useRef, useEffect, useMemo, CSSProperties } from 'react';
+import {
+  CalculatorInputs,
+  CalculationResult,
+  AdvancedSettings,
+  FILING_STATUSES,
+} from '../../types';
+import { Strategy } from '../../strategyData';
+
+// Design tokens from EDI Calc Meeting Mode.html
+const M = {
+  bg: '#f5f7fa',
+  panel: '#ffffff',
+  sidebar: '#0b1020',
+  sidebarInk: '#cbd2e1',
+  sidebarFaint: '#7c869b',
+  sidebarLine: '#1d2334',
+  ink: '#0b1020',
+  inkSoft: '#475068',
+  inkFaint: '#8892a6',
+  line: '#e3e8f0',
+  lineSoft: '#eef1f6',
+  accent: '#4f46e5',
+  accentDeep: '#3730a3',
+  accentSoft: '#eef0ff',
+  accentFaint: '#f5f4ff',
+  good: '#0f9466',
+  goodSoft: '#e6f4ee',
+  mono: '"IBM Plex Mono", ui-monospace, monospace',
+  sans: '"IBM Plex Sans", system-ui, sans-serif',
+};
+
+const fmtCurrency = (n: number): string => {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}K`;
+  return `${sign}$${Math.round(abs).toLocaleString()}`;
+};
+const fmtCurrencyFull = (n: number): string =>
+  `${n < 0 ? '-' : ''}$${Math.abs(Math.round(n)).toLocaleString()}`;
+const fmtPercent = (n: number): string => `${(n * 100).toFixed(2)}%`;
+const fmtPercent1 = (n: number): string => `${(n * 100).toFixed(1)}%`;
+
+interface TaxRates {
+  federalStRate: number;
+  federalLtRate: number;
+  stateRate: number;
+  combinedStRate: number;
+  combinedLtRate: number;
+}
+
+interface MeetingModeProps {
+  inputs: CalculatorInputs;
+  results: CalculationResult;
+  collateralOnlyResults: CalculationResult;
+  taxRates: TaxRates;
+  advancedSettings: AdvancedSettings;
+  currentStrategy: Strategy | undefined;
+  onExitMeetingMode: () => void;
+  onPinScenario: () => void;
+  canPin: boolean;
+  onExport?: () => void;
+}
+
+// ═══ Slim left rail with active scenario + collapse ═══
+function Rail({
+  collapsed,
+  onToggle,
+  onEdit,
+  inputs,
+  currentStrategy,
+  taxRates,
+  results,
+  advancedSettings,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  inputs: CalculatorInputs;
+  currentStrategy: Strategy | undefined;
+  taxRates: TaxRates;
+  results: CalculationResult;
+  advancedSettings: AdvancedSettings;
+}) {
+  const filingLabel =
+    FILING_STATUSES.find(f => f.value === inputs.filingStatus)?.label.replace(
+      'Married Filing Jointly',
+      'MFJ'
+    ).replace('Married Filing Separately', 'MFS').replace('Head of Household', 'HOH') ?? inputs.filingStatus.toUpperCase();
+
+  return (
+    <aside
+      style={{
+        width: collapsed ? 64 : 300,
+        flexShrink: 0,
+        background: M.sidebar,
+        color: M.sidebarInk,
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          padding: collapsed ? '18px 14px' : '18px 22px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: `1px solid ${M.sidebarLine}`,
+        }}
+      >
+        {!collapsed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: `linear-gradient(135deg, ${M.accent}, #8b7cf6)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: 800,
+                fontSize: 14,
+                boxShadow: '0 4px 12px rgba(79,70,229,0.35)',
+              }}
+            >
+              E
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'white', letterSpacing: -0.3 }}>
+                EDI Calc
+              </div>
+              <div style={{ fontSize: 10.5, color: M.sidebarFaint, fontWeight: 500 }}>
+                Meeting Mode
+              </div>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={onToggle}
+          title={collapsed ? 'Expand inputs' : 'Hide inputs'}
+          style={{
+            width: 28,
+            height: 28,
+            border: `1px solid ${M.sidebarLine}`,
+            borderRadius: 6,
+            background: '#141a29',
+            cursor: 'pointer',
+            color: M.sidebarInk,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d={collapsed ? 'M9 18l6-6-6-6' : 'M15 18l-6-6 6-6'} />
+          </svg>
+        </button>
+      </div>
+
+      {collapsed ? (
+        <div
+          style={{
+            padding: 10,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
+          {(
+            [
+              ['S', 'Strategy', true],
+              ['P', 'Profile', false],
+              ['A', 'Advanced', false],
+            ] as const
+          ).map(([k, t, active]) => (
+            <div
+              key={k}
+              title={t}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 9,
+                background: active ? M.accent : 'transparent',
+                color: active ? 'white' : M.sidebarFaint,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: 'pointer',
+                boxShadow: active ? '0 4px 10px rgba(79,70,229,0.3)' : 'none',
+              }}
+            >
+              {k}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px' }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: M.sidebarFaint,
+              textTransform: 'uppercase',
+              letterSpacing: 1.2,
+              marginBottom: 10,
+            }}
+          >
+            Active scenario
+          </div>
+
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              background:
+                'linear-gradient(160deg, rgba(79,70,229,0.18), rgba(79,70,229,0.04))',
+              border: '1px solid rgba(79,70,229,0.25)',
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 8 }}>
+              {currentStrategy?.name ?? 'Strategy'}
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 8,
+                fontSize: 11.5,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    color: M.sidebarFaint,
+                    fontSize: 10,
+                    marginBottom: 2,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  COLLATERAL
+                </div>
+                <div style={{ color: 'white', fontWeight: 600, fontFamily: M.mono }}>
+                  {fmtCurrency(inputs.collateralAmount)}
+                </div>
+              </div>
+              <div>
+                <div
+                  style={{
+                    color: M.sidebarFaint,
+                    fontSize: 10,
+                    marginBottom: 2,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  INCOME
+                </div>
+                <div style={{ color: 'white', fontWeight: 600, fontFamily: M.mono }}>
+                  {fmtCurrency(inputs.annualIncome)}
+                </div>
+              </div>
+              <div>
+                <div
+                  style={{
+                    color: M.sidebarFaint,
+                    fontSize: 10,
+                    marginBottom: 2,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  STATE · FILE
+                </div>
+                <div style={{ color: 'white', fontWeight: 600 }}>
+                  {inputs.stateCode} · {filingLabel}
+                </div>
+              </div>
+              <div>
+                <div
+                  style={{
+                    color: M.sidebarFaint,
+                    fontSize: 10,
+                    marginBottom: 2,
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  QFAF
+                </div>
+                <div
+                  style={{
+                    color: inputs.qfafEnabled ? '#a5f3cf' : '#fca5a5',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 999,
+                      background: inputs.qfafEnabled ? '#4ade80' : '#f87171',
+                    }}
+                  />
+                  {inputs.qfafEnabled ? 'ON' : 'OFF'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: M.sidebarFaint,
+              textTransform: 'uppercase',
+              letterSpacing: 1.2,
+              marginBottom: 10,
+            }}
+          >
+            Scenario summary
+          </div>
+          {(
+            [
+              ['Collateral', fmtCurrency(inputs.collateralAmount), '#60a5fa'],
+              ['Income', fmtCurrency(inputs.annualIncome), '#a78bfa'],
+              ['Projection', `${advancedSettings.projectionYears} yr`, '#f59e0b'],
+              [
+                'Strategy',
+                currentStrategy?.name ?? '—',
+                '#4ade80',
+              ],
+              ['QFAF value', fmtCurrency(results.sizing.qfafValue), '#38bdf8'],
+              ['Combined ST', fmtPercent(taxRates.combinedStRate), '#fb7185'],
+            ] as const
+          ).map(([k, v, dot]) => (
+            <div
+              key={k}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '10px 12px',
+                marginBottom: 4,
+                borderRadius: 7,
+                background: 'rgba(255,255,255,0.02)',
+                border: `1px solid ${M.sidebarLine}`,
+              }}
+            >
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12.5,
+                  color: M.sidebarInk,
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: 999, background: dot }} />
+                {k}
+              </span>
+              <span
+                style={{
+                  fontSize: 12,
+                  color: 'white',
+                  fontWeight: 600,
+                  fontFamily: M.mono,
+                  maxWidth: 130,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {v}
+              </span>
+            </div>
+          ))}
+
+          <button
+            onClick={onEdit}
+            style={{
+              width: '100%',
+              marginTop: 20,
+              padding: '10px 12px',
+              background: 'white',
+              color: M.ink,
+              border: 'none',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: M.sans,
+            }}
+          >
+            Edit all inputs →
+          </button>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+interface ChartPoint {
+  y: number;
+  port: number;
+  baseline: number;
+  save: number;
+}
+
+// ═══ The hero graph — interactive, hoverable ═══
+function HeroChart({
+  yearIdx,
+  setYearIdx,
+  showBaseline,
+  compact = false,
+  data,
+  collateral,
+}: {
+  yearIdx: number;
+  setYearIdx: (i: number) => void;
+  showBaseline: boolean;
+  compact?: boolean;
+  data: ChartPoint[];
+  collateral: number;
+}) {
+  const W = 900;
+  const H = compact ? 280 : 380;
+  const pad = { l: 60, r: 30, t: 40, b: 36 };
+  const plotW = W - pad.l - pad.r;
+  const plotH = H - pad.t - pad.b;
+
+  const allPoints: ChartPoint[] = [
+    { y: 0, port: collateral, baseline: collateral, save: 0 },
+    ...data,
+  ];
+  const maxV = Math.max(...allPoints.map(d => Math.max(d.port, d.baseline))) * 1.03;
+  const minV = Math.min(...allPoints.map(d => Math.min(d.port, d.baseline))) * 0.96;
+  const range = maxV - minV || 1;
+
+  const xs = (i: number) => pad.l + (i / (allPoints.length - 1)) * plotW;
+  const ys = (v: number) => pad.t + plotH - ((v - minV) / range) * plotH;
+
+  const withPts = allPoints.map((d, i) => [xs(i), ys(d.port)] as const);
+  const basePts = allPoints.map((d, i) => [xs(i), ys(d.baseline)] as const);
+
+  const pathFrom = (pts: readonly (readonly [number, number])[]) =>
+    pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
+  const withPath = pathFrom(withPts);
+  const basePath = pathFrom(basePts);
+  const withArea =
+    withPath +
+    ` L${withPts[withPts.length - 1][0]},${pad.t + plotH} L${withPts[0][0]},${pad.t + plotH} Z`;
+
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return;
+    const r = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * W - pad.l;
+    const i = Math.max(
+      0,
+      Math.min(allPoints.length - 1, Math.round((x / plotW) * (allPoints.length - 1)))
+    );
+    setYearIdx(i);
+  };
+
+  const safeIdx = Math.max(0, Math.min(allPoints.length - 1, yearIdx));
+  const active = allPoints[safeIdx];
+  const activeX = xs(safeIdx);
+  const activeYPort = ys(active.port);
+  const activeYBase = ys(active.baseline);
+  const delta = active.port - active.baseline;
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        onMouseMove={onMove}
+        style={{ width: '100%', display: 'block', cursor: 'crosshair' }}
+      >
+        <defs>
+          <linearGradient id="mm-withGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={M.accent} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={M.accent} stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="mm-lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#818cf8" />
+            <stop offset="100%" stopColor={M.accent} />
+          </linearGradient>
+        </defs>
+
+        {[0.25, 0.5, 0.75, 1].map(r => (
+          <line
+            key={r}
+            x1={pad.l}
+            x2={W - pad.r}
+            y1={pad.t + plotH * r}
+            y2={pad.t + plotH * r}
+            stroke={M.lineSoft}
+            strokeWidth="1"
+          />
+        ))}
+
+        {[0, 0.33, 0.66, 1].map(r => {
+          const v = minV + range * (1 - r);
+          return (
+            <text
+              key={r}
+              x={pad.l - 10}
+              y={pad.t + plotH * r + 4}
+              fontSize="10"
+              fill={M.inkFaint}
+              textAnchor="end"
+              fontFamily={M.mono}
+            >
+              {fmtCurrency(v)}
+            </text>
+          );
+        })}
+
+        {showBaseline && (
+          <path
+            d={basePath}
+            fill="none"
+            stroke={M.inkFaint}
+            strokeWidth="1.5"
+            strokeDasharray="5 4"
+          />
+        )}
+
+        <path d={withArea} fill="url(#mm-withGrad)" />
+        <path
+          d={withPath}
+          fill="none"
+          stroke="url(#mm-lineGrad)"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+
+        {withPts.map((p, i) => (
+          <circle
+            key={i}
+            cx={p[0]}
+            cy={p[1]}
+            r={i === safeIdx ? 6 : 3}
+            fill={M.accent}
+            stroke="white"
+            strokeWidth={i === safeIdx ? 3 : 1.5}
+          />
+        ))}
+
+        <line
+          x1={activeX}
+          x2={activeX}
+          y1={pad.t}
+          y2={pad.t + plotH}
+          stroke={M.accent}
+          strokeWidth="1.5"
+          strokeDasharray="3 3"
+          opacity="0.55"
+        />
+        {showBaseline && (
+          <circle
+            cx={activeX}
+            cy={activeYBase}
+            r="4"
+            fill="white"
+            stroke={M.inkFaint}
+            strokeWidth="2"
+          />
+        )}
+
+        {showBaseline && safeIdx > 0 && Math.abs(delta) > 0 && (
+          <g>
+            <line
+              x1={activeX + 20}
+              x2={activeX + 20}
+              y1={activeYPort}
+              y2={activeYBase}
+              stroke={M.good}
+              strokeWidth="2"
+            />
+            <line
+              x1={activeX + 16}
+              x2={activeX + 24}
+              y1={activeYPort}
+              y2={activeYPort}
+              stroke={M.good}
+              strokeWidth="2"
+            />
+            <line
+              x1={activeX + 16}
+              x2={activeX + 24}
+              y1={activeYBase}
+              y2={activeYBase}
+              stroke={M.good}
+              strokeWidth="2"
+            />
+            <rect
+              x={activeX + 28}
+              y={(activeYPort + activeYBase) / 2 - 11}
+              width="72"
+              height="22"
+              rx="4"
+              fill={M.good}
+            />
+            <text
+              x={activeX + 64}
+              y={(activeYPort + activeYBase) / 2 + 4}
+              fontSize="11.5"
+              fontWeight="700"
+              fill="white"
+              textAnchor="middle"
+              fontFamily={M.mono}
+            >
+              {delta >= 0 ? '+' : ''}
+              {fmtCurrency(delta)}
+            </text>
+          </g>
+        )}
+
+        {allPoints.map((d, i) =>
+          i === 0 ||
+          i === Math.floor(allPoints.length / 2) ||
+          i === allPoints.length - 1 ||
+          i === safeIdx ? (
+            <text
+              key={i}
+              x={xs(i)}
+              y={H - 12}
+              fontSize="10.5"
+              fill={i === safeIdx ? M.accent : M.inkFaint}
+              fontWeight={i === safeIdx ? 700 : 500}
+              textAnchor="middle"
+              fontFamily={M.mono}
+            >
+              {i === 0 ? 'Today' : `Y${d.y}`}
+            </text>
+          ) : null
+        )}
+      </svg>
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 12,
+          background: 'white',
+          border: `1px solid ${M.line}`,
+          borderRadius: 10,
+          padding: '12px 14px',
+          minWidth: 180,
+          boxShadow: '0 10px 30px rgba(11,16,32,0.08)',
+          fontFamily: M.sans,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10.5,
+            color: M.inkFaint,
+            fontWeight: 700,
+            letterSpacing: 0.6,
+            textTransform: 'uppercase',
+            marginBottom: 8,
+          }}
+        >
+          {safeIdx === 0 ? 'Starting point' : `Year ${active.y}`}
+        </div>
+        <div
+          style={{
+            fontSize: 11.5,
+            color: M.inkSoft,
+            display: 'flex',
+            justifyContent: 'space-between',
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{ width: 8, height: 8, borderRadius: 999, background: M.accent }}
+            />{' '}
+            With EDI
+          </span>
+          <span style={{ fontFamily: M.mono, fontWeight: 700, color: M.ink }}>
+            {fmtCurrency(active.port)}
+          </span>
+        </div>
+        {showBaseline && (
+          <div
+            style={{
+              fontSize: 11.5,
+              color: M.inkSoft,
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 8, height: 2, background: M.inkFaint }} /> Baseline
+            </span>
+            <span style={{ fontFamily: M.mono, fontWeight: 600, color: M.inkSoft }}>
+              {fmtCurrency(active.baseline)}
+            </span>
+          </div>
+        )}
+        {safeIdx > 0 && (
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: `1px solid ${M.lineSoft}`,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+            }}
+          >
+            <span style={{ fontSize: 11, color: M.good, fontWeight: 600 }}>Advantage</span>
+            <span
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                color: M.good,
+                fontFamily: M.mono,
+              }}
+            >
+              {delta >= 0 ? '+' : ''}
+              {fmtCurrency(delta)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══ Animated count-up ═══
+function CountUp({
+  value,
+  duration = 1400,
+}: {
+  value: number;
+  duration?: number;
+}) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(value * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+  return (
+    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+      ${(display / 1_000_000).toFixed(2)}M
+    </span>
+  );
+}
+
+type Level = 'high' | 'detail' | 'mechanics';
+
+// ═══ Level switcher ═══
+function LevelSwitch({ level, setLevel }: { level: Level; setLevel: (l: Level) => void }) {
+  const levels: { k: Level; label: string; sub: string }[] = [
+    { k: 'high', label: 'High level', sub: 'The story' },
+    { k: 'detail', label: 'Detail', sub: 'Year-by-year' },
+    { k: 'mechanics', label: 'Mechanics', sub: 'How it works' },
+  ];
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        padding: 4,
+        background: 'white',
+        border: `1px solid ${M.line}`,
+        borderRadius: 12,
+        boxShadow: '0 2px 8px rgba(11,16,32,0.04)',
+      }}
+    >
+      {levels.map((l, i) => {
+        const active = level === l.k;
+        return (
+          <button
+            key={l.k}
+            onClick={() => setLevel(l.k)}
+            style={{
+              padding: '8px 18px',
+              border: 'none',
+              borderRadius: 9,
+              cursor: 'pointer',
+              background: active ? M.ink : 'transparent',
+              color: active ? 'white' : M.inkSoft,
+              textAlign: 'left',
+              fontFamily: M.sans,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.2 }}>
+              <span
+                style={{
+                  color: active ? 'rgba(255,255,255,0.55)' : M.inkFaint,
+                  marginRight: 6,
+                  fontFamily: M.mono,
+                }}
+              >
+                0{i + 1}
+              </span>
+              {l.label}
+            </div>
+            <div
+              style={{
+                fontSize: 10.5,
+                color: active ? 'rgba(255,255,255,0.65)' : M.inkFaint,
+                marginTop: 1,
+              }}
+            >
+              {l.sub}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══ Detail view ═══
+function DetailView({
+  yearIdx,
+  setYearIdx,
+  yearData,
+  totalTaxSavings,
+  totalNol,
+  finalPortfolio,
+}: {
+  yearIdx: number;
+  setYearIdx: (i: number) => void;
+  yearData: { y: number; save: number; nol: number; port: number }[];
+  totalTaxSavings: number;
+  totalNol: number;
+  finalPortfolio: number;
+}) {
+  const cum = yearData.map((_, i) =>
+    yearData.slice(0, i + 1).reduce((s, a) => s + a.save, 0)
+  );
+  const maxSave = Math.max(...yearData.map(y => Math.max(y.save, 0)), 1);
+
+  return (
+    <div>
+      <div
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 12,
+              color: M.inkFaint,
+              fontWeight: 600,
+              letterSpacing: 0.3,
+              textTransform: 'uppercase',
+            }}
+          >
+            Detail view
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: M.ink, marginTop: 2 }}>
+            Year-by-year breakdown
+          </div>
+        </div>
+        <div style={{ fontSize: 13, color: M.inkSoft }}>
+          Click any row to focus the chart above.
+        </div>
+      </div>
+
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: 13.5,
+          fontFamily: M.mono,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        <thead>
+          <tr>
+            {['Year', 'Tax savings', 'Cumulative', 'NOL gen.', 'Portfolio', 'Savings bar'].map(
+              (h, i) => (
+                <th
+                  key={h}
+                  style={{
+                    textAlign: i === 0 ? 'left' : i === 5 ? 'left' : 'right',
+                    padding: '10px 16px',
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    color: M.inkFaint,
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    borderBottom: `2px solid ${M.line}`,
+                    fontFamily: M.sans,
+                  }}
+                >
+                  {h}
+                </th>
+              )
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {yearData.map((y, i) => {
+            const active = i + 1 === yearIdx;
+            return (
+              <tr
+                key={y.y}
+                onClick={() => setYearIdx(i + 1)}
+                style={{
+                  cursor: 'pointer',
+                  background: active ? M.accentFaint : 'transparent',
+                  borderLeft: active
+                    ? `3px solid ${M.accent}`
+                    : '3px solid transparent',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (!active) e.currentTarget.style.background = '#fafbfc';
+                }}
+                onMouseLeave={e => {
+                  if (!active) e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                <td
+                  style={{
+                    padding: '10px 16px',
+                    fontWeight: 700,
+                    color: active ? M.accent : M.ink,
+                    fontFamily: M.sans,
+                  }}
+                >
+                  Year {y.y}
+                </td>
+                <td
+                  style={{
+                    padding: '10px 16px',
+                    textAlign: 'right',
+                    color: y.save >= 0 ? M.good : '#dc2626',
+                    fontWeight: 700,
+                  }}
+                >
+                  {fmtCurrencyFull(y.save)}
+                </td>
+                <td
+                  style={{
+                    padding: '10px 16px',
+                    textAlign: 'right',
+                    color: M.ink,
+                    fontWeight: 600,
+                  }}
+                >
+                  {fmtCurrencyFull(cum[i])}
+                </td>
+                <td
+                  style={{
+                    padding: '10px 16px',
+                    textAlign: 'right',
+                    color: M.inkSoft,
+                  }}
+                >
+                  {fmtCurrencyFull(y.nol)}
+                </td>
+                <td
+                  style={{
+                    padding: '10px 16px',
+                    textAlign: 'right',
+                    color: M.ink,
+                  }}
+                >
+                  {fmtCurrencyFull(y.port)}
+                </td>
+                <td style={{ padding: '10px 16px', width: 220 }}>
+                  <div
+                    style={{
+                      height: 8,
+                      background: M.lineSoft,
+                      borderRadius: 4,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${Math.max(0, (y.save / maxSave) * 100)}%`,
+                        background: `linear-gradient(90deg, ${M.accent}, #8b7cf6)`,
+                        borderRadius: 4,
+                        transition: 'width 0.6s ease',
+                      }}
+                    />
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr style={{ background: M.ink, color: 'white' }}>
+            <td
+              style={{
+                padding: '14px 16px',
+                fontWeight: 700,
+                fontSize: 13,
+                fontFamily: M.sans,
+              }}
+            >
+              {yearData.length}-year total
+            </td>
+            <td
+              style={{
+                padding: '14px 16px',
+                textAlign: 'right',
+                fontWeight: 700,
+                color: '#a5f3cf',
+              }}
+            >
+              {fmtCurrencyFull(totalTaxSavings)}
+            </td>
+            <td
+              style={{
+                padding: '14px 16px',
+                textAlign: 'right',
+                fontWeight: 700,
+              }}
+            >
+              {fmtCurrencyFull(totalTaxSavings)}
+            </td>
+            <td
+              style={{
+                padding: '14px 16px',
+                textAlign: 'right',
+                fontWeight: 600,
+                color: '#cbd2e1',
+              }}
+            >
+              {fmtCurrencyFull(totalNol)}
+            </td>
+            <td
+              style={{
+                padding: '14px 16px',
+                textAlign: 'right',
+                fontWeight: 700,
+              }}
+            >
+              {fmtCurrencyFull(finalPortfolio)}
+            </td>
+            <td
+              style={{
+                padding: '14px 16px',
+                color: '#a5f3cf',
+                fontSize: 11.5,
+                fontFamily: M.sans,
+              }}
+            >
+              Cumulative advantage
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ═══ Mechanics view ═══
+function MechanicsView({
+  qfafValue,
+  totalExposure,
+  totalNol,
+  totalTaxSavings,
+  taxRates,
+  currentStrategy,
+}: {
+  qfafValue: number;
+  totalExposure: number;
+  totalNol: number;
+  totalTaxSavings: number;
+  taxRates: TaxRates;
+  currentStrategy: Strategy | undefined;
+}) {
+  const strategyLabel = currentStrategy?.name ?? 'Overlay strategy';
+  const steps = [
+    {
+      n: 1,
+      title: 'Establish QFAF',
+      tone: M.accent,
+      body:
+        'A Qualified Fund-of-Funds overlay is established against collateral, giving structured exposure without a taxable sale of the underlying.',
+      metric: fmtCurrency(qfafValue),
+      metricLabel: 'QFAF value',
+    },
+    {
+      n: 2,
+      title: 'Direct-indexing overlay',
+      tone: '#8b7cf6',
+      body: `A long/short ${strategyLabel} overlay harvests losses on constituent positions while maintaining benchmark-like exposure.`,
+      metric: fmtCurrency(totalExposure),
+      metricLabel: 'Total exposure',
+    },
+    {
+      n: 3,
+      title: 'Loss harvesting generates NOL',
+      tone: '#f59e0b',
+      body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedStRate)}), with the balance carried forward as NOL.`,
+      metric: fmtCurrency(totalNol),
+      metricLabel: 'NOL generated',
+    },
+    {
+      n: 4,
+      title: 'Tax savings compound',
+      tone: M.good,
+      body:
+        'Savings compound year over year — amplifying the baseline return and compounding the advantage vs. standard direct indexing.',
+      metric: fmtCurrency(totalTaxSavings),
+      metricLabel: 'Est. cumulative savings',
+    },
+  ];
+  return (
+    <div>
+      <div style={{ marginBottom: 22 }}>
+        <div
+          style={{
+            fontSize: 12,
+            color: M.inkFaint,
+            fontWeight: 600,
+            letterSpacing: 0.3,
+            textTransform: 'uppercase',
+          }}
+        >
+          Mechanics view
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: M.ink, marginTop: 2 }}>
+          How the strategy works
+        </div>
+        <div style={{ fontSize: 13.5, color: M.inkSoft, marginTop: 4 }}>
+          Four steps, in order — use this to walk a prospect through the mechanics.
+        </div>
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        <div
+          style={{
+            position: 'absolute',
+            left: 31,
+            top: 31,
+            bottom: 31,
+            width: 2,
+            background: `linear-gradient(180deg, ${M.accent}, #8b7cf6, #f59e0b, ${M.good})`,
+          }}
+        />
+
+        {steps.map((s, i) => (
+          <div
+            key={s.n}
+            style={{
+              display: 'flex',
+              gap: 20,
+              marginBottom: i < steps.length - 1 ? 24 : 0,
+              position: 'relative',
+            }}
+          >
+            <div
+              style={{
+                flexShrink: 0,
+                width: 64,
+                height: 64,
+                borderRadius: 16,
+                background: s.tone,
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: 22,
+                boxShadow: `0 6px 18px ${s.tone}55`,
+                zIndex: 2,
+              }}
+            >
+              {s.n}
+            </div>
+            <div
+              style={{
+                flex: 1,
+                padding: '16px 20px',
+                background: 'white',
+                border: `1px solid ${M.line}`,
+                borderRadius: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 24,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: M.ink,
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  {s.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: M.inkSoft,
+                    marginTop: 4,
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {s.body}
+                </div>
+              </div>
+              <div
+                style={{
+                  flexShrink: 0,
+                  textAlign: 'right',
+                  paddingLeft: 24,
+                  borderLeft: `1px solid ${M.lineSoft}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    color: M.inkFaint,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    marginBottom: 4,
+                  }}
+                >
+                  {s.metricLabel}
+                </div>
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: s.tone,
+                    fontFamily: M.mono,
+                    fontVariantNumeric: 'tabular-nums',
+                    letterSpacing: -0.5,
+                  }}
+                >
+                  {s.metric}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          marginTop: 28,
+          padding: 20,
+          background: M.accentFaint,
+          borderRadius: 12,
+          border: `1px solid ${M.accentSoft}`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12,
+            color: M.accentDeep,
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+            marginBottom: 12,
+          }}
+        >
+          The tax math
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: 18,
+          }}
+        >
+          {(
+            [
+              ['Fed ST', fmtPercent(taxRates.federalStRate), false],
+              ['Fed LT', fmtPercent(taxRates.federalLtRate), false],
+              ['State', fmtPercent(taxRates.stateRate), false],
+              ['Combined ST', fmtPercent(taxRates.combinedStRate), true],
+              ['Combined LT', fmtPercent(taxRates.combinedLtRate), true],
+            ] as const
+          ).map(([k, v, h]) => (
+            <div key={k}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: M.inkFaint,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                {k}
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: h ? M.accent : M.ink,
+                  fontFamily: M.mono,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {v}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══ Main MeetingMode ═══
+export function MeetingMode({
+  inputs,
+  results,
+  collateralOnlyResults,
+  taxRates,
+  advancedSettings,
+  currentStrategy,
+  onExitMeetingMode,
+  onPinScenario,
+  canPin,
+  onExport,
+}: MeetingModeProps) {
+  const [level, setLevel] = useState<Level>('high');
+  const [showBaseline, setShowBaseline] = useState(true);
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [showDecomp, setShowDecomp] = useState(true);
+
+  // Build year-by-year chart data from real results
+  const yearData: ChartPoint[] = useMemo(
+    () =>
+      results.years.map((y, i) => ({
+        y: y.year,
+        port: y.totalValue,
+        baseline: collateralOnlyResults.years[i]?.totalValue ?? y.totalValue,
+        save: y.taxSavings,
+      })),
+    [results.years, collateralOnlyResults.years]
+  );
+
+  const detailYearData = useMemo(
+    () =>
+      results.years.map(y => ({
+        y: y.year,
+        save: y.taxSavings,
+        nol: y.excessToNol,
+        port: y.totalValue,
+      })),
+    [results.years]
+  );
+
+  const totalTaxSavings = results.summary.totalTaxSavings;
+  const incrementalBenefit =
+    results.summary.totalTaxSavings - collateralOnlyResults.summary.totalTaxSavings;
+  const taxAlpha = results.summary.effectiveTaxAlpha;
+  const finalPortfolio = results.summary.finalPortfolioValue;
+  const totalNol = results.summary.totalNolGenerated;
+
+  const [yearIdx, setYearIdx] = useState(yearData.length);
+  useEffect(() => {
+    // When years change (e.g. projection years change), clamp index.
+    setYearIdx(idx => Math.min(idx, yearData.length));
+  }, [yearData.length]);
+
+  // Decomposition of hero number
+  const decomposition = useMemo(() => {
+    const year1 = detailYearData[0]?.save ?? 0;
+    const years2plus = detailYearData.slice(1).reduce((s, y) => s + y.save, 0);
+    const nolBenefit = results.years.reduce((s, y) => s + (y.nolUsageBenefit ?? 0), 0);
+    // Reinvestment compounding = total − (year1 + years2plus). NOL benefit is
+    // already embedded in year savings; show it as a standalone indicator.
+    const reinvest = Math.max(0, totalTaxSavings - year1 - years2plus);
+    return [
+      {
+        label: 'Year 1 harvest',
+        value: year1,
+        color: M.accent,
+        note: `Loss harvest × ${fmtPercent1(taxRates.combinedStRate)} combined rate`,
+      },
+      {
+        label: `Years 2–${detailYearData.length} harvest`,
+        value: years2plus,
+        color: '#8b7cf6',
+        note: 'Ongoing harvesting as portfolio grows',
+      },
+      {
+        label: 'NOL carry-forward',
+        value: nolBenefit,
+        color: '#f59e0b',
+        note: `${fmtCurrency(totalNol)} of NOL offsetting future income`,
+      },
+      {
+        label: 'Compounding',
+        value: reinvest,
+        color: M.good,
+        note: 'Savings compound over the projection period',
+      },
+    ];
+  }, [detailYearData, totalTaxSavings, totalNol, results.years, taxRates.combinedStRate]);
+
+  const filingLabel =
+    FILING_STATUSES.find(f => f.value === inputs.filingStatus)?.label.replace(
+      'Married Filing Jointly',
+      'MFJ'
+    ).replace('Married Filing Separately', 'MFS').replace('Head of Household', 'HOH') ?? inputs.filingStatus.toUpperCase();
+
+  const levelSubheadingStyle: CSSProperties = {
+    fontSize: 12,
+    fontWeight: 700,
+    color: M.accent,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        background: M.bg,
+        color: M.ink,
+        fontFamily: M.sans,
+      }}
+    >
+      <Rail
+        collapsed={railCollapsed}
+        onToggle={() => setRailCollapsed(!railCollapsed)}
+        onEdit={onExitMeetingMode}
+        inputs={inputs}
+        currentStrategy={currentStrategy}
+        taxRates={taxRates}
+        results={results}
+        advancedSettings={advancedSettings}
+      />
+
+      <main style={{ flex: 1, overflow: 'auto' }}>
+        <header
+          style={{
+            padding: '14px 32px',
+            background: 'white',
+            borderBottom: `1px solid ${M.line}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+          }}
+        >
+          <LevelSwitch level={level} setLevel={setLevel} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '7px 12px',
+                border: `1px solid ${M.line}`,
+                borderRadius: 8,
+                background: showDecomp ? M.accentFaint : 'white',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                color: showDecomp ? M.accent : M.inkSoft,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showDecomp}
+                onChange={e => setShowDecomp(e.target.checked)}
+                style={{ accentColor: M.accent, cursor: 'pointer' }}
+              />
+              Show breakdown
+            </label>
+            <div
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                background: M.goodSoft,
+                color: M.good,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 0.4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: 999, background: M.good }} />{' '}
+              LIVE
+            </div>
+            <button
+              onClick={onPinScenario}
+              disabled={!canPin}
+              title={canPin ? 'Pin this scenario' : 'Pin limit reached'}
+              style={{
+                padding: '8px 14px',
+                background: 'white',
+                border: `1px solid ${M.line}`,
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: canPin ? M.inkSoft : M.inkFaint,
+                cursor: canPin ? 'pointer' : 'not-allowed',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                opacity: canPin ? 1 : 0.6,
+              }}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M12 17V3M5 10l7-7 7 7" />
+              </svg>
+              Pin scenario
+            </button>
+            <button
+              onClick={onExport ?? (() => window.print())}
+              style={{
+                padding: '8px 14px',
+                background: M.ink,
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Export one-pager
+            </button>
+          </div>
+        </header>
+
+        <div style={{ padding: '32px 36px', maxWidth: 1280, margin: '0 auto' }}>
+          {level === 'high' && (
+            <>
+              <div style={{ marginBottom: 28 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 14,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: M.accent,
+                      letterSpacing: 1,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Your {advancedSettings.projectionYears}-year projection
+                  </span>
+                  <span style={{ width: 40, height: 1, background: M.accent }} />
+                  <span style={{ fontSize: 12, color: M.inkFaint }}>
+                    {currentStrategy?.name ?? 'Strategy'} · {inputs.stateCode} · {filingLabel}
+                  </span>
+                </div>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 56,
+                    fontWeight: 800,
+                    letterSpacing: -2,
+                    color: M.ink,
+                    lineHeight: 1.05,
+                  }}
+                >
+                  An estimated{' '}
+                  <span style={{ color: M.accent }}>
+                    <CountUp key={String(totalTaxSavings)} value={totalTaxSavings} />
+                  </span>
+                  <br />
+                  in tax savings.
+                </h1>
+                <p
+                  style={{
+                    margin: '14px 0 0',
+                    fontSize: 15,
+                    color: M.inkSoft,
+                    maxWidth: 640,
+                    lineHeight: 1.55,
+                  }}
+                >
+                  Compared to a straight direct-indexing baseline, the EDI strategy
+                  {inputs.qfafEnabled ? ' with QFAF overlay' : ''} projects an additional{' '}
+                  <strong style={{ color: M.good }}>
+                    {fmtCurrency(incrementalBenefit)} of benefit
+                  </strong>
+                  , compounding at a {fmtPercent(taxAlpha)} annualized tax alpha.
+                </p>
+              </div>
+
+              {showDecomp && (
+                <div
+                  style={{
+                    background: 'white',
+                    borderRadius: 16,
+                    border: `1px solid ${M.line}`,
+                    padding: '22px 26px',
+                    marginBottom: 20,
+                    boxShadow: '0 4px 20px rgba(11,16,32,0.04)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 8,
+                        background: M.accentFaint,
+                        color: M.accent,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: 13,
+                      }}
+                    >
+                      ?
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>
+                      How we get to {fmtCurrency(totalTaxSavings)}
+                    </div>
+                    <span style={{ fontSize: 12, color: M.inkFaint }}>
+                      — compounding forces working together
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const positiveParts = decomposition.filter(p => p.value > 0);
+                    const totalFlex = positiveParts.reduce((s, p) => s + p.value, 0) || 1;
+                    return (
+                      <>
+                        <div
+                          style={{
+                            height: 42,
+                            display: 'flex',
+                            borderRadius: 10,
+                            overflow: 'hidden',
+                            marginBottom: 14,
+                            boxShadow: '0 2px 6px rgba(11,16,32,0.06)',
+                          }}
+                        >
+                          {positiveParts.map((p, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                flex: p.value / totalFlex,
+                                background: p.color,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                fontFamily: M.mono,
+                                borderRight:
+                                  i < positiveParts.length - 1 ? '2px solid white' : 'none',
+                              }}
+                            >
+                              {fmtCurrency(p.value)}
+                            </div>
+                          ))}
+                        </div>
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gap: 14,
+                          }}
+                        >
+                          {decomposition.map((p, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                padding: '12px 14px',
+                                borderRadius: 10,
+                                background: '#fafbfc',
+                                border: `1px solid ${M.lineSoft}`,
+                                borderTop: `3px solid ${p.color}`,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  color: M.inkFaint,
+                                  letterSpacing: 0.5,
+                                  textTransform: 'uppercase',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                Step {i + 1}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  color: M.ink,
+                                  marginBottom: 3,
+                                }}
+                              >
+                                {p.label}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 17,
+                                  fontWeight: 800,
+                                  color: p.color,
+                                  fontFamily: M.mono,
+                                  fontVariantNumeric: 'tabular-nums',
+                                  letterSpacing: -0.3,
+                                  marginBottom: 6,
+                                }}
+                              >
+                                {fmtCurrency(p.value)}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: M.inkSoft,
+                                  lineHeight: 1.4,
+                                }}
+                              >
+                                {p.note}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 14,
+                            padding: '10px 14px',
+                            background: M.accentFaint,
+                            borderRadius: 8,
+                            fontSize: 12,
+                            color: M.accentDeep,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          <strong>The key insight:</strong> year 1 saves roughly{' '}
+                          {fmtCurrency(detailYearData[0]?.save ?? 0)}. Because harvesting
+                          continues and NOL credits roll forward, the advantage compounds —
+                          so over {advancedSettings.projectionYears} years you reach{' '}
+                          {fmtCurrency(totalTaxSavings)}. It's the compounding, not the rate,
+                          that does the heavy lifting.
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: 14,
+                  marginBottom: 20,
+                }}
+              >
+                {(
+                  [
+                    {
+                      label: 'Cumulative tax savings',
+                      value: fmtCurrency(totalTaxSavings),
+                      sub: `over ${advancedSettings.projectionYears} years`,
+                      primary: true,
+                    },
+                    {
+                      label: 'Final portfolio value',
+                      value: fmtCurrency(finalPortfolio),
+                      sub: `grown from ${fmtCurrency(inputs.collateralAmount)}`,
+                      primary: false,
+                    },
+                    {
+                      label: 'Annual tax alpha',
+                      value: fmtPercent(taxAlpha),
+                      sub: 'vs. direct indexing',
+                      primary: false,
+                    },
+                  ] as const
+                ).map(m => (
+                  <div
+                    key={m.label}
+                    style={{
+                      padding: '20px 22px',
+                      borderRadius: 14,
+                      background: m.primary
+                        ? `linear-gradient(145deg, ${M.accent}, ${M.accentDeep})`
+                        : 'white',
+                      color: m.primary ? 'white' : M.ink,
+                      border: m.primary ? 'none' : `1px solid ${M.line}`,
+                      boxShadow: m.primary
+                        ? '0 10px 30px rgba(79,70,229,0.25)'
+                        : '0 1px 0 rgba(11,16,32,0.02)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: 0.5,
+                        textTransform: 'uppercase',
+                        opacity: m.primary ? 0.75 : 1,
+                        color: m.primary ? 'rgba(255,255,255,0.85)' : M.inkFaint,
+                      }}
+                    >
+                      {m.label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 36,
+                        fontWeight: 800,
+                        letterSpacing: -1,
+                        marginTop: 10,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {m.value}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        marginTop: 6,
+                        opacity: m.primary ? 0.8 : 1,
+                        color: m.primary ? 'rgba(255,255,255,0.8)' : M.inkSoft,
+                      }}
+                    >
+                      {m.sub}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  background: 'white',
+                  borderRadius: 16,
+                  border: `1px solid ${M.line}`,
+                  padding: '24px 26px',
+                  marginBottom: 20,
+                  boxShadow: '0 4px 20px rgba(11,16,32,0.04)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 16,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: M.inkFaint,
+                        letterSpacing: 0.5,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Portfolio trajectory
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 700,
+                        color: M.ink,
+                        marginTop: 2,
+                        letterSpacing: -0.3,
+                      }}
+                    >
+                      Hover the chart to explore year by year →
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '7px 12px',
+                        border: `1px solid ${M.line}`,
+                        borderRadius: 8,
+                        background: showBaseline ? M.accentFaint : 'white',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: showBaseline ? M.accent : M.inkSoft,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={showBaseline}
+                        onChange={e => setShowBaseline(e.target.checked)}
+                        style={{ accentColor: M.accent, cursor: 'pointer' }}
+                      />
+                      Compare to baseline
+                    </label>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        gap: 12,
+                        padding: '7px 14px',
+                        fontSize: 12,
+                        color: M.inkSoft,
+                        background: '#fafbfc',
+                        border: `1px solid ${M.line}`,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 12,
+                            height: 3,
+                            background: M.accent,
+                            borderRadius: 2,
+                          }}
+                        />{' '}
+                        With EDI
+                      </span>
+                      {showBaseline && (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 12,
+                              height: 2,
+                              background: M.inkFaint,
+                              borderTop: `1px dashed ${M.inkFaint}`,
+                            }}
+                          />{' '}
+                          Baseline
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <HeroChart
+                  yearIdx={yearIdx}
+                  setYearIdx={setYearIdx}
+                  showBaseline={showBaseline}
+                  data={yearData}
+                  collateral={inputs.collateralAmount}
+                />
+                <div
+                  style={{
+                    marginTop: 20,
+                    padding: '16px 4px 4px',
+                    borderTop: `1px solid ${M.lineSoft}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 10,
+                    }}
+                  >
+                    <span style={{ fontSize: 11.5, color: M.inkFaint, fontWeight: 600 }}>
+                      Year scrubber
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        color: M.accent,
+                        fontFamily: M.mono,
+                      }}
+                    >
+                      {yearIdx === 0 ? 'Today' : `Year ${yearIdx}`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={yearData.length}
+                    value={yearIdx}
+                    onChange={e => setYearIdx(parseInt(e.target.value, 10))}
+                    style={{ width: '100%', accentColor: M.accent }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: '18px 22px',
+                  background: 'white',
+                  borderRadius: 12,
+                  border: `1px dashed ${M.line}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: M.ink }}>
+                    Ready to go deeper?
+                  </div>
+                  <div style={{ fontSize: 12.5, color: M.inkSoft, marginTop: 2 }}>
+                    Show the year-by-year numbers, or walk through how the strategy actually
+                    works.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => setLevel('detail')}
+                    style={{
+                      padding: '9px 16px',
+                      background: 'white',
+                      border: `1px solid ${M.line}`,
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color: M.ink,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Show year-by-year →
+                  </button>
+                  <button
+                    onClick={() => setLevel('mechanics')}
+                    style={{
+                      padding: '9px 16px',
+                      background: M.accent,
+                      border: 'none',
+                      color: 'white',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(79,70,229,0.25)',
+                    }}
+                  >
+                    Explain the mechanics →
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {level === 'detail' && (
+            <>
+              <div
+                style={{
+                  marginBottom: 20,
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={levelSubheadingStyle}>Level 02 · Detail</div>
+                  <h1
+                    style={{
+                      margin: 0,
+                      fontSize: 36,
+                      fontWeight: 800,
+                      letterSpacing: -1,
+                      color: M.ink,
+                    }}
+                  >
+                    The numbers, year by year.
+                  </h1>
+                </div>
+                <button
+                  onClick={() => setLevel('high')}
+                  style={{
+                    padding: '8px 14px',
+                    background: 'transparent',
+                    border: `1px solid ${M.line}`,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: M.inkSoft,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ← Back to high level
+                </button>
+              </div>
+              <div
+                style={{
+                  background: 'white',
+                  borderRadius: 16,
+                  border: `1px solid ${M.line}`,
+                  padding: '20px 22px',
+                  marginBottom: 16,
+                  boxShadow: '0 4px 20px rgba(11,16,32,0.04)',
+                }}
+              >
+                <HeroChart
+                  yearIdx={yearIdx}
+                  setYearIdx={setYearIdx}
+                  showBaseline
+                  compact
+                  data={yearData}
+                  collateral={inputs.collateralAmount}
+                />
+              </div>
+              <div
+                style={{
+                  background: 'white',
+                  borderRadius: 16,
+                  border: `1px solid ${M.line}`,
+                  padding: '20px 24px',
+                  boxShadow: '0 4px 20px rgba(11,16,32,0.04)',
+                }}
+              >
+                <DetailView
+                  yearIdx={yearIdx}
+                  setYearIdx={setYearIdx}
+                  yearData={detailYearData}
+                  totalTaxSavings={totalTaxSavings}
+                  totalNol={totalNol}
+                  finalPortfolio={finalPortfolio}
+                />
+              </div>
+            </>
+          )}
+
+          {level === 'mechanics' && (
+            <>
+              <div
+                style={{
+                  marginBottom: 24,
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div style={levelSubheadingStyle}>Level 03 · Mechanics</div>
+                  <h1
+                    style={{
+                      margin: 0,
+                      fontSize: 36,
+                      fontWeight: 800,
+                      letterSpacing: -1,
+                      color: M.ink,
+                    }}
+                  >
+                    Under the hood.
+                  </h1>
+                </div>
+                <button
+                  onClick={() => setLevel('detail')}
+                  style={{
+                    padding: '8px 14px',
+                    background: 'transparent',
+                    border: `1px solid ${M.line}`,
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: M.inkSoft,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ← Back to detail
+                </button>
+              </div>
+              <MechanicsView
+                qfafValue={results.sizing.qfafValue}
+                totalExposure={results.sizing.totalExposure}
+                totalNol={totalNol}
+                totalTaxSavings={totalTaxSavings}
+                taxRates={taxRates}
+                currentStrategy={currentStrategy}
+              />
+            </>
+          )}
+
+          <div
+            style={{
+              marginTop: 32,
+              padding: '14px 0',
+              fontSize: 11,
+              color: M.inkFaint,
+              lineHeight: 1.55,
+              maxWidth: 820,
+            }}
+          >
+            Estimates do not reflect advisory fees, financing costs, tracking error,
+            transaction costs, or behavioral effects. Actual results will vary. For discussion
+            purposes only.
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
