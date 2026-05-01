@@ -293,6 +293,7 @@ export function Calculator() {
         qfafValue={results.sizing.qfafValue}
         totalExposure={results.sizing.totalExposure}
         annualTaxSavings={results.years[0]?.taxSavings ?? 0}
+        startMonth={inputs.startMonth}
         year2TaxSavings={
           inputs.qfafEnabled && results.years.length > 1 ? results.years[1]?.taxSavings : undefined
         }
@@ -312,7 +313,11 @@ export function Calculator() {
         onPinScenario={() => pinnedScenario.pin(inputs, advancedSettings, results)}
         onUnpinScenario={handleUnpinAll}
         pinnedValues={pinnedScenario.pinned ? {
-          collateral: pinnedScenario.pinned.inputs.collateralAmount,
+          collateral:
+            pinnedScenario.pinned.inputs.splitAllocation?.enabled === true
+              ? pinnedScenario.pinned.inputs.splitAllocation.coreAmount +
+                pinnedScenario.pinned.inputs.splitAllocation.overlayAmount
+              : pinnedScenario.pinned.inputs.collateralAmount,
           qfafValue: pinnedScenario.pinned.results.sizing.qfafValue,
           annualTaxSavings: pinnedScenario.pinned.results.years[0]?.taxSavings ?? 0,
           year2TaxSavings: pinnedScenario.pinned.inputs.qfafEnabled && pinnedScenario.pinned.results.years.length > 1
@@ -466,6 +471,7 @@ export function Calculator() {
         combinedStRate={combinedStRate}
         combinedLtRate={combinedLtRate}
         qfafMultiplier={advancedSettings.qfafMultiplier}
+        startMonth={inputs.startMonth}
       />
       </PinnableSection>
 
@@ -503,6 +509,10 @@ export function Calculator() {
           startMonth={inputs.startMonth}
           onPrintRef={(handler) => setPrintHandler(() => handler)}
           onExportRef={(handler) => setExportHandler(() => handler)}
+          onImportCsv={(parsedInputs, parsedSettings) => {
+            setInputs(prev => ({ ...prev, ...parsedInputs }));
+            setAdvancedSettings(prev => ({ ...prev, ...parsedSettings }));
+          }}
         />
       </CollapsibleSection>
       </PinnableSection>

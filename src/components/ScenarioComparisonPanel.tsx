@@ -5,8 +5,8 @@ import {
   AdvancedSettings,
   CalculationResult,
 } from '../types';
-import { getStrategy } from '../strategyData';
 import { formatCurrency, formatPercent, formatCurrencyAbbreviated } from '../utils/formatters';
+import { getEffectiveView } from '../utils/effectiveAllocation';
 import './ScenarioComparisonPanel.css';
 
 // ============================================
@@ -73,11 +73,11 @@ interface ScenarioSummary {
 }
 
 function getScenarioSummary(inputs: CalculatorInputs): ScenarioSummary {
-  const strategy = getStrategy(inputs.strategyId);
+  const view = getEffectiveView(inputs);
   return {
-    strategy: strategy?.name ?? inputs.strategyId,
+    strategy: view.displayName,
     sizingMode: inputs.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed',
-    collateral: formatCurrencyAbbreviated(inputs.collateralAmount),
+    collateral: formatCurrencyAbbreviated(view.totalCollateral),
     duration: `${inputs.qfafDuration}yr`,
     qfafEnabled: inputs.qfafEnabled,
   };
@@ -111,7 +111,9 @@ function detectKeyDifferences(scenarios: PinnedScenario[]): string[] {
   if (scenarios.length < 2) return [];
   const diffs: string[] = [];
 
-  const strategies = new Set(scenarios.map(s => s.inputs.strategyId));
+  // Use effective view so split-allocation scenarios are compared by their
+  // actual displayed strategy/collateral rather than legacy fallback fields.
+  const strategies = new Set(scenarios.map(s => getEffectiveView(s.inputs).displayName));
   if (strategies.size > 1) diffs.push('Strategy');
 
   const modes = new Set(scenarios.map(s => s.inputs.qfafSizingMode));
@@ -120,7 +122,7 @@ function detectKeyDifferences(scenarios: PinnedScenario[]): string[] {
   const durations = new Set(scenarios.map(s => s.inputs.qfafDuration));
   if (durations.size > 1) diffs.push('Duration');
 
-  const collaterals = new Set(scenarios.map(s => s.inputs.collateralAmount));
+  const collaterals = new Set(scenarios.map(s => getEffectiveView(s.inputs).totalCollateral));
   if (collaterals.size > 1) diffs.push('Collateral');
 
   const qfafStates = new Set(scenarios.map(s => s.inputs.qfafEnabled));

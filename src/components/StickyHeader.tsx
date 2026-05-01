@@ -3,6 +3,7 @@ import { formatCurrency, formatCurrencyAbbreviated } from '../utils/formatters';
 import { useValueFlash } from '../hooks/useValueFlash';
 import { useDelta } from '../hooks/useDelta';
 import { DeltaBadge } from './DeltaBadge';
+import { PartialYearBadge } from './PartialYearBadge';
 
 /**
  * Pin/thumbtack icon for the pin scenario button.
@@ -62,6 +63,8 @@ interface StickyHeaderProps {
   totalExposure: number;
   /** Year 1 tax savings in dollars */
   annualTaxSavings: number;
+  /** Start month (1=January). Used to show a partial-year indicator on Year 1 metrics. */
+  startMonth?: number;
   /** Year 2+ tax savings (includes NOL usage), undefined if QFAF disabled */
   year2TaxSavings?: number;
   /** Total estimated tax savings over the full projection period */
@@ -131,6 +134,7 @@ export const StickyHeader = React.memo(function StickyHeader({
   qfafValue,
   totalExposure,
   annualTaxSavings,
+  startMonth = 1,
   year2TaxSavings,
   totalTaxSavings,
   isExpanded,
@@ -195,12 +199,21 @@ export const StickyHeader = React.memo(function StickyHeader({
           {pinnedValues && <PinnedDelta current={qfafValue} pinned={pinnedValues.qfafValue} />}
         </div>
         <div className="sticky-header__metric sticky-header__metric--highlight">
-          <span className="sticky-header__label">Year 1 Savings</span>
+          <span className="sticky-header__label">
+            Year 1 Savings
+            <PartialYearBadge startMonth={startMonth} compact />
+          </span>
           <span className="sticky-header__value" aria-live="polite" ref={savingsFlash}>
             {formatCurrency(annualTaxSavings)}
             <DeltaBadge delta={savingsDelta} />
           </span>
-          {isExpanded && <span className="sticky-header__subtext">First year benefit</span>}
+          {isExpanded && (
+            <span className="sticky-header__subtext">
+              {startMonth && startMonth > 1
+                ? `Pro-rated to ${13 - startMonth} months`
+                : 'First year benefit'}
+            </span>
+          )}
           {pinnedValues && <PinnedDelta current={annualTaxSavings} pinned={pinnedValues.annualTaxSavings} />}
         </div>
         {year2TaxSavings !== undefined && year2TaxSavings > 0 && (

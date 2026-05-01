@@ -6,8 +6,8 @@ import {
   CalculationResult,
   PinnedScenario,
 } from '../types';
-import { getStrategy } from '../strategyData';
 import { formatCurrencyAbbreviated } from '../utils/formatters';
+import { getEffectiveView } from '../utils/effectiveAllocation';
 
 const STORAGE_KEY = STORAGE_KEYS.PINNED_SCENARIO;
 const MAX_SCENARIOS = 4;
@@ -72,13 +72,12 @@ function loadStoredScenarios(): PinnedScenario[] {
  * e.g. "CA $3.0M / Core 130/30 (Dynamic)"
  */
 function generateLabel(inputs: CalculatorInputs): string {
-  const strategy = getStrategy(inputs.strategyId);
-  const strategyName = strategy?.name ?? inputs.strategyId;
-  const collateral = formatCurrencyAbbreviated(inputs.collateralAmount);
+  const view = getEffectiveView(inputs);
+  const collateral = formatCurrencyAbbreviated(view.totalCollateral);
   const sizingMode = inputs.qfafEnabled
     ? ` (${inputs.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed'})`
     : '';
-  return `${inputs.stateCode} ${collateral} / ${strategyName}${sizingMode}`;
+  return `${inputs.stateCode} ${collateral} / ${view.displayName}${sizingMode}`;
 }
 
 export interface UsePinnedScenarioReturn {

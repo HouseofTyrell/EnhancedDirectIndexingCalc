@@ -10,6 +10,8 @@ interface ResultsTableProps {
   sizing: CalculatedSizing;
   qfafEnabled: boolean;
   projectionYears?: number;
+  /** Start month (1=January). Year 1 row gets a partial-year badge when > 1. */
+  startMonth?: number;
 }
 
 // Chevron icons for expand/collapse
@@ -43,7 +45,9 @@ export function ResultsTable({
   data,
   sizing,
   qfafEnabled,
+  startMonth = 1,
 }: ResultsTableProps) {
+  const partialFirstYearMonths = startMonth > 1 ? 13 - startMonth : null;
   const [expandPortfolio, setExpandPortfolio] = useState(false);
   const [expandCapital, setExpandCapital] = useState(false);
   const [expandOrdLoss, setExpandOrdLoss] = useState(false);
@@ -421,6 +425,14 @@ export function ResultsTable({
                   <tr className={isWindDown ? 'wind-down-row' : ''}>
                     <td className="year-cell">
                       {year.year}
+                      {year.year === 1 && partialFirstYearMonths !== null && (
+                        <span
+                          className="partial-year-badge partial-year-badge--compact"
+                          title={`Year 1 pro-rated to ${partialFirstYearMonths} months`}
+                        >
+                          {partialFirstYearMonths} mo
+                        </span>
+                      )}
                       {isWindDown && <span className="wind-down-badge" title="Wind-down: strategy ended, carryforward usage only">W/D</span>}
                     </td>
                     <td>{formatCurrency(portfolioValue)}</td>
