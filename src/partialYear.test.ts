@@ -83,13 +83,53 @@ describe('Partial Year Start', () => {
       );
     });
 
-    it('should NOT affect Year 2 calculations', () => {
+    it('blends Year 1 and Year 2 operating-year rates in calendar Year 2', () => {
+      // Core-130-30 operating Y1 rate = 0.230, Y2 rate = 0.130.
+      // For a July start (yf=0.5), calendar Y2 = (Y1 + Y2) × 0.5 = 0.180.
+      // For a January start, calendar Y2 = Y2 rate = 0.130.
       const fullYear = calculate(createInputs({ startMonth: 1 }));
       const halfYear = calculate(createInputs({ startMonth: 7 }));
 
-      expect(halfYear.years[1].effectiveStLossRate).toBeCloseTo(
-        fullYear.years[1].effectiveStLossRate, 6
+      expect(fullYear.years[1].effectiveStLossRate).toBeCloseTo(0.130, 3);
+      expect(halfYear.years[1].effectiveStLossRate).toBeCloseTo(0.180, 3);
+      expect(halfYear.years[1].effectiveStLossRate).toBeGreaterThan(
+        fullYear.years[1].effectiveStLossRate
       );
+    });
+
+    it('extends strategy life by one calendar year for partial-year starts', () => {
+      // qfafDuration=10, January start: strategy active in calendar Y1..Y10.
+      // qfafDuration=10, July start: strategy active in calendar Y1..Y11
+      // (with Y1 and Y11 each being 6 months of operation).
+      const halfYear = calculate(createInputs({ startMonth: 7, qfafDuration: 10 }));
+      // Calendar Y11 should still have nonzero strategy activity.
+      expect(halfYear.years.length).toBeGreaterThanOrEqual(11);
+      expect(halfYear.years[10].stLossesHarvested).toBeGreaterThan(0);
+      // Calendar Y12+ is post-strategy wind-down (no new harvesting).
+      if (halfYear.years[11]) {
+        expect(halfYear.years[11].stLossesHarvested).toBe(0);
+      }
+    });
+
+    it('conserves total ST losses across the strategy life regardless of start month', () => {
+      // Sum of ST losses harvested across all calendar years should be
+      // approximately equal regardless of start month (Y1 partial + extended
+      // trailing year), since the strategy operates for `qfafDuration` years
+      // either way. With growth disabled, totals match exactly.
+      const settings: AdvancedSettings = { ...DEFAULT_SETTINGS, growthEnabled: false };
+      const sumLosses = (r: ReturnType<typeof calculate>) =>
+        r.years.reduce((s, y) => s + y.stLossesHarvested, 0);
+
+      const jan = calculate(createInputs({ startMonth: 1, qfafSizingMode: 'fixed' }), settings);
+      const apr = calculate(createInputs({ startMonth: 4, qfafSizingMode: 'fixed' }), settings);
+      const jul = calculate(createInputs({ startMonth: 7, qfafSizingMode: 'fixed' }), settings);
+      const oct = calculate(createInputs({ startMonth: 10, qfafSizingMode: 'fixed' }), settings);
+
+      const janTotal = sumLosses(jan);
+      // Within 0.5% across all start months
+      expect(Math.abs(sumLosses(apr) - janTotal) / janTotal).toBeLessThan(0.005);
+      expect(Math.abs(sumLosses(jul) - janTotal) / janTotal).toBeLessThan(0.005);
+      expect(Math.abs(sumLosses(oct) - janTotal) / janTotal).toBeLessThan(0.005);
     });
   });
 
@@ -197,7 +237,9 @@ describe('Partial Year Start — Sensitivity Path', () => {
     );
   });
 
-  it('should NOT pro-rate Year 2 in sensitivity analysis', () => {
+  it('blends operating-year rates in calendar Year 2 for sensitivity analysis', () => {
+    // Same as the base path: calendar Y2 of a July start blends operating
+    // years 1 and 2, so its effective ST loss rate is higher than a Jan start.
     const fullYear = calculateWithSensitivity(
       createInputs({ startMonth: 1 }),
       DEFAULT_SETTINGS,
@@ -209,8 +251,8 @@ describe('Partial Year Start — Sensitivity Path', () => {
       DEFAULT_SENSITIVITY,
     );
 
-    expect(halfYear.years[1].effectiveStLossRate).toBeCloseTo(
-      fullYear.years[1].effectiveStLossRate, 6
+    expect(halfYear.years[1].effectiveStLossRate).toBeGreaterThan(
+      fullYear.years[1].effectiveStLossRate
     );
   });
 });

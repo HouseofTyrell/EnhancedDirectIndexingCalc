@@ -1,6 +1,6 @@
 import { CalculatorInputs, SplitAllocation } from '../types';
 import { Strategy, getStrategy } from '../strategyData';
-import { getEffectiveStLossRate } from './helpers';
+import { getEffectiveStLossRate, getCalendarYearStLossRate } from './helpers';
 
 export interface ResolvedLeg {
   strategy: Strategy;
@@ -66,14 +66,40 @@ export function resolveAllocation(inputs: CalculatorInputs): ResolvedAllocation 
 
 /**
  * Compute the collateral-weighted ST loss rate across all legs for the given
- * year, using each leg's strategy-specific year schedule (with custom rate
- * overrides honored via `getEffectiveStLossRate`).
+ * operating year, using each leg's strategy-specific year schedule (with
+ * custom rate overrides honored via `getEffectiveStLossRate`).
  */
 export function getBlendedStLossRate(allocation: ResolvedAllocation, year: number): number {
   if (allocation.totalCollateral <= 0) return 0;
   let weightedSum = 0;
   for (const leg of allocation.legs) {
     const legRate = getEffectiveStLossRate(leg.strategy.id, leg.strategy.ltGainRate, year);
+    weightedSum += leg.collateralAmount * legRate;
+  }
+  return weightedSum / allocation.totalCollateral;
+}
+
+/**
+ * Calendar-year-aware version of getBlendedStLossRate. For partial-year
+ * starts, blends each leg's operating-year rates by the same calendar-year
+ * weighting before combining across legs.
+ */
+export function getBlendedCalendarYearStLossRate(
+  allocation: ResolvedAllocation,
+  calendarYear: number,
+  startMonth: number,
+  qfafDuration: number
+): number {
+  if (allocation.totalCollateral <= 0) return 0;
+  let weightedSum = 0;
+  for (const leg of allocation.legs) {
+    const legRate = getCalendarYearStLossRate(
+      leg.strategy.id,
+      leg.strategy.ltGainRate,
+      calendarYear,
+      startMonth,
+      qfafDuration
+    );
     weightedSum += leg.collateralAmount * legRate;
   }
   return weightedSum / allocation.totalCollateral;
