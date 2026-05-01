@@ -715,6 +715,310 @@ interface ChartPoint {
   save: number;
 }
 
+// Per-year tax mechanics for the breakdown chart (Level 02 / Detail view).
+// Mirrors the same fields surfaced in the main calculator's year-by-year table.
+export interface BreakdownPoint {
+  y: number;
+  // Positive contributions (stacked above zero):
+  ordinaryLossBenefit: number;
+  nolUsageBenefit: number;
+  capitalLossBenefit: number;
+  // Negative contributions (stacked below zero):
+  ltGainCost: number;
+  remainingStGainCost: number;
+  // Net of all the above (matches YearResult.taxSavings).
+  netSavings: number;
+  // For the secondary panel — running NOL balance after this year.
+  nolCarryforward: number;
+}
+
+// ═══ Year-by-year tax-mechanics breakdown — replaces the EDI-vs-baseline
+//     chart in the Level 02 Detail view. Stacked bars per year decompose
+//     net tax savings into its underlying benefits and costs, with the same
+//     hover/click year-focus behavior as HeroChart so the existing DetailView
+//     table continues to drive off the same yearIdx state.
+function BenefitBreakdownChart({
+  yearIdx,
+  setYearIdx,
+  data,
+}: {
+  yearIdx: number;
+  setYearIdx: (i: number) => void;
+  data: BreakdownPoint[];
+}) {
+  const W = 900;
+  const H = 280;
+  const pad = { l: 60, r: 30, t: 30, b: 56 };
+  const plotW = W - pad.l - pad.r;
+  const plotH = H - pad.t - pad.b;
+
+  // Determine the y-range. Positive max is the sum of stacked benefits;
+  // negative min is the sum of stacked costs. Default to a small symmetric
+  // range when there is no activity so the zero line stays visible.
+  const stackedPos = data.map(
+    d => d.ordinaryLossBenefit + d.nolUsageBenefit + d.capitalLossBenefit
+  );
+  const stackedNeg = data.map(d => d.ltGainCost + d.remainingStGainCost);
+  const posMax = Math.max(...stackedPos, ...data.map(d => d.netSavings), 1);
+  const negMax = Math.max(...stackedNeg, -Math.min(...data.map(d => d.netSavings), 0), 1);
+  const yTop = posMax * 1.12;
+  const yBot = -negMax * 1.12;
+  const range = yTop - yBot || 1;
+
+  const ys = (v: number) => pad.t + plotH - ((v - yBot) / range) * plotH;
+
+  // Bar geometry: small gap between bars, capped width for narrow data.
+  const slot = data.length > 0 ? plotW / data.length : plotW;
+  const barW = Math.min(36, slot * 0.62);
+  const xCenter = (i: number) => pad.l + slot * (i + 0.5);
+
+  // Hover/click: nearest bar by x. Same UX as HeroChart.
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current || data.length === 0) return;
+    const r = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * W - pad.l;
+    const i = Math.max(0, Math.min(data.length - 1, Math.floor(x / slot)));
+    setYearIdx(i + 1);
+  };
+
+  // Axis ticks: 4 horizontal grid lines (top, midpoint above zero, zero, bottom).
+  const tickValues = [yTop, yTop / 2, 0, yBot / 2, yBot];
+
+  // Active bar (1-indexed yearIdx; 0 means "no selection").
+  const activeI = yearIdx > 0 ? Math.min(yearIdx - 1, data.length - 1) : -1;
+
+  // Color tokens — match the rest of Meeting Mode's palette.
+  const ordColor = M.accent;       // ordinary loss benefit (primary blue/purple)
+  const nolColor = '#8b7cf6';      // NOL usage benefit (lighter purple)
+  const capColor = '#38bdf8';      // capital loss benefit (sky blue)
+  const ltColor = '#dc2626';       // LT gain cost (red)
+  const stColor = '#f59e0b';       // remaining ST gain cost (amber)
+  const netColor = M.good;         // net savings dot/line (green)
+
+  return (
+    <div>
+      {/* Chart heading: matches the HeroChart heading style for parity. */}
+      <div
+        style={{
+          marginBottom: 14,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 12,
+              color: M.inkFaint,
+              fontWeight: 600,
+              letterSpacing: 0.3,
+              textTransform: 'uppercase',
+            }}
+          >
+            Year-by-year mechanics
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: M.ink, marginTop: 2 }}>
+            What drives each year&rsquo;s tax savings
+          </div>
+        </div>
+        <div style={{ fontSize: 13, color: M.inkSoft }}>
+          Hover or click a bar to focus the table below.
+        </div>
+      </div>
+
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        onMouseMove={onMove}
+        onClick={onMove}
+        onMouseLeave={() => setYearIdx(data.length)}
+        style={{
+          width: '100%',
+          height: 'auto',
+          maxHeight: 320,
+          cursor: 'crosshair',
+          display: 'block',
+        }}
+      >
+        {/* Horizontal grid + axis labels */}
+        {tickValues.map((v, i) => (
+          <g key={i}>
+            <line
+              x1={pad.l}
+              x2={W - pad.r}
+              y1={ys(v)}
+              y2={ys(v)}
+              stroke={Math.abs(v) < 0.01 ? M.inkFaint : M.lineSoft}
+              strokeWidth={Math.abs(v) < 0.01 ? 1.2 : 1}
+              strokeDasharray={Math.abs(v) < 0.01 ? '0' : '3 4'}
+            />
+            <text
+              x={pad.l - 8}
+              y={ys(v) + 4}
+              textAnchor="end"
+              fontSize="10.5"
+              fill={M.inkFaint}
+              fontFamily={M.sans}
+            >
+              {fmtCurrency(v)}
+            </text>
+          </g>
+        ))}
+
+        {/* Bars: one stacked group per year. */}
+        {data.map((d, i) => {
+          const x = xCenter(i) - barW / 2;
+          const isActive = i === activeI;
+          const opacity = activeI === -1 || isActive ? 1 : 0.55;
+
+          // Stack positive segments from zero upward (bottom of each segment
+          // is the running positive total; visual bottom y is zero, top y
+          // shrinks as we add).
+          let posCum = 0;
+          const posSegments: { value: number; color: string }[] = [
+            { value: d.ordinaryLossBenefit, color: ordColor },
+            { value: d.nolUsageBenefit, color: nolColor },
+            { value: d.capitalLossBenefit, color: capColor },
+          ];
+          let negCum = 0;
+          const negSegments: { value: number; color: string }[] = [
+            { value: d.ltGainCost, color: ltColor },
+            { value: d.remainingStGainCost, color: stColor },
+          ];
+
+          return (
+            <g key={d.y} opacity={opacity}>
+              {/* Positive stack */}
+              {posSegments.map((seg, k) => {
+                if (seg.value <= 0) return null;
+                const yTopSeg = ys(posCum + seg.value);
+                const yBotSeg = ys(posCum);
+                posCum += seg.value;
+                return (
+                  <rect
+                    key={k}
+                    x={x}
+                    y={yTopSeg}
+                    width={barW}
+                    height={Math.max(1, yBotSeg - yTopSeg)}
+                    fill={seg.color}
+                    rx={1.5}
+                  />
+                );
+              })}
+
+              {/* Negative stack */}
+              {negSegments.map((seg, k) => {
+                if (seg.value <= 0) return null;
+                const yTopSeg = ys(-negCum);
+                const yBotSeg = ys(-(negCum + seg.value));
+                negCum += seg.value;
+                return (
+                  <rect
+                    key={k}
+                    x={x}
+                    y={yTopSeg}
+                    width={barW}
+                    height={Math.max(1, yBotSeg - yTopSeg)}
+                    fill={seg.color}
+                    rx={1.5}
+                  />
+                );
+              })}
+
+              {/* Net savings marker */}
+              <circle
+                cx={x + barW / 2}
+                cy={ys(d.netSavings)}
+                r={isActive ? 5 : 4}
+                fill="white"
+                stroke={netColor}
+                strokeWidth={2.5}
+              />
+
+              {/* Year label */}
+              <text
+                x={x + barW / 2}
+                y={H - pad.b + 18}
+                textAnchor="middle"
+                fontSize="11"
+                fontWeight={isActive ? 700 : 500}
+                fill={isActive ? M.accent : M.inkSoft}
+                fontFamily={M.sans}
+              >
+                Y{d.y}
+              </text>
+
+              {/* Net amount label above active bar */}
+              {isActive && (
+                <text
+                  x={x + barW / 2}
+                  y={ys(Math.max(d.netSavings, 0)) - 10}
+                  textAnchor="middle"
+                  fontSize="11.5"
+                  fontWeight={700}
+                  fill={M.ink}
+                  fontFamily={M.sans}
+                >
+                  {fmtCurrency(d.netSavings)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Legend */}
+      <div
+        style={{
+          marginTop: 6,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 14,
+          fontSize: 11.5,
+          color: M.inkSoft,
+          fontFamily: M.sans,
+        }}
+      >
+        <LegendSwatch color={ordColor} label="Ordinary loss benefit" />
+        <LegendSwatch color={nolColor} label="NOL usage benefit" />
+        <LegendSwatch color={capColor} label="Capital loss benefit" />
+        <LegendSwatch color={ltColor} label="LT gain cost" />
+        <LegendSwatch color={stColor} label="Remaining ST gain cost" />
+        <LegendSwatch color={netColor} label="Net savings" ring />
+      </div>
+    </div>
+  );
+}
+
+function LegendSwatch({
+  color,
+  label,
+  ring = false,
+}: {
+  color: string;
+  label: string;
+  ring?: boolean;
+}) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span
+        style={{
+          width: ring ? 10 : 12,
+          height: ring ? 10 : 10,
+          borderRadius: ring ? 999 : 2,
+          background: ring ? 'white' : color,
+          border: ring ? `2.5px solid ${color}` : 'none',
+          display: 'inline-block',
+        }}
+      />
+      {label}
+    </span>
+  );
+}
+
 // ═══ The hero graph — interactive, hoverable ═══
 function HeroChart({
   yearIdx,
@@ -1689,6 +1993,24 @@ export function MeetingMode({
     [visibleYears]
   );
 
+  // Year-by-year benefit/cost decomposition for the new BenefitBreakdownChart.
+  // Mirrors the same numbers surfaced in the main calculator's year-by-year
+  // table (ordinary loss / NOL usage / capital loss / LT gain cost / etc).
+  const breakdownData: BreakdownPoint[] = useMemo(
+    () =>
+      visibleYears.map(y => ({
+        y: y.year,
+        ordinaryLossBenefit: y.ordinaryLossBenefit,
+        nolUsageBenefit: y.nolUsageBenefit,
+        capitalLossBenefit: y.capitalLossBenefit,
+        ltGainCost: y.ltGainCost,
+        remainingStGainCost: y.remainingStGainCost,
+        netSavings: y.taxSavings,
+        nolCarryforward: y.nolCarryforward,
+      })),
+    [visibleYears]
+  );
+
   // Bound summary figures to the user's projection window so labels ("over N
   // years") agree with the numbers shown — core.ts keeps running the sim past
   // projectionYears during QFAF wind-down, which we don't want to surface here.
@@ -2524,13 +2846,10 @@ export function MeetingMode({
                   boxShadow: '0 4px 20px rgba(11,16,32,0.04)',
                 }}
               >
-                <HeroChart
+                <BenefitBreakdownChart
                   yearIdx={yearIdx}
                   setYearIdx={setYearIdx}
-                  showBaseline
-                  compact
-                  data={yearData}
-                  collateral={effectiveCollateral}
+                  data={breakdownData}
                 />
               </div>
               <div
