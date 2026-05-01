@@ -1727,41 +1727,74 @@ export function MeetingMode({
     };
   }, [printMode]);
 
-  // Decomposition of hero number
+  // Decomposition of hero number.
+  //
+  // Three cards explain how we get to totalTaxSavings (Year 1 harvest +
+  // Years 2..N harvest + NOL carry-forward as an embedded sub-component),
+  // and a fourth card shows what the total looks like if every year's tax
+  // savings were reinvested at the portfolio growth rate:
+  //
+  //   FV = Σ taxSavings_n × (1 + r)^(N − n)
+  //
+  // The first three cards drive the proportional "how we get to $X" bar;
+  // the compounding card is rendered as a separate informational tile and
+  // is excluded from the bar (since it sums to a different total).
   const decomposition = useMemo(() => {
     const year1 = detailYearData[0]?.save ?? 0;
     const years2plus = detailYearData.slice(1).reduce((s, y) => s + y.save, 0);
     const nolBenefit = visibleYears.reduce((s, y) => s + (y.nolUsageBenefit ?? 0), 0);
-    // Reinvestment compounding = total − (year1 + years2plus). NOL benefit is
-    // already embedded in year savings; show it as a standalone indicator.
-    const reinvest = Math.max(0, totalTaxSavings - year1 - years2plus);
+    const r = advancedSettings.growthEnabled ? advancedSettings.defaultAnnualReturn : 0;
+    const N = detailYearData.length;
+    const futureValue = detailYearData.reduce(
+      (s, y, i) => s + y.save * Math.pow(1 + r, N - (i + 1)),
+      0
+    );
+    const compoundingBonus = Math.max(0, futureValue - totalTaxSavings);
     return [
       {
         label: 'Year 1 harvest',
         value: year1,
         color: M.accent,
         note: `Loss harvest × ${fmtPercent1(taxRates.combinedStRate)} combined rate`,
+        inBar: true,
       },
       {
         label: `Years 2–${detailYearData.length} harvest`,
         value: years2plus,
         color: '#8b7cf6',
         note: 'Ongoing harvesting as portfolio grows',
+        inBar: true,
       },
       {
         label: 'NOL carry-forward',
         value: nolBenefit,
         color: '#f59e0b',
         note: `${fmtCurrency(totalNol)} of NOL offsetting future income`,
+        inBar: true,
       },
       {
-        label: 'Compounding',
-        value: reinvest,
+        label: 'With reinvestment',
+        // Headline number is the total future value of reinvested savings.
+        value: futureValue,
         color: M.good,
-        note: 'Savings compound over the projection period',
+        note:
+          r > 0
+            ? `Each year's savings reinvested at ${fmtPercent1(r)} grows to ${fmtCurrency(
+                futureValue
+              )} by year ${N} — a ${fmtCurrency(compoundingBonus)} gain on top of the ${fmtCurrency(totalTaxSavings)} of un-invested savings.`
+            : 'Enable portfolio growth to model reinvested savings.',
+        inBar: false,
       },
     ];
-  }, [detailYearData, totalTaxSavings, totalNol, visibleYears, taxRates.combinedStRate]);
+  }, [
+    detailYearData,
+    totalTaxSavings,
+    totalNol,
+    visibleYears,
+    taxRates.combinedStRate,
+    advancedSettings.growthEnabled,
+    advancedSettings.defaultAnnualReturn,
+  ]);
 
   const filingLabel =
     FILING_STATUSES.find(f => f.value === inputs.filingStatus)?.label.replace(
@@ -2052,7 +2085,7 @@ export function MeetingMode({
                   </div>
 
                   {(() => {
-                    const positiveParts = decomposition.filter(p => p.value > 0);
+                    const positiveParts = decomposition.filter(p => p.value > 0 && p.inBar);
                     const totalFlex = positiveParts.reduce((s, p) => s + p.value, 0) || 1;
                     return (
                       <>
