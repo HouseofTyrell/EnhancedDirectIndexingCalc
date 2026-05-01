@@ -19,12 +19,18 @@ import {
 } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
 import { StrategyRates, TaxRates } from './types';
-import { getEffectiveStLossRate, calculateCarryforwards, calculateSummary } from './helpers';
+import {
+  getEffectiveStLossRate,
+  getCalendarYearStLossRate,
+  getOperatingFraction,
+  calculateCarryforwards,
+  calculateSummary,
+} from './helpers';
 import { calculateSizing } from './sizing';
 import {
   resolveAllocation,
-  getBlendedStLossRate,
   getBlendedLtGainRate,
+  getBlendedCalendarYearStLossRate,
   ResolvedAllocation,
   ResolvedLeg,
 } from './splitAllocation';
@@ -140,13 +146,16 @@ export function calculateWithSensitivity(
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
 
-  // Auto-extend projection to show at least 2 post-QFAF years
+  // Auto-extend projection to show at least 2 post-QFAF years.
+  // Partial-year starts extend the strategy by one calendar year.
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
-  const minProjection = qfafDuration > 0 ? qfafDuration + 2 : projectionYears;
+  const yf = (13 - (inputs.startMonth ?? 1)) / 12;
+  const isPartialStart = yf < 1;
+  const strategyLastCalendarYear =
+    qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
+  const minProjection =
+    qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
-
-  // Partial year: month 1 = full year (12/12), month 4 = 9/12, month 12 = 1/12
-  const yearFraction = (13 - (inputs.startMonth ?? 1)) / 12;
 
   for (let year = 1; year <= effectiveProjectionYears; year++) {
     // Snapshot per-leg state for this year's blends.
@@ -162,28 +171,41 @@ export function calculateWithSensitivity(
       legs: yearStartLegs,
     };
 
-    // Blended (or single-strategy) base rates BEFORE sensitivity variance.
-    // In single-strategy mode we use only the un-blended rate for QFAF
-    // resizing — the per-year strategy passed to calculateYearWithSensitivity
-    // is built below to preserve original double-application semantics.
+    // Operating fraction + calendar-year ST loss rate (partial-year aware).
+    const opFraction = getOperatingFraction(year, inputs.startMonth ?? 1, qfafDuration);
     const baseLtGainRate = allocation.isSplit
       ? getBlendedLtGainRate(yearAllocation)
       : allocation.primary.strategy.ltGainRate;
-    const baseStLossRate = allocation.isSplit
-      ? getBlendedStLossRate(yearAllocation, year)
-      : getEffectiveStLossRate(
+    // For single mode, preserve the legacy behavior where the LT rate (with
+    // sensitivity variance applied once externally) feeds into the inner ST
+    // loss rate via getEffectiveStLossRate's `lt` parameter. We mirror that
+    // here by passing the variance-adjusted LT to the calendar-year helper.
+    const stLossLtForRate = allocation.isSplit
+      ? baseLtGainRate
+      : baseLtGainRate * (1 + sensitivity.ltGainRateVariance);
+    const calStLossRate = allocation.isSplit
+      ? getBlendedCalendarYearStLossRate(yearAllocation, year, inputs.startMonth ?? 1, qfafDuration)
+      : getCalendarYearStLossRate(
           allocation.primary.strategy.id,
-          allocation.primary.strategy.ltGainRate,
-          year
+          stLossLtForRate,
+          year,
+          inputs.startMonth ?? 1,
+          qfafDuration
         );
 
-    // Zero out QFAF after duration expires (breakeven unwind)
-    let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+    // Zero out QFAF after the strategy's last operating year (breakeven unwind)
+    let effectiveQfafValue =
+      strategyLastCalendarYear > 0 && year > strategyLastCalendarYear ? 0 : qfafValue;
 
-    // Dynamic resizing: shrink QFAF to match this year's collateral ST losses.
+    // Dynamic resizing: shrink QFAF to match this calendar year's collateral ST losses.
     let cashReturned = 0;
-    if (isDynamic && effectiveQfafValue > 0) {
-      const neededQfaf = yearStartTotalCollateral * baseStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+    if (isDynamic && effectiveQfafValue > 0 && opFraction > 0) {
+      const neededQfaf =
+        yearStartTotalCollateral *
+        calStLossRate *
+        (1 - settings.washSaleDisallowanceRate) /
+        (QFAF_ST_GAIN_RATE * opFraction) *
+        (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
       effectiveQfafValue = cappedQfaf;
@@ -208,8 +230,8 @@ export function calculateWithSensitivity(
       section461Limit,
     };
 
-    // After strategy duration, zero out tax-harvesting activity
-    const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
+    const strategyActive = opFraction > 0;
+    const yearFractionForCall = strategyActive ? opFraction : 1.0;
 
     // Strategy passed to calculateYearWithSensitivity.
     // In single-strategy mode, pre-apply variance to both rates so that the
@@ -217,18 +239,23 @@ export function calculateWithSensitivity(
     // produce identical results to before. In split mode, pass the un-adjusted
     // blended rates and let the inner function apply variance once.
     let strategyForYear: StrategyRates;
-    let yearSensitivityOverrides: SensitivityYearOverrides | undefined;
+    let yearSensitivityOverrides: SensitivityYearOverrides;
     if (allocation.isSplit) {
-      strategyForYear = { stLossRate: baseStLossRate, ltGainRate: baseLtGainRate };
+      strategyForYear = { stLossRate: calStLossRate, ltGainRate: baseLtGainRate };
       yearSensitivityOverrides = {
-        baseStLossRate,
+        baseStLossRate: calStLossRate,
+        stRateIsCalendarBlended: true,
         financingCost: getBlendedFinancingCost(yearAllocation, adjustedSettings),
       };
     } else {
       const adjustedStLossRate = allocation.primary.strategy.stLossRate * (1 + sensitivity.stLossRateVariance);
       const adjustedLtGainRate = baseLtGainRate * (1 + sensitivity.ltGainRateVariance);
       strategyForYear = { stLossRate: adjustedStLossRate, ltGainRate: adjustedLtGainRate };
-      yearSensitivityOverrides = undefined;
+      // Calendar-year blended rate already accounts for partial-year start.
+      yearSensitivityOverrides = {
+        baseStLossRate: calStLossRate,
+        stRateIsCalendarBlended: true,
+      };
     }
 
     const result = calculateYearWithSensitivity(
@@ -246,7 +273,7 @@ export function calculateWithSensitivity(
       sensitivity.ltGainRateVariance,
       scaledTrackingError,
       allocation.isSplit ? undefined : allocation.primary.strategy,
-      year === 1 ? yearFraction : 1.0,
+      yearFractionForCall,
       strategyActive,
       yearSensitivityOverrides
     );
@@ -254,12 +281,11 @@ export function calculateWithSensitivity(
     // Per-leg next-year growth/fees in split mode.
     if (allocation.isSplit) {
       const baseReturn = adjustedSettings.growthEnabled ? adjustedSettings.defaultAnnualReturn : 0;
-      const yf = year === 1 ? yearFraction : 1.0;
       for (let i = 0; i < legCollateral.length; i++) {
         const legStrategy = yearStartLegs[i].strategy;
         const legFinancing = getEffectiveFinancingCost(legStrategy, adjustedSettings);
-        const grown = legCollateral[i] * (1 + baseReturn * yf);
-        legCollateral[i] = safeNumber(grown * (1 - legFinancing * yf));
+        const grown = legCollateral[i] * (1 + baseReturn * yearFractionForCall);
+        legCollateral[i] = safeNumber(grown * (1 - legFinancing * yearFractionForCall));
       }
       const legSum = legCollateral.reduce((s, v) => s + v, 0);
       result.collateralValue = legSum;
@@ -270,8 +296,10 @@ export function calculateWithSensitivity(
 
     years.push({ ...result, qfafCashReturned: cashReturned });
 
-    // Update QFAF state for next year. Don't track QFAF growth after unwind.
-    qfafValue = (qfafDuration > 0 && year >= qfafDuration) ? 0 : result.qfafValue;
+    // Update QFAF state for next year. Don't track QFAF growth after the
+    // strategy's final calendar year.
+    qfafValue =
+      strategyLastCalendarYear > 0 && year >= strategyLastCalendarYear ? 0 : result.qfafValue;
     stCarryforward = result.stLossCarryforward;
     ltCarryforward = result.ltLossCarryforward;
     nolCarryforward = result.nolCarryforward;
@@ -286,6 +314,10 @@ export function calculateWithSensitivity(
 
 interface SensitivityYearOverrides {
   baseStLossRate?: number; // pre-blended rate; bypasses internal getEffectiveStLossRate
+  // When true, the override above is a calendar-year time-weighted rate that
+  // already includes the partial-year fractional weighting. The inner
+  // computation should NOT multiply ST losses by `yearFraction` again.
+  stRateIsCalendarBlended?: boolean;
   financingCost?: number;  // pre-blended financing; bypasses fullStrategy lookup
 }
 
@@ -335,7 +367,12 @@ function calculateYearWithSensitivity(
   const adjustedStLossRate = baseStLossRate * (1 + effectiveStVariance);
   const adjustedLtGainRate = strategy.ltGainRate * (1 + effectiveLtVariance);
 
-  const grossStLosses = strategyActive ? collateralValue * adjustedStLossRate * yearFraction : 0;
+  // When the caller passes a calendar-year blended rate, the partial-year
+  // weighting is already baked into the rate — don't multiply by yearFraction.
+  const stRateIsCalendarBlended = overrides?.stRateIsCalendarBlended === true;
+  const grossStLosses = strategyActive
+    ? collateralValue * adjustedStLossRate * (stRateIsCalendarBlended ? 1 : yearFraction)
+    : 0;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
   const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * adjustedLtGainRate * yearFraction) : 0;
 

@@ -16,13 +16,18 @@ import {
   getShortRatio,
 } from '../strategyData';
 import { StrategyRates, TaxRates } from './types';
-import { getEffectiveStLossRate, calculateSummary } from './helpers';
+import {
+  calculateSummary,
+  getCalendarYearStLossRate,
+  getOperatingFraction,
+} from './helpers';
 import { calculateSizing } from './sizing';
 import { calculateYear, CalculateYearOverrides } from './core';
 import {
   resolveAllocation,
   getBlendedStLossRate,
   getBlendedLtGainRate,
+  getBlendedCalendarYearStLossRate,
   ResolvedAllocation,
   ResolvedLeg,
 } from './splitAllocation';
@@ -100,12 +105,16 @@ export function calculateWithOverrides(
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
 
-  // Auto-extend projection to show at least 2 post-QFAF years
+  // Auto-extend projection to show at least 2 post-QFAF years.
+  // Partial-year starts extend the strategy's life by one calendar year.
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
-  const minProjection = qfafDuration > 0 ? qfafDuration + 2 : projectionYears;
+  const yf = (13 - (inputs.startMonth ?? 1)) / 12;
+  const isPartialStart = yf < 1;
+  const strategyLastCalendarYear =
+    qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
+  const minProjection =
+    qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
-
-  const yearFraction = (13 - (inputs.startMonth ?? 1)) / 12;
 
   for (let year = 1; year <= effectiveProjectionYears; year++) {
     const override = overrideMap.get(year);
@@ -167,38 +176,53 @@ export function calculateWithOverrides(
       legs: yearStartLegs,
     };
 
-    // Zero out QFAF after duration expires (breakeven unwind)
-    let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
+    // Calendar-year rate blending + operating fraction (see core.ts for derivation).
+    const opFraction = getOperatingFraction(year, inputs.startMonth ?? 1, qfafDuration);
+    const calStLossRate = allocation.isSplit
+      ? getBlendedCalendarYearStLossRate(yearAllocation, year, inputs.startMonth ?? 1, qfafDuration)
+      : getCalendarYearStLossRate(
+          allocation.primary.strategy.id,
+          allocation.primary.strategy.ltGainRate,
+          year,
+          inputs.startMonth ?? 1,
+          qfafDuration
+        );
 
-    // Dynamic resizing: shrink QFAF to match this year's collateral ST losses.
+    // Zero out QFAF after the strategy's last operating year (breakeven unwind)
+    let effectiveQfafValue =
+      strategyLastCalendarYear > 0 && year > strategyLastCalendarYear ? 0 : qfafValue;
+
+    // Dynamic resizing: shrink QFAF to match this calendar year's collateral ST losses.
     let cashReturned = 0;
-    if (isDynamic && effectiveQfafValue > 0) {
-      const yearStLossRate = allocation.isSplit
-        ? getBlendedStLossRate(yearAllocation, year)
-        : getEffectiveStLossRate(allocation.primary.strategy.id, allocation.primary.strategy.ltGainRate, year);
-      const neededQfaf = yearStartTotalCollateral * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+    if (isDynamic && effectiveQfafValue > 0 && opFraction > 0) {
+      const neededQfaf =
+        yearStartTotalCollateral *
+        calStLossRate *
+        (1 - settings.washSaleDisallowanceRate) /
+        (QFAF_ST_GAIN_RATE * opFraction) *
+        (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
       effectiveQfafValue = cappedQfaf;
     }
 
-    // After strategy duration, zero out tax-harvesting activity
-    const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
+    const strategyActive = opFraction > 0;
+    const yearFractionForCall = strategyActive ? opFraction : 1.0;
 
     // Pre-blend rates for split mode.
     let yearOverrides: CalculateYearOverrides | undefined;
     let strategyForCalc: StrategyRates;
     if (allocation.isSplit) {
-      const blendedSt = getBlendedStLossRate(yearAllocation, year);
       const blendedLt = getBlendedLtGainRate(yearAllocation);
-      strategyForCalc = { stLossRate: blendedSt, ltGainRate: blendedLt };
+      strategyForCalc = { stLossRate: calStLossRate, ltGainRate: blendedLt };
       yearOverrides = {
-        effectiveStLossRate: blendedSt,
+        effectiveStLossRate: calStLossRate,
         ltGainRate: blendedLt,
         financingCost: getBlendedFinancingCost(yearAllocation, settings),
       };
     } else {
       strategyForCalc = allocation.primary.strategy;
+      yearOverrides = { effectiveStLossRate: calStLossRate };
     }
 
     const result = calculateYear(
@@ -214,7 +238,7 @@ export function calculateWithOverrides(
       settings,
       yearIncome,
       allocation.isSplit ? undefined : allocation.primary.strategy,
-      year === 1 ? yearFraction : 1.0,
+      yearFractionForCall,
       strategyActive,
       yearOverrides
     );
@@ -222,12 +246,11 @@ export function calculateWithOverrides(
     // In split mode, recompute per-leg next-year values.
     if (allocation.isSplit) {
       const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
-      const yf = year === 1 ? yearFraction : 1.0;
       for (let i = 0; i < legCollateral.length; i++) {
         const legStrategy = yearStartLegs[i].strategy;
         const legFinancing = getEffectiveFinancingCost(legStrategy, settings);
-        const grown = legCollateral[i] * (1 + baseReturn * yf);
-        legCollateral[i] = grown * (1 - legFinancing * yf);
+        const grown = legCollateral[i] * (1 + baseReturn * yearFractionForCall);
+        legCollateral[i] = grown * (1 - legFinancing * yearFractionForCall);
       }
       const legSum = legCollateral.reduce((s, v) => s + v, 0);
       result.collateralValue = legSum;
@@ -238,8 +261,10 @@ export function calculateWithOverrides(
 
     years.push({ ...result, qfafCashReturned: cashReturned });
 
-    // Update QFAF state for next year. Don't track QFAF growth after unwind.
-    qfafValue = (qfafDuration > 0 && year >= qfafDuration) ? 0 : result.qfafValue;
+    // Update QFAF state for next year. Don't track QFAF growth after the
+    // strategy's final calendar year.
+    qfafValue =
+      strategyLastCalendarYear > 0 && year >= strategyLastCalendarYear ? 0 : result.qfafValue;
     stCarryforward = result.stLossCarryforward;
     ltCarryforward = result.ltLossCarryforward;
     nolCarryforward = result.nolCarryforward;
