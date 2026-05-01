@@ -255,23 +255,25 @@ export function SizingSummary({
               {formatPercent(combinedStRate)}
             </span>
           </div>
-          <div className="benefit-card">
-            <span className="benefit-label">
-              <InfoText
-                contentKey="lt-gain-cost"
-                currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)}
-              >
-                LT Gain Cost
-              </InfoText>
-            </span>
-            <span className="benefit-value negative">
-              −{formatCurrency((results.years[0]?.ltGainsRealized ?? 0) * combinedLtRate)}
-            </span>
-            <span className="benefit-formula">
-              {formatCurrency(results.years[0]?.ltGainsRealized ?? 0)} ×{' '}
-              {formatPercent(combinedLtRate)}
-            </span>
-          </div>
+          {(results.years[0]?.ltGainsRealized ?? 0) > 0 && (
+            <div className="benefit-card">
+              <span className="benefit-label">
+                <InfoText
+                  contentKey="lt-gain-cost"
+                  currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)}
+                >
+                  LT Gain Cost
+                </InfoText>
+              </span>
+              <span className="benefit-value negative">
+                −{formatCurrency((results.years[0]?.ltGainsRealized ?? 0) * combinedLtRate)}
+              </span>
+              <span className="benefit-formula">
+                {formatCurrency(results.years[0]?.ltGainsRealized ?? 0)} ×{' '}
+                {formatPercent(combinedLtRate)}
+              </span>
+            </div>
+          )}
           <div className="benefit-card highlight">
             <span className="benefit-label">
               <InfoText
@@ -337,20 +339,22 @@ export function SizingSummary({
                 {formatPercent(combinedStRate)}
               </span>
             </div>
-            <div className="benefit-card">
-              <span className="benefit-label">
-                <InfoText contentKey="lt-gain-cost">
-                  LT Gain Cost
-                </InfoText>
-              </span>
-              <span className="benefit-value negative">
-                −{formatCurrency((results.years[1]?.ltGainsRealized ?? 0) * combinedLtRate)}
-              </span>
-              <span className="benefit-formula">
-                {formatCurrency(results.years[1]?.ltGainsRealized ?? 0)} ×{' '}
-                {formatPercent(combinedLtRate)}
-              </span>
-            </div>
+            {(results.years[1]?.ltGainsRealized ?? 0) > 0 && (
+              <div className="benefit-card">
+                <span className="benefit-label">
+                  <InfoText contentKey="lt-gain-cost">
+                    LT Gain Cost
+                  </InfoText>
+                </span>
+                <span className="benefit-value negative">
+                  −{formatCurrency((results.years[1]?.ltGainsRealized ?? 0) * combinedLtRate)}
+                </span>
+                <span className="benefit-formula">
+                  {formatCurrency(results.years[1]?.ltGainsRealized ?? 0)} ×{' '}
+                  {formatPercent(combinedLtRate)}
+                </span>
+              </div>
+            )}
             <div className="benefit-card highlight">
               <span className="benefit-label">
                 <InfoText contentKey="year2-tax-savings">
