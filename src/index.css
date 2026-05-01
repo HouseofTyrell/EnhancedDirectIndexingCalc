@@ -6797,3 +6797,50 @@ select:focus:not(:focus-visible) {
   font-size: 0.85rem;
   color: var(--negative);
 }
+
+/* ============================================================
+   Meeting Mode print one-pager
+   ============================================================
+   When the user clicks "Export one-pager", MeetingMode re-renders all
+   three level sections stacked + adds the .meeting-mode-print class to
+   the root, then calls window.print(). These rules ensure the printed
+   output is clean: page breaks between sections, no shadows, full
+   width, and no leftover screen UI. */
+
+@media print {
+  .meeting-mode-print {
+    background: white !important;
+  }
+
+  .meeting-mode-print main {
+    overflow: visible !important;
+  }
+
+  .meeting-mode-print .meeting-mode-print-page {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .meeting-mode-print .meeting-mode-print-page + .meeting-mode-print-page {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  /* Stop sticky positioning from breaking pagination */
+  .meeting-mode-print header {
+    position: static !important;
+  }
+
+  /* Tame heavy shadows so they don't render as gray blocks on paper */
+  .meeting-mode-print * {
+    box-shadow: none !important;
+  }
+
+  /* Make sure colored text/backgrounds render rather than the default
+     "economy mode" some browsers apply. */
+  .meeting-mode-print,
+  .meeting-mode-print * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
