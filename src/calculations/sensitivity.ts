@@ -21,6 +21,13 @@ import { safeNumber } from '../utils/formatters';
 import { StrategyRates, TaxRates } from './types';
 import { getEffectiveStLossRate, calculateCarryforwards, calculateSummary } from './helpers';
 import { calculateSizing } from './sizing';
+import {
+  resolveAllocation,
+  getBlendedStLossRate,
+  getBlendedLtGainRate,
+  ResolvedAllocation,
+  ResolvedLeg,
+} from './splitAllocation';
 
 /**
  * Calculate the effective financing cost based on strategy leverage and user settings.
@@ -56,6 +63,15 @@ function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSetting
   }
 }
 
+function getBlendedFinancingCost(allocation: ResolvedAllocation, settings: AdvancedSettings): number {
+  if (allocation.totalCollateral <= 0) return 0;
+  let weightedSum = 0;
+  for (const leg of allocation.legs) {
+    weightedSum += leg.collateralAmount * getEffectiveFinancingCost(leg.strategy, settings);
+  }
+  return weightedSum / allocation.totalCollateral;
+}
+
 /**
  * Calculate with sensitivity analysis adjustments.
  *
@@ -65,18 +81,17 @@ function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSetting
  * - Annual return: Override portfolio growth rate
  * - ST loss rate variance: Adjust strategy ST loss rates
  * - LT gain rate variance: Adjust strategy LT gain rates
+ *
+ * Split allocation: when enabled, ST loss and LT gain rates are blended across
+ * legs by collateral weight before variance is applied. The tracking-error
+ * multiplier uses each leg's tracking error weighted similarly.
  */
 export function calculateWithSensitivity(
   inputs: CalculatorInputs,
   settings: AdvancedSettings = DEFAULT_SETTINGS,
   sensitivity: SensitivityParams = DEFAULT_SENSITIVITY
 ): CalculationResult {
-  const strategy = getStrategy(inputs.strategyId);
-
-  // Validate strategy exists
-  if (!strategy) {
-    throw new Error(`Invalid strategy ID: ${inputs.strategyId}`);
-  }
+  const allocation = resolveAllocation(inputs);
 
   // Calculate initial sizing
   const sizing = calculateSizing(inputs, settings.qfafMultiplier);
@@ -88,19 +103,14 @@ export function calculateWithSensitivity(
   // Apply sensitivity adjustments to rates
   const adjustedStateRate = Math.max(0, baseStateRate + sensitivity.stateRateChange);
 
-  // Get base tracking error from strategy and scale by multiplier
-  // This models implementation risk: 0x = perfect, 1x = baseline, 2x = high variance
-  const scaledTrackingError = strategy.trackingError * sensitivity.trackingErrorMultiplier;
-
-  // Apply ST loss and LT gain variance to strategy rates
-  const adjustedStLossRate = strategy.stLossRate * (1 + sensitivity.stLossRateVariance);
-  const adjustedLtGainRate = strategy.ltGainRate * (1 + sensitivity.ltGainRateVariance);
-
-  // Create adjusted strategy with modified rates
-  const adjustedStrategy: StrategyRates = {
-    stLossRate: adjustedStLossRate,
-    ltGainRate: adjustedLtGainRate,
-  };
+  // Tracking error: in split mode, blend by collateral weight.
+  const blendedTrackingError = allocation.isSplit && allocation.totalCollateral > 0
+    ? allocation.legs.reduce(
+        (sum, leg) => sum + (leg.collateralAmount * leg.strategy.trackingError),
+        0
+      ) / allocation.totalCollateral
+    : allocation.primary.strategy.trackingError;
+  const scaledTrackingError = blendedTrackingError * sensitivity.trackingErrorMultiplier;
 
   // Use sensitivity annual return if different from default
   const sensitivityOverride = sensitivity.annualReturn !== DEFAULT_SENSITIVITY.annualReturn;
@@ -119,7 +129,8 @@ export function calculateWithSensitivity(
   const years: YearResult[] = [];
 
   let qfafValue = sizing.qfafValue;
-  let collateralValue = sizing.collateralValue;
+  // Track per-leg collateral so split mode handles diverging financing fees correctly.
+  const legCollateral = allocation.legs.map(leg => leg.collateralAmount);
   let stCarryforward = inputs.existingStLossCarryforward;
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
@@ -138,17 +149,41 @@ export function calculateWithSensitivity(
   const yearFraction = (13 - (inputs.startMonth ?? 1)) / 12;
 
   for (let year = 1; year <= effectiveProjectionYears; year++) {
+    // Snapshot per-leg state for this year's blends.
+    const yearStartLegs: ResolvedLeg[] = allocation.legs.map((leg, i) => ({
+      strategy: leg.strategy,
+      collateralAmount: legCollateral[i],
+    }));
+    const yearStartTotalCollateral = legCollateral.reduce((s, v) => s + v, 0);
+    const yearAllocation: ResolvedAllocation = {
+      isSplit: allocation.isSplit,
+      totalCollateral: yearStartTotalCollateral,
+      primary: allocation.primary,
+      legs: yearStartLegs,
+    };
+
+    // Blended (or single-strategy) base rates BEFORE sensitivity variance.
+    // In single-strategy mode we use only the un-blended rate for QFAF
+    // resizing — the per-year strategy passed to calculateYearWithSensitivity
+    // is built below to preserve original double-application semantics.
+    const baseLtGainRate = allocation.isSplit
+      ? getBlendedLtGainRate(yearAllocation)
+      : allocation.primary.strategy.ltGainRate;
+    const baseStLossRate = allocation.isSplit
+      ? getBlendedStLossRate(yearAllocation, year)
+      : getEffectiveStLossRate(
+          allocation.primary.strategy.id,
+          allocation.primary.strategy.ltGainRate,
+          year
+        );
+
     // Zero out QFAF after duration expires (breakeven unwind)
     let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
 
     // Dynamic resizing: shrink QFAF to match this year's collateral ST losses.
-    // Size against the annual rate — yearFraction is applied to both QFAF gains
-    // and collateral losses at generation, so it cancels out of the sizing target.
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0) {
-      const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-      const neededQfaf = collateralValue * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
-      // Can only shrink, never grow beyond initial or current value
+      const neededQfaf = yearStartTotalCollateral * baseStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
       effectiveQfafValue = cappedQfaf;
@@ -176,31 +211,67 @@ export function calculateWithSensitivity(
     // After strategy duration, zero out tax-harvesting activity
     const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
 
+    // Strategy passed to calculateYearWithSensitivity.
+    // In single-strategy mode, pre-apply variance to both rates so that the
+    // inner function's existing (legacy) variance treatment continues to
+    // produce identical results to before. In split mode, pass the un-adjusted
+    // blended rates and let the inner function apply variance once.
+    let strategyForYear: StrategyRates;
+    let yearSensitivityOverrides: SensitivityYearOverrides | undefined;
+    if (allocation.isSplit) {
+      strategyForYear = { stLossRate: baseStLossRate, ltGainRate: baseLtGainRate };
+      yearSensitivityOverrides = {
+        baseStLossRate,
+        financingCost: getBlendedFinancingCost(yearAllocation, adjustedSettings),
+      };
+    } else {
+      const adjustedStLossRate = allocation.primary.strategy.stLossRate * (1 + sensitivity.stLossRateVariance);
+      const adjustedLtGainRate = baseLtGainRate * (1 + sensitivity.ltGainRateVariance);
+      strategyForYear = { stLossRate: adjustedStLossRate, ltGainRate: adjustedLtGainRate };
+      yearSensitivityOverrides = undefined;
+    }
+
     const result = calculateYearWithSensitivity(
       year,
       effectiveQfafValue,
-      collateralValue,
+      yearStartTotalCollateral,
       stCarryforward,
       ltCarryforward,
       nolCarryforward,
       inputs,
-      adjustedStrategy,
+      strategyForYear,
       yearTaxRates,
       adjustedSettings,
       sensitivity.stLossRateVariance,
       sensitivity.ltGainRateVariance,
       scaledTrackingError,
-      strategy, // Pass full strategy for financing cost calculation
-      year === 1 ? yearFraction : 1.0, // Partial year applies to Year 1 only
-      strategyActive
+      allocation.isSplit ? undefined : allocation.primary.strategy,
+      year === 1 ? yearFraction : 1.0,
+      strategyActive,
+      yearSensitivityOverrides
     );
+
+    // Per-leg next-year growth/fees in split mode.
+    if (allocation.isSplit) {
+      const baseReturn = adjustedSettings.growthEnabled ? adjustedSettings.defaultAnnualReturn : 0;
+      const yf = year === 1 ? yearFraction : 1.0;
+      for (let i = 0; i < legCollateral.length; i++) {
+        const legStrategy = yearStartLegs[i].strategy;
+        const legFinancing = getEffectiveFinancingCost(legStrategy, adjustedSettings);
+        const grown = legCollateral[i] * (1 + baseReturn * yf);
+        legCollateral[i] = safeNumber(grown * (1 - legFinancing * yf));
+      }
+      const legSum = legCollateral.reduce((s, v) => s + v, 0);
+      result.collateralValue = legSum;
+      result.totalValue = result.qfafValue + legSum;
+    } else {
+      legCollateral[0] = result.collateralValue;
+    }
 
     years.push({ ...result, qfafCashReturned: cashReturned });
 
-    // Update state for next year
-    // Don't track QFAF growth after unwind
+    // Update QFAF state for next year. Don't track QFAF growth after unwind.
     qfafValue = (qfafDuration > 0 && year >= qfafDuration) ? 0 : result.qfafValue;
-    collateralValue = result.collateralValue;
     stCarryforward = result.stLossCarryforward;
     ltCarryforward = result.ltLossCarryforward;
     nolCarryforward = result.nolCarryforward;
@@ -211,6 +282,11 @@ export function calculateWithSensitivity(
     years,
     summary: calculateSummary(years, sizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined),
   };
+}
+
+interface SensitivityYearOverrides {
+  baseStLossRate?: number; // pre-blended rate; bypasses internal getEffectiveStLossRate
+  financingCost?: number;  // pre-blended financing; bypasses fullStrategy lookup
 }
 
 /**
@@ -234,15 +310,18 @@ function calculateYearWithSensitivity(
   scaledTrackingError: number,
   fullStrategy?: Strategy, // Full strategy object for financing cost calculation
   yearFraction: number = 1.0, // Partial year: (13 - startMonth) / 12, applied to Year 1 only
-  strategyActive: boolean = true // Whether the strategy is actively generating tax events
+  strategyActive: boolean = true, // Whether the strategy is actively generating tax events
+  overrides?: SensitivityYearOverrides
 ): YearResult {
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
   const stGainsGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
   const ordinaryLossesGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
 
-  // Get base rates with decay (same as normal calculation)
-  const baseStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
+  // Get base rates with decay (same as normal calculation), or use blended override.
+  const baseStLossRate =
+    overrides?.baseStLossRate ??
+    getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
 
   // Amplify user-specified variances by tracking error
   // Higher tracking error = more uncertainty in variance estimates
@@ -339,11 +418,16 @@ function calculateYearWithSensitivity(
 
   // Portfolio growth: apply annual return (if enabled) minus financing fees (if enabled)
   const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
-  // Use fullStrategy if provided, otherwise lookup by ID
-  const strategyForFinancing = fullStrategy || getStrategy(inputs.strategyId);
-  const totalFinancingCost = strategyForFinancing
-    ? getEffectiveFinancingCost(strategyForFinancing, settings)
-    : 0;
+  // Financing cost: use override if supplied (split mode); otherwise look up from strategy.
+  let totalFinancingCost: number;
+  if (overrides?.financingCost !== undefined) {
+    totalFinancingCost = overrides.financingCost;
+  } else {
+    const strategyForFinancing = fullStrategy || getStrategy(inputs.strategyId);
+    totalFinancingCost = strategyForFinancing
+      ? getEffectiveFinancingCost(strategyForFinancing, settings)
+      : 0;
+  }
   const growthRate = baseReturn - totalFinancingCost;
   // QFAF can use a separate return rate if specified (defaults to collateral growth rate)
   const qfafBaseReturn = settings.growthEnabled

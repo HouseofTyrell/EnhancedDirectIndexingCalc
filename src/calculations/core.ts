@@ -19,6 +19,24 @@ import { safeNumber } from '../utils/formatters';
 import { StrategyRates, TaxRates } from './types';
 import { getEffectiveStLossRate, calculateCarryforwards, calculateSummary } from './helpers';
 import { calculateSizing } from './sizing';
+import {
+  resolveAllocation,
+  getBlendedStLossRate,
+  getBlendedLtGainRate,
+  ResolvedAllocation,
+  ResolvedLeg,
+} from './splitAllocation';
+
+/**
+ * Optional per-year overrides used by the split-allocation path. When these
+ * are supplied, `calculateYear` skips its single-strategy lookups and uses
+ * the pre-blended values instead.
+ */
+export interface CalculateYearOverrides {
+  effectiveStLossRate?: number;
+  ltGainRate?: number;
+  financingCost?: number;
+}
 
 /**
  * Calculate the effective financing cost based on strategy leverage and user settings.
@@ -56,17 +74,28 @@ function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSetting
   }
 }
 
+/**
+ * Compute the collateral-weighted financing cost across all legs of an
+ * allocation. In single-strategy mode this just returns the one leg's cost.
+ */
+function getBlendedFinancingCost(
+  allocation: ResolvedAllocation,
+  settings: AdvancedSettings
+): number {
+  if (allocation.totalCollateral <= 0) return 0;
+  let weightedSum = 0;
+  for (const leg of allocation.legs) {
+    weightedSum += leg.collateralAmount * getEffectiveFinancingCost(leg.strategy, settings);
+  }
+  return weightedSum / allocation.totalCollateral;
+}
+
 export function calculate(
   inputs: CalculatorInputs,
   settings: AdvancedSettings = DEFAULT_SETTINGS
 ): CalculationResult {
   const sizing = calculateSizing(inputs, settings.qfafMultiplier);
-  const strategy = getStrategy(inputs.strategyId);
-
-  // Validate strategy exists (003 - fix non-null assertion)
-  if (!strategy) {
-    throw new Error(`Invalid strategy ID: ${inputs.strategyId}`);
-  }
+  const allocation = resolveAllocation(inputs);
 
   // Pre-calculate tax rates once before the loop (013 - redundant lookups)
   // Use settings section461Limits if provided, otherwise fall back to defaults
@@ -98,7 +127,9 @@ export function calculate(
   let qfafValue = sizing.qfafValue;
   const initialQfafValue = sizing.qfafValue;
   const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
-  let collateralValue = sizing.collateralValue;
+  // Track each leg's collateral separately so per-leg financing fees compound
+  // correctly. In single-strategy mode this collapses to one leg.
+  const legCollateral = allocation.legs.map(leg => leg.collateralAmount);
   let stCarryforward = inputs.existingStLossCarryforward;
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
@@ -123,6 +154,20 @@ export function calculate(
     if (qfafDuration === 0 && year > projectionYears) {
       break;
     }
+
+    // Snapshot the per-leg state for this year's computations.
+    const yearStartLegs: ResolvedLeg[] = allocation.legs.map((leg, i) => ({
+      strategy: leg.strategy,
+      collateralAmount: legCollateral[i],
+    }));
+    const yearStartTotalCollateral = legCollateral.reduce((s, v) => s + v, 0);
+    const yearAllocation: ResolvedAllocation = {
+      isSplit: allocation.isSplit,
+      totalCollateral: yearStartTotalCollateral,
+      primary: allocation.primary,
+      legs: yearStartLegs,
+    };
+
     // Zero out QFAF after duration expires (breakeven unwind)
     let effectiveQfafValue = (qfafDuration > 0 && year > qfafDuration) ? 0 : qfafValue;
 
@@ -131,8 +176,10 @@ export function calculate(
     // and collateral losses at generation, so it cancels out of the sizing target.
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0) {
-      const yearStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
-      const neededQfaf = collateralValue * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
+      const yearStLossRate = allocation.isSplit
+        ? getBlendedStLossRate(yearAllocation, year)
+        : getEffectiveStLossRate(allocation.primary.strategy.id, allocation.primary.strategy.ltGainRate, year);
+      const neededQfaf = yearStartTotalCollateral * yearStLossRate * (1 - settings.washSaleDisallowanceRate) / QFAF_ST_GAIN_RATE * (1 - (inputs.qfafSizingCushion ?? 0));
       // Can only shrink, never grow beyond initial or current value
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -143,27 +190,65 @@ export function calculate(
     // Portfolio still grows but no new ST losses or LT gains are generated
     const strategyActive = !(qfafDuration > 0 && year > qfafDuration);
 
+    // For split mode, pre-compute the blended rates the inner math needs.
+    let yearOverrides: CalculateYearOverrides | undefined;
+    let strategyForCalc: StrategyRates;
+    if (allocation.isSplit) {
+      const blendedSt = getBlendedStLossRate(yearAllocation, year);
+      const blendedLt = getBlendedLtGainRate(yearAllocation);
+      strategyForCalc = { stLossRate: blendedSt, ltGainRate: blendedLt };
+      yearOverrides = {
+        effectiveStLossRate: blendedSt,
+        ltGainRate: blendedLt,
+        financingCost: getBlendedFinancingCost(yearAllocation, settings),
+      };
+    } else {
+      strategyForCalc = allocation.primary.strategy;
+    }
+
     const result = calculateYear(
       year,
       effectiveQfafValue,
-      collateralValue,
+      yearStartTotalCollateral,
       stCarryforward,
       ltCarryforward,
       nolCarryforward,
       inputs,
-      strategy,
+      strategyForCalc,
       taxRates,
       settings,
       undefined, // yearIncome (not overridden)
-      strategy, // Pass full strategy for financing cost calculation
+      allocation.isSplit ? undefined : allocation.primary.strategy, // Pass full strategy for financing cost calculation
       year === 1 ? yearFraction : 1.0, // Partial year applies to Year 1 only
-      strategyActive
+      strategyActive,
+      yearOverrides
     );
+
+    // In split mode, calculateYear returns the combined growth-applied collateral,
+    // but we want to track each leg's value separately so next year's blends
+    // reflect their diverging financing/growth costs. Recompute per leg here
+    // and override the displayed totals with the leg-tracked sum.
+    if (allocation.isSplit) {
+      const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
+      const yf = year === 1 ? yearFraction : 1.0;
+      for (let i = 0; i < legCollateral.length; i++) {
+        const legStrategy = yearStartLegs[i].strategy;
+        const legFinancing = getEffectiveFinancingCost(legStrategy, settings);
+        const grown = legCollateral[i] * (1 + baseReturn * yf);
+        legCollateral[i] = safeNumber(grown * (1 - legFinancing * yf));
+      }
+      const legSum = legCollateral.reduce((s, v) => s + v, 0);
+      result.collateralValue = legSum;
+      result.totalValue = result.qfafValue + legSum;
+    } else {
+      // Single-strategy mode: keep behavior identical to legacy code by
+      // pulling the next year's start value from calculateYear's result.
+      legCollateral[0] = result.collateralValue;
+    }
 
     years.push({ ...result, qfafCashReturned: cashReturned });
     // Don't track QFAF growth after unwind
     qfafValue = (qfafDuration > 0 && year >= qfafDuration) ? 0 : result.qfafValue;
-    collateralValue = result.collateralValue;
     stCarryforward = result.stLossCarryforward;
     ltCarryforward = result.ltLossCarryforward;
     nolCarryforward = result.nolCarryforward;
@@ -190,7 +275,8 @@ export function calculateYear(
   yearIncome?: number, // Optional income override for this year
   fullStrategy?: Strategy, // Full strategy object for financing cost calculation
   yearFraction: number = 1.0, // Partial year: (13 - startMonth) / 12, applied to Year 1 only
-  strategyActive: boolean = true // Whether the strategy is actively generating tax events
+  strategyActive: boolean = true, // Whether the strategy is actively generating tax events
+  overrides?: CalculateYearOverrides // Pre-blended rates for split allocation mode
 ): YearResult {
   // Use year income override if provided, otherwise use base annual income
   const effectiveIncome = yearIncome ?? inputs.annualIncome;
@@ -204,10 +290,15 @@ export function calculateYear(
   // Uses custom rates if set, otherwise applies 7% annual decay
   // Also applies wash sale disallowance (typically 5-15% disallowed)
   // When strategy is inactive (post-duration), no new harvesting occurs
-  const effectiveStLossRate = getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
+  // In split-allocation mode the caller passes a pre-blended `effectiveStLossRate`
+  // override so we don't need to look up a single strategy's rate.
+  const effectiveStLossRate =
+    overrides?.effectiveStLossRate ??
+    getEffectiveStLossRate(inputs.strategyId, strategy.ltGainRate, year);
+  const ltGainRate = overrides?.ltGainRate ?? strategy.ltGainRate;
   const grossStLosses = strategyActive ? collateralValue * effectiveStLossRate * yearFraction : 0;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * strategy.ltGainRate * yearFraction) : 0;
+  const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * ltGainRate * yearFraction) : 0;
 
   // Net ST position (should be ~0 with proper auto-sizing)
   const grossNetSt = stGainsGenerated - stLossesHarvested;
@@ -306,11 +397,17 @@ export function calculateYear(
   // This separates growth and fee timing so that fees don't reduce the growth rate directly —
   // the portfolio grows at the full return rate, then fees are charged on the grown value.
   const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
-  // Use fullStrategy if provided, otherwise lookup by ID
-  const strategyForFinancing = fullStrategy || getStrategy(inputs.strategyId);
-  const totalFinancingCost = strategyForFinancing
-    ? getEffectiveFinancingCost(strategyForFinancing, settings)
-    : 0;
+  // Financing cost may be supplied directly (split-allocation blended rate);
+  // otherwise look up by strategy.
+  let totalFinancingCost: number;
+  if (overrides?.financingCost !== undefined) {
+    totalFinancingCost = overrides.financingCost;
+  } else {
+    const strategyForFinancing = fullStrategy || getStrategy(inputs.strategyId);
+    totalFinancingCost = strategyForFinancing
+      ? getEffectiveFinancingCost(strategyForFinancing, settings)
+      : 0;
+  }
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
   // QFAF can also use a separate return rate if specified (defaults to collateral growth rate)
   const qfafBaseReturn = settings.growthEnabled
