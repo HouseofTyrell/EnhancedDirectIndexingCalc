@@ -8,6 +8,7 @@ import {
 import { Strategy, STRATEGIES } from '../../strategyData';
 import { STATES } from '../../taxData';
 import { formatWithCommas, parseFormattedNumber } from '../../utils/formatters';
+import { getEffectiveView } from '../../utils/effectiveAllocation';
 
 // Design tokens from EDI Calc Meeting Mode.html
 const M = {
@@ -105,7 +106,9 @@ function Rail({
   onToggle,
   onOpenFullCalculator,
   inputs,
-  currentStrategy,
+  // currentStrategy was previously used for display; readouts now use
+  // getEffectiveView(inputs) so split mode renders the blended view.
+  currentStrategy: _currentStrategy,
   taxRates,
   results,
   advancedSettings,
@@ -267,7 +270,10 @@ function Rail({
             }}
           >
             <div style={{ fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 8 }}>
-              {currentStrategy?.name ?? 'Strategy'}
+              {(() => {
+                const view = getEffectiveView(inputs);
+                return view.displayName;
+              })()}
             </div>
             <div
               style={{
@@ -289,7 +295,7 @@ function Rail({
                   COLLATERAL
                 </div>
                 <div style={{ color: 'white', fontWeight: 600, fontFamily: M.mono }}>
-                  {fmtCurrency(inputs.collateralAmount)}
+                  {fmtCurrency(getEffectiveView(inputs).totalCollateral)}
                 </div>
               </div>
               <div>
@@ -368,6 +374,38 @@ function Rail({
           >
             Adjust scenario
           </div>
+
+          {inputs.splitAllocation?.enabled === true && (() => {
+            const view = getEffectiveView(inputs);
+            if (!view.isSplit) return null;
+            return (
+              <div
+                style={{
+                  marginBottom: 14,
+                  padding: 10,
+                  borderRadius: 8,
+                  background: 'rgba(79,70,229,0.15)',
+                  border: '1px solid rgba(79,70,229,0.35)',
+                  fontSize: 11,
+                  color: M.sidebarInk,
+                  lineHeight: 1.4,
+                }}
+              >
+                <div style={{ fontWeight: 700, color: 'white', marginBottom: 4, fontSize: 11.5 }}>
+                  Split allocation active
+                </div>
+                {view.legs.map(leg => (
+                  <div key={leg.strategy.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span>{leg.label}: {leg.strategy.name}</span>
+                    <span style={{ fontFamily: M.mono }}>{fmtCurrency(leg.amount)}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 6, fontSize: 10, fontStyle: 'italic', color: M.sidebarFaint }}>
+                  Edit split details in the main calculator view. Controls below are not active in split mode.
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Strategy */}
           <div style={{ marginBottom: 12 }}>
@@ -1663,8 +1701,10 @@ export function MeetingMode({
     [visibleCollateralYears]
   );
   const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
+  // Effective collateral: total of both legs in split mode, single amount otherwise.
+  const effectiveCollateral = useMemo(() => getEffectiveView(inputs).totalCollateral, [inputs]);
   const finalPortfolio =
-    visibleYears[visibleYears.length - 1]?.totalValue ?? inputs.collateralAmount;
+    visibleYears[visibleYears.length - 1]?.totalValue ?? effectiveCollateral;
   const totalNol =
     visibleYears[visibleYears.length - 1]?.nolCarryforward ??
     results.summary.totalNolGenerated;
@@ -2108,7 +2148,7 @@ export function MeetingMode({
                     {
                       label: 'Final portfolio value',
                       value: fmtCurrency(finalPortfolio),
-                      sub: `grown from ${fmtCurrency(inputs.collateralAmount)}`,
+                      sub: `grown from ${fmtCurrency(effectiveCollateral)}`,
                       primary: false,
                     },
                     {
@@ -2293,7 +2333,7 @@ export function MeetingMode({
                   setYearIdx={setYearIdx}
                   showBaseline={showBaseline}
                   data={yearData}
-                  collateral={inputs.collateralAmount}
+                  collateral={effectiveCollateral}
                 />
                 <div
                   style={{
@@ -2448,7 +2488,7 @@ export function MeetingMode({
                   showBaseline
                   compact
                   data={yearData}
-                  collateral={inputs.collateralAmount}
+                  collateral={effectiveCollateral}
                 />
               </div>
               <div

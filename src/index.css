@@ -1752,6 +1752,43 @@ input[type='range']::-webkit-slider-thumb {
   color: var(--text-primary);
 }
 
+.financing-split-note {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.partial-year-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+  cursor: help;
+  border: 1px solid #fde68a;
+}
+
+.partial-year-badge--compact {
+  padding: 0.05rem 0.4rem;
+  font-size: 0.65rem;
+}
+
+[data-theme='dark'] .partial-year-badge {
+  background: rgba(251, 191, 36, 0.18);
+  color: #fcd34d;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
 .cost-dollars {
   color: var(--text-secondary);
   font-size: 0.85em;

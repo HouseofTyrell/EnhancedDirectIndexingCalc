@@ -1,5 +1,6 @@
 import type { CalculationResult, CalculatorInputs } from '../types';
 import type { AdvancedSettings } from '../types';
+import { getEffectiveView } from './effectiveAllocation';
 
 interface ExportData {
   inputs: CalculatorInputs;
@@ -25,11 +26,15 @@ export async function exportToExcel(data: ExportData): Promise<void> {
   const wb = XLSX.utils.book_new();
 
   // Sheet 1: Summary
+  const view = getEffectiveView(data.inputs);
   const summaryRows = [
     ['Tax Optimization Calculator — Summary'],
     [],
-    ['Strategy', data.results.sizing.strategyName],
-    ['Collateral Amount', data.inputs.collateralAmount],
+    ['Strategy', view.displayName],
+    ['Collateral Amount', view.totalCollateral],
+    ...(view.isSplit
+      ? view.legs.map(leg => [`  ${leg.label}: ${leg.strategy.name}`, leg.amount])
+      : []),
     ['Auto-Sized QFAF', data.results.sizing.qfafValue],
     ['Total Exposure', data.results.sizing.totalExposure],
     [],
@@ -44,13 +49,15 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     ['Total NOL Generated', data.results.summary.totalNolGenerated],
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
-  // Format currency columns
+  // Format currency columns. Identify the "Effective Tax Alpha" row by label
+  // since split-allocation breakdown can shift later rows down.
   const currencyFmt = '$#,##0';
   const pctFmt = '0.00%';
-  for (let r = 2; r <= 12; r++) {
+  const alphaRow = summaryRows.findIndex(row => row[0] === 'Effective Tax Alpha');
+  for (let r = 2; r < summaryRows.length; r++) {
     const cell = summarySheet[XLSX.utils.encode_cell({ r, c: 1 })];
     if (cell && typeof cell.v === 'number') {
-      cell.z = r === 10 ? pctFmt : currencyFmt;
+      cell.z = r === alphaRow ? pctFmt : currencyFmt;
     }
   }
   XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');

@@ -5,6 +5,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { useValueFlash } from '../hooks/useValueFlash';
 import { useDelta } from '../hooks/useDelta';
 import { DeltaBadge } from './DeltaBadge';
+import { PartialYearBadge } from './PartialYearBadge';
 
 interface SizingSummaryProps {
   results: CalculationResult;
@@ -13,6 +14,7 @@ interface SizingSummaryProps {
   combinedStRate: number;
   combinedLtRate: number;
   qfafMultiplier?: number;
+  startMonth?: number;
 }
 
 export function SizingSummary({
@@ -22,6 +24,7 @@ export function SizingSummary({
   combinedStRate,
   combinedLtRate,
   qfafMultiplier,
+  startMonth = 1,
 }: SizingSummaryProps) {
   const year1Savings = results.years[0]?.taxSavings ?? 0;
   const year2Savings = results.years[1]?.taxSavings ?? 0;
@@ -228,7 +231,10 @@ export function SizingSummary({
       {/* Year 1 / Year 2+ Tax Benefit Breakdown with Timeline Connector */}
       <div className={`tax-benefit-timeline ${!(results.years.length > 1 && qfafEnabled) ? 'tax-benefit-timeline--single' : ''}`}>
       <div className="tax-benefit-summary">
-        <h3>Estimated Year 1 Tax Benefit</h3>
+        <h3>
+          Estimated Year 1 Tax Benefit
+          <PartialYearBadge startMonth={startMonth} compact />
+        </h3>
         <div className="benefit-cards">
           <div className="benefit-card">
             <span className="benefit-label">

@@ -1,7 +1,8 @@
 import { CalculatorInputs, AdvancedSettings, CalculationResult, SplitAllocation } from '../types';
-import { STRATEGIES, Strategy, getStrategy, getLongLeverageRatio, getShortRatio } from '../strategyData';
+import { STRATEGIES, Strategy, getStrategy } from '../strategyData';
 import { StrategyRateEditor } from '../AdvancedMode/StrategyRateEditor';
 import { formatCurrency, formatWithCommas, parseFormattedNumber, formatPercent } from '../utils/formatters';
+import { getEffectiveView } from '../utils/effectiveAllocation';
 import { InfoPopup } from '../InfoPopup';
 
 const DEFAULT_SPLIT: SplitAllocation = {
@@ -425,9 +426,10 @@ export function StrategySelectionInputs({
                   <div className="fee-input-group">
                     <label htmlFor="simpleManagerFee">Manager Fees</label>
                     {(() => {
-                      const strategy = getStrategy(inputs.strategyId);
-                      const leveragePct = strategy ? getShortRatio(strategy) : 0;
+                      const view = getEffectiveView(inputs);
+                      const leveragePct = view.weightedShortRatio;
                       const managerFee = advancedSettings.simpleManagerFeeBase * leveragePct + advancedSettings.simpleManagerFeeFixed;
+                      const hasStrategy = view.legs.length > 0;
                       return (
                         <>
                           <div className="input-with-suffix">
@@ -440,29 +442,37 @@ export function StrategySelectionInputs({
                             <span className="suffix">%</span>
                           </div>
                           <span className="input-hint">
-                            {strategy ? `${(advancedSettings.simpleManagerFeeBase * 100).toFixed(0)}bp × ${(leveragePct * 100).toFixed(0)}% leverage + ${(advancedSettings.simpleManagerFeeFixed * 10000).toFixed(1)}bp = ${(managerFee * 10000).toFixed(1)}bp` : '—'}
+                            {hasStrategy
+                              ? `${(advancedSettings.simpleManagerFeeBase * 100).toFixed(0)}bp × ${(leveragePct * 100).toFixed(0)}%${view.isSplit ? ' blended' : ''} leverage + ${(advancedSettings.simpleManagerFeeFixed * 10000).toFixed(1)}bp = ${(managerFee * 10000).toFixed(1)}bp`
+                              : '—'}
                           </span>
                         </>
                       );
                     })()}
                   </div>
                   {(() => {
-                    const strategy = getStrategy(inputs.strategyId);
-                    if (!strategy) return null;
-                    const leveragePct = getShortRatio(strategy);
+                    const view = getEffectiveView(inputs);
+                    if (view.legs.length === 0) return null;
+                    const leveragePct = view.weightedShortRatio;
                     const managerFee = advancedSettings.simpleManagerFeeBase * leveragePct + advancedSettings.simpleManagerFeeFixed;
                     const totalEffective = advancedSettings.simpleWealthMgmtFee + managerFee;
-                    const showDollars = inputs.collateralAmount > 0;
+                    const collateral = view.totalCollateral;
+                    const showDollars = collateral > 0;
                     return (
                       <div className="financing-summary">
-                        <strong>Total Effective Cost for {strategy.name}:</strong>
+                        <strong>Total Effective Cost for {view.displayName}:</strong>
                         <div className="financing-breakdown">
-                          <div>Wealth management: {(advancedSettings.simpleWealthMgmtFee * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((advancedSettings.simpleWealthMgmtFee * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Manager fees: {(managerFee * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((managerFee * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>Wealth management: {(advancedSettings.simpleWealthMgmtFee * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((advancedSettings.simpleWealthMgmtFee * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>Manager fees: {(managerFee * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((managerFee * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
                           <div className="financing-total">
                             <strong>Total: {(totalEffective * 100).toFixed(2)}% of portfolio</strong>
-                            {showDollars && <strong className="cost-dollars"> (${((totalEffective * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</strong>}
+                            {showDollars && <strong className="cost-dollars"> (${((totalEffective * collateral) / 1000).toFixed(0)}K/year)</strong>}
                           </div>
+                          {view.isSplit && (
+                            <div className="financing-split-note">
+                              Leverage is collateral-weighted across both legs ({view.legs.map(l => `${l.label}: ${l.strategy.name}`).join(', ')}).
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -489,18 +499,20 @@ export function StrategySelectionInputs({
                     </button>
                   </div>
                   {(() => {
-                    const strategy = getStrategy(inputs.strategyId);
-                    const longLeverage = strategy ? getLongLeverageRatio(strategy) : 0;
-                    const shortRatio = strategy ? getShortRatio(strategy) : 0;
+                    const view = getEffectiveView(inputs);
+                    const hasStrategy = view.legs.length > 0;
+                    const longLeverage = view.weightedLongLeverage;
+                    const shortRatio = view.weightedShortRatio;
                     const marginCost = advancedSettings.brokerMarginRate * longLeverage;
                     const borrowCost = advancedSettings.shortBorrowRate * shortRatio;
                     const dividendCost = advancedSettings.shortDividendRate * shortRatio;
+                    const blendedNote = view.isSplit ? ' blended' : '';
                     return (
                       <>
                         <div className="fee-input-group">
                           <label htmlFor="brokerMargin">
                             Broker Margin Rate
-                            {strategy && <span className="effective-cost"> → {(marginCost * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && <span className="effective-cost"> → {(marginCost * 100).toFixed(2)}% of portfolio</span>}
                           </label>
                           <div className="input-with-suffix">
                             <input id="brokerMargin" type="number" step={0.25} min={0} max={20}
@@ -510,14 +522,14 @@ export function StrategySelectionInputs({
                             <span className="suffix">%</span>
                           </div>
                           <span className="input-hint">
-                            Applied to {strategy ? `${(longLeverage * 100).toFixed(0)}%` : '—'} long leverage
-                            {strategy && ` (${(advancedSettings.brokerMarginRate * 100).toFixed(2)}% × ${(longLeverage * 100).toFixed(0)}% = ${(marginCost * 100).toFixed(2)}%)`}
+                            Applied to {hasStrategy ? `${(longLeverage * 100).toFixed(0)}%${blendedNote}` : '—'} long leverage
+                            {hasStrategy && ` (${(advancedSettings.brokerMarginRate * 100).toFixed(2)}% × ${(longLeverage * 100).toFixed(0)}% = ${(marginCost * 100).toFixed(2)}%)`}
                           </span>
                         </div>
                         <div className="fee-input-group">
                           <label htmlFor="shortBorrow">
                             Short Borrow Fee
-                            {strategy && <span className="effective-cost"> → {(borrowCost * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && <span className="effective-cost"> → {(borrowCost * 100).toFixed(2)}% of portfolio</span>}
                           </label>
                           <div className="input-with-suffix">
                             <input id="shortBorrow" type="number" step={0.1} min={0} max={10}
@@ -527,14 +539,14 @@ export function StrategySelectionInputs({
                             <span className="suffix">%</span>
                           </div>
                           <span className="input-hint">
-                            Applied to {strategy ? `${(shortRatio * 100).toFixed(0)}%` : '—'} short positions
-                            {strategy && ` (${(advancedSettings.shortBorrowRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(borrowCost * 100).toFixed(2)}%)`}
+                            Applied to {hasStrategy ? `${(shortRatio * 100).toFixed(0)}%${blendedNote}` : '—'} short positions
+                            {hasStrategy && ` (${(advancedSettings.shortBorrowRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(borrowCost * 100).toFixed(2)}%)`}
                           </span>
                         </div>
                         <div className="fee-input-group">
                           <label htmlFor="shortDividend">
                             Short Dividend Cost
-                            {strategy && <span className="effective-cost"> → {(dividendCost * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && <span className="effective-cost"> → {(dividendCost * 100).toFixed(2)}% of portfolio</span>}
                           </label>
                           <div className="input-with-suffix">
                             <input id="shortDividend" type="number" step={0.1} min={0} max={5}
@@ -544,14 +556,14 @@ export function StrategySelectionInputs({
                             <span className="suffix">%</span>
                           </div>
                           <span className="input-hint">
-                            Applied to {strategy ? `${(shortRatio * 100).toFixed(0)}%` : '—'} short positions
-                            {strategy && ` (${(advancedSettings.shortDividendRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(dividendCost * 100).toFixed(2)}%)`}
+                            Applied to {hasStrategy ? `${(shortRatio * 100).toFixed(0)}%${blendedNote}` : '—'} short positions
+                            {hasStrategy && ` (${(advancedSettings.shortDividendRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(dividendCost * 100).toFixed(2)}%)`}
                           </span>
                         </div>
                         <div className="fee-input-group">
                           <label htmlFor="wealthMgmtFee">
                             Wealth Management Fee
-                            {strategy && <span className="effective-cost"> → {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && <span className="effective-cost"> → {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}% of portfolio</span>}
                           </label>
                           <div className="input-with-suffix">
                             <input id="wealthMgmtFee" type="number" step={0.05} min={0} max={3}
@@ -566,27 +578,33 @@ export function StrategySelectionInputs({
                     );
                   })()}
                   {(() => {
-                    const strategy = getStrategy(inputs.strategyId);
-                    if (!strategy) return null;
-                    const longLeverage = getLongLeverageRatio(strategy);
-                    const shortRatio = getShortRatio(strategy);
+                    const view = getEffectiveView(inputs);
+                    if (view.legs.length === 0) return null;
+                    const longLeverage = view.weightedLongLeverage;
+                    const shortRatio = view.weightedShortRatio;
                     const marginCost = advancedSettings.brokerMarginRate * longLeverage;
                     const borrowCost = advancedSettings.shortBorrowRate * shortRatio;
                     const dividendCost = advancedSettings.shortDividendRate * shortRatio;
                     const totalEffective = marginCost + borrowCost + dividendCost + advancedSettings.wealthManagementFeeRate;
-                    const showDollars = inputs.collateralAmount > 0;
+                    const collateral = view.totalCollateral;
+                    const showDollars = collateral > 0;
                     return (
                       <div className="financing-summary">
-                        <strong>Total Effective Cost for {strategy.name}:</strong>
+                        <strong>Total Effective Cost for {view.displayName}:</strong>
                         <div className="financing-breakdown">
-                          <div>Margin interest: {(marginCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((marginCost * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Stock borrow: {(borrowCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((borrowCost * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Short dividends: {(dividendCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((dividendCost * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Advisory fee: {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((advancedSettings.wealthManagementFeeRate * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>Margin interest: {(marginCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((marginCost * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>Stock borrow: {(borrowCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((borrowCost * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>Short dividends: {(dividendCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((dividendCost * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>Advisory fee: {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((advancedSettings.wealthManagementFeeRate * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
                           <div className="financing-total">
                             <strong>Total: {(totalEffective * 100).toFixed(2)}% of portfolio</strong>
-                            {showDollars && <strong className="cost-dollars"> (${((totalEffective * inputs.collateralAmount) / 1000).toFixed(0)}K/year)</strong>}
+                            {showDollars && <strong className="cost-dollars"> (${((totalEffective * collateral) / 1000).toFixed(0)}K/year)</strong>}
                           </div>
+                          {view.isSplit && (
+                            <div className="financing-split-note">
+                              Leverage and short ratios are collateral-weighted across both legs ({view.legs.map(l => `${l.label}: ${l.strategy.name}`).join(', ')}).
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

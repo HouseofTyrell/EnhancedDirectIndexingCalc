@@ -1,8 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ResultsTable } from '../ResultsTable';
 import { CalculatorInputs, AdvancedSettings, CalculationResult } from '../types';
 import { Strategy } from '../strategyData';
 import { formatShortcut } from '../hooks/useKeyboardShortcuts';
+import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
 
 interface TaxRates {
   federalStRate: number;
@@ -31,6 +32,14 @@ interface ResultsChartsSectionProps {
   startMonth?: number;
   onPrintRef?: (handler: () => void) => void;
   onExportRef?: (handler: () => void) => void;
+  /**
+   * Apply a parsed CSV scenario back into Calculator state. When omitted, the
+   * Import Scenario button is hidden.
+   */
+  onImportCsv?: (
+    inputs: Partial<CalculatorInputs>,
+    settings: Partial<AdvancedSettings>
+  ) => void;
 }
 
 export function ResultsChartsSection({
@@ -43,6 +52,7 @@ export function ResultsChartsSection({
   startMonth,
   onPrintRef,
   onExportRef,
+  onImportCsv,
 }: ResultsChartsSectionProps) {
   // Filter chart data to only show strategy-active years (no wind-down)
   const activeYears = useMemo(
@@ -64,6 +74,39 @@ export function ResultsChartsSection({
     });
   }, [inputs, results, advancedSettings, taxRates]);
 
+  const handleExportCsv = useCallback(() => {
+    downloadInputsCsv(inputs, advancedSettings);
+  }, [inputs, advancedSettings]);
+
+  // Hidden file input for the Import Scenario button.
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleImportClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+  const handleFileChosen = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Reset the input so the same file can be re-imported later.
+      e.target.value = '';
+      if (!file || !onImportCsv) return;
+      try {
+        const text = await file.text();
+        const { inputs: parsedInputs, settings: parsedSettings, warnings } =
+          parseInputsFromCsv(text);
+        onImportCsv(parsedInputs, parsedSettings);
+        if (warnings.length > 0) {
+          window.alert(
+            `Scenario imported with warnings:\n\n${warnings.join('\n')}`
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        window.alert(`Could not import scenario: ${msg}`);
+      }
+    },
+    [onImportCsv]
+  );
+
   // Expose handlers to parent via useEffect (not during render)
   useEffect(() => {
     if (onPrintRef) onPrintRef(handlePrint);
@@ -83,6 +126,7 @@ export function ResultsChartsSection({
         sizing={results.sizing}
         qfafEnabled={inputs.qfafEnabled}
         projectionYears={projectionYears}
+        startMonth={startMonth}
       />
 
       {/* Portfolio Value Chart — only active strategy years */}
@@ -106,6 +150,31 @@ export function ResultsChartsSection({
         >
           Export to Excel
         </button>
+        <button
+          className="export-btn"
+          onClick={handleExportCsv}
+          title="Export inputs as CSV (re-loadable via Import Scenario)"
+        >
+          Export Scenario (CSV)
+        </button>
+        {onImportCsv && (
+          <>
+            <button
+              className="export-btn"
+              onClick={handleImportClick}
+              title="Load inputs from a previously exported scenario CSV"
+            >
+              Import Scenario (CSV)
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              style={{ display: 'none' }}
+              onChange={handleFileChosen}
+            />
+          </>
+        )}
       </section>
     </>
   );
