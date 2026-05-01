@@ -1719,6 +1719,16 @@ export function MeetingMode({
     setYearIdx(idx => Math.min(idx, yearData.length));
   }, [yearData.length]);
 
+  // Esc exits meeting mode. Listening at document level so it works regardless
+  // of which child element has focus.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onExitMeetingMode();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onExitMeetingMode]);
+
   // Decomposition of hero number
   const decomposition = useMemo(() => {
     const year1 = detailYearData[0]?.save ?? 0;
@@ -1894,6 +1904,38 @@ export function MeetingMode({
               }}
             >
               Export one-pager
+            </button>
+            <button
+              onClick={onExitMeetingMode}
+              title="Return to the full calculator (Esc)"
+              style={{
+                padding: '8px 14px',
+                background: 'white',
+                color: M.inkSoft,
+                border: `1px solid ${M.line}`,
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              Exit Meeting Mode
             </button>
           </div>
         </header>
