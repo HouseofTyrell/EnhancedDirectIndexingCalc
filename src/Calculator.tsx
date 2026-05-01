@@ -277,7 +277,6 @@ export function Calculator() {
         onExitMeetingMode={() => setIsMeetingMode(false)}
         onPinScenario={handlePinScenario}
         canPin={pinnedScenario.canPin}
-        onExport={() => window.print()}
         onUpdateInput={updateInput}
         onUpdateSettings={setAdvancedSettings}
       />
