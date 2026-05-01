@@ -708,13 +708,6 @@ function Rail({
   );
 }
 
-interface ChartPoint {
-  y: number;
-  port: number;
-  baseline: number;
-  save: number;
-}
-
 // Per-year tax mechanics for the breakdown chart (Level 02 / Detail view).
 // Mirrors the same fields surfaced in the main calculator's year-by-year table.
 export interface BreakdownPoint {
@@ -1019,330 +1012,6 @@ function LegendSwatch({
   );
 }
 
-// ═══ The hero graph — interactive, hoverable ═══
-function HeroChart({
-  yearIdx,
-  setYearIdx,
-  showBaseline,
-  compact = false,
-  data,
-  collateral,
-}: {
-  yearIdx: number;
-  setYearIdx: (i: number) => void;
-  showBaseline: boolean;
-  compact?: boolean;
-  data: ChartPoint[];
-  collateral: number;
-}) {
-  const W = 900;
-  const H = compact ? 280 : 380;
-  const pad = { l: 60, r: 30, t: 40, b: 36 };
-  const plotW = W - pad.l - pad.r;
-  const plotH = H - pad.t - pad.b;
-
-  const allPoints: ChartPoint[] = [
-    { y: 0, port: collateral, baseline: collateral, save: 0 },
-    ...data,
-  ];
-  const maxV = Math.max(...allPoints.map(d => Math.max(d.port, d.baseline))) * 1.03;
-  const minV = Math.min(...allPoints.map(d => Math.min(d.port, d.baseline))) * 0.96;
-  const range = maxV - minV || 1;
-
-  const xs = (i: number) => pad.l + (i / (allPoints.length - 1)) * plotW;
-  const ys = (v: number) => pad.t + plotH - ((v - minV) / range) * plotH;
-
-  const withPts = allPoints.map((d, i) => [xs(i), ys(d.port)] as const);
-  const basePts = allPoints.map((d, i) => [xs(i), ys(d.baseline)] as const);
-
-  const pathFrom = (pts: readonly (readonly [number, number])[]) =>
-    pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
-  const withPath = pathFrom(withPts);
-  const basePath = pathFrom(basePts);
-  const withArea =
-    withPath +
-    ` L${withPts[withPts.length - 1][0]},${pad.t + plotH} L${withPts[0][0]},${pad.t + plotH} Z`;
-
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!svgRef.current) return;
-    const r = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * W - pad.l;
-    const i = Math.max(
-      0,
-      Math.min(allPoints.length - 1, Math.round((x / plotW) * (allPoints.length - 1)))
-    );
-    setYearIdx(i);
-  };
-
-  const safeIdx = Math.max(0, Math.min(allPoints.length - 1, yearIdx));
-  const active = allPoints[safeIdx];
-  const activeX = xs(safeIdx);
-  const activeYPort = ys(active.port);
-  const activeYBase = ys(active.baseline);
-  const delta = active.port - active.baseline;
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        onMouseMove={onMove}
-        style={{ width: '100%', display: 'block', cursor: 'crosshair' }}
-      >
-        <defs>
-          <linearGradient id="mm-withGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={M.accent} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={M.accent} stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="mm-lineGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#818cf8" />
-            <stop offset="100%" stopColor={M.accent} />
-          </linearGradient>
-        </defs>
-
-        {[0.25, 0.5, 0.75, 1].map(r => (
-          <line
-            key={r}
-            x1={pad.l}
-            x2={W - pad.r}
-            y1={pad.t + plotH * r}
-            y2={pad.t + plotH * r}
-            stroke={M.lineSoft}
-            strokeWidth="1"
-          />
-        ))}
-
-        {[0, 0.33, 0.66, 1].map(r => {
-          const v = minV + range * (1 - r);
-          return (
-            <text
-              key={r}
-              x={pad.l - 10}
-              y={pad.t + plotH * r + 4}
-              fontSize="10"
-              fill={M.inkFaint}
-              textAnchor="end"
-              fontFamily={M.mono}
-            >
-              {fmtCurrency(v)}
-            </text>
-          );
-        })}
-
-        {showBaseline && (
-          <path
-            d={basePath}
-            fill="none"
-            stroke={M.inkFaint}
-            strokeWidth="1.5"
-            strokeDasharray="5 4"
-          />
-        )}
-
-        <path d={withArea} fill="url(#mm-withGrad)" />
-        <path
-          d={withPath}
-          fill="none"
-          stroke="url(#mm-lineGrad)"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-
-        {withPts.map((p, i) => (
-          <circle
-            key={i}
-            cx={p[0]}
-            cy={p[1]}
-            r={i === safeIdx ? 6 : 3}
-            fill={M.accent}
-            stroke="white"
-            strokeWidth={i === safeIdx ? 3 : 1.5}
-          />
-        ))}
-
-        <line
-          x1={activeX}
-          x2={activeX}
-          y1={pad.t}
-          y2={pad.t + plotH}
-          stroke={M.accent}
-          strokeWidth="1.5"
-          strokeDasharray="3 3"
-          opacity="0.55"
-        />
-        {showBaseline && (
-          <circle
-            cx={activeX}
-            cy={activeYBase}
-            r="4"
-            fill="white"
-            stroke={M.inkFaint}
-            strokeWidth="2"
-          />
-        )}
-
-        {showBaseline && safeIdx > 0 && Math.abs(delta) > 0 && (
-          <g>
-            <line
-              x1={activeX + 20}
-              x2={activeX + 20}
-              y1={activeYPort}
-              y2={activeYBase}
-              stroke={M.good}
-              strokeWidth="2"
-            />
-            <line
-              x1={activeX + 16}
-              x2={activeX + 24}
-              y1={activeYPort}
-              y2={activeYPort}
-              stroke={M.good}
-              strokeWidth="2"
-            />
-            <line
-              x1={activeX + 16}
-              x2={activeX + 24}
-              y1={activeYBase}
-              y2={activeYBase}
-              stroke={M.good}
-              strokeWidth="2"
-            />
-            <rect
-              x={activeX + 28}
-              y={(activeYPort + activeYBase) / 2 - 11}
-              width="72"
-              height="22"
-              rx="4"
-              fill={M.good}
-            />
-            <text
-              x={activeX + 64}
-              y={(activeYPort + activeYBase) / 2 + 4}
-              fontSize="11.5"
-              fontWeight="700"
-              fill="white"
-              textAnchor="middle"
-              fontFamily={M.mono}
-            >
-              {delta >= 0 ? '+' : ''}
-              {fmtCurrency(delta)}
-            </text>
-          </g>
-        )}
-
-        {allPoints.map((d, i) =>
-          i === 0 ||
-          i === Math.floor(allPoints.length / 2) ||
-          i === allPoints.length - 1 ||
-          i === safeIdx ? (
-            <text
-              key={i}
-              x={xs(i)}
-              y={H - 12}
-              fontSize="10.5"
-              fill={i === safeIdx ? M.accent : M.inkFaint}
-              fontWeight={i === safeIdx ? 700 : 500}
-              textAnchor="middle"
-              fontFamily={M.mono}
-            >
-              {i === 0 ? 'Today' : `Y${d.y}`}
-            </text>
-          ) : null
-        )}
-      </svg>
-
-      <div
-        style={{
-          position: 'absolute',
-          top: 10,
-          right: 12,
-          background: 'white',
-          border: `1px solid ${M.line}`,
-          borderRadius: 10,
-          padding: '12px 14px',
-          minWidth: 180,
-          boxShadow: '0 10px 30px rgba(11,16,32,0.08)',
-          fontFamily: M.sans,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 10.5,
-            color: M.inkFaint,
-            fontWeight: 700,
-            letterSpacing: 0.6,
-            textTransform: 'uppercase',
-            marginBottom: 8,
-          }}
-        >
-          {safeIdx === 0 ? 'Starting point' : `Year ${active.y}`}
-        </div>
-        <div
-          style={{
-            fontSize: 11.5,
-            color: M.inkSoft,
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: 4,
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{ width: 8, height: 8, borderRadius: 999, background: M.accent }}
-            />{' '}
-            With EDI
-          </span>
-          <span style={{ fontFamily: M.mono, fontWeight: 700, color: M.ink }}>
-            {fmtCurrency(active.port)}
-          </span>
-        </div>
-        {showBaseline && (
-          <div
-            style={{
-              fontSize: 11.5,
-              color: M.inkSoft,
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 8, height: 2, background: M.inkFaint }} /> Baseline
-            </span>
-            <span style={{ fontFamily: M.mono, fontWeight: 600, color: M.inkSoft }}>
-              {fmtCurrency(active.baseline)}
-            </span>
-          </div>
-        )}
-        {safeIdx > 0 && (
-          <div
-            style={{
-              marginTop: 8,
-              paddingTop: 8,
-              borderTop: `1px solid ${M.lineSoft}`,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'baseline',
-            }}
-          >
-            <span style={{ fontSize: 11, color: M.good, fontWeight: 600 }}>Advantage</span>
-            <span
-              style={{
-                fontSize: 14,
-                fontWeight: 800,
-                color: M.good,
-                fontFamily: M.mono,
-              }}
-            >
-              {delta >= 0 ? '+' : ''}
-              {fmtCurrency(delta)}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ═══ Animated count-up ═══
 function CountUp({
@@ -1620,58 +1289,67 @@ function DetailView({
           <tr style={{ background: M.ink, color: 'white' }}>
             <td
               style={{
-                padding: '14px 16px',
-                fontWeight: 700,
-                fontSize: 13,
+                padding: '16px 16px',
+                fontWeight: 800,
+                fontSize: 13.5,
                 fontFamily: M.sans,
+                color: 'white',
               }}
             >
               {yearData.length}-year total
             </td>
             <td
               style={{
-                padding: '14px 16px',
+                padding: '16px 16px',
                 textAlign: 'right',
-                fontWeight: 700,
-                color: '#a5f3cf',
+                fontWeight: 800,
+                fontSize: 14,
+                color: '#86efac',
               }}
             >
               {fmtCurrencyFull(totalTaxSavings)}
             </td>
             <td
               style={{
-                padding: '14px 16px',
+                padding: '16px 16px',
                 textAlign: 'right',
-                fontWeight: 700,
+                fontWeight: 800,
+                fontSize: 14,
+                color: 'white',
               }}
             >
               {fmtCurrencyFull(totalTaxSavings)}
             </td>
             <td
               style={{
-                padding: '14px 16px',
+                padding: '16px 16px',
                 textAlign: 'right',
-                fontWeight: 600,
-                color: '#cbd2e1',
+                fontWeight: 700,
+                fontSize: 14,
+                color: '#f1f5f9',
               }}
             >
               {fmtCurrencyFull(totalNol)}
             </td>
             <td
               style={{
-                padding: '14px 16px',
+                padding: '16px 16px',
                 textAlign: 'right',
-                fontWeight: 700,
+                fontWeight: 800,
+                fontSize: 14,
+                color: 'white',
               }}
             >
               {fmtCurrencyFull(finalPortfolio)}
             </td>
             <td
               style={{
-                padding: '14px 16px',
-                color: '#a5f3cf',
+                padding: '16px 16px',
+                color: '#86efac',
                 fontSize: 11.5,
+                fontWeight: 700,
                 fontFamily: M.sans,
+                letterSpacing: 0.3,
               }}
             >
               Cumulative advantage
@@ -1942,7 +1620,11 @@ function MechanicsView({
 export function MeetingMode({
   inputs,
   results,
-  collateralOnlyResults,
+  // collateralOnlyResults was used to draw the EDI-vs-baseline comparison; the
+  // Meeting Mode page now focuses on the strategy's own tax mechanics, so the
+  // baseline series is no longer rendered here. Kept in the prop signature for
+  // call-site compatibility.
+  collateralOnlyResults: _collateralOnlyResults,
   taxRates,
   advancedSettings,
   currentStrategy,
@@ -1954,9 +1636,12 @@ export function MeetingMode({
   onUpdateSettings,
 }: MeetingModeProps) {
   const [level, setLevel] = useState<Level>('high');
-  const [showBaseline, setShowBaseline] = useState(true);
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [showDecomp, setShowDecomp] = useState(true);
+  // Print one-pager state. When true, the page renders all three level sections
+  // stacked (with page breaks) instead of just the active level, hides the
+  // editing rail and on-screen controls, and triggers window.print().
+  const [printMode, setPrintMode] = useState(false);
 
   // core.ts may return more years than projectionYears (wind-down continues until
   // carryforwards exhausted). Cap the view to what the user actually asked for.
@@ -1965,23 +1650,8 @@ export function MeetingMode({
     () => results.years.slice(0, projectionYears),
     [results.years, projectionYears]
   );
-  const visibleCollateralYears = useMemo(
-    () => collateralOnlyResults.years.slice(0, projectionYears),
-    [collateralOnlyResults.years, projectionYears]
-  );
 
   // Build year-by-year chart data from real results, bounded to projectionYears
-  const yearData: ChartPoint[] = useMemo(
-    () =>
-      visibleYears.map((y, i) => ({
-        y: y.year,
-        port: y.totalValue,
-        baseline: visibleCollateralYears[i]?.totalValue ?? y.totalValue,
-        save: y.taxSavings,
-      })),
-    [visibleYears, visibleCollateralYears]
-  );
-
   const detailYearData = useMemo(
     () =>
       visibleYears.map(y => ({
@@ -2018,11 +1688,6 @@ export function MeetingMode({
     () => visibleYears.reduce((s, y) => s + y.taxSavings, 0),
     [visibleYears]
   );
-  const collateralOnlyTaxSavings = useMemo(
-    () => visibleCollateralYears.reduce((s, y) => s + y.taxSavings, 0),
-    [visibleCollateralYears]
-  );
-  const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
   // Effective collateral: total of both legs in split mode, single amount otherwise.
   const effectiveCollateral = useMemo(() => getEffectiveView(inputs).totalCollateral, [inputs]);
   const finalPortfolio =
@@ -2030,16 +1695,12 @@ export function MeetingMode({
   const totalNol =
     visibleYears[visibleYears.length - 1]?.nolCarryforward ??
     results.summary.totalNolGenerated;
-  const taxAlpha =
-    results.sizing.totalExposure > 0 && projectionYears > 0
-      ? totalTaxSavings / results.sizing.totalExposure / projectionYears
-      : 0;
 
-  const [yearIdx, setYearIdx] = useState(yearData.length);
+  const [yearIdx, setYearIdx] = useState(breakdownData.length);
   useEffect(() => {
     // When years change (e.g. projection years change), clamp index.
-    setYearIdx(idx => Math.min(idx, yearData.length));
-  }, [yearData.length]);
+    setYearIdx(idx => Math.min(idx, breakdownData.length));
+  }, [breakdownData.length]);
 
   // Esc exits meeting mode. Listening at document level so it works regardless
   // of which child element has focus.
@@ -2050,6 +1711,21 @@ export function MeetingMode({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onExitMeetingMode]);
+
+  // Print one-pager: when printMode flips on, give the DOM a beat to settle
+  // (we render all three levels stacked + hide the rail), then open the print
+  // dialog. Any exit path from the dialog (cancel or finish) fires `afterprint`,
+  // which restores the on-screen view.
+  useEffect(() => {
+    if (!printMode) return;
+    const restore = () => setPrintMode(false);
+    window.addEventListener('afterprint', restore);
+    const t = window.setTimeout(() => window.print(), 50);
+    return () => {
+      window.removeEventListener('afterprint', restore);
+      window.clearTimeout(t);
+    };
+  }, [printMode]);
 
   // Decomposition of hero number
   const decomposition = useMemo(() => {
@@ -2104,6 +1780,7 @@ export function MeetingMode({
 
   return (
     <div
+      className={printMode ? 'meeting-mode-print' : undefined}
       style={{
         display: 'flex',
         minHeight: '100vh',
@@ -2112,18 +1789,20 @@ export function MeetingMode({
         fontFamily: M.sans,
       }}
     >
-      <Rail
-        collapsed={railCollapsed}
-        onToggle={() => setRailCollapsed(!railCollapsed)}
-        onOpenFullCalculator={onExitMeetingMode}
-        inputs={inputs}
-        currentStrategy={currentStrategy}
-        taxRates={taxRates}
-        results={results}
-        advancedSettings={advancedSettings}
-        onUpdateInput={onUpdateInput}
-        onUpdateSettings={onUpdateSettings}
-      />
+      {!printMode && (
+        <Rail
+          collapsed={railCollapsed}
+          onToggle={() => setRailCollapsed(!railCollapsed)}
+          onOpenFullCalculator={onExitMeetingMode}
+          inputs={inputs}
+          currentStrategy={currentStrategy}
+          taxRates={taxRates}
+          results={results}
+          advancedSettings={advancedSettings}
+          onUpdateInput={onUpdateInput}
+          onUpdateSettings={onUpdateSettings}
+        />
+      )}
 
       <main style={{ flex: 1, overflow: 'auto' }}>
         <header
@@ -2131,7 +1810,7 @@ export function MeetingMode({
             padding: '14px 32px',
             background: 'white',
             borderBottom: `1px solid ${M.line}`,
-            display: 'flex',
+            display: printMode ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'sticky',
@@ -2213,7 +1892,10 @@ export function MeetingMode({
               Pin scenario
             </button>
             <button
-              onClick={onExport ?? (() => window.print())}
+              onClick={() => {
+                if (onExport) onExport();
+                else setPrintMode(true);
+              }}
               style={{
                 padding: '8px 14px',
                 background: M.ink,
@@ -2263,8 +1945,8 @@ export function MeetingMode({
         </header>
 
         <div style={{ padding: '32px 36px', maxWidth: 1280, margin: '0 auto' }}>
-          {level === 'high' && (
-            <>
+          {(level === 'high' || printMode) && (
+            <div className={printMode ? 'meeting-mode-print-page' : undefined}>
               <div style={{ marginBottom: 28 }}>
                 <div
                   style={{
@@ -2316,12 +1998,13 @@ export function MeetingMode({
                     lineHeight: 1.55,
                   }}
                 >
-                  Compared to a straight direct-indexing baseline, the EDI strategy
-                  {inputs.qfafEnabled ? ' with QFAF overlay' : ''} projects an additional{' '}
+                  {inputs.qfafEnabled ? 'Enhanced direct indexing with the QFAF overlay' : 'Direct indexing'}{' '}
+                  generates an estimated{' '}
                   <strong style={{ color: M.good }}>
-                    {fmtCurrency(incrementalBenefit)} of benefit
-                  </strong>
-                  , compounding at a {fmtPercent(taxAlpha)} annualized tax alpha.
+                    {fmtCurrency(totalTaxSavings)}
+                  </strong>{' '}
+                  of net tax savings over the {advancedSettings.projectionYears}-year projection,
+                  driven by ordinary loss deductions, NOL usage, and capital loss carryforwards.
                 </p>
               </div>
 
@@ -2496,7 +2179,7 @@ export function MeetingMode({
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
                   gap: 14,
                   marginBottom: 20,
                 }}
@@ -2510,15 +2193,9 @@ export function MeetingMode({
                       primary: true,
                     },
                     {
-                      label: 'Final portfolio value',
-                      value: fmtCurrency(finalPortfolio),
-                      sub: `grown from ${fmtCurrency(effectiveCollateral)}`,
-                      primary: false,
-                    },
-                    {
-                      label: 'Annual tax alpha',
-                      value: fmtPercent(taxAlpha),
-                      sub: 'vs. direct indexing',
+                      label: 'Year 1 tax savings',
+                      value: fmtCurrency(detailYearData[0]?.save ?? 0),
+                      sub: 'first-year benefit',
                       primary: false,
                     },
                   ] as const
@@ -2585,125 +2262,17 @@ export function MeetingMode({
                   boxShadow: '0 4px 20px rgba(11,16,32,0.04)',
                 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 16,
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: M.inkFaint,
-                        letterSpacing: 0.5,
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      Portfolio trajectory
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 18,
-                        fontWeight: 700,
-                        color: M.ink,
-                        marginTop: 2,
-                        letterSpacing: -0.3,
-                      }}
-                    >
-                      Hover the chart to explore year by year →
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <label
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '7px 12px',
-                        border: `1px solid ${M.line}`,
-                        borderRadius: 8,
-                        background: showBaseline ? M.accentFaint : 'white',
-                        cursor: 'pointer',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: showBaseline ? M.accent : M.inkSoft,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={showBaseline}
-                        onChange={e => setShowBaseline(e.target.checked)}
-                        style={{ accentColor: M.accent, cursor: 'pointer' }}
-                      />
-                      Compare to baseline
-                    </label>
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        gap: 12,
-                        padding: '7px 14px',
-                        fontSize: 12,
-                        color: M.inkSoft,
-                        background: '#fafbfc',
-                        border: `1px solid ${M.line}`,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 12,
-                            height: 3,
-                            background: M.accent,
-                            borderRadius: 2,
-                          }}
-                        />{' '}
-                        With EDI
-                      </span>
-                      {showBaseline && (
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 12,
-                              height: 2,
-                              background: M.inkFaint,
-                              borderTop: `1px dashed ${M.inkFaint}`,
-                            }}
-                          />{' '}
-                          Baseline
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <HeroChart
+                <BenefitBreakdownChart
                   yearIdx={yearIdx}
                   setYearIdx={setYearIdx}
-                  showBaseline={showBaseline}
-                  data={yearData}
-                  collateral={effectiveCollateral}
+                  data={breakdownData}
                 />
                 <div
                   style={{
                     marginTop: 20,
                     padding: '16px 4px 4px',
                     borderTop: `1px solid ${M.lineSoft}`,
+                    display: printMode ? 'none' : 'block',
                   }}
                 >
                   <div
@@ -2731,7 +2300,7 @@ export function MeetingMode({
                   <input
                     type="range"
                     min={0}
-                    max={yearData.length}
+                    max={breakdownData.length}
                     value={yearIdx}
                     onChange={e => setYearIdx(parseInt(e.target.value, 10))}
                     style={{ width: '100%', accentColor: M.accent }}
@@ -2745,7 +2314,7 @@ export function MeetingMode({
                   background: 'white',
                   borderRadius: 12,
                   border: `1px dashed ${M.line}`,
-                  display: 'flex',
+                  display: printMode ? 'none' : 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                 }}
@@ -2793,11 +2362,14 @@ export function MeetingMode({
                   </button>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
-          {level === 'detail' && (
-            <>
+          {(level === 'detail' || printMode) && (
+            <div
+              className={printMode ? 'meeting-mode-print-page' : undefined}
+              style={printMode ? { paddingTop: 20 } : undefined}
+            >
               <div
                 style={{
                   marginBottom: 20,
@@ -2831,6 +2403,7 @@ export function MeetingMode({
                     fontWeight: 600,
                     color: M.inkSoft,
                     cursor: 'pointer',
+                    display: printMode ? 'none' : 'inline-flex',
                   }}
                 >
                   ← Back to high level
@@ -2870,11 +2443,14 @@ export function MeetingMode({
                   finalPortfolio={finalPortfolio}
                 />
               </div>
-            </>
+            </div>
           )}
 
-          {level === 'mechanics' && (
-            <>
+          {(level === 'mechanics' || printMode) && (
+            <div
+              className={printMode ? 'meeting-mode-print-page' : undefined}
+              style={printMode ? { paddingTop: 20 } : undefined}
+            >
               <div
                 style={{
                   marginBottom: 24,
@@ -2908,6 +2484,7 @@ export function MeetingMode({
                     fontWeight: 600,
                     color: M.inkSoft,
                     cursor: 'pointer',
+                    display: printMode ? 'none' : 'inline-flex',
                   }}
                 >
                   ← Back to detail
@@ -2921,7 +2498,7 @@ export function MeetingMode({
                 taxRates={taxRates}
                 currentStrategy={currentStrategy}
               />
-            </>
+            </div>
           )}
 
           <div
