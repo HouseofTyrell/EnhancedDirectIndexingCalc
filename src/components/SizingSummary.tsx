@@ -64,6 +64,18 @@ export function SizingSummary({
           </span>
           <span className="sizing-value" ref={collateralFlash}>{formatCurrency(results.sizing.collateralValue)}</span>
           <span className="sizing-sublabel">{results.sizing.strategyName}</span>
+          {results.sizing.splitLegs && results.sizing.splitLegs.length > 0 && (
+            <div className="sizing-split-breakdown">
+              {results.sizing.splitLegs.map(leg => (
+                <div key={leg.strategyId} className="sizing-split-leg">
+                  <span>
+                    {leg.strategyType === 'core' ? 'Core' : 'Overlay'}: {leg.strategyName}
+                  </span>
+                  <span>{formatCurrency(leg.collateralValue)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="sizing-card">
           <span className="sizing-label">

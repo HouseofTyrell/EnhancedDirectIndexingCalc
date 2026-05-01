@@ -250,6 +250,17 @@ export const DEFAULTS: CalculatorInputs = {
   strategyId: 'overlay-45-45',
   collateralAmount: 10000000,
 
+  // Split allocation: disabled by default (single-strategy mode). When enabled,
+  // collateral is split between a Core (cash) leg and an Overlay (appreciated
+  // stock) leg, each running its own strategy.
+  splitAllocation: {
+    enabled: false,
+    coreStrategyId: 'core-145-45',
+    coreAmount: 3000000,
+    overlayStrategyId: 'overlay-45-45',
+    overlayAmount: 7000000,
+  },
+
   // Carryforwards
   existingStLossCarryforward: 0,
   existingLtLossCarryforward: 0,

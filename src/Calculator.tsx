@@ -224,12 +224,21 @@ export function Calculator() {
   });
 
   // Input validation (warn-only, does not block calculation)
+  // Effective collateral: in split-allocation mode, use the sum of both legs
+  // so headline displays and validations reflect the analysis.
+  const effectiveCollateral = useMemo(() => {
+    if (inputs.splitAllocation?.enabled) {
+      return inputs.splitAllocation.coreAmount + inputs.splitAllocation.overlayAmount;
+    }
+    return inputs.collateralAmount;
+  }, [inputs.splitAllocation, inputs.collateralAmount]);
+
   const validationWarnings = useMemo(() => {
     const warnings: Record<string, string> = {};
-    if (inputs.collateralAmount > 0 && inputs.collateralAmount < 100_000) {
+    if (effectiveCollateral > 0 && effectiveCollateral < 100_000) {
       warnings.collateral = 'Minimum recommended: $100,000';
     }
-    if (inputs.collateralAmount > 100_000_000) {
+    if (effectiveCollateral > 100_000_000) {
       warnings.collateral = 'Unusually large — verify amount';
     }
     if (inputs.annualIncome > 100_000_000) {
@@ -239,7 +248,7 @@ export function Calculator() {
       warnings.stateRate = 'Rate exceeds 15% — verify';
     }
     return warnings;
-  }, [inputs.collateralAmount, inputs.annualIncome, inputs.stateCode, inputs.stateRate]);
+  }, [effectiveCollateral, inputs.annualIncome, inputs.stateCode, inputs.stateRate]);
 
   const currentStrategy = getStrategy(inputs.strategyId);
 
@@ -280,7 +289,7 @@ export function Calculator() {
       <OnboardingTour />
       <StickyHeader
         strategyName={currentStrategy?.name ?? ''}
-        collateral={inputs.collateralAmount}
+        collateral={effectiveCollateral}
         qfafValue={results.sizing.qfafValue}
         totalExposure={results.sizing.totalExposure}
         annualTaxSavings={results.years[0]?.taxSavings ?? 0}
@@ -507,7 +516,7 @@ export function Calculator() {
         totalNolGenerated={results.summary.totalNolGenerated}
         projectionYears={advancedSettings.projectionYears}
         collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
-        collateralAmount={inputs.collateralAmount}
+        collateralAmount={effectiveCollateral}
         stateCode={inputs.stateCode}
       />
       </PinnableSection>
@@ -669,7 +678,7 @@ export function Calculator() {
                 totalNolGenerated={results.summary.totalNolGenerated}
                 projectionYears={advancedSettings.projectionYears}
                 collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
-                collateralAmount={inputs.collateralAmount}
+                collateralAmount={effectiveCollateral}
                 stateCode={inputs.stateCode}
               />
             ),

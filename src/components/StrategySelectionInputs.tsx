@@ -1,8 +1,20 @@
-import { CalculatorInputs, AdvancedSettings, CalculationResult } from '../types';
+import { CalculatorInputs, AdvancedSettings, CalculationResult, SplitAllocation } from '../types';
 import { STRATEGIES, Strategy, getStrategy, getLongLeverageRatio, getShortRatio } from '../strategyData';
 import { StrategyRateEditor } from '../AdvancedMode/StrategyRateEditor';
-import { formatWithCommas, parseFormattedNumber, formatPercent } from '../utils/formatters';
+import { formatCurrency, formatWithCommas, parseFormattedNumber, formatPercent } from '../utils/formatters';
 import { InfoPopup } from '../InfoPopup';
+
+const DEFAULT_SPLIT: SplitAllocation = {
+  enabled: false,
+  coreStrategyId: 'core-145-45',
+  coreAmount: 3000000,
+  overlayStrategyId: 'overlay-45-45',
+  overlayAmount: 7000000,
+};
+
+function getSplit(inputs: CalculatorInputs): SplitAllocation {
+  return inputs.splitAllocation ?? DEFAULT_SPLIT;
+}
 
 interface StrategySelectionInputsProps {
   inputs: CalculatorInputs;
@@ -34,58 +46,161 @@ export function StrategySelectionInputs({
   onSetRateEditorOpen,
   onRateVersionIncrement,
 }: StrategySelectionInputsProps) {
+  const split = getSplit(inputs);
+  const isSplitEnabled = inputs.splitAllocation?.enabled === true;
+
+  const updateSplit = (patch: Partial<SplitAllocation>) => {
+    onUpdateInput('splitAllocation', { ...split, ...patch });
+  };
+
+  const splitTotal = split.coreAmount + split.overlayAmount;
+
   return (
     <div className="input-sub-card">
       <div className="input-sub-card__label">Strategy Selection</div>
-      <div className="input-pair">
-        <div className="input-group">
-          <label htmlFor="strategy">Collateral Strategy</label>
-          <select
-            id="strategy"
-            value={inputs.strategyId}
-            onChange={e => onUpdateInput('strategyId', e.target.value)}
-          >
-            <optgroup label="Core (Cash Funded)">
-              {STRATEGIES.filter(s => s.type === 'core').map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Overlay (Appreciated Stock)">
-              {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-          <span className="input-hint">
-            {currentStrategy?.type === 'core'
-              ? 'Cash invested in direct indexing'
-              : 'Existing appreciated stock used as collateral'}
-          </span>
-        </div>
 
-        <div className="input-group">
-          <label htmlFor="collateral">Collateral Amount</label>
-          <div className={`input-with-prefix ${validationWarnings.collateral ? 'input-warning' : ''}`}>
-            <span className="prefix">$</span>
-            <input
-              id="collateral"
-              type="text"
-              inputMode="numeric"
-              value={formatWithCommas(inputs.collateralAmount)}
-              onChange={e =>
-                onUpdateInput('collateralAmount', parseFormattedNumber(e.target.value))
-              }
-            />
-          </div>
-          {validationWarnings.collateral && (
-            <span className="input-warning-text">{validationWarnings.collateral}</span>
-          )}
-        </div>
+      <div className="input-group toggle-group">
+        <label className="toggle-label">
+          <input
+            type="checkbox"
+            checked={isSplitEnabled}
+            onChange={e => updateSplit({ enabled: e.target.checked })}
+          />
+          <span className="toggle-switch"></span>
+          Split allocation (Core + Overlay)
+        </label>
+        <span className="input-hint">
+          {isSplitEnabled
+            ? 'Cash funds a Core leg; appreciated stock funds an Overlay leg. QFAF auto-sizes against the combined ST losses.'
+            : 'Single strategy: all collateral runs one Core or Overlay strategy.'}
+        </span>
       </div>
+
+      {isSplitEnabled ? (
+        <>
+          <div className="input-pair">
+            <div className="input-group">
+              <label htmlFor="core-strategy">Core Strategy (cash)</label>
+              <select
+                id="core-strategy"
+                value={split.coreStrategyId}
+                onChange={e => updateSplit({ coreStrategyId: e.target.value })}
+              >
+                {STRATEGIES.filter(s => s.type === 'core').map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <span className="input-hint">Cash invested in direct indexing</span>
+            </div>
+            <div className="input-group">
+              <label htmlFor="core-amount">Core Allocation</label>
+              <div className="input-with-prefix">
+                <span className="prefix">$</span>
+                <input
+                  id="core-amount"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(split.coreAmount)}
+                  onChange={e => updateSplit({ coreAmount: parseFormattedNumber(e.target.value) })}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="input-pair">
+            <div className="input-group">
+              <label htmlFor="overlay-strategy">Overlay Strategy (appreciated stock)</label>
+              <select
+                id="overlay-strategy"
+                value={split.overlayStrategyId}
+                onChange={e => updateSplit({ overlayStrategyId: e.target.value })}
+              >
+                {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <span className="input-hint">Existing appreciated stock used as collateral</span>
+            </div>
+            <div className="input-group">
+              <label htmlFor="overlay-amount">Overlay Allocation</label>
+              <div className="input-with-prefix">
+                <span className="prefix">$</span>
+                <input
+                  id="overlay-amount"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(split.overlayAmount)}
+                  onChange={e => updateSplit({ overlayAmount: parseFormattedNumber(e.target.value) })}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="input-hint" style={{ marginTop: '0.25rem' }}>
+            Total collateral: <strong>{formatCurrency(splitTotal)}</strong>
+            {splitTotal > 0 && (
+              <>
+                {' '}({formatPercent(split.coreAmount / splitTotal)} Core /{' '}
+                {formatPercent(split.overlayAmount / splitTotal)} Overlay)
+              </>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="input-pair">
+          <div className="input-group">
+            <label htmlFor="strategy">Collateral Strategy</label>
+            <select
+              id="strategy"
+              value={inputs.strategyId}
+              onChange={e => onUpdateInput('strategyId', e.target.value)}
+            >
+              <optgroup label="Core (Cash Funded)">
+                {STRATEGIES.filter(s => s.type === 'core').map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Overlay (Appreciated Stock)">
+                {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            <span className="input-hint">
+              {currentStrategy?.type === 'core'
+                ? 'Cash invested in direct indexing'
+                : 'Existing appreciated stock used as collateral'}
+            </span>
+          </div>
+
+          <div className="input-group">
+            <label htmlFor="collateral">Collateral Amount</label>
+            <div className={`input-with-prefix ${validationWarnings.collateral ? 'input-warning' : ''}`}>
+              <span className="prefix">$</span>
+              <input
+                id="collateral"
+                type="text"
+                inputMode="numeric"
+                value={formatWithCommas(inputs.collateralAmount)}
+                onChange={e =>
+                  onUpdateInput('collateralAmount', parseFormattedNumber(e.target.value))
+                }
+              />
+            </div>
+            {validationWarnings.collateral && (
+              <span className="input-warning-text">{validationWarnings.collateral}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="input-pair">
         <div className="input-group">
@@ -124,7 +239,7 @@ export function StrategySelectionInputs({
       </div>
 
       {/* Strategy Rate Info - shows Year 1 effective rates (includes custom overrides) */}
-      {currentStrategy && results.years[0] && (
+      {!isSplitEnabled && currentStrategy && results.years[0] && (
         <div className="strategy-rates-info">
           <div className="strategy-rate">
             <span className="rate-label">ST Loss Rate (Y1):</span>
@@ -149,6 +264,34 @@ export function StrategySelectionInputs({
           </button>
         </div>
       )}
+      {isSplitEnabled && results.years[0] && (() => {
+        const coreStrat = getStrategy(split.coreStrategyId);
+        const overlayStrat = getStrategy(split.overlayStrategyId);
+        const blendedLt = splitTotal > 0 && coreStrat && overlayStrat
+          ? (split.coreAmount * coreStrat.ltGainRate + split.overlayAmount * overlayStrat.ltGainRate) / splitTotal
+          : 0;
+        const blendedSt = results.years[0].effectiveStLossRate;
+        return (
+          <div className="strategy-rates-info">
+            <div className="strategy-rate">
+              <span className="rate-label">Blended ST Loss Rate (Y1):</span>
+              <span className="rate-value positive">{formatPercent(blendedSt)}</span>
+            </div>
+            <div className="strategy-rate">
+              <span className="rate-label">Blended LT Gain Rate:</span>
+              <span className="rate-value negative">
+                {formatPercent(inputs.ltGainsEnabled ? blendedLt : 0)}
+              </span>
+            </div>
+            <div className="strategy-rate">
+              <span className="rate-label">Net Capital Loss (Y1):</span>
+              <span className="rate-value highlight">
+                {formatPercent(blendedSt - (inputs.ltGainsEnabled ? blendedLt : 0))}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Strategy Rate Editor Modal */}
       <StrategyRateEditor

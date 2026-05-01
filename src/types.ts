@@ -8,6 +8,18 @@ export const FILING_STATUSES = [
 
 export type FilingStatus = (typeof FILING_STATUSES)[number]['value'];
 
+// Split allocation: allow a single analysis to fund collateral with both
+// cash (Core) and appreciated stock (Overlay). When `enabled` is true the
+// calculation engine ignores the top-level `strategyId` / `collateralAmount`
+// and uses the per-leg amounts below.
+export interface SplitAllocation {
+  enabled: boolean;
+  coreStrategyId: string;
+  coreAmount: number;
+  overlayStrategyId: string;
+  overlayAmount: number;
+}
+
 export interface CalculatorInputs {
   // Client profile
   filingStatus: FilingStatus;
@@ -18,6 +30,10 @@ export interface CalculatorInputs {
   // Strategy selection (replaces collateralType + leverageRatio)
   strategyId: string;
   collateralAmount: number;
+
+  // Optional: split collateral between a Core (cash) leg and an Overlay
+  // (appreciated stock) leg. When enabled, overrides strategyId/collateralAmount.
+  splitAllocation?: SplitAllocation;
 
   // Existing carryforwards
   existingStLossCarryforward: number;
@@ -50,6 +66,15 @@ export interface CalculatorInputs {
   ltGainsEnabled: boolean;
 }
 
+export interface SizingLeg {
+  strategyId: string;
+  strategyName: string;
+  strategyType: 'core' | 'overlay';
+  collateralValue: number;
+  avgStLossRate: number;
+  year1StLosses: number;
+}
+
 export interface CalculatedSizing {
   strategyId: string;
   strategyName: string;
@@ -68,6 +93,8 @@ export interface CalculatedSizing {
   // Sizing metadata
   avgStLossRate: number; // Average ST loss rate used for sizing
   sizingYears: number; // Number of years averaged
+  // When split allocation is active, per-leg breakdown. Leg 0 is Core, Leg 1 is Overlay.
+  splitLegs?: SizingLeg[];
 }
 
 export interface YearResult {
