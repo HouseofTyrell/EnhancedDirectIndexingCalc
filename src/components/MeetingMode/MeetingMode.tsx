@@ -1646,6 +1646,17 @@ export function MeetingMode({
   // core.ts may return more years than projectionYears (wind-down continues until
   // carryforwards exhausted). Cap the view to what the user actually asked for.
   const projectionYears = advancedSettings.projectionYears;
+
+  // Calendar dates for prospect-facing copy. Strategy starts at startMonth of
+  // the current calendar year and runs `projectionYears` operating years;
+  // the year shown in copy is the last calendar year that contains strategy
+  // activity (= startYear + projectionYears − 1 for January starts; one
+  // higher for partial-year starts since the trailing partial calendar year
+  // still has activity).
+  const startYear = new Date().getFullYear();
+  const isPartialStart = (inputs.startMonth ?? 1) > 1;
+  const endYear = startYear + projectionYears - 1 + (isPartialStart ? 1 : 0);
+  const projectionRangeLabel = `${startYear}–${endYear}`;
   const visibleYears = useMemo(
     () => results.years.slice(0, projectionYears),
     [results.years, projectionYears]
@@ -1781,7 +1792,7 @@ export function MeetingMode({
           r > 0
             ? `Each year's savings reinvested at ${fmtPercent1(r)} grows to ${fmtCurrency(
                 futureValue
-              )} by year ${N} — a ${fmtCurrency(compoundingBonus)} gain on top of the ${fmtCurrency(totalTaxSavings)} of un-invested savings.`
+              )} by ${endYear} — a ${fmtCurrency(compoundingBonus)} gain on top of the ${fmtCurrency(totalTaxSavings)} of un-invested savings.`
             : 'Enable portfolio growth to model reinvested savings.',
         inBar: false,
       },
@@ -1794,6 +1805,7 @@ export function MeetingMode({
     taxRates.combinedStRate,
     advancedSettings.growthEnabled,
     advancedSettings.defaultAnnualReturn,
+    endYear,
   ]);
 
   const filingLabel =
@@ -1998,7 +2010,7 @@ export function MeetingMode({
                       textTransform: 'uppercase',
                     }}
                   >
-                    Your {advancedSettings.projectionYears}-year projection
+                    Your projection · {projectionRangeLabel}
                   </span>
                   <span style={{ width: 40, height: 1, background: M.accent }} />
                   <span style={{ fontSize: 12, color: M.inkFaint }}>
@@ -2036,7 +2048,7 @@ export function MeetingMode({
                   <strong style={{ color: M.good }}>
                     {fmtCurrency(totalTaxSavings)}
                   </strong>{' '}
-                  of net tax savings over the {advancedSettings.projectionYears}-year projection,
+                  of net tax savings through {endYear},
                   driven by ordinary loss deductions, NOL usage, and capital loss carryforwards.
                 </p>
               </div>
@@ -2199,7 +2211,7 @@ export function MeetingMode({
                           <strong>The key insight:</strong> year 1 saves roughly{' '}
                           {fmtCurrency(detailYearData[0]?.save ?? 0)}. Because harvesting
                           continues and NOL credits roll forward, the advantage compounds —
-                          so over {advancedSettings.projectionYears} years you reach{' '}
+                          so by {endYear} you reach{' '}
                           {fmtCurrency(totalTaxSavings)}. It's the compounding, not the rate,
                           that does the heavy lifting.
                         </div>
@@ -2222,7 +2234,7 @@ export function MeetingMode({
                     {
                       label: 'Cumulative tax savings',
                       value: fmtCurrency(totalTaxSavings),
-                      sub: `over ${advancedSettings.projectionYears} years`,
+                      sub: `through ${endYear}`,
                       primary: true,
                     },
                     {
