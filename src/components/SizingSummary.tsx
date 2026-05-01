@@ -235,17 +235,17 @@ export function SizingSummary({
               <InfoText
                 contentKey="ordinary-loss-benefit"
                 currentValue={formatCurrency(
-                  results.sizing.year1UsableOrdinaryLoss * combinedStRate
+                  (results.years[0]?.usableOrdinaryLoss ?? 0) * combinedStRate
                 )}
               >
                 Ordinary Loss Benefit
               </InfoText>
             </span>
             <span className="benefit-value positive">
-              +{formatCurrency(results.sizing.year1UsableOrdinaryLoss * combinedStRate)}
+              +{formatCurrency((results.years[0]?.usableOrdinaryLoss ?? 0) * combinedStRate)}
             </span>
             <span className="benefit-formula">
-              {formatCurrency(results.sizing.year1UsableOrdinaryLoss)} ×{' '}
+              {formatCurrency(results.years[0]?.usableOrdinaryLoss ?? 0)} ×{' '}
               {formatPercent(combinedStRate)}
             </span>
           </div>
