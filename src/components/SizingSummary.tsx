@@ -119,34 +119,47 @@ export function SizingSummary({
       </div>
 
       <div className="offset-status">
+        {(() => {
+          // For single-year sizing, show the actual Year 1 amounts from the
+          // projection (prorated for partial-year starts). For multi-year
+          // sizing, show the annualized averages used for QFAF sizing.
+          const year1 = results.years[0];
+          const useActuals = results.sizing.sizingYears === 1 && year1;
+          const stLosses = useActuals ? year1.stLossesHarvested : results.sizing.year1StLosses;
+          const stGains = useActuals ? year1.stGainsGenerated : results.sizing.year1StGains;
+          const ordLosses = useActuals ? year1.ordinaryLossesGenerated : results.sizing.year1OrdinaryLosses;
+          const usableOrd = useActuals ? year1.usableOrdinaryLoss : results.sizing.year1UsableOrdinaryLoss;
+          const excessNol = useActuals ? year1.excessToNol : results.sizing.year1ExcessToNol;
+          return (
+            <>
         <div className="offset-row">
           <span>
             <InfoText
               contentKey="year1-st-losses"
-              currentValue={formatCurrency(results.sizing.year1StLosses)}
+              currentValue={formatCurrency(stLosses)}
             >
               {results.sizing.sizingYears === 1
                 ? 'Year 1 ST Losses (Collateral)'
                 : `Avg ST Losses, Yrs 1–${results.sizing.sizingYears} (Collateral)`}
             </InfoText>
           </span>
-          <span className="positive">{formatCurrency(results.sizing.year1StLosses)}</span>
+          <span className="positive">{formatCurrency(stLosses)}</span>
         </div>
         <div className="offset-row">
           <span>
             <InfoText
               contentKey="year1-st-gains"
-              currentValue={formatCurrency(results.sizing.year1StGains)}
+              currentValue={formatCurrency(stGains)}
             >
               {results.sizing.sizingYears === 1
                 ? 'Year 1 ST Gains (QFAF)'
                 : 'Matched ST Gains (QFAF)'}
             </InfoText>
           </span>
-          <span className="negative">({formatCurrency(results.sizing.year1StGains)})</span>
+          <span className="negative">({formatCurrency(stGains)})</span>
         </div>
         {(() => {
-          const netSt = results.sizing.year1StLosses - results.sizing.year1StGains;
+          const netSt = stLosses - stGains;
           const isMatched = Math.abs(netSt) < 1;
           const hasExcessGains = netSt < -1; // ST gains > ST losses
           const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
@@ -174,39 +187,42 @@ export function SizingSummary({
           <span>
             <InfoText
               contentKey="year1-ordinary-losses"
-              currentValue={formatCurrency(results.sizing.year1OrdinaryLosses)}
+              currentValue={formatCurrency(ordLosses)}
             >
               Year 1 Ordinary Loss (QFAF)
             </InfoText>
           </span>
-          <span className="positive">{formatCurrency(results.sizing.year1OrdinaryLosses)}</span>
+          <span className="positive">{formatCurrency(ordLosses)}</span>
         </div>
         <div className="offset-row">
           <span>
             <InfoText
               contentKey="usable-ordinary-loss"
-              currentValue={formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
+              currentValue={formatCurrency(usableOrd)}
             >
               Usable Ordinary Loss
             </InfoText>
           </span>
           <span className="positive">
-            {formatCurrency(results.sizing.year1UsableOrdinaryLoss)}
+            {formatCurrency(usableOrd)}
           </span>
         </div>
-        {results.sizing.year1ExcessToNol > 0 && (
+        {excessNol > 0 && (
           <div className="offset-row">
             <span>
               <InfoText
                 contentKey="excess-to-nol"
-                currentValue={formatCurrency(results.sizing.year1ExcessToNol)}
+                currentValue={formatCurrency(excessNol)}
               >
                 Excess → NOL Carryforward
               </InfoText>
             </span>
-            <span>{formatCurrency(results.sizing.year1ExcessToNol)}</span>
+            <span>{formatCurrency(excessNol)}</span>
           </div>
         )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Year 1 / Year 2+ Tax Benefit Breakdown with Timeline Connector */}
