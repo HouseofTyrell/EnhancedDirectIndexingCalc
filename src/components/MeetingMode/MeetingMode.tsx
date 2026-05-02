@@ -1362,6 +1362,99 @@ function DetailView({
 }
 
 // ═══ Mechanics view ═══
+// ═══ Print page chrome (header + footer) — only rendered when printMode is on
+//     so the on-screen layout is unaffected. Each page gets the same scenario
+//     summary up top and a page-of-3 pager + disclaimer at the bottom for a
+//     consistent, professional feel across the printed handout.
+function PrintPageHeader({
+  pageNumber,
+  scenarioLine,
+  rangeLabel,
+}: {
+  pageNumber: 1 | 2 | 3;
+  scenarioLine: string;
+  rangeLabel: string;
+}) {
+  const today = new Date().toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        paddingBottom: 10,
+        marginBottom: 22,
+        borderBottom: `1.5px solid ${M.ink}`,
+        fontFamily: M.sans,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 800,
+            color: M.ink,
+            letterSpacing: -0.2,
+          }}
+        >
+          EDI Calc
+        </span>
+        <span style={{ fontSize: 11, color: M.inkFaint, fontWeight: 600 }}>
+          Tax Strategy Projection · {rangeLabel}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
+        <span style={{ fontSize: 11, color: M.inkSoft }}>{scenarioLine}</span>
+        <span
+          style={{
+            fontSize: 11,
+            color: M.inkFaint,
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {today}
+        </span>
+        <span
+          style={{
+            fontSize: 10.5,
+            color: M.inkFaint,
+            fontWeight: 700,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+          }}
+        >
+          Page {pageNumber} of 3
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function PrintPageFooter() {
+  return (
+    <div
+      style={{
+        marginTop: 32,
+        paddingTop: 12,
+        borderTop: `1px solid ${M.line}`,
+        fontSize: 9.5,
+        color: M.inkFaint,
+        lineHeight: 1.5,
+        fontFamily: M.sans,
+      }}
+    >
+      Estimates do not reflect advisory fees, financing costs, tracking error,
+      transaction costs, or behavioral effects. Actual results will vary. For
+      discussion purposes only.
+    </div>
+  );
+}
+
 function MechanicsView({
   qfafValue,
   totalExposure,
@@ -1814,6 +1907,12 @@ export function MeetingMode({
       'MFJ'
     ).replace('Married Filing Separately', 'MFS').replace('Head of Household', 'HOH') ?? inputs.filingStatus.toUpperCase();
 
+  // Compact scenario summary used in the print header on every page so each
+  // sheet stands alone.
+  const printScenarioLine = `${getEffectiveView(inputs).displayName} · ${fmtCurrency(
+    getEffectiveView(inputs).totalCollateral
+  )} · ${inputs.stateCode} ${filingLabel}`;
+
   const levelSubheadingStyle: CSSProperties = {
     fontSize: 12,
     fontWeight: 700,
@@ -1991,7 +2090,17 @@ export function MeetingMode({
 
         <div style={{ padding: '32px 36px', maxWidth: 1280, margin: '0 auto' }}>
           {(level === 'high' || printMode) && (
-            <div className={printMode ? 'meeting-mode-print-page' : undefined}>
+            <div
+              className={printMode ? 'meeting-mode-print-page' : undefined}
+              data-print-page="1"
+            >
+              {printMode && (
+                <PrintPageHeader
+                  pageNumber={1}
+                  scenarioLine={printScenarioLine}
+                  rangeLabel={projectionRangeLabel}
+                />
+              )}
               <div style={{ marginBottom: 28 }}>
                 <div
                   style={{
@@ -2020,7 +2129,9 @@ export function MeetingMode({
                 <h1
                   style={{
                     margin: 0,
-                    fontSize: 56,
+                    // Smaller H1 in print so the headline + paragraph + KPIs
+                    // + decomposition fit on a single Letter/A4 page.
+                    fontSize: printMode ? 36 : 56,
                     fontWeight: 800,
                     letterSpacing: -2,
                     color: M.ink,
@@ -2305,6 +2416,10 @@ export function MeetingMode({
                   padding: '24px 26px',
                   marginBottom: 20,
                   boxShadow: '0 4px 20px rgba(11,16,32,0.04)',
+                  // The same chart leads page 2 in the printed one-pager, so
+                  // hide this copy when printing to keep page 1 focused on the
+                  // headline narrative.
+                  display: printMode ? 'none' : 'block',
                 }}
               >
                 <BenefitBreakdownChart
@@ -2407,14 +2522,23 @@ export function MeetingMode({
                   </button>
                 </div>
               </div>
+              {printMode && <PrintPageFooter />}
             </div>
           )}
 
           {(level === 'detail' || printMode) && (
             <div
               className={printMode ? 'meeting-mode-print-page' : undefined}
+              data-print-page="2"
               style={printMode ? { paddingTop: 20 } : undefined}
             >
+              {printMode && (
+                <PrintPageHeader
+                  pageNumber={2}
+                  scenarioLine={printScenarioLine}
+                  rangeLabel={projectionRangeLabel}
+                />
+              )}
               <div
                 style={{
                   marginBottom: 20,
@@ -2488,14 +2612,23 @@ export function MeetingMode({
                   finalPortfolio={finalPortfolio}
                 />
               </div>
+              {printMode && <PrintPageFooter />}
             </div>
           )}
 
           {(level === 'mechanics' || printMode) && (
             <div
               className={printMode ? 'meeting-mode-print-page' : undefined}
+              data-print-page="3"
               style={printMode ? { paddingTop: 20 } : undefined}
             >
+              {printMode && (
+                <PrintPageHeader
+                  pageNumber={3}
+                  scenarioLine={printScenarioLine}
+                  rangeLabel={projectionRangeLabel}
+                />
+              )}
               <div
                 style={{
                   marginBottom: 24,
@@ -2543,6 +2676,7 @@ export function MeetingMode({
                 taxRates={taxRates}
                 currentStrategy={currentStrategy}
               />
+              {printMode && <PrintPageFooter />}
             </div>
           )}
 
@@ -2554,6 +2688,9 @@ export function MeetingMode({
               color: M.inkFaint,
               lineHeight: 1.55,
               maxWidth: 820,
+              // The print one-pager has its own per-page footer disclaimer;
+              // hide the on-screen version so it doesn't double up.
+              display: printMode ? 'none' : 'block',
             }}
           >
             Estimates do not reflect advisory fees, financing costs, tracking error,

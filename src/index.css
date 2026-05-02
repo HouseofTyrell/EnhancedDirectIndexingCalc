@@ -6799,45 +6799,103 @@ select:focus:not(:focus-visible) {
 }
 
 /* ============================================================
-   Meeting Mode print one-pager
+   Meeting Mode print one-pager (3-page handout)
    ============================================================
    When the user clicks "Export one-pager", MeetingMode re-renders all
    three level sections stacked + adds the .meeting-mode-print class to
-   the root, then calls window.print(). These rules ensure the printed
-   output is clean: page breaks between sections, no shadows, full
-   width, and no leftover screen UI. */
+   the root, then calls window.print(). The handout is exactly three
+   pages (Story / Numbers / Mechanics) with consistent margins, a
+   per-page header (brand · scenario · page n of 3) and per-page
+   disclaimer footer.
+
+   Rules below:
+   - Set @page margins so content doesn't hug the paper edge.
+   - Force a page break after every section EXCEPT the last.
+   - Stop content within a section from being split mid-page.
+   - Strip screen-only chrome: shadows, sticky positioning, animations.
+   - Force browsers to print colors as-shown (Chrome/Safari otherwise
+     drop backgrounds in "economy mode").
+   - Constrain the main content width so columns don't stretch into
+     un-readable lines on landscape printers. */
+
+@page {
+  size: auto;
+  margin: 0.55in 0.5in 0.55in 0.5in;
+}
 
 @media print {
+  /* Hide everything except the meeting-mode page when printing the
+     one-pager. Other parts of the calculator (modals, toasts, etc.)
+     occasionally render outside MeetingMode and would otherwise leak
+     into the printed output. */
+  body {
+    background: white !important;
+  }
+
   .meeting-mode-print {
     background: white !important;
+    min-height: auto !important;
   }
 
   .meeting-mode-print main {
     overflow: visible !important;
+    padding: 0 !important;
   }
 
+  /* The on-screen layout uses padding: 32px 36px on the inner
+     container; for print, ride flush to the @page margin instead so
+     the header rule actually sits at the top of the paper. */
+  .meeting-mode-print main > div {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Each printed page = one .meeting-mode-print-page section. Force
+     all three to occupy full pages with page-break-after; the last
+     page's break is suppressed so we don't emit a trailing blank
+     sheet. */
   .meeting-mode-print .meeting-mode-print-page {
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    padding-top: 0 !important;
+  }
+
+  .meeting-mode-print .meeting-mode-print-page:last-of-type {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Allow internal cards to break across pages only as a last resort. */
+  .meeting-mode-print .meeting-mode-print-page > * {
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
-  .meeting-mode-print .meeting-mode-print-page + .meeting-mode-print-page {
-    page-break-before: always;
-    break-before: page;
+  /* Print-only header rule should always live at the top edge. */
+  .meeting-mode-print [data-print-page] > div:first-child {
+    margin-top: 0 !important;
   }
 
-  /* Stop sticky positioning from breaking pagination */
+  /* Stop sticky positioning from breaking pagination. */
   .meeting-mode-print header {
     position: static !important;
   }
 
-  /* Tame heavy shadows so they don't render as gray blocks on paper */
-  .meeting-mode-print * {
+  /* Tame heavy shadows + animations on paper. */
+  .meeting-mode-print *,
+  .meeting-mode-print *::before,
+  .meeting-mode-print *::after {
     box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
   }
 
-  /* Make sure colored text/backgrounds render rather than the default
-     "economy mode" some browsers apply. */
+  /* Force color rendering — required for the colored accent bars in
+     the decomposition tile and the dark footer in the year-by-year
+     table to actually print. */
   .meeting-mode-print,
   .meeting-mode-print * {
     -webkit-print-color-adjust: exact !important;
