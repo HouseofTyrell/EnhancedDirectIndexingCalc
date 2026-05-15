@@ -2,6 +2,12 @@ import { useState, Fragment } from 'react';
 import { YearResult, CalculatedSizing } from './types';
 import { InfoText } from './InfoPopup';
 import { formatCurrency } from './utils/formatters';
+import {
+  buildLossBreakdown,
+  describeSegments,
+  BreakdownGranularity,
+} from './calculations/lossBreakdown';
+import { getEffectiveStLossRate } from './calculations/helpers';
 
 type ViewMode = 'combined' | 'qfaf-only' | 'collateral-only';
 
@@ -12,6 +18,15 @@ interface ResultsTableProps {
   projectionYears?: number;
   /** Start month (1=January). Year 1 row gets a partial-year badge when > 1. */
   startMonth?: number;
+  /** QFAF duration in years; used to bound the loss breakdown. */
+  qfafDuration?: number;
+  /**
+   * Single-strategy id + ltGainRate for the rate-aware sub-period breakdown.
+   * When omitted (e.g. split allocation), the breakdown falls back to a
+   * uniform per-month split.
+   */
+  strategyId?: string;
+  ltGainRate?: number;
 }
 
 // Chevron icons for expand/collapse
@@ -46,6 +61,9 @@ export function ResultsTable({
   sizing,
   qfafEnabled,
   startMonth = 1,
+  qfafDuration = 10,
+  strategyId,
+  ltGainRate,
 }: ResultsTableProps) {
   const partialFirstYearMonths = startMonth > 1 ? 13 - startMonth : null;
   const [expandPortfolio, setExpandPortfolio] = useState(false);
@@ -54,6 +72,31 @@ export function ResultsTable({
   const [expandSavings, setExpandSavings] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('combined');
+  const [breakdownGranularity, setBreakdownGranularity] =
+    useState<BreakdownGranularity>('quarterly');
+  const [expandedBreakdownYears, setExpandedBreakdownYears] = useState<Set<number>>(
+    () => new Set()
+  );
+
+  const toggleBreakdownYear = (year: number) => {
+    setExpandedBreakdownYears(prev => {
+      const next = new Set(prev);
+      if (next.has(year)) {
+        next.delete(year);
+      } else {
+        next.add(year);
+      }
+      return next;
+    });
+  };
+
+  // Rate-aware breakdown only works for single-strategy mode where we know
+  // the deployment-year rate schedule. Split allocation falls through to a
+  // uniform per-active-month split.
+  const rateForDeploymentYear =
+    strategyId && ltGainRate !== undefined
+      ? (dy: number) => getEffectiveStLossRate(strategyId, ltGainRate, dy)
+      : undefined;
 
   // Calculate cumulative tax savings (inline, updated per rendered row)
   let cumulativeSavings = 0;
@@ -424,6 +467,27 @@ export function ResultsTable({
                   )}
                   <tr className={isWindDown ? 'wind-down-row' : ''}>
                     <td className="year-cell">
+                      {!isWindDown && (
+                        <button
+                          type="button"
+                          className="breakdown-toggle"
+                          onClick={() => toggleBreakdownYear(year.year)}
+                          aria-expanded={expandedBreakdownYears.has(year.year)}
+                          title={
+                            expandedBreakdownYears.has(year.year)
+                              ? 'Hide month/quarter breakdown'
+                              : 'Show month/quarter breakdown'
+                          }
+                        >
+                          <span className="expand-icon">
+                            {expandedBreakdownYears.has(year.year) ? (
+                              <ChevronDown />
+                            ) : (
+                              <ChevronRight />
+                            )}
+                          </span>
+                        </button>
+                      )}
                       {year.year}
                       {year.year === 1 && partialFirstYearMonths !== null && (
                         <span
@@ -556,6 +620,83 @@ export function ResultsTable({
                       {formatCurrency(cumulativeSavings)}
                     </td>
                   </tr>
+                  {expandedBreakdownYears.has(year.year) && !isWindDown && (
+                    <tr className="breakdown-sub-row">
+                      <td colSpan={getColSpan()}>
+                        <div className="loss-breakdown">
+                          <div className="loss-breakdown-controls">
+                            <span className="loss-breakdown-title">
+                              Year {year.year} loss generation
+                            </span>
+                            <div className="loss-breakdown-granularity">
+                              <button
+                                type="button"
+                                className={`view-mode-btn ${breakdownGranularity === 'quarterly' ? 'active' : ''}`}
+                                onClick={() => setBreakdownGranularity('quarterly')}
+                              >
+                                Quarterly
+                              </button>
+                              <button
+                                type="button"
+                                className={`view-mode-btn ${breakdownGranularity === 'monthly' ? 'active' : ''}`}
+                                onClick={() => setBreakdownGranularity('monthly')}
+                              >
+                                Monthly
+                              </button>
+                            </div>
+                          </div>
+                          <table className="loss-breakdown-table">
+                            <thead>
+                              <tr>
+                                <th>Period</th>
+                                <th>Deployment Year</th>
+                                <th className="num">ST Losses (Collateral)</th>
+                                {qfafEnabled && (
+                                  <th className="num">Ord. Losses (QFAF)</th>
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {buildLossBreakdown({
+                                year,
+                                yearIndex: year.year,
+                                startMonth,
+                                qfafDuration,
+                                granularity: breakdownGranularity,
+                                rateForDeploymentYear,
+                              }).map(p => (
+                                <tr
+                                  key={p.label}
+                                  className={p.active ? '' : 'loss-breakdown-inactive'}
+                                >
+                                  <td>{p.label}</td>
+                                  <td>{describeSegments(p.segments)}</td>
+                                  <td className="num negative">
+                                    {p.active
+                                      ? `(${formatCurrency(p.stLosses)})`
+                                      : '—'}
+                                  </td>
+                                  {qfafEnabled && (
+                                    <td className="num negative">
+                                      {p.active
+                                        ? `(${formatCurrency(p.ordinaryLosses)})`
+                                        : '—'}
+                                    </td>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {!rateForDeploymentYear && (
+                            <p className="loss-breakdown-note">
+                              Split allocation: losses spread uniformly across active
+                              months (deployment-year rates aren't a single curve).
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </Fragment>
               );
             })}

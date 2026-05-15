@@ -127,6 +127,13 @@ export function ResultsChartsSection({
         qfafEnabled={inputs.qfafEnabled}
         projectionYears={projectionYears}
         startMonth={startMonth}
+        qfafDuration={inputs.qfafDuration}
+        strategyId={
+          inputs.splitAllocation?.enabled ? undefined : currentStrategy?.id
+        }
+        ltGainRate={
+          inputs.splitAllocation?.enabled ? undefined : currentStrategy?.ltGainRate
+        }
       />
 
       {/* Portfolio Value Chart — only active strategy years */}
