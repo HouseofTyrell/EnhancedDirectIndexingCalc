@@ -171,16 +171,16 @@ function getNiitThreshold(status: string) {
 }
 
 /**
- * Compute the federal marginal short-term capital gains tax rate for a given
- * income level and filing status. Includes the 3.8% Net Investment Income Tax
- * (NIIT) when income exceeds the applicable threshold.
+ * Compute the federal marginal ordinary income tax rate (bracket rate only,
+ * WITHOUT the 3.8% NIIT). Use this to value deductions taken against ordinary
+ * income (W-2 wages, etc.): such deductions do not reduce net investment
+ * income, so the NIIT does not apply to them (IRC §1411).
  * @param income - Total taxable income in dollars
  * @param status - Filing status code ("single", "mfj", "mfs", or "hoh")
- * @returns The combined marginal federal short-term rate as a decimal
+ * @returns The marginal federal ordinary rate as a decimal
  */
-export function getFederalStRate(income: number, status: string): number {
+export function getFederalOrdinaryRate(income: number, status: string): number {
   const brackets = getBrackets(status);
-  const niitThreshold = getNiitThreshold(status);
 
   let marginalRate = 0.1;
   for (let i = brackets.length - 1; i >= 0; i--) {
@@ -190,7 +190,23 @@ export function getFederalStRate(income: number, status: string): number {
     }
   }
 
-  // Add NIIT for high earners
+  return marginalRate;
+}
+
+/**
+ * Compute the federal marginal short-term capital gains tax rate for a given
+ * income level and filing status. Includes the 3.8% Net Investment Income Tax
+ * (NIIT) when income exceeds the applicable threshold.
+ * @param income - Total taxable income in dollars
+ * @param status - Filing status code ("single", "mfj", "mfs", or "hoh")
+ * @returns The combined marginal federal short-term rate as a decimal
+ */
+export function getFederalStRate(income: number, status: string): number {
+  const niitThreshold = getNiitThreshold(status);
+
+  let marginalRate = getFederalOrdinaryRate(income, status);
+
+  // Add NIIT for high earners (ST gains are net investment income)
   if (income > niitThreshold) {
     marginalRate += NIIT_RATE;
   }

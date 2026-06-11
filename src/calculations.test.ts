@@ -594,6 +594,53 @@ describe('QFAF Duration', () => {
   });
 });
 
+describe('NIIT treatment of ordinary deductions', () => {
+  // Deductions against ordinary income (wages) don't reduce net investment
+  // income, so the 3.8% NIIT must be excluded from their value (IRC §1411).
+  // ST gains/losses themselves remain NIIT-rated. Matches ediOnly.ts treatment.
+  it('values ordinary loss benefit at the bracket rate without NIIT', () => {
+    // $500K MFJ income → 32% bracket, above the $250K NIIT threshold
+    const inputs = createInputs();
+    const result = calculate(inputs, DEFAULT_SETTINGS);
+    const y1 = result.years[0];
+
+    const expectedCombinedOrdinaryRate = 0.32 + 0.133; // bracket + CA, NO 3.8% NIIT
+    expect(y1.ordinaryLossBenefit).toBeCloseTo(
+      y1.usableOrdinaryLoss * expectedCombinedOrdinaryRate,
+      2
+    );
+  });
+
+  it('values NOL usage benefit without NIIT', () => {
+    // Large collateral so losses exceed the 461(l) limit and build NOL
+    const inputs = createInputs({ collateralAmount: 10000000, annualIncome: 3000000 });
+    const result = calculate(inputs, DEFAULT_SETTINGS);
+    const yearWithNol = result.years.find(y => y.nolUsedThisYear > 0);
+    expect(yearWithNol).toBeDefined();
+
+    const expectedCombinedOrdinaryRate = 0.37 + 0.133; // top bracket + CA, NO NIIT
+    expect(yearWithNol!.nolUsageBenefit).toBeCloseTo(
+      yearWithNol!.nolUsedThisYear * expectedCombinedOrdinaryRate,
+      2
+    );
+  });
+
+  it('still applies NIIT to net ST gain costs', () => {
+    // Disable QFAF sizing match by leaving fixed sizing in later years:
+    // leakage years have remaining ST gains taxed at the full ST+NIIT rate
+    const inputs = createInputs({ qfafSizingYears: 1, qfafSizingMode: 'fixed' });
+    const result = calculate(inputs, DEFAULT_SETTINGS);
+    const leakYear = result.years.find(y => y.netStGainLoss > 0);
+    expect(leakYear).toBeDefined();
+
+    const expectedCombinedStRate = 0.32 + 0.038 + 0.133; // bracket + NIIT + CA
+    expect(leakYear!.remainingStGainCost).toBeCloseTo(
+      leakYear!.netStGainLoss * expectedCombinedStRate,
+      2
+    );
+  });
+});
+
 describe('ST Gain Leakage', () => {
   it('should report zero leakage when QFAF is properly sized (Year 1)', () => {
     const inputs = createInputs({ qfafSizingYears: 1 });

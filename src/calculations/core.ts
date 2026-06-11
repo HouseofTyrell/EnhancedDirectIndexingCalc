@@ -5,7 +5,7 @@ import {
   AdvancedSettings,
   DEFAULT_SETTINGS,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getStateRate } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -116,14 +116,17 @@ export function calculate(
 
   const bracketStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
   const bracketLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+  const bracketOrdinaryRate = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
   const stateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
 
   // When using custom rates, apply them directly; otherwise use bracket-based rates
   // NIIT is added on top of LT rate when applicable (income > $250k MFJ, $200k single)
+  // ordinaryRate excludes NIIT: deductions against wages don't reduce NII (§1411)
   const taxRates: TaxRates = {
     stRate: useCustomRates ? settings.stcgRate : bracketStRate,
     ltRate: useCustomRates ? settings.ltcgRate + settings.niitRate : bracketLtRate,
+    ordinaryRate: useCustomRates ? settings.stcgRate : bracketOrdinaryRate,
     stateRate,
     section461Limit,
   };
@@ -381,19 +384,23 @@ export function calculateYear(
 
   // Calculate tax savings directly as sum of benefits minus costs
   // This matches the Year 1 Tax Benefit breakdown in the UI
-  const { stRate, ltRate, stateRate } = taxRates;
+  const { stRate, ltRate, ordinaryRate, stateRate } = taxRates;
   const combinedStRate = stRate + stateRate;
   const combinedLtRate = ltRate + stateRate;
+  // Deductions against ordinary income (wages) don't reduce net investment
+  // income, so NIIT is excluded from their value (IRC §1411). This matches
+  // the treatment already used in ediOnly.ts for the $3K deduction.
+  const combinedOrdinaryRate = ordinaryRate + stateRate;
 
   // Benefits:
   // 1. Ordinary loss reduces W2 income tax
-  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
+  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
 
   // 2. Capital loss carryforward used against ordinary income ($3k/yr limit)
-  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
+  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
 
   // 3. NOL used against taxable income
-  const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
+  const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
   // Costs:
   // 1. LT gains are taxed at LT rates

@@ -125,7 +125,7 @@ export function exportInputsToCsv(
 
   // Misc
   lines.push(csvRow('startMonth', inputs.startMonth));
-  lines.push(csvRow('ltGainsEnabled', inputs.ltGainsEnabled));
+  lines.push(csvRow('ltGainsEnabled', inputs.ltGainsEnabled ?? true));
 
   // Split allocation
   if (inputs.splitAllocation) {

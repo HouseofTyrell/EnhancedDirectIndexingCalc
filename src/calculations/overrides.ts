@@ -7,7 +7,7 @@ import {
   DEFAULT_SETTINGS,
   YearOverride,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getStateRate } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate } from '../taxData';
 import {
   QFAF_ST_GAIN_RATE,
   SECTION_461L_LIMITS,
@@ -126,6 +126,7 @@ export function calculateWithOverrides(
     const yearTaxRates: TaxRates = {
       stRate: getFederalStRate(yearIncome, inputs.filingStatus),
       ltRate: getFederalLtRate(yearIncome, inputs.filingStatus),
+      ordinaryRate: getFederalOrdinaryRate(yearIncome, inputs.filingStatus),
       stateRate: baseStateRate,
       section461Limit:
         settings.section461Limits[inputs.filingStatus] ??

@@ -7,7 +7,7 @@ import {
   SensitivityParams,
   DEFAULT_SENSITIVITY,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getStateRate } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -214,10 +214,12 @@ export function calculateWithSensitivity(
     // Calculate tax rates with sensitivity adjustments
     const baseFederalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const baseFederalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+    const baseFederalOrdinaryRate = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
 
     // Apply federal rate change (affects both ST and LT rates proportionally)
     const adjustedFederalStRate = Math.max(0, baseFederalStRate + sensitivity.federalRateChange);
     const adjustedFederalLtRate = Math.max(0, baseFederalLtRate + sensitivity.federalRateChange);
+    const adjustedFederalOrdinaryRate = Math.max(0, baseFederalOrdinaryRate + sensitivity.federalRateChange);
 
     // Use settings section461Limits if provided
     const section461Limit =
@@ -226,6 +228,7 @@ export function calculateWithSensitivity(
     const yearTaxRates: TaxRates = {
       stRate: adjustedFederalStRate,
       ltRate: adjustedFederalLtRate,
+      ordinaryRate: adjustedFederalOrdinaryRate,
       stateRate: adjustedStateRate,
       section461Limit,
     };
@@ -412,14 +415,16 @@ function calculateYearWithSensitivity(
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
 
   // Calculate tax savings
-  const { stRate, ltRate, stateRate } = taxRates;
+  const { stRate, ltRate, ordinaryRate, stateRate } = taxRates;
   const combinedStRate = stRate + stateRate;
   const combinedLtRate = ltRate + stateRate;
+  // NIIT excluded from deductions against ordinary income (IRC §1411) — see core.ts
+  const combinedOrdinaryRate = ordinaryRate + stateRate;
 
   // Benefits
-  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
-  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
-  const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
+  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
+  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
+  const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
   // Costs
   const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
