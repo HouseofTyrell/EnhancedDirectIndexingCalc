@@ -260,7 +260,11 @@ export function calculateWithOverrides(
       legCollateral[0] = result.collateralValue;
     }
 
-    years.push({ ...result, qfafCashReturned: cashReturned });
+    // Terminal unwind: return the QFAF's end-of-year value as cash in the
+    // last operating calendar year (see core.ts for rationale).
+    const terminalProceeds =
+      strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
+    years.push({ ...result, qfafCashReturned: cashReturned + terminalProceeds });
 
     // Update QFAF state for next year. Don't track QFAF growth after the
     // strategy's final calendar year.

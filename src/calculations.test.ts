@@ -654,12 +654,37 @@ describe('ST Gain Leakage', () => {
     expect(result.years[4].stGainLeakage).toBeGreaterThan(0);
   });
 
-  it('should default qfafCashReturned to 0 in fixed mode', () => {
+  it('should only return cash at terminal unwind in fixed mode', () => {
+    // Fixed mode never resizes, so the only cash event is the terminal
+    // unwind: the QFAF is redeemed at its end-of-year value in the last
+    // operating calendar year (duration 10, January start → year 10).
     const inputs = createInputs({ qfafSizingMode: 'fixed' });
     const result = calculate(inputs);
     for (const year of result.years) {
-      expect(year.qfafCashReturned).toBe(0);
+      if (year.year === 10) {
+        // Terminal proceeds equal the QFAF's end-of-year value
+        expect(year.qfafCashReturned).toBeCloseTo(year.qfafValue, 2);
+        expect(year.qfafCashReturned).toBeGreaterThan(0);
+      } else {
+        expect(year.qfafCashReturned).toBe(0);
+      }
     }
+  });
+
+  it('should include returned QFAF cash in finalTotalWealth', () => {
+    const inputs = createInputs({ qfafSizingMode: 'fixed' });
+    const result = calculate(inputs);
+    const totalReturned = result.years.reduce((s, y) => s + y.qfafCashReturned, 0);
+    expect(result.summary.totalQfafCashReturned).toBeCloseTo(totalReturned, 2);
+    expect(result.summary.finalTotalWealth).toBeCloseTo(
+      result.summary.finalPortfolioValue + totalReturned,
+      2
+    );
+    // The QFAF principal must not vanish from total wealth: with growth
+    // disabled, final wealth ≈ collateral + initial QFAF value.
+    expect(result.summary.finalTotalWealth).toBeGreaterThan(
+      result.summary.finalPortfolioValue
+    );
   });
 });
 

@@ -170,6 +170,10 @@ export interface CalculationResult {
     finalPortfolioValue: number;
     effectiveTaxAlpha: number;
     totalNolGenerated: number;
+    /** Cumulative cash returned by QFAF resizing + terminal unwind (held outside the portfolio) */
+    totalQfafCashReturned: number;
+    /** finalPortfolioValue + totalQfafCashReturned: total wealth including returned cash */
+    finalTotalWealth: number;
   };
 }
 

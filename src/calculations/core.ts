@@ -282,7 +282,14 @@ export function calculate(
       legCollateral[0] = result.collateralValue;
     }
 
-    years.push({ ...result, qfafCashReturned: cashReturned });
+    // Terminal unwind: in the strategy's last operating calendar year the
+    // QFAF is redeemed at its end-of-year value (breakeven unwind — annual
+    // gain/loss allocations keep outside basis at NAV, so no tax on exit in
+    // this model) and the proceeds are returned to the client as cash.
+    // Without this, the QFAF principal silently vanished from total wealth.
+    const terminalProceeds =
+      strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
+    years.push({ ...result, qfafCashReturned: cashReturned + terminalProceeds });
     // Don't track QFAF growth after the strategy's final calendar year.
     qfafValue =
       strategyLastCalendarYear > 0 && year >= strategyLastCalendarYear ? 0 : result.qfafValue;

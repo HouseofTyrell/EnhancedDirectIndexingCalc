@@ -224,14 +224,25 @@ export function calculateCarryforwards(
 export function calculateSummary(years: YearResult[], sizing: CalculatedSizing, qfafDuration?: number) {
   const totalTaxSavings = years.reduce((sum, y) => sum + y.taxSavings, 0);
   const totalNolGenerated = years.reduce((sum, y) => sum + y.excessToNol, 0);
+  // Cash returned by QFAF dynamic resizing and the terminal unwind. Held
+  // outside the strategy (modeled as uninvested), but part of total wealth.
+  const totalQfafCashReturned = years.reduce((sum, y) => sum + y.qfafCashReturned, 0);
   // Safe array access (005 - fix unchecked array access)
   const lastYear = years.length > 0 ? years[years.length - 1] : undefined;
   const finalPortfolioValue = lastYear?.totalValue ?? 0;
+  const finalTotalWealth = finalPortfolioValue + totalQfafCashReturned;
   // Annualize tax alpha over QFAF duration (not full projection length)
   // This measures per-year efficiency of the QFAF program specifically
   const numYears = qfafDuration ?? (years.length || 1);
   const effectiveTaxAlpha =
     sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / numYears : 0;
 
-  return { totalTaxSavings, finalPortfolioValue, effectiveTaxAlpha, totalNolGenerated };
+  return {
+    totalTaxSavings,
+    finalPortfolioValue,
+    effectiveTaxAlpha,
+    totalNolGenerated,
+    totalQfafCashReturned,
+    finalTotalWealth,
+  };
 }
