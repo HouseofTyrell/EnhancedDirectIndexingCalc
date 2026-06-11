@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculate, calculateSizing } from './calculations';
+import { calculate, calculateSizing, calculateWithOverrides } from './calculations';
 import { CalculatorInputs, DEFAULT_SETTINGS, AdvancedSettings } from './types';
 
 // Helper to create base inputs
@@ -591,6 +591,44 @@ describe('QFAF Duration', () => {
 
     // Projection should be at least 10 years (projectionYears already >= duration + 2)
     expect(result.years.length).toBe(10);
+  });
+});
+
+describe('QFAF sizing consistency', () => {
+  it('matches ST gains to ST losses with a custom multiplier', () => {
+    // With a 1.0x multiplier, sizing must divide by 1.0 (not the 1.5 default)
+    // so gains still offset losses.
+    const settings = { ...DEFAULT_SETTINGS, qfafMultiplier: 1.0 };
+    const result = calculate(createInputs({ qfafSizingYears: 1 }), settings);
+    const y1 = result.years[0];
+    expect(y1.stGainsGenerated).toBeCloseTo(y1.stLossesHarvested, 0);
+    expect(y1.stGainLeakage).toBeCloseTo(0, 0);
+  });
+
+  it('sizes against harvestable losses net of wash-sale disallowance', () => {
+    // With 10% wash-sale disallowance, fixed-mode Year 1 should not leak
+    // ST gains: the QFAF is sized to the net harvestable losses.
+    const settings = { ...DEFAULT_SETTINGS, washSaleDisallowanceRate: 0.1 };
+    const result = calculate(
+      createInputs({ qfafSizingYears: 1, qfafSizingMode: 'fixed' }),
+      settings
+    );
+    const y1 = result.years[0];
+    expect(y1.stGainLeakage).toBeCloseTo(0, 0);
+  });
+});
+
+describe('calculateWithOverrides custom-rate parity', () => {
+  it('uses custom tax rates like calculate() does', () => {
+    const settings = { ...DEFAULT_SETTINGS, stcgRate: 0.45, ltcgRate: 0.25 };
+    const inputs = createInputs();
+    const base = calculate(inputs, settings);
+    const withOverrides = calculateWithOverrides(inputs, settings, []);
+    expect(withOverrides.years[0].taxSavings).toBeCloseTo(base.years[0].taxSavings, 0);
+    expect(withOverrides.years[0].ordinaryLossBenefit).toBeCloseTo(
+      base.years[0].ordinaryLossBenefit,
+      0
+    );
   });
 });
 

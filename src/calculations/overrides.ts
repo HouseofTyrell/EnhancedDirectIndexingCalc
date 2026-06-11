@@ -79,11 +79,18 @@ export function calculateWithOverrides(
   }
 
   // Calculate initial sizing (will be adjusted for infusions)
-  const baseSizing = calculateSizing(inputs, settings.qfafMultiplier);
+  const baseSizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
 
   // Pre-calculate base tax rates
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+
+  // Honor custom tax rates the same way calculate() does, so the standard
+  // view and Year-by-Year Planning agree when custom rates are set.
+  const useCustomRates =
+    settings.stcgRate !== DEFAULT_SETTINGS.stcgRate ||
+    settings.ltcgRate !== DEFAULT_SETTINGS.ltcgRate ||
+    settings.niitRate !== DEFAULT_SETTINGS.niitRate;
 
   const years: YearResult[] = [];
 
@@ -124,9 +131,15 @@ export function calculateWithOverrides(
 
     // Calculate tax rates for this year's income (needed for cash infusion tax adjustment)
     const yearTaxRates: TaxRates = {
-      stRate: getFederalStRate(yearIncome, inputs.filingStatus),
-      ltRate: getFederalLtRate(yearIncome, inputs.filingStatus),
-      ordinaryRate: getFederalOrdinaryRate(yearIncome, inputs.filingStatus),
+      stRate: useCustomRates
+        ? settings.stcgRate
+        : getFederalStRate(yearIncome, inputs.filingStatus),
+      ltRate: useCustomRates
+        ? settings.ltcgRate + settings.niitRate
+        : getFederalLtRate(yearIncome, inputs.filingStatus),
+      ordinaryRate: useCustomRates
+        ? settings.stcgRate
+        : getFederalOrdinaryRate(yearIncome, inputs.filingStatus),
       stateRate: baseStateRate,
       section461Limit:
         settings.section461Limits[inputs.filingStatus] ??
@@ -200,7 +213,7 @@ export function calculateWithOverrides(
         yearStartTotalCollateral *
         calStLossRate *
         (1 - settings.washSaleDisallowanceRate) /
-        (QFAF_ST_GAIN_RATE * opFraction) *
+        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
         (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);

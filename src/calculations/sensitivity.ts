@@ -100,7 +100,7 @@ export function calculateWithSensitivity(
   const allocation = resolveAllocation(inputs);
 
   // Calculate initial sizing
-  const sizing = calculateSizing(inputs, settings.qfafMultiplier);
+  const sizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
 
   // Get base state rate
   const baseStateRate =
@@ -204,7 +204,7 @@ export function calculateWithSensitivity(
         yearStartTotalCollateral *
         calStLossRate *
         (1 - settings.washSaleDisallowanceRate) /
-        (QFAF_ST_GAIN_RATE * opFraction) *
+        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
         (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -394,11 +394,11 @@ function calculateYearWithSensitivity(
     netStGainLoss -= usedStCarryforward;
   }
 
-  // Section 461(l) limitation on ordinary losses
+  // Section 461(l) limitation on ordinary losses (income clamped ≥ 0, see core.ts)
   const usableOrdinaryLoss = Math.min(
     ordinaryLossesGenerated,
     taxRates.section461Limit,
-    inputs.annualIncome
+    Math.max(0, inputs.annualIncome)
   );
   const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
 

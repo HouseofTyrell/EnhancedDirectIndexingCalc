@@ -100,7 +100,7 @@ export function calculate(
   inputs: CalculatorInputs,
   settings: AdvancedSettings = DEFAULT_SETTINGS
 ): CalculationResult {
-  const sizing = calculateSizing(inputs, settings.qfafMultiplier);
+  const sizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
   const allocation = resolveAllocation(inputs);
 
   // Pre-calculate tax rates once before the loop (013 - redundant lookups)
@@ -212,7 +212,7 @@ export function calculate(
         yearStartTotalCollateral *
         calStLossRate *
         (1 - settings.washSaleDisallowanceRate) /
-        (QFAF_ST_GAIN_RATE * opFraction) *
+        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
         (1 - (inputs.qfafSizingCushion ?? 0));
       // Can only shrink, never grow beyond initial or current value
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
@@ -365,10 +365,12 @@ export function calculateYear(
 
   // Section 461(l) limitation on ordinary losses
   // Cannot deduct more than: (1) losses generated, (2) statutory limit, (3) taxable income
+  // Income clamped at 0 so a negative year-income override can't produce a
+  // negative deduction. (Precise negative-income → NOL modeling is D-010.)
   const usableOrdinaryLoss = Math.min(
     ordinaryLossesGenerated,
     taxRates.section461Limit,
-    effectiveIncome
+    Math.max(0, effectiveIncome)
   );
   const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
 
