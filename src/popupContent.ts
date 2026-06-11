@@ -202,6 +202,46 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     impact: 'Shows the growth of your invested capital over the projection period.',
   },
 
+  'embedded-gain-at-horizon': {
+    title: 'Embedded Gain at Horizon',
+    definition:
+      'Estimated unrealized gain in the collateral portfolio at the end of the projection. ' +
+      'Includes both market appreciation and the basis reduction created by tax-loss ' +
+      'harvesting (each harvested loss lowers cost basis; realized LT gains raise it).',
+    formula:
+      'Embedded Gain = (Final Value − Initial Value) + Σ(ST Losses Harvested − LT Gains Realized)',
+    impact:
+      'This is the gain that would be taxed on full liquidation. Assumes initial basis equals ' +
+      'initial market value; Overlay collateral funded with appreciated stock carries additional ' +
+      'pre-existing embedded gain not shown.',
+  },
+
+  'incremental-deferred-tax': {
+    title: 'Deferred Tax If Liquidated',
+    definition:
+      'Estimated additional tax due on full liquidation at the end of the projection, beyond what ' +
+      'a passive buy-and-hold investor would owe, after applying remaining capital loss ' +
+      'carryforwards. This is the portion of projected tax savings that is timing (deferral) ' +
+      'rather than permanent benefit.',
+    formula: 'max(0, (Embedded Gain − Remaining Carryforwards) × LT Rate − Passive Exit Tax)',
+    impact:
+      'If the portfolio is never fully liquidated — held until death (basis step-up) or donated — ' +
+      'the deferred portion may become permanent. Remaining NOL carryforward is not applied here ' +
+      'and retains separate value against ordinary income.',
+  },
+
+  'net-benefit-after-liquidation': {
+    title: 'Net Benefit After Liquidation',
+    definition:
+      'Estimated total tax savings minus the deferred tax that would come due on full ' +
+      'liquidation at the end of the projection. This is the conservative, "everything sold" ' +
+      'view of the strategy benefit.',
+    formula: 'Total Tax Savings − Deferred Tax If Liquidated',
+    impact:
+      'The realistic outcome usually falls between this number (full liquidation) and the ' +
+      'headline Total Tax Savings (no liquidation, e.g. step-up at death).',
+  },
+
   'effective-tax-alpha': {
     title: 'Annualized Tax Alpha',
     definition: 'Average annual tax savings as a percentage of total exposure.',

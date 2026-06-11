@@ -27,6 +27,11 @@ export function DisclaimerFooter() {
             <li>NOL rules (80% offset limit) could be modified by future legislation</li>
             <li>State tax treatment varies; some states do not conform to federal rules</li>
             <li>QFAF tax treatment depends on ongoing IRS guidance</li>
+            <li>
+              Tax-loss harvesting reduces cost basis: a portion of projected savings is tax
+              deferral, not elimination, and becomes due if the portfolio is liquidated.
+              Deferral may become permanent via basis step-up at death or charitable transfer
+            </li>
           </ul>
         </div>
 

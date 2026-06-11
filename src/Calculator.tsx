@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { calculate, calculateWithOverrides, calculateWithSensitivity } from './calculations';
+import { calculate, calculateWithOverrides, calculateWithSensitivity, computeExitTaxAnalysis } from './calculations';
 import { DEFAULTS, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
 import {
@@ -161,6 +161,19 @@ export function Calculator() {
     combinedStRate,
     combinedLtRate,
   } = taxRates;
+
+  // Exit-tax / deferred-gain analysis (D-003): quantifies the embedded gain
+  // created by basis erosion and splits projected savings into permanent vs
+  // deferred components.
+  const exitTaxAnalysis = useMemo(
+    () =>
+      computeExitTaxAnalysis(
+        results,
+        combinedLtRate,
+        advancedSettings.growthEnabled ? advancedSettings.defaultAnnualReturn : 0
+      ),
+    [results, combinedLtRate, advancedSettings.growthEnabled, advancedSettings.defaultAnnualReturn]
+  );
 
   const updateInput = useCallback(
     <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => {
@@ -526,6 +539,7 @@ export function Calculator() {
         projectionYears={advancedSettings.projectionYears}
         collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
         collateralAmount={effectiveCollateral}
+        exitTaxAnalysis={exitTaxAnalysis}
         stateCode={inputs.stateCode}
       />
       </PinnableSection>
@@ -688,6 +702,7 @@ export function Calculator() {
                 projectionYears={advancedSettings.projectionYears}
                 collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
                 collateralAmount={effectiveCollateral}
+                exitTaxAnalysis={exitTaxAnalysis}
                 stateCode={inputs.stateCode}
               />
             ),

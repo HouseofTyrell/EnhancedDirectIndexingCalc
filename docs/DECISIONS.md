@@ -49,6 +49,12 @@ into the main view: show embedded gain, exit tax if liquidated, and split the he
 into permanent savings vs. deferral.
 **Implications:** Largest decided work item. Headline metrics and Meeting Mode handout
 will change. Sequence after the engine is green (D-004 and bug fixes below).
+**Status: IMPLEMENTED (2026-06-11)** — `src/calculations/exitTax.ts` computes embedded
+gain from actual projected dollar flows (works in split mode), carryforward shelter,
+exit tax vs. a passive baseline, and the permanent/deferred split. Surfaced in
+ResultsSummary as three cards (Embedded Gain / Deferred Tax If Liquidated / Net Benefit
+After Liquidation) with tooltips and a basis-reduction disclosure; footer disclosure
+added. Meeting Mode integration deferred pending D-008.
 
 ### D-004 — Wind-down / projection-length semantics
 **Date:** 2026-06-11
@@ -61,6 +67,7 @@ existing tests: always project at least 2 post-QFAF wind-down years so clients s
 carryforward tail and the views agree.
 **Implications:** Fix the engine, not the tests. Suite must be green before D-003 work
 starts.
+**Status: IMPLEMENTED (2026-06-11)** — all 13 failing tests now pass.
 
 ---
 
@@ -114,25 +121,26 @@ enable Advanced Settings to include them").
 
 ---
 
-## Bugs — no decision required (fix when engine work starts)
+## Bugs — no decision required
 
-1. **NIIT in ordinary-deduction benefits** — `core.ts:388-400` values ordinary-loss/NOL/
-   $3K benefits at a rate that includes 3.8% NIIT; deductions against W-2 wages don't
-   save NIIT. `ediOnly.ts:130-135` already does this correctly. ~$19.5K/yr overstatement
-   at default inputs.
-2. **QFAF unwind principal vanishes** — at end of duration `qfafValue` → 0 without
-   crediting returned principal to portfolio/cash or `qfafCashReturned`
-   (`core.ts:288-289`). Final Portfolio Value understates by ~the QFAF balance.
+1. ~~**NIIT in ordinary-deduction benefits**~~ **FIXED 2026-06-11** — `TaxRates` gains an
+   NIIT-free `ordinaryRate` used to value ordinary-loss/NOL/$3K benefits in all three
+   engines; ST/LT gain costs keep NIIT-inclusive rates. Regression tests added.
+2. ~~**QFAF unwind principal vanishes**~~ **FIXED 2026-06-11** — terminal unwind proceeds
+   recorded as `qfafCashReturned` in the last operating year; summary gains
+   `totalQfafCashReturned` and `finalTotalWealth`.
 3. **Custom QFAF multiplier inconsistency** — initial sizing (`sizing.ts:52`) and dynamic
-   resizing (`core.ts:217`) use the 1.5 constant; infusion resizing
-   (`overrides.ts:162`) and gains generation (`core.ts:323`) use the setting.
+   resizing (`core.ts`) use the 1.5 constant; infusion resizing
+   (`overrides.ts`) and gains generation use the setting.
 4. **Wash-sale haircut asymmetry** — initial sizing ignores the wash-sale rate, dynamic
    resizing applies it → Year-1 ST gain leakage in fixed mode when rate > 0.
 5. **`calculateWithOverrides` ignores custom STCG/LTCG/NIIT rates** — Year-by-Year
    Planning disagrees with the standard view when custom rates are set.
 6. **Negative-income edge** — `min(..., effectiveIncome)` can produce a negative ordinary
    deduction with negative year-income overrides.
-7. **Test suite red** — 13 failures, resolved by D-004's chosen semantics.
+7. ~~**Test suite red**~~ **FIXED 2026-06-11** — D-004 implemented; suite green (333 tests).
 8. **Three duplicated projection loops** (`core.ts` / `overrides.ts` / `sensitivity.ts`,
    incl. copy-pasted `getEffectiveFinancingCost`) — consolidate to prevent recurrence of
    3–5.
+9. **Pre-existing broken type-check build** — **FIXED 2026-06-11** (`ltGainsEnabled` made
+   optional to match all consumers; dead props removed from ScenarioComparisonPanel).
