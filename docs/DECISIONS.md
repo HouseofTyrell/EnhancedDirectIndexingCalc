@@ -16,10 +16,12 @@ all future work; don't re-ask them.
 **Date:** 2026-06-11
 **Context:** Owner wants the pre-improvement version kept intact as a comparison point
 ("fork the code here"). A true GitHub fork into the same account isn't possible.
-**Decision:** Keep `main` untouched and add an immutable annotated tag
-(`baseline-2026-06-11`) at the pre-improvement commit (`b6a8d4e`). All improvements land
-via PRs on working branches. To compare against baseline:
-`git diff baseline-2026-06-11..HEAD` or check out the tag and `npm run build`.
+**Decision:** Keep `main` untouched and pin an immutable marker at the pre-improvement
+commit (`b6a8d4e`). Owner chose a tag; the remote rejects tag pushes (branch-restricted),
+so the equivalent `baseline-2026-06-11` *branch* was created at `b6a8d4e` instead —
+functionally identical and visible in the GitHub UI. All improvements land via PRs on
+working branches. To compare against baseline:
+`git diff origin/baseline-2026-06-11..HEAD` or check out the branch and `npm run build`.
 **Implications:** No improvement work is committed directly to `main`. The pre-built
 `TaxOptimizationCalculator.html` at the tag is the frozen distributable of the old version.
 
