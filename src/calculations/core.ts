@@ -143,9 +143,9 @@ export function calculate(
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
 
-  // QFAF duration determines when strategy ends; wind-down continues until carryforwards exhausted
+  // QFAF duration determines when strategy ends; the projection then shows the
+  // wind-down tail so carryforward usage stays visible.
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
-  const maxProjectionYears = Math.max(projectionYears, 30); // Safety cap
 
   // Partial year: month 1 = full year (12/12), month 4 = 9/12, month 12 = 1/12.
   // For partial-year starts (yf < 1), the strategy spans qfafDuration + 1
@@ -156,17 +156,13 @@ export function calculate(
   const strategyLastCalendarYear =
     qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
 
-  for (let year = 1; year <= maxProjectionYears; year++) {
-    // In wind-down mode: stop if all carryforwards are exhausted
-    const inWindDown = strategyLastCalendarYear > 0 && year > strategyLastCalendarYear;
-    if (inWindDown && stCarryforward <= 0 && ltCarryforward <= 0 && nolCarryforward <= 0) {
-      break;
-    }
-    // If no QFAF (pure collateral), respect projectionYears as before
-    if (qfafDuration === 0 && year > projectionYears) {
-      break;
-    }
+  // Auto-extend the projection to show at least 2 post-QFAF wind-down years
+  // (D-004). Matches calculateWithOverrides so the two views agree.
+  const minProjection =
+    qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
+  const effectiveProjectionYears = Math.max(projectionYears, minProjection);
 
+  for (let year = 1; year <= effectiveProjectionYears; year++) {
     // Snapshot the per-leg state for this year's computations.
     const yearStartLegs: ResolvedLeg[] = allocation.legs.map((leg, i) => ({
       strategy: leg.strategy,
