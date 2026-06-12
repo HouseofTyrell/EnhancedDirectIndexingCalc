@@ -322,9 +322,15 @@ export function calculateWithSensitivity(
       sizing,
       inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined,
       settings.discountRate,
+      // Mirrors core.ts: no state component where individuals get no loss
+      // carryforwards (PA/NJ) — those losses expire each state tax year.
       finalYearRates && {
-        combinedStRate: finalYearRates.stRate + finalYearRates.state.stRate,
-        combinedLtRate: finalYearRates.ltRate + finalYearRates.state.ltRate,
+        combinedStRate:
+          finalYearRates.stRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.stRate : 0),
+        combinedLtRate:
+          finalYearRates.ltRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.ltRate : 0),
       }
     ),
   };

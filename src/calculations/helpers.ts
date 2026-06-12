@@ -302,9 +302,9 @@ export function calculateSummary(
 
   // Loss reserve built (D-015): the ending CF balances are the EDI product's
   // contingent shelter. Valued character-by-character at the final year's
-  // combined gains rates — CFs offset future capital gains, which PA/NJ DO
-  // tax, so the state component uses gains rates rather than the (disallowed)
-  // ordinary-deduction rate. Kept out of totalTaxSavings: contingent value.
+  // combined gains rates. Callers zero the state component where individuals
+  // get no loss carryforwards (PA/NJ — losses expire each state tax year).
+  // Kept out of totalTaxSavings: contingent value.
   const finalStCarryforward = lastYear?.stLossCarryforward ?? 0;
   const finalLtCarryforward = lastYear?.ltLossCarryforward ?? 0;
   const lossReserveShelterValue = safeNumber(

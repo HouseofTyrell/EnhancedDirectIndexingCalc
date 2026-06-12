@@ -678,7 +678,10 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     impact:
       'Contingent on future gains being realized — it is NEVER added to the realized Est. Tax ' +
       'Savings headline. When you model a gain event, the sheltered portion moves into realized ' +
-      'savings and the reserve shrinks.',
+      'savings and the reserve shrinks. Expiration: federal capital-loss carryforwards never ' +
+      'expire during life (they are lost at death — see Net If Held to Step-Up), and post-2017 ' +
+      'NOLs carry forward indefinitely. PA and NJ give individuals no state loss carryforwards, ' +
+      'so the reserve is valued at federal-only rates there.',
   },
 
   'protection-ratio': {

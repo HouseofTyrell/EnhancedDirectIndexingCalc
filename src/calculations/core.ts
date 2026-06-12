@@ -472,9 +472,16 @@ export function calculateWithOverrides(
       adjustedSizing,
       inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined,
       settings.discountRate,
+      // Reserve valuation rates: PA/NJ give individuals NO loss carryforwards,
+      // so the state-level shelter of an end-of-horizon CF balance is zero —
+      // those losses expire each state tax year. Federal (incl. NIIT) remains.
       finalYearRates && {
-        combinedStRate: finalYearRates.stRate + finalYearRates.state.stRate,
-        combinedLtRate: finalYearRates.ltRate + finalYearRates.state.ltRate,
+        combinedStRate:
+          finalYearRates.stRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.stRate : 0),
+        combinedLtRate:
+          finalYearRates.ltRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.ltRate : 0),
       }
     ),
   };

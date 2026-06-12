@@ -66,11 +66,12 @@ describe('loss-reserve summary (D-015)', () => {
     expect(result.summary.lossReserveShelterValue).toBeCloseTo(expected, 2);
   });
 
-  it('values the reserve at PA GAINS rates despite no ordinary-loss offset', () => {
-    // PA gives $0 state benefit on ordinary deductions/NOL
-    // (allowsLossOffsetAgainstIncome: false), but it DOES tax capital gains
-    // at 3.07% — and CF shelter offsets future gains, so the reserve keeps
-    // the state gains-rate component.
+  it('values the reserve at FEDERAL-only rates for PA (losses expire each state year)', () => {
+    // PA (like NJ) gives individuals no loss carryforwards at all
+    // (allowsLossOffsetAgainstIncome: false): a CF balance carried past
+    // year-end has zero state shelter value — unused losses effectively
+    // expire each PA tax year. Only the federal component (incl. NIIT)
+    // survives into the reserve valuation.
     const result = calculate(
       createInputs({
         stateCode: 'PA',
@@ -82,8 +83,7 @@ describe('loss-reserve summary (D-015)', () => {
     );
     const { finalStCarryforward, finalLtCarryforward } = result.summary;
 
-    const expected =
-      finalStCarryforward * (FED_ST + 0.0307) + finalLtCarryforward * (FED_LT + 0.0307);
+    const expected = finalStCarryforward * FED_ST + finalLtCarryforward * FED_LT;
     expect(result.summary.lossReserveShelterValue).toBeCloseTo(expected, 2);
   });
 

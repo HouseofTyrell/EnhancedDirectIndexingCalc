@@ -514,6 +514,15 @@ anchor, step-up is disclosed upside.
     blank app-chrome lead page**~~ **FIXED 2026-06-12** — print zoom on handout pages,
     break-between (not after) pagination, app-nav hidden in print, compact footer.
     Verified: exactly 3 sheets, disclosures on every page.
+13. ~~**Loss reserve overvalued for PA/NJ residents**~~ **FIXED 2026-06-12** —
+    `lossReserveShelterValue` included the state gains-rate component for all states,
+    but PA/NJ give individuals NO loss carryforwards: unused losses effectively expire
+    each state tax year, so an end-of-horizon CF balance has zero state shelter value
+    there. Both engines now zero the state component when
+    `allowsLossOffsetAgainstIncome` is false; valued federal-only (incl. NIIT).
+    Surfaced while answering the owner's "do losses expire?" question — the popup now
+    states the expiration facts (federal CFs/post-2017 NOLs never expire during life;
+    lost at death per the step-up card; PA/NJ state-level immediate expiry).
 
 **UX polish queue — ALL FIXED 2026-06-12:**
 - ~~Tour started at results~~ → reordered to start at strategy/inputs, end at results.
