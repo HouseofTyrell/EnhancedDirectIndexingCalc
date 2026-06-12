@@ -541,6 +541,48 @@ headless-Chromium PDF render in QFAF, EDI, and EDI+fees scenarios. Tests: 10 add
 signed advantage; `MeetingMode.test.tsx` asserts the new handout text both modes);
 suite at 370.
 
+### Meeting Mode mock-meeting review (2026-06-12)
+
+Owner: "I like the format and idea but it doesn't hold up during a meeting." A scripted
+mock meeting (advisor pitch + 7 realistic interruptions + wrap-up, browser-driven)
+produced a friction log. Plain mechanical fixes (count-up discipline, tfoot contrast,
+dead pin button honesty, scrubber default, EDI hero formatting, app chrome hidden in
+MM, CPA-grade mechanics content incl. §461(l)/wash sales, EDI mechanics branching,
+dead-years chart explanation) need no decision. Four items were decided:
+
+#### D-022 — Meeting Mode decomposition must sum: by benefit type
+**Date:** 2026-06-12
+**Context:** the "How we get to $X" strip showed Year 1 + Years 2–N + NOL carryforward,
+which double-counts NOL (inside the years figure) — $3.42M of cards under a $2.34M
+headline, on screen and on the printed handout. Fails the CPA bar.
+**Decision (owner):** re-decompose by benefit type — ordinary-loss benefit, NOL usage,
+capital-loss/$3K benefit, less gain costs — which the engine already reports per year,
+sums exactly to the headline, and matches the chart legend.
+
+#### D-023 — In-meeting what-ifs: bounded meeting-rail presets
+**Date:** 2026-06-12
+**Context:** 5 of 7 realistic client questions (retirement income drop, fees, gain
+event, market drop, growth) forced exiting Meeting Mode mid-meeting.
+**Decision (owner):** add bounded controls to the MM rail — retirement step-down
+(year + new income), gain event (year + size), growth on/off + return, financing fees
+on/off — running through the one engine via existing overrides. Defaults stay off per
+D-002. Full events editor stays in the Workspace.
+
+#### D-024 — Comparison memory: auto before/after chip AND real pinning
+**Date:** 2026-06-12
+**Context:** live changes swap the story with no memory of the prior number; the Pin
+Scenario button was hard-wired dead (`canPin={false}`) with a misleading tooltip.
+**Decision (owner):** both — any live MM change shows a dismissible "Was → Now" chip
+under the hero automatically, and scenario pinning is wired for real with a pinned
+ghost comparison row in MM for deliberate A/B setups.
+
+#### D-025 — Meeting Mode runs sandboxed with a keep prompt
+**Date:** 2026-06-12
+**Context:** MM edits silently and permanently mutate the advisor's working scenario.
+**Decision (owner):** MM operates on a copy of inputs/settings; on exit, ask "Keep the
+changes made during the meeting?" — discard is the default, keep applies them to the
+Workspace. No silent mutation.
+
 ---
 
 ## Bugs — no decision required
