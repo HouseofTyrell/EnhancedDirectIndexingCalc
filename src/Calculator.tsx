@@ -315,19 +315,20 @@ export function Calculator() {
 
   // Meeting Mode: prospect-facing presentation of the current scenario.
   // Same inputs, same calculation results — different visualization.
+  // NOTE: the Classic host is NOT sandboxed (no MeetingSession wrapper), so
+  // the D-023 what-if props are intentionally omitted — the "Client
+  // questions" group only appears in the Workspace's sandboxed session
+  // (D-025). The D-024 chip and pin are Meeting-Mode-local and work here too.
   if (isMeetingMode) {
     return (
       <MeetingMode
         inputs={inputs}
         results={results}
-        collateralOnlyResults={collateralOnlyResults}
         taxRates={taxRates}
         exitAnalysis={exitTaxAnalysis}
         advancedSettings={advancedSettings}
         currentStrategy={currentStrategy}
         onExitMeetingMode={() => setIsMeetingMode(false)}
-        onPinScenario={handlePinScenario}
-        canPin={pinnedScenario.canPin}
         onUpdateInput={updateInput}
         onUpdateSettings={setAdvancedSettings}
       />

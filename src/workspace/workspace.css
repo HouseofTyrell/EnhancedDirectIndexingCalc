@@ -152,28 +152,39 @@
   color: var(--text-secondary, #64748b);
 }
 
-/* ── Sub-navigation ── */
+/* ── Sub-navigation ──
+   Segmented-control styling: these read as the primary way into the
+   year-by-year table and charts, so they must look like tabs, not links
+   (the owner twice failed to find the views behind the old text style). */
 .ws-subnav {
-  display: flex;
-  gap: 6px;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
-  padding-bottom: 0;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--section-bg, #f1f5f9);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  align-self: flex-start;
 }
 
 .ws-subnav-btn {
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
-  padding: 8px 14px;
-  font-size: 0.9rem;
+  border-radius: 7px;
+  padding: 9px 20px;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: var(--text-secondary, #64748b);
+  color: var(--text-secondary, #475569);
   cursor: pointer;
 }
 
+.ws-subnav-btn:hover:not(.active) {
+  background: var(--card-bg, #fff);
+}
+
 .ws-subnav-btn.active {
-  color: #2563eb;
-  border-bottom-color: #2563eb;
+  color: #fff;
+  background: #2563eb;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
 }
 
 /* ── Overview ── */

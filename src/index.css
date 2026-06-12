@@ -118,6 +118,21 @@ body {
   z-index: var(--z-sticky);
 }
 
+/* Meeting Mode (mock-meeting review): hide the app tab bar — and the theme
+   toggle inside it — while Meeting Mode is mounted, on screen as well as in
+   print. MeetingMode adds/removes this body class on mount/unmount, so the
+   chrome returns the moment the advisor exits. */
+body.meeting-mode-active .app-nav {
+  display: none;
+}
+
+/* "For your CPA" card (Meeting Mode mechanics): collapsible <details> on
+   screen; the print handout swaps in the always-expanded variant instead
+   (see the print block below). */
+.mm-cpa-print-expanded {
+  display: none;
+}
+
 .nav-container {
   max-width: none;
   margin: 0 auto;
@@ -7070,6 +7085,16 @@ select:focus:not(:focus-visible) {
     zoom: 0.62;
   }
 
+  /* Long projections (set in MeetingMode.tsx by visible year count): the
+     page-2 table grows a row per year, so tighten its zoom to keep one
+     sheet per logical page. */
+  .meeting-mode-print .meeting-mode-print-page.mm-print-dense {
+    zoom: 0.5;
+  }
+  .meeting-mode-print .meeting-mode-print-page.mm-print-densest {
+    zoom: 0.34;
+  }
+
   /* Break BETWEEN pages (not after the last one): a trailing sibling div
      defeats :last-of-type and used to emit a blank final sheet. */
   .meeting-mode-print .meeting-mode-print-page + .meeting-mode-print-page {
@@ -7091,6 +7116,16 @@ select:focus:not(:focus-visible) {
   /* Stop sticky positioning from breaking pagination. */
   .meeting-mode-print header {
     position: static !important;
+  }
+
+  /* "For your CPA": print the expanded variant on page 3 instead of the
+     on-screen <details> (whose collapsed summary would print as a stub).
+     Page count re-verified at exactly 3 sheets with this expanded. */
+  .meeting-mode-print .mm-cpa-details {
+    display: none !important;
+  }
+  .meeting-mode-print .mm-cpa-print-expanded {
+    display: block !important;
   }
 
   /* Tame heavy shadows + animations on paper. */

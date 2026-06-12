@@ -541,6 +541,96 @@ headless-Chromium PDF render in QFAF, EDI, and EDI+fees scenarios. Tests: 10 add
 signed advantage; `MeetingMode.test.tsx` asserts the new handout text both modes);
 suite at 370.
 
+### Meeting Mode mock-meeting review (2026-06-12)
+
+Owner: "I like the format and idea but it doesn't hold up during a meeting." A scripted
+mock meeting (advisor pitch + 7 realistic interruptions + wrap-up, browser-driven)
+produced a friction log. Plain mechanical fixes (count-up discipline, tfoot contrast,
+dead pin button honesty, scrubber default, EDI hero formatting, app chrome hidden in
+MM, CPA-grade mechanics content incl. §461(l)/wash sales, EDI mechanics branching,
+dead-years chart explanation) need no decision. Four items were decided:
+
+#### D-022 — Meeting Mode decomposition must sum: by benefit type
+**Date:** 2026-06-12
+**Context:** the "How we get to $X" strip showed Year 1 + Years 2–N + NOL carryforward,
+which double-counts NOL (inside the years figure) — $3.42M of cards under a $2.34M
+headline, on screen and on the printed handout. Fails the CPA bar.
+**Decision (owner):** re-decompose by benefit type — ordinary-loss benefit, NOL usage,
+capital-loss/$3K benefit, less gain costs — which the engine already reports per year,
+sums exactly to the headline, and matches the chart legend.
+**Status: IMPLEMENTED (2026-06-12)** — `computeBenefitDecomposition` (exported from
+`MeetingMode.tsx`) sums the engine's own per-year fields over the visible window:
+Σ ordinaryLossBenefit + Σ nolUsageBenefit + Σ capitalLossBenefit −
+Σ (ltGainCost + remainingStGainCost) — the exact per-year identity core.ts uses for
+`taxSavings`, so the strip sums to the headline by construction. QFAF strip shows the
+three benefit cards (chart-legend labels/colors) plus a "Less: gains & costs" card only
+when costs are nonzero; the EDI strip keeps its Year-1 / Years 2–N realized split
+(computed from the one unrounded source) with the loss-reserve tile still excluded
+from the realized bar. Card figures are whole-dollar and reconciled via
+`reconcileRounded` (largest component absorbs the ≤$2 float residual) with an explicit
+"$a + $b + $c − $d = $total" line, so the displayed numbers also sum exactly — killing
+the "$2K + $14K vs $15K" rounding mismatch. Printed page-1 strip is the same component.
+Tests assert engine-level and display-level summation in both modes; browser-verified
+live (QFAF: $1,256,494 + $1,082,456 + $0 = $2,338,950 under the $2.34M hero; EDI:
+$1,509 + $13,581 = $15,090 under the $15K hero); print pagination re-verified at
+exactly 3 sheets in both modes.
+
+#### D-023 — In-meeting what-ifs: bounded meeting-rail presets
+**Date:** 2026-06-12
+**Context:** 5 of 7 realistic client questions (retirement income drop, fees, gain
+event, market drop, growth) forced exiting Meeting Mode mid-meeting.
+**Decision (owner):** add bounded controls to the MM rail — retirement step-down
+(year + new income), gain event (year + size), growth on/off + return, financing fees
+on/off — running through the one engine via existing overrides. Defaults stay off per
+D-002. Full events editor stays in the Workspace.
+**Status: IMPLEMENTED (2026-06-12)** — collapsible "Client questions" rail group (labeled
+"answers reset unless kept") with the four what-ifs, all off by default. Retirement
+step-down and the LT gain event are composed into the SAME sparse `YearOverride` map the
+Workspace events editor feeds (`composeWhatIfOverrides` in
+`src/workspace/MeetingSession.tsx`) and run through `calculateWithOverrides` — proven
+equivalent to hand-built overrides by test. Growth (+ 0–12% return slider) and financing
+fees toggle the meeting-local settings copy. Workspace-host only: the Classic-tab Meeting
+Mode is not sandboxed, so the group is hidden there.
+
+#### D-024 — Comparison memory: auto before/after chip AND real pinning
+**Date:** 2026-06-12
+**Context:** live changes swap the story with no memory of the prior number; the Pin
+Scenario button was hard-wired dead (`canPin={false}`) with a misleading tooltip.
+**Decision (owner):** both — any live MM change shows a dismissible "Was → Now" chip
+under the hero automatically, and scenario pinning is wired for real with a pinned
+ghost comparison row in MM for deliberate A/B setups.
+**Status: IMPLEMENTED (2026-06-12)** — (1) Auto chip: baseline captured at MM entry and
+at each dismissal; any change to the visible-window savings (or the EDI loss reserve in
+EDI mode) renders a one-line dismissible "Was X → Now Y" chip under the hero (derived
+state — it can never show stale values). (2) Real pin: "Pin current scenario" in the
+advisor rail freezes a small struct (headline, year-1, net-if-liquidated, loss reserve,
+final wealth) — NOT live results — into a single replace-on-repin slot; a ghost row with
+an Unpin control renders under the hero, survives level switches, and dies with MM exit
+(not persisted). The print one-pager gains a compact "Compared with pinned scenario"
+line on page 1; pagination re-verified at exactly 3 sheets (QFAF + EDI, pin + preset
+active). The old dead pin button / misleading tooltip path and the unused
+`onPinScenario`/`canPin`/`collateralOnlyResults` props were removed from both hosts.
+Tests cover chip old/new + re-baselining and pin freezing under input changes.
+
+#### D-025 — Meeting Mode runs sandboxed with a keep prompt
+**Date:** 2026-06-12
+**Context:** MM edits silently and permanently mutate the advisor's working scenario.
+**Decision (owner):** MM operates on a copy of inputs/settings; on exit, ask "Keep the
+changes made during the meeting?" — discard is the default, keep applies them to the
+Workspace. No silent mutation.
+**Status: IMPLEMENTED (2026-06-12)** — new `MeetingSession` (`src/workspace/
+MeetingSession.tsx`) wraps Meeting Mode from the Workspace: it snapshots the effective
+inputs/settings/per-year events at entry and holds the meeting-local copies; all MM rail
+edits and D-023 what-ifs hit the copy, computed through the shared
+`calculate`/`calculateWithOverrides` + rates pipeline (`computeScenarioRates`/
+`buildActiveOverrides`, now used by both the Workspace pane and the session). Dirty exit
+shows the keep prompt (Discard autofocused/default; backdrop click returns to the
+meeting); Keep applies inputs + settings and materializes active what-ifs into the
+Workspace events map (and drops total-budget funding mode, CSV-import convention).
+Clean exits skip the prompt. The Classic-tab Meeting Mode host remains un-sandboxed
+(live edits, as before) and is labeled accordingly in code. Workspace-level test proves
+Discard leaves inputs bit-identical and Keep applies them.
+
 ---
 
 ## Bugs — no decision required
