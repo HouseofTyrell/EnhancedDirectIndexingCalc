@@ -112,7 +112,7 @@ describe('Split Allocation', () => {
     expect(legs[0]?.strategyType).toBe('core');
     expect(legs[1]?.strategyType).toBe('overlay');
     expect(legs[0]?.year1StLosses).toBeCloseTo(1_150_000, 0); // 5M × 23%
-    expect(legs[1]?.year1StLosses).toBeCloseTo(550_000, 0);   // 5M × 11%
+    expect(legs[1]?.year1StLosses).toBeCloseTo(550_000, 0); // 5M × 11%
   });
 
   it('auto-sizes QFAF against the combined ST loss capacity', () => {

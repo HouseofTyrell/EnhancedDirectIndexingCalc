@@ -50,10 +50,7 @@ export function App() {
             Classic Calculator
           </button>
           {activeView === 'qfaf-test' && (
-            <button
-              className={`nav-tab active`}
-              onClick={() => setActiveView('qfaf-test')}
-            >
+            <button className={`nav-tab active`} onClick={() => setActiveView('qfaf-test')}>
               QFAF Test
             </button>
           )}

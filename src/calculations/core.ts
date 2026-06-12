@@ -7,7 +7,14 @@ import {
   DEFAULT_SETTINGS,
   YearOverride,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile, computeLtcgExcise } from '../taxData';
+import {
+  getFederalStRate,
+  getFederalLtRate,
+  getFederalOrdinaryRate,
+  getStateRate,
+  getStateTaxProfile,
+  computeLtcgExcise,
+} from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -93,7 +100,6 @@ export function calculateWithOverrides(
   settings: AdvancedSettings = DEFAULT_SETTINGS,
   overrides: YearOverride[] = []
 ): CalculationResult {
-
   const allocation = resolveAllocation(inputs);
 
   // Build a map of overrides by year for quick lookup
@@ -103,7 +109,11 @@ export function calculateWithOverrides(
   }
 
   // Calculate initial sizing (will be adjusted for infusions)
-  const baseSizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
+  const baseSizing = calculateSizing(
+    inputs,
+    settings.qfafMultiplier,
+    settings.washSaleDisallowanceRate
+  );
 
   // Pre-calculate base tax rates and the per-state treatment profile (D-005)
   const baseStateRate =
@@ -146,10 +156,8 @@ export function calculateWithOverrides(
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
   const yf = (13 - (inputs.startMonth ?? 1)) / 12;
   const isPartialStart = yf < 1;
-  const strategyLastCalendarYear =
-    qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
-  const minProjection =
-    qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
+  const strategyLastCalendarYear = qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
+  const minProjection = qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
   // NOL exhaustion extension: if NOL remains at the end of the standard
   // horizon, keep projecting wind-down years until it is fully used (capped,
@@ -160,9 +168,7 @@ export function calculateWithOverrides(
   // Null when the plan is disabled/invalid or split allocation is enabled
   // (split wins in v1; the UI shows a "plan ignored" warning).
   const dlvPlan = allocation.isSplit ? null : resolveDeleveragePlan(inputs);
-  const dlvSchedule = dlvPlan
-    ? resolveDeleverageSchedule(inputs, settings, hardCapYears)
-    : null;
+  const dlvSchedule = dlvPlan ? resolveDeleverageSchedule(inputs, settings, hardCapYears) : null;
   // Running embedded-gain state for unwind-gain sizing (consistent with
   // exitTax.ts: market appreciation + pre-existing gain + Σ(harvested ST
   // losses − realized LT gains) − Σ prior unwind gains realized).
@@ -183,7 +189,10 @@ export function calculateWithOverrides(
 
   for (let year = 1; year <= hardCapYears; year++) {
     const inNolExtension = year > effectiveProjectionYears;
-    if (inNolExtension && nolCarryforward <= 0.5) break;
+    // Extension runs while NOL or capital-loss carryforwards remain; the
+    // stall guard below stops it once nothing is meaningfully consuming them
+    // (the $3K/yr ordinary offset alone doesn't justify decades of rows).
+    if (inNolExtension && nolCarryforward <= 0.5 && stCarryforward + ltCarryforward <= 0.5) break;
 
     const override = overrideMap.get(year);
 
@@ -194,8 +203,7 @@ export function calculateWithOverrides(
     }
 
     // Get effective income for this year
-    const yearIncome =
-      override?.w2Income ?? (inNolExtension ? carryIncome : inputs.annualIncome);
+    const yearIncome = override?.w2Income ?? (inNolExtension ? carryIncome : inputs.annualIncome);
 
     // Calculate tax rates for this year's income (needed for cash infusion tax adjustment)
     const yearTaxRates: TaxRates = {
@@ -210,8 +218,7 @@ export function calculateWithOverrides(
         : getFederalOrdinaryRate(yearIncome, inputs.filingStatus),
       state: stateProfile,
       section461Limit:
-        settings.section461Limits[inputs.filingStatus] ??
-        SECTION_461L_LIMITS[inputs.filingStatus],
+        settings.section461Limits[inputs.filingStatus] ?? SECTION_461L_LIMITS[inputs.filingStatus],
     };
 
     // Apply cash infusion at the start of the year
@@ -268,7 +275,12 @@ export function calculateWithOverrides(
     const calStLossRate = dlvYear
       ? dlvYear.stLossRate
       : allocation.isSplit
-        ? getBlendedCalendarYearStLossRate(yearAllocation, year, inputs.startMonth ?? 1, qfafDuration)
+        ? getBlendedCalendarYearStLossRate(
+            yearAllocation,
+            year,
+            inputs.startMonth ?? 1,
+            qfafDuration
+          )
         : getCalendarYearStLossRate(
             allocation.primary.strategy.id,
             allocation.primary.strategy.ltGainRate,
@@ -285,10 +297,8 @@ export function calculateWithOverrides(
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0 && opFraction > 0) {
       const neededQfaf =
-        yearStartTotalCollateral *
-        calStLossRate *
-        (1 - settings.washSaleDisallowanceRate) /
-        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
+        ((yearStartTotalCollateral * calStLossRate * (1 - settings.washSaleDisallowanceRate)) /
+          ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction)) *
         (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -332,8 +342,11 @@ export function calculateWithOverrides(
     if (dlvYear && dlvPlan && dlvYear.fracUnwoundThisYear > 0) {
       const embeddedGain = Math.max(
         0,
-        yearStartTotalCollateral - dlvInitialCollateral +
-          dlvPreExistingGain + dlvCumNetHarvest - dlvCumUnwindRealized
+        yearStartTotalCollateral -
+          dlvInitialCollateral +
+          dlvPreExistingGain +
+          dlvCumNetHarvest -
+          dlvCumUnwindRealized
       );
       // Pro-rata: gain per dollar of the LONG book (NAV × (1 + long leverage)).
       const grossLongValue = yearStartTotalCollateral * (1 + dlvPlan.sourceLongLeverage);
@@ -350,8 +363,7 @@ export function calculateWithOverrides(
       const shortCoverGain = dlvPlan.shortCoverGainPct * shortDollarsCovered;
       yearOverrides.unwindStGain =
         (dlvPlan.unwindGainCharacter === 'st' ? dlvLongUnwindGain : 0) + shortCoverGain;
-      yearOverrides.unwindLtGain =
-        dlvPlan.unwindGainCharacter === 'lt' ? dlvLongUnwindGain : 0;
+      yearOverrides.unwindLtGain = dlvPlan.unwindGainCharacter === 'lt' ? dlvLongUnwindGain : 0;
     }
 
     const ev = override?.gainEvent;
@@ -408,9 +420,13 @@ export function calculateWithOverrides(
     const terminalProceeds =
       strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
     const totalRedeemed = cashReturned + terminalProceeds;
-    // Stall guard: an extension year that consumed no NOL adds nothing
-    // (e.g., zero income) — stop instead of emitting empty years.
-    if (inNolExtension && result.nolUsedThisYear <= 0.5) {
+    // Stall guard: an extension year must consume NOL or burn capital-loss
+    // carryforward beyond the $3K ordinary-offset trickle (LT-gain
+    // realization, deleverage unwinds); otherwise stop instead of emitting
+    // empty years (a $6M CF at $3K/yr would mean ~2,000 of them).
+    const cfConsumed =
+      stCarryforward + ltCarryforward - (result.stLossCarryforward + result.ltLossCarryforward);
+    if (inNolExtension && result.nolUsedThisYear <= 0.5 && cfConsumed <= 3000 + 0.5) {
       break;
     }
     if (redeployProceeds) {
@@ -486,8 +502,12 @@ export function calculateYear(
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate (default 150% of MV each)
   // Use safeNumber to prevent NaN/Infinity propagation (004)
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
-  const stGainsGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
-  const ordinaryLossesGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
+  const stGainsGenerated = strategyActive
+    ? safeNumber(qfafValue * qfafMultiplier * yearFraction)
+    : 0;
+  const ordinaryLossesGenerated = strategyActive
+    ? safeNumber(qfafValue * qfafMultiplier * yearFraction)
+    : 0;
 
   // Collateral generates ST losses and LT gains per strategy rates
   // Uses custom rates if set, otherwise applies 7% annual decay
@@ -509,7 +529,10 @@ export function calculateYear(
     grossStLosses = strategyActive ? collateralValue * effectiveStLossRate * yearFraction : 0;
   }
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * ltGainRate * yearFraction) : 0;
+  const ltGainsRealized =
+    strategyActive && inputs.ltGainsEnabled !== false
+      ? safeNumber(collateralValue * ltGainRate * yearFraction)
+      : 0;
 
   // Deleverage unwind gains (D-016/D-017): ENDOGENOUS strategy costs, the
   // opposite of D-012 gain events — they net WITH the strategy's own flows
@@ -569,14 +592,16 @@ export function calculateYear(
   // gain income absorbs deduction too (the cap base is full taxable income).
   const incomeAvailable = Math.max(
     0,
-    effectiveIncome + taxableSt + taxableLt + eventTaxableSt + eventTaxableLt -
+    effectiveIncome +
+      taxableSt +
+      taxableLt +
+      eventTaxableSt +
+      eventTaxableLt -
       capitalLossUsedAgainstIncome
   );
   const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
   const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
-  const excessToNol = safeNumber(
-    ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol
-  );
+  const excessToNol = safeNumber(ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol);
 
   // Update NOL carryforward: add excess, subtract used
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
@@ -671,11 +696,7 @@ export function calculateYear(
   // Net tax savings: ordinary deductions minus capital gains costs
   // ST gains and ST losses wash (by design) — no phantom "conversion benefit"
   const taxSavings = safeNumber(
-    ordinaryLossBenefit +
-      capitalLossBenefit +
-      nolUsageBenefit -
-      ltGainCost -
-      remainingStGainCost
+    ordinaryLossBenefit + capitalLossBenefit + nolUsageBenefit - ltGainCost - remainingStGainCost
   );
 
   // ST gain leakage: excess QFAF ST gains not offset by collateral losses
@@ -719,14 +740,18 @@ export function calculateYear(
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
   // QFAF can also use a separate return rate if specified (defaults to collateral growth rate)
   const qfafBaseReturn = settings.growthEnabled
-    ? (settings.qfafAnnualReturn !== null ? settings.qfafAnnualReturn : settings.defaultAnnualReturn)
+    ? settings.qfafAnnualReturn !== null
+      ? settings.qfafAnnualReturn
+      : settings.defaultAnnualReturn
     : 0;
   const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafBaseReturn : 0;
   // Grow at full return rate, then deduct fees at end of year on the grown value
   const grownQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
   const newQfafValue = safeNumber(grownQfafValue * (1 - totalFinancingCost * yearFraction));
   const grownCollateralValue = safeNumber(collateralValue * (1 + baseReturn * yearFraction));
-  const newCollateralValue = safeNumber(grownCollateralValue * (1 - totalFinancingCost * yearFraction));
+  const newCollateralValue = safeNumber(
+    grownCollateralValue * (1 - totalFinancingCost * yearFraction)
+  );
   // Dollar financing cost charged this year (D-014 insights input). In split
   // mode the blended rate is weighted by start-of-year collateral and all
   // legs grow at the same base return, so charging it on the grown total

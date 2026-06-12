@@ -97,8 +97,7 @@ describe('CSV scenario round-trip', () => {
   });
 
   it('reports unknown fields as warnings instead of failing', () => {
-    const csv =
-      'Field,Value\nschema,edicalc-scenario-v1\nfilingStatus,mfj\nfutureField,42\n';
+    const csv = 'Field,Value\nschema,edicalc-scenario-v1\nfilingStatus,mfj\nfutureField,42\n';
     const { inputs, warnings } = parseInputsFromCsv(csv);
     expect(inputs.filingStatus).toBe('mfj');
     expect(warnings.some(w => w.includes('futureField'))).toBe(true);
@@ -119,11 +118,9 @@ describe('CSV scenario round-trip', () => {
   });
 
   it('treats empty qfafAnnualReturn as null (use default)', () => {
-    const csv = [
-      'Field,Value',
-      'schema,edicalc-scenario-v1',
-      'settings.qfafAnnualReturn,',
-    ].join('\n');
+    const csv = ['Field,Value', 'schema,edicalc-scenario-v1', 'settings.qfafAnnualReturn,'].join(
+      '\n'
+    );
     const { settings, warnings } = parseInputsFromCsv(csv);
     expect(settings.qfafAnnualReturn).toBeNull();
     expect(warnings).toEqual([]);

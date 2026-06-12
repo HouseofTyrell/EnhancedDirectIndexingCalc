@@ -39,10 +39,22 @@ describe('Partial Year Start', () => {
       const defaultResult = calculate(defaultInputs);
 
       expect(janResult.years[0].taxSavings).toBeCloseTo(defaultResult.years[0].taxSavings, 2);
-      expect(janResult.years[0].stLossesHarvested).toBeCloseTo(defaultResult.years[0].stLossesHarvested, 2);
-      expect(janResult.years[0].ltGainsRealized).toBeCloseTo(defaultResult.years[0].ltGainsRealized, 2);
-      expect(janResult.years[0].stGainsGenerated).toBeCloseTo(defaultResult.years[0].stGainsGenerated, 2);
-      expect(janResult.years[0].ordinaryLossesGenerated).toBeCloseTo(defaultResult.years[0].ordinaryLossesGenerated, 2);
+      expect(janResult.years[0].stLossesHarvested).toBeCloseTo(
+        defaultResult.years[0].stLossesHarvested,
+        2
+      );
+      expect(janResult.years[0].ltGainsRealized).toBeCloseTo(
+        defaultResult.years[0].ltGainsRealized,
+        2
+      );
+      expect(janResult.years[0].stGainsGenerated).toBeCloseTo(
+        defaultResult.years[0].stGainsGenerated,
+        2
+      );
+      expect(janResult.years[0].ordinaryLossesGenerated).toBeCloseTo(
+        defaultResult.years[0].ordinaryLossesGenerated,
+        2
+      );
     });
   });
 
@@ -52,7 +64,8 @@ describe('Partial Year Start', () => {
       const halfYear = calculate(createInputs({ startMonth: 7 }));
 
       expect(halfYear.years[0].stLossesHarvested).toBeCloseTo(
-        fullYear.years[0].stLossesHarvested * 0.5, 0
+        fullYear.years[0].stLossesHarvested * 0.5,
+        0
       );
     });
 
@@ -61,7 +74,8 @@ describe('Partial Year Start', () => {
       const halfYear = calculate(createInputs({ startMonth: 7 }));
 
       expect(halfYear.years[0].ltGainsRealized).toBeCloseTo(
-        fullYear.years[0].ltGainsRealized * 0.5, 0
+        fullYear.years[0].ltGainsRealized * 0.5,
+        0
       );
     });
 
@@ -70,7 +84,8 @@ describe('Partial Year Start', () => {
       const halfYear = calculate(createInputs({ startMonth: 7 }));
 
       expect(halfYear.years[0].stGainsGenerated).toBeCloseTo(
-        fullYear.years[0].stGainsGenerated * 0.5, 0
+        fullYear.years[0].stGainsGenerated * 0.5,
+        0
       );
     });
 
@@ -79,7 +94,8 @@ describe('Partial Year Start', () => {
       const halfYear = calculate(createInputs({ startMonth: 7 }));
 
       expect(halfYear.years[0].ordinaryLossesGenerated).toBeCloseTo(
-        fullYear.years[0].ordinaryLossesGenerated * 0.5, 0
+        fullYear.years[0].ordinaryLossesGenerated * 0.5,
+        0
       );
     });
 
@@ -90,8 +106,8 @@ describe('Partial Year Start', () => {
       const fullYear = calculate(createInputs({ startMonth: 1 }));
       const halfYear = calculate(createInputs({ startMonth: 7 }));
 
-      expect(fullYear.years[1].effectiveStLossRate).toBeCloseTo(0.130, 3);
-      expect(halfYear.years[1].effectiveStLossRate).toBeCloseTo(0.180, 3);
+      expect(fullYear.years[1].effectiveStLossRate).toBeCloseTo(0.13, 3);
+      expect(halfYear.years[1].effectiveStLossRate).toBeCloseTo(0.18, 3);
       expect(halfYear.years[1].effectiveStLossRate).toBeGreaterThan(
         fullYear.years[1].effectiveStLossRate
       );
@@ -139,7 +155,8 @@ describe('Partial Year Start', () => {
       const aprilStart = calculate(createInputs({ startMonth: 4 }));
 
       expect(aprilStart.years[0].stLossesHarvested).toBeCloseTo(
-        fullYear.years[0].stLossesHarvested * 0.75, 0
+        fullYear.years[0].stLossesHarvested * 0.75,
+        0
       );
     });
 
@@ -180,7 +197,10 @@ describe('Partial Year Start', () => {
 
       // Net ST position must be zero — any leakage means proration was applied
       // to one side but not the other.
-      expect(halfYear.years[0].stGainsGenerated - halfYear.years[0].stLossesHarvested).toBeCloseTo(0, 0);
+      expect(halfYear.years[0].stGainsGenerated - halfYear.years[0].stLossesHarvested).toBeCloseTo(
+        0,
+        0
+      );
       expect(halfYear.years[0].stGainLeakage).toBeCloseTo(0, 0);
     });
 
@@ -189,7 +209,8 @@ describe('Partial Year Start', () => {
       const halfYear = calculate(createInputs({ startMonth: 7, qfafSizingMode: 'dynamic' }));
 
       expect(halfYear.years[0].stGainsGenerated).toBeCloseTo(
-        fullYear.years[0].stGainsGenerated * 0.5, 0
+        fullYear.years[0].stGainsGenerated * 0.5,
+        0
       );
     });
 
@@ -197,15 +218,17 @@ describe('Partial Year Start', () => {
       const fullYear = calculate(createInputs({ startMonth: 1, qfafSizingMode: 'dynamic' }));
       const halfYear = calculate(createInputs({ startMonth: 7, qfafSizingMode: 'dynamic' }));
 
-      expect(halfYear.years[0].taxSavings).toBeCloseTo(
-        fullYear.years[0].taxSavings * 0.5, 0
-      );
+      expect(halfYear.years[0].taxSavings).toBeCloseTo(fullYear.years[0].taxSavings * 0.5, 0);
     });
   });
 
   describe('Portfolio growth with partial year', () => {
     it('should pro-rate Year 1 growth when growth is enabled', () => {
-      const settings: AdvancedSettings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.10 };
+      const settings: AdvancedSettings = {
+        ...DEFAULT_SETTINGS,
+        growthEnabled: true,
+        defaultAnnualReturn: 0.1,
+      };
 
       const fullYear = calculate(createInputs({ startMonth: 1 }), settings);
       const halfYear = calculate(createInputs({ startMonth: 7 }), settings);
@@ -213,7 +236,7 @@ describe('Partial Year Start', () => {
       const fullGrowth = fullYear.years[0].collateralValue / 1000000;
       const halfGrowth = halfYear.years[0].collateralValue / 1000000;
 
-      expect(fullGrowth).toBeCloseTo(1.10, 1);
+      expect(fullGrowth).toBeCloseTo(1.1, 1);
       expect(halfGrowth).toBeCloseTo(1.05, 1);
     });
   });
@@ -224,16 +247,17 @@ describe('Partial Year Start — Sensitivity Path', () => {
     const fullYear = calculateWithSensitivity(
       createInputs({ startMonth: 1 }),
       DEFAULT_SETTINGS,
-      DEFAULT_SENSITIVITY,
+      DEFAULT_SENSITIVITY
     );
     const halfYear = calculateWithSensitivity(
       createInputs({ startMonth: 7 }),
       DEFAULT_SETTINGS,
-      DEFAULT_SENSITIVITY,
+      DEFAULT_SENSITIVITY
     );
 
     expect(halfYear.years[0].stLossesHarvested).toBeCloseTo(
-      fullYear.years[0].stLossesHarvested * 0.5, 0
+      fullYear.years[0].stLossesHarvested * 0.5,
+      0
     );
   });
 
@@ -243,12 +267,12 @@ describe('Partial Year Start — Sensitivity Path', () => {
     const fullYear = calculateWithSensitivity(
       createInputs({ startMonth: 1 }),
       DEFAULT_SETTINGS,
-      DEFAULT_SENSITIVITY,
+      DEFAULT_SENSITIVITY
     );
     const halfYear = calculateWithSensitivity(
       createInputs({ startMonth: 7 }),
       DEFAULT_SETTINGS,
-      DEFAULT_SENSITIVITY,
+      DEFAULT_SENSITIVITY
     );
 
     expect(halfYear.years[1].effectiveStLossRate).toBeGreaterThan(

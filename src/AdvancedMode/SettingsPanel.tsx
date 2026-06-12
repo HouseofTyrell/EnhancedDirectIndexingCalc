@@ -1,6 +1,10 @@
 import { AdvancedSettings, DEFAULT_SETTINGS } from '../types';
 import { InfoText } from '../InfoPopup';
-import { formatWithCommas, parseFormattedNumber, formatPercent as formatPercentBase } from '../utils/formatters';
+import {
+  formatWithCommas,
+  parseFormattedNumber,
+  formatPercent as formatPercentBase,
+} from '../utils/formatters';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -71,9 +75,7 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
-                <InfoText contentKey="setting-qfaf-growth">
-                  QFAF Growth
-                </InfoText>
+                <InfoText contentKey="setting-qfaf-growth">QFAF Growth</InfoText>
               </span>
               <span className="setting-hint">Whether QFAF appreciates with market returns</span>
             </div>
@@ -93,9 +95,7 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
-                <InfoText contentKey="setting-wash-sale">
-                  Wash Sale Disallowance
-                </InfoText>
+                <InfoText contentKey="setting-wash-sale">Wash Sale Disallowance</InfoText>
               </span>
               <span className="setting-hint">
                 % of ST losses disallowed due to wash sales (0-15%)
@@ -125,9 +125,7 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
         {/* Section 461(l) Limits */}
         <div className="settings-section">
           <h4>
-            <InfoText contentKey="section-461-limit">
-              Section 461(l) Limits
-            </InfoText>
+            <InfoText contentKey="section-461-limit">Section 461(l) Limits</InfoText>
           </h4>
 
           <div className="setting-row">
@@ -202,9 +200,7 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
         {/* NOL Rules */}
         <div className="settings-section">
           <h4>
-            <InfoText contentKey="nol-carryforward">
-              NOL Rules
-            </InfoText>
+            <InfoText contentKey="nol-carryforward">NOL Rules</InfoText>
           </h4>
 
           <div className="setting-row">
@@ -282,9 +278,7 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
         {/* Tax Rate Assumptions */}
         <div className="settings-section">
           <h4>
-            <InfoText contentKey="federal-st-rate">
-              Tax Rate Assumptions
-            </InfoText>
+            <InfoText contentKey="federal-st-rate">Tax Rate Assumptions</InfoText>
           </h4>
 
           <div className="setting-row">

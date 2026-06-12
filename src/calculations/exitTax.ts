@@ -89,17 +89,17 @@ export function computeExitTaxAnalysis(
   // here; without the subtraction the horizon exit would tax them twice.
   const cumulativeBasisReduction = safeNumber(
     years.reduce(
-      (sum, y) =>
-        sum + y.stLossesHarvested - y.ltGainsRealized - y.deleverageGainRealized,
+      (sum, y) => sum + y.stLossesHarvested - y.ltGainsRealized - y.deleverageGainRealized,
       0
     )
   );
 
   // Pre-existing gain: collateral contributed above its cost basis (the
   // concentrated-stock case). Included on both sides of the comparison.
-  const costBasis = collateralCostBasis !== undefined
-    ? Math.min(collateralCostBasis, initialCollateral)
-    : initialCollateral;
+  const costBasis =
+    collateralCostBasis !== undefined
+      ? Math.min(collateralCostBasis, initialCollateral)
+      : initialCollateral;
   const preExistingGain = Math.max(0, safeNumber(initialCollateral - costBasis));
 
   // Embedded gain = market value − basis

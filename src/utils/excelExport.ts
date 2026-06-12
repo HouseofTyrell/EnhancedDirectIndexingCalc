@@ -41,7 +41,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     ['Year 1 Tax Savings', data.results.years[0]?.taxSavings ?? 0],
     [
       'Year 2+ Tax Savings',
-      data.results.years.length > 1 ? data.results.years[1]?.taxSavings ?? 0 : 'N/A',
+      data.results.years.length > 1 ? (data.results.years[1]?.taxSavings ?? 0) : 'N/A',
     ],
     ['Total Tax Savings (All Years)', data.results.summary.totalTaxSavings],
     ['Effective Tax Alpha', data.results.summary.effectiveTaxAlpha],
@@ -78,9 +78,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     'NOL Carryforward',
     'Tax Savings',
     'Income Offset',
-    ...(hasDeleverage
-      ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved']
-      : []),
+    ...(hasDeleverage ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved'] : []),
   ];
   const yearRows: (string | number)[][] = [yearHeaders];
   for (const y of data.results.years) {

@@ -166,7 +166,7 @@
   border-bottom: 2px solid var(--border);
 }
 
-.comparison-table thead th:nth-child(n+2) {
+.comparison-table thead th:nth-child(n + 2) {
   text-align: right;
 }
 
@@ -339,7 +339,9 @@
   line-height: 1;
   flex-shrink: 0;
   opacity: 0.5;
-  transition: opacity 0.15s, color 0.15s;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
 }
 
 .scenario-header__remove:hover {

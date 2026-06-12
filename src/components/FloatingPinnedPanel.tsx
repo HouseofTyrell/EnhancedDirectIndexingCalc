@@ -35,10 +35,13 @@ function loadItemOrder(): string[] {
     const stored = localStorage.getItem(ORDER_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.every((v: unknown) => typeof v === 'string')) return parsed;
+      if (Array.isArray(parsed) && parsed.every((v: unknown) => typeof v === 'string'))
+        return parsed;
       localStorage.removeItem(ORDER_KEY);
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return [];
 }
 
@@ -50,12 +53,18 @@ function loadItemHeights(): Record<string, number> {
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) return parsed;
       localStorage.removeItem(HEIGHTS_KEY);
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return {};
 }
 
 const ANCHOR_CYCLE: (AnchorPosition | null)[] = [
-  'bottom-right', 'bottom-left', 'top-right', 'top-left', null,
+  'bottom-right',
+  'bottom-left',
+  'top-right',
+  'top-left',
+  null,
 ];
 
 function getAnchoredPosition(anchor: AnchorPosition, w: number, h: number) {
@@ -121,7 +130,13 @@ export function FloatingPinnedPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; px: number; py: number } | null>(null);
   const resizeStartRef = useRef<{
-    dir: ResizeDir; w: number; h: number; x: number; y: number; px: number; py: number;
+    dir: ResizeDir;
+    w: number;
+    h: number;
+    x: number;
+    y: number;
+    px: number;
+    py: number;
   } | null>(null);
   const itemResizeStartRef = useRef<{ id: string; h: number; py: number } | null>(null);
   const itemDragStartRef = useRef<{ id: string; py: number } | null>(null);
@@ -194,7 +209,9 @@ export function FloatingPinnedPanel({
       } else {
         localStorage.removeItem(ORDER_KEY);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [itemOrder]);
 
   // Persist item heights
@@ -205,13 +222,16 @@ export function FloatingPinnedPanel({
       } else {
         localStorage.removeItem(HEIGHTS_KEY);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [itemHeights]);
 
   // Derive ordered elements from itemOrder
-  const orderedElements = itemOrder.length > 0
-    ? itemOrder.map(id => elements.find(e => e.id === id)).filter((e): e is PinnedElement => !!e)
-    : elements;
+  const orderedElements =
+    itemOrder.length > 0
+      ? itemOrder.map(id => elements.find(e => e.id === id)).filter((e): e is PinnedElement => !!e)
+      : elements;
 
   // --- Panel drag ---
   const handleDragStart = useCallback(
@@ -257,8 +277,13 @@ export function FloatingPinnedPanel({
       e.stopPropagation();
       setResizeDir(dir);
       resizeStartRef.current = {
-        dir, w: size.width, h: size.height, x: pos.x, y: pos.y,
-        px: e.clientX, py: e.clientY,
+        dir,
+        w: size.width,
+        h: size.height,
+        x: pos.x,
+        y: pos.y,
+        px: e.clientX,
+        py: e.clientY,
       };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
@@ -268,7 +293,15 @@ export function FloatingPinnedPanel({
   const handleResizeMove = useCallback(
     (e: React.PointerEvent) => {
       if (!resizeDir || !resizeStartRef.current) return;
-      const { dir, w: startW, h: startH, x: startX, y: startY, px: startPx, py: startPy } = resizeStartRef.current;
+      const {
+        dir,
+        w: startW,
+        h: startH,
+        x: startX,
+        y: startY,
+        px: startPx,
+        py: startPy,
+      } = resizeStartRef.current;
       const dx = e.clientX - startPx;
       const dy = e.clientY - startPy;
       const maxW = Math.round(window.innerWidth * 0.9);
@@ -436,9 +469,7 @@ export function FloatingPinnedPanel({
   const allCollapsed = elements.length > 0 && elements.every(e => collapsedItems.has(e.id));
 
   // When collapsed, anchor Y to bottom of viewport
-  const effectiveY = collapsed
-    ? window.innerHeight - COLLAPSED_HEIGHT - EDGE_MARGIN
-    : pos.y;
+  const effectiveY = collapsed ? window.innerHeight - COLLAPSED_HEIGHT - EDGE_MARGIN : pos.y;
 
   // Mobile: bottom sheet style; Desktop: fixed with transform
   const panelStyle: React.CSSProperties = isMobile
@@ -466,7 +497,11 @@ export function FloatingPinnedPanel({
         onPointerUp={handleDragEnd}
         onPointerCancel={handleDragEnd}
       >
-        {!isMobile && <span className="floating-panel__drag-dots" aria-hidden="true">⋮⋮</span>}
+        {!isMobile && (
+          <span className="floating-panel__drag-dots" aria-hidden="true">
+            ⋮⋮
+          </span>
+        )}
         <button
           className="floating-panel__toggle"
           onClick={() => setCollapsed(c => !c)}
@@ -487,12 +522,30 @@ export function FloatingPinnedPanel({
               aria-label={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
             >
               {allCollapsed ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="7 13 12 18 17 13" />
                   <polyline points="7 6 12 11 17 6" />
                 </svg>
               ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="17 11 12 6 7 11" />
                   <polyline points="17 18 12 13 7 18" />
                 </svg>
@@ -503,11 +556,26 @@ export function FloatingPinnedPanel({
             <button
               className={`floating-panel__anchor-btn${anchor ? ' floating-panel__anchor-btn--active' : ''}`}
               onClick={cycleAnchor}
-              title={anchor ? `Anchored ${ANCHOR_LABELS[anchor]} — click to cycle` : 'Anchor to corner'}
-              aria-label={anchor ? `Anchored ${anchor}, click to change` : 'Anchor panel to screen corner'}
+              title={
+                anchor ? `Anchored ${ANCHOR_LABELS[anchor]} — click to cycle` : 'Anchor to corner'
+              }
+              aria-label={
+                anchor ? `Anchored ${anchor}, click to change` : 'Anchor panel to screen corner'
+              }
             >
-              {anchor ? ANCHOR_LABELS[anchor] : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {anchor ? (
+                ANCHOR_LABELS[anchor]
+              ) : (
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M12 17v5" />
                   <circle cx="12" cy="12" r="4" />
                   <path d="M12 3v2" />
@@ -524,7 +592,16 @@ export function FloatingPinnedPanel({
               title="Reset position, size & layout"
               aria-label="Reset panel position, size and layout"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
                 <path d="M21 3v5h-5" />
                 <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
@@ -538,7 +615,16 @@ export function FloatingPinnedPanel({
             title="Unpin all"
             aria-label="Unpin all"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="3 6 5 6 21 6" />
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
             </svg>
@@ -554,7 +640,10 @@ export function FloatingPinnedPanel({
             return (
               <div
                 key={el.id}
-                ref={node => { if (node) itemRefs.current.set(el.id, node); else itemRefs.current.delete(el.id); }}
+                ref={node => {
+                  if (node) itemRefs.current.set(el.id, node);
+                  else itemRefs.current.delete(el.id);
+                }}
                 className={`floating-panel__item${itemCollapsed ? ' floating-panel__item--collapsed' : ''}${dragItemId === el.id ? ' floating-panel__item--dragging' : ''}${dropTargetId === el.id ? ' floating-panel__item--drop-target' : ''}`}
               >
                 <div
@@ -562,7 +651,12 @@ export function FloatingPinnedPanel({
                   onClick={() => toggleItemCollapse(el.id)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleItemCollapse(el.id); } }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleItemCollapse(el.id);
+                    }
+                  }}
                 >
                   {!isMobile && elements.length > 1 && (
                     <span
@@ -584,7 +678,10 @@ export function FloatingPinnedPanel({
                   <span className="floating-panel__item-label">{el.label}</span>
                   <button
                     className="floating-panel__item-close"
-                    onClick={e => { e.stopPropagation(); onUnpin(el.id); }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onUnpin(el.id);
+                    }}
                     aria-label={`Unpin ${el.label}`}
                     title="Unpin"
                   >
@@ -620,17 +717,19 @@ export function FloatingPinnedPanel({
       )}
 
       {/* Multi-directional resize zones (desktop, expanded only) */}
-      {!collapsed && !isMobile && RESIZE_DIRS.map(dir => (
-        <div
-          key={dir}
-          className={`floating-panel__resize-zone floating-panel__resize-zone--${dir}`}
-          onPointerDown={e => handleResizeStart(dir, e)}
-          onPointerMove={handleResizeMove}
-          onPointerUp={handleResizeEnd}
-          onPointerCancel={handleResizeEnd}
-          aria-hidden="true"
-        />
-      ))}
+      {!collapsed &&
+        !isMobile &&
+        RESIZE_DIRS.map(dir => (
+          <div
+            key={dir}
+            className={`floating-panel__resize-zone floating-panel__resize-zone--${dir}`}
+            onPointerDown={e => handleResizeStart(dir, e)}
+            onPointerMove={handleResizeMove}
+            onPointerUp={handleResizeEnd}
+            onPointerCancel={handleResizeEnd}
+            aria-hidden="true"
+          />
+        ))}
     </div>
   );
 }

@@ -37,7 +37,10 @@ interface ScenarioResult {
   totalNolGenerated: number;
 }
 
-export const ScenarioAnalysis = memo(function ScenarioAnalysis({ inputs, settings }: ScenarioAnalysisProps) {
+export const ScenarioAnalysis = memo(function ScenarioAnalysis({
+  inputs,
+  settings,
+}: ScenarioAnalysisProps) {
   const scenarios = useMemo(() => {
     const results: ScenarioResult[] = [];
 

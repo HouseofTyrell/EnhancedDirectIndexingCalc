@@ -84,7 +84,7 @@ State warnings now describe the modeled treatment. Four per-state regression tes
 **Decision (owner):** QFAF stands for **"Quantinno Fundamental Arbitrage Fund."**
 **Status: IMPLEMENTED (2026-06-12)** — standardized in README, popup tooltips,
 ResultsTable, and Meeting Mode (which also lost its overstated "is established…giving
-structured exposure" phrasing). `TAX_CALCULATION_REVIEW.md` left as a historical
+structured exposure" phrasing). `docs/reviews/TAX_CALCULATION_REVIEW.md` left as a historical
 point-in-time document. Still open from the original finding: an owner-approved
 one-paragraph description of the 150% tax treatment and its qualification assumptions.
 

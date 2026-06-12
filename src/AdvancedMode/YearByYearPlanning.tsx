@@ -83,12 +83,14 @@ export const YearByYearPlanning = memo(function YearByYearPlanning({
             {overrides.map(override => {
               const hasInfusion = override.cashInfusion > 0;
               const taxType = override.cashInfusionTaxType ?? 'gross';
-              const netAmount = taxType === 'gross'
-                ? override.cashInfusion * (1 - combinedTaxRate)
-                : override.cashInfusion;
-              const grossAmount = taxType === 'net'
-                ? override.cashInfusion / (1 - combinedTaxRate)
-                : override.cashInfusion;
+              const netAmount =
+                taxType === 'gross'
+                  ? override.cashInfusion * (1 - combinedTaxRate)
+                  : override.cashInfusion;
+              const grossAmount =
+                taxType === 'net'
+                  ? override.cashInfusion / (1 - combinedTaxRate)
+                  : override.cashInfusion;
 
               return (
                 <tr key={override.year}>

@@ -93,7 +93,7 @@ describe('Financial Advisor Scenarios', () => {
       // Tax alpha should be reasonable (1-10% range for high-tax state like CA)
       // Higher combined rates (49.1% combined in CA) produce higher tax alpha
       expect(result.summary.effectiveTaxAlpha).toBeGreaterThan(0.01);
-      expect(result.summary.effectiveTaxAlpha).toBeLessThan(0.10);
+      expect(result.summary.effectiveTaxAlpha).toBeLessThan(0.1);
     });
   });
 
@@ -293,9 +293,7 @@ describe('Financial Advisor Scenarios', () => {
       const withoutQfaf = calculate(client, DEFAULT_SETTINGS);
 
       // QFAF adds significant value through ordinary loss deduction
-      expect(withQfaf.summary.totalTaxSavings).toBeGreaterThan(
-        withoutQfaf.summary.totalTaxSavings
-      );
+      expect(withQfaf.summary.totalTaxSavings).toBeGreaterThan(withoutQfaf.summary.totalTaxSavings);
     });
   });
 
@@ -318,9 +316,7 @@ describe('Financial Advisor Scenarios', () => {
 
     it('should show overlay strategies have lower leverage', () => {
       const coreModerate = calculateSizing(createClientProfile({ strategyId: 'core-145-45' }));
-      const overlayModerate = calculateSizing(
-        createClientProfile({ strategyId: 'overlay-45-45' })
-      );
+      const overlayModerate = calculateSizing(createClientProfile({ strategyId: 'overlay-45-45' }));
 
       // Overlay has lower ST loss rate, so QFAF is smaller relative to collateral
       expect(overlayModerate.qfafRatio).toBeLessThan(coreModerate.qfafRatio);

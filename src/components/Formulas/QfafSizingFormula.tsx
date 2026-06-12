@@ -8,7 +8,10 @@ export function QfafSizingFormula({ qfafMultiplier = 1.5 }: QfafSizingFormulaPro
   return (
     <div className="formula-doc">
       <h4>QFAF Auto-Sizing Formula</h4>
-      <p>QFAF is sized so its ST gains match the collateral's average ST losses over the sizing window:</p>
+      <p>
+        QFAF is sized so its ST gains match the collateral's average ST losses over the sizing
+        window:
+      </p>
       <pre>
         {`QFAF Value = (Collateral × Avg ST Loss Rate) / ${pct}%
 

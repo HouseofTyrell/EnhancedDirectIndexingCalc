@@ -3,7 +3,10 @@ interface ProjectionFormulaProps {
   projectionYears?: number;
 }
 
-export function ProjectionFormula({ qfafMultiplier = 1.5, projectionYears = 10 }: ProjectionFormulaProps) {
+export function ProjectionFormula({
+  qfafMultiplier = 1.5,
+  projectionYears = 10,
+}: ProjectionFormulaProps) {
   const pct = (qfafMultiplier * 100).toFixed(0);
   return (
     <div className="formula-doc">

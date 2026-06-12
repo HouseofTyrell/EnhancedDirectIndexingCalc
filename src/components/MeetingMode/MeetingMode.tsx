@@ -55,10 +55,7 @@ interface TaxRates {
   combinedOrdinaryRate: number;
 }
 
-type UpdateInput = <K extends keyof CalculatorInputs>(
-  key: K,
-  value: CalculatorInputs[K]
-) => void;
+type UpdateInput = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => void;
 type UpdateSettings = (updater: (prev: AdvancedSettings) => AdvancedSettings) => void;
 
 interface MeetingModeProps {
@@ -129,10 +126,10 @@ function Rail({
   onUpdateSettings: UpdateSettings;
 }) {
   const filingLabel =
-    FILING_STATUSES.find(f => f.value === inputs.filingStatus)?.label.replace(
-      'Married Filing Jointly',
-      'MFJ'
-    ).replace('Married Filing Separately', 'MFS').replace('Head of Household', 'HOH') ?? inputs.filingStatus.toUpperCase();
+    FILING_STATUSES.find(f => f.value === inputs.filingStatus)
+      ?.label.replace('Married Filing Jointly', 'MFJ')
+      .replace('Married Filing Separately', 'MFS')
+      .replace('Head of Household', 'HOH') ?? inputs.filingStatus.toUpperCase();
 
   return (
     <aside
@@ -201,7 +198,14 @@ function Rail({
             justifyContent: 'center',
           }}
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+          >
             <path d={collapsed ? 'M9 18l6-6-6-6' : 'M15 18l-6-6 6-6'} />
           </svg>
         </button>
@@ -265,8 +269,7 @@ function Rail({
             style={{
               padding: 14,
               borderRadius: 10,
-              background:
-                'linear-gradient(160deg, rgba(79,70,229,0.18), rgba(79,70,229,0.04))',
+              background: 'linear-gradient(160deg, rgba(79,70,229,0.18), rgba(79,70,229,0.04))',
               border: '1px solid rgba(79,70,229,0.25)',
               marginBottom: 20,
             }}
@@ -377,37 +380,51 @@ function Rail({
             Adjust scenario
           </div>
 
-          {inputs.splitAllocation?.enabled === true && (() => {
-            const view = getEffectiveView(inputs);
-            if (!view.isSplit) return null;
-            return (
-              <div
-                style={{
-                  marginBottom: 14,
-                  padding: 10,
-                  borderRadius: 8,
-                  background: 'rgba(79,70,229,0.15)',
-                  border: '1px solid rgba(79,70,229,0.35)',
-                  fontSize: 11,
-                  color: M.sidebarInk,
-                  lineHeight: 1.4,
-                }}
-              >
-                <div style={{ fontWeight: 700, color: 'white', marginBottom: 4, fontSize: 11.5 }}>
-                  Split allocation active
-                </div>
-                {view.legs.map(leg => (
-                  <div key={leg.strategy.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span>{leg.label}: {leg.strategy.name}</span>
-                    <span style={{ fontFamily: M.mono }}>{fmtCurrency(leg.amount)}</span>
+          {inputs.splitAllocation?.enabled === true &&
+            (() => {
+              const view = getEffectiveView(inputs);
+              if (!view.isSplit) return null;
+              return (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    padding: 10,
+                    borderRadius: 8,
+                    background: 'rgba(79,70,229,0.15)',
+                    border: '1px solid rgba(79,70,229,0.35)',
+                    fontSize: 11,
+                    color: M.sidebarInk,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: 'white', marginBottom: 4, fontSize: 11.5 }}>
+                    Split allocation active
                   </div>
-                ))}
-                <div style={{ marginTop: 6, fontSize: 10, fontStyle: 'italic', color: M.sidebarFaint }}>
-                  Edit split details in the main calculator view. Controls below are not active in split mode.
+                  {view.legs.map(leg => (
+                    <div
+                      key={leg.strategy.id}
+                      style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}
+                    >
+                      <span>
+                        {leg.label}: {leg.strategy.name}
+                      </span>
+                      <span style={{ fontFamily: M.mono }}>{fmtCurrency(leg.amount)}</span>
+                    </div>
+                  ))}
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 10,
+                      fontStyle: 'italic',
+                      color: M.sidebarFaint,
+                    }}
+                  >
+                    Edit split details in the main calculator view. Controls below are not active in
+                    split mode.
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
           {/* Strategy */}
           <div style={{ marginBottom: 12 }}>
@@ -499,9 +516,7 @@ function Rail({
                 type="text"
                 inputMode="numeric"
                 value={formatWithCommas(inputs.annualIncome)}
-                onChange={e =>
-                  onUpdateInput('annualIncome', parseFormattedNumber(e.target.value))
-                }
+                onChange={e => onUpdateInput('annualIncome', parseFormattedNumber(e.target.value))}
                 style={{
                   ...railFieldStyle,
                   paddingLeft: 22,
@@ -548,10 +563,7 @@ function Rail({
                 id="mm-filing"
                 value={inputs.filingStatus}
                 onChange={e =>
-                  onUpdateInput(
-                    'filingStatus',
-                    e.target.value as CalculatorInputs['filingStatus']
-                  )
+                  onUpdateInput('filingStatus', e.target.value as CalculatorInputs['filingStatus'])
                 }
                 style={railFieldStyle}
               >
@@ -785,12 +797,12 @@ function BenefitBreakdownChart({
   const activeI = yearIdx > 0 ? Math.min(yearIdx - 1, data.length - 1) : -1;
 
   // Color tokens — match the rest of Meeting Mode's palette.
-  const ordColor = M.accent;       // ordinary loss benefit (primary blue/purple)
-  const nolColor = '#8b7cf6';      // NOL usage benefit (lighter purple)
-  const capColor = '#38bdf8';      // capital loss benefit (sky blue)
-  const ltColor = '#dc2626';       // LT gain cost (red)
-  const stColor = '#f59e0b';       // remaining ST gain cost (amber)
-  const netColor = M.good;         // net savings dot/line (green)
+  const ordColor = M.accent; // ordinary loss benefit (primary blue/purple)
+  const nolColor = '#8b7cf6'; // NOL usage benefit (lighter purple)
+  const capColor = '#38bdf8'; // capital loss benefit (sky blue)
+  const ltColor = '#dc2626'; // LT gain cost (red)
+  const stColor = '#f59e0b'; // remaining ST gain cost (amber)
+  const netColor = M.good; // net savings dot/line (green)
 
   return (
     <div>
@@ -1015,15 +1027,8 @@ function LegendSwatch({
   );
 }
 
-
 // ═══ Animated count-up ═══
-function CountUp({
-  value,
-  duration = 1400,
-}: {
-  value: number;
-  duration?: number;
-}) {
+function CountUp({ value, duration = 1400 }: { value: number; duration?: number }) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
     let raf = 0;
@@ -1038,9 +1043,7 @@ function CountUp({
     return () => cancelAnimationFrame(raf);
   }, [value, duration]);
   return (
-    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-      ${(display / 1_000_000).toFixed(2)}M
-    </span>
+    <span style={{ fontVariantNumeric: 'tabular-nums' }}>${(display / 1_000_000).toFixed(2)}M</span>
   );
 }
 
@@ -1125,9 +1128,7 @@ function DetailView({
   totalNol: number;
   finalPortfolio: number;
 }) {
-  const cum = yearData.map((_, i) =>
-    yearData.slice(0, i + 1).reduce((s, a) => s + a.save, 0)
-  );
+  const cum = yearData.map((_, i) => yearData.slice(0, i + 1).reduce((s, a) => s + a.save, 0));
   const maxSave = Math.max(...yearData.map(y => Math.max(y.save, 0)), 1);
 
   return (
@@ -1204,9 +1205,7 @@ function DetailView({
                 style={{
                   cursor: 'pointer',
                   background: active ? M.accentFaint : 'transparent',
-                  borderLeft: active
-                    ? `3px solid ${M.accent}`
-                    : '3px solid transparent',
+                  borderLeft: active ? `3px solid ${M.accent}` : '3px solid transparent',
                   transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => {
@@ -1451,19 +1450,19 @@ function PrintPageFooter() {
         fontFamily: M.sans,
       }}
     >
-      <strong>Important disclosures.</strong> This is a hypothetical illustration for
-      discussion purposes only — not investment, tax, or legal advice, and not an offer of any
-      security. Estimates do not reflect advisory fees, financing costs, tracking error,
-      transaction costs, or behavioral effects; actual results will vary. Tax-loss harvesting
-      reduces cost basis: a portion of projected savings is tax deferral that becomes due if the
-      portfolio is liquidated (it may become permanent via basis step-up at death or charitable
-      transfer). Ordinary loss deductions are limited by IRC §461(l) ($512K MFJ / $256K others,
-      2026); excess becomes an NOL usable against up to 80% of future taxable income. Projections
-      assume 0–15% of harvested losses are disallowed as wash sales and that the QFAF (Quantinno
-      Fundamental Arbitrage Fund) qualifies for the modeled tax treatment under current IRS
-      guidance, which may change. State treatment varies — CA, NY, PA, NJ, MA, and WA differ
-      materially from the federal rules modeled here. Consult qualified tax, legal, and
-      investment advisors before acting. Past performance does not guarantee future results.
+      <strong>Important disclosures.</strong> This is a hypothetical illustration for discussion
+      purposes only — not investment, tax, or legal advice, and not an offer of any security.
+      Estimates do not reflect advisory fees, financing costs, tracking error, transaction costs, or
+      behavioral effects; actual results will vary. Tax-loss harvesting reduces cost basis: a
+      portion of projected savings is tax deferral that becomes due if the portfolio is liquidated
+      (it may become permanent via basis step-up at death or charitable transfer). Ordinary loss
+      deductions are limited by IRC §461(l) ($512K MFJ / $256K others, 2026); excess becomes an NOL
+      usable against up to 80% of future taxable income. Projections assume 0–15% of harvested
+      losses are disallowed as wash sales and that the QFAF (Quantinno Fundamental Arbitrage Fund)
+      qualifies for the modeled tax treatment under current IRS guidance, which may change. State
+      treatment varies — CA, NY, PA, NJ, MA, and WA differ materially from the federal rules modeled
+      here. Consult qualified tax, legal, and investment advisors before acting. Past performance
+      does not guarantee future results.
     </div>
   );
 }
@@ -1489,8 +1488,7 @@ function MechanicsView({
       n: 1,
       title: 'Establish QFAF',
       tone: M.accent,
-      body:
-        'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.',
+      body: 'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.',
       metric: fmtCurrency(qfafValue),
       metricLabel: 'QFAF value',
     },
@@ -1514,8 +1512,7 @@ function MechanicsView({
       n: 4,
       title: 'Tax savings compound',
       tone: M.good,
-      body:
-        'Estimated tax savings, if reinvested, can compound over time — potentially adding to after-tax results vs. standard direct indexing.',
+      body: 'Estimated tax savings, if reinvested, can compound over time — potentially adding to after-tax results vs. standard direct indexing.',
       metric: fmtCurrency(totalTaxSavings),
       metricLabel: 'Est. cumulative savings',
     },
@@ -1808,8 +1805,7 @@ export function MeetingMode({
   );
   // Effective collateral: total of both legs in split mode, single amount otherwise.
   const effectiveCollateral = useMemo(() => getEffectiveView(inputs).totalCollateral, [inputs]);
-  const finalPortfolio =
-    visibleYears[visibleYears.length - 1]?.totalValue ?? effectiveCollateral;
+  const finalPortfolio = visibleYears[visibleYears.length - 1]?.totalValue ?? effectiveCollateral;
   // Total NOL generated over the program (the final-year *balance* is often $0
   // once the NOL has been consumed, which made these labels read "$0 of NOL").
   const totalNol = results.summary.totalNolGenerated;
@@ -1936,10 +1932,10 @@ export function MeetingMode({
   ]);
 
   const filingLabel =
-    FILING_STATUSES.find(f => f.value === inputs.filingStatus)?.label.replace(
-      'Married Filing Jointly',
-      'MFJ'
-    ).replace('Married Filing Separately', 'MFS').replace('Head of Household', 'HOH') ?? inputs.filingStatus.toUpperCase();
+    FILING_STATUSES.find(f => f.value === inputs.filingStatus)
+      ?.label.replace('Married Filing Jointly', 'MFJ')
+      .replace('Married Filing Separately', 'MFS')
+      .replace('Head of Household', 'HOH') ?? inputs.filingStatus.toUpperCase();
 
   // Compact scenario summary used in the print header on every page so each
   // sheet stands alone.
@@ -2035,8 +2031,7 @@ export function MeetingMode({
                 gap: 6,
               }}
             >
-              <span style={{ width: 6, height: 6, borderRadius: 999, background: M.good }} />{' '}
-              LIVE
+              <span style={{ width: 6, height: 6, borderRadius: 999, background: M.good }} /> LIVE
             </div>
             <button
               onClick={onPinScenario}
@@ -2124,10 +2119,7 @@ export function MeetingMode({
 
         <div style={{ padding: '32px 36px', maxWidth: 1280, margin: '0 auto' }}>
           {(level === 'high' || printMode) && (
-            <div
-              className={printMode ? 'meeting-mode-print-page' : undefined}
-              data-print-page="1"
-            >
+            <div className={printMode ? 'meeting-mode-print-page' : undefined} data-print-page="1">
               {printMode && (
                 <PrintPageHeader
                   pageNumber={1}
@@ -2208,24 +2200,20 @@ export function MeetingMode({
                   {ediMode ? (
                     <>
                       Enhanced direct indexing generates an estimated{' '}
-                      <strong style={{ color: M.good }}>
-                        {fmtCurrency(totalTaxSavings)}
-                      </strong>{' '}
-                      of realized tax savings through {endYear} — and builds{' '}
+                      <strong style={{ color: M.good }}>{fmtCurrency(totalTaxSavings)}</strong> of
+                      realized tax savings through {endYear} — and builds{' '}
                       <strong>{fmtCurrency(cfReserveBalance)}</strong> of loss carryforwards, a
                       reserve worth an estimated{' '}
                       <strong style={{ color: M.accent }}>{fmtCurrency(lossReserve)}</strong> of
-                      shelter against future capital gains (contingent on those gains being
-                      realized — a business sale, concentrated-stock exit, or RSU diversification).
+                      shelter against future capital gains (contingent on those gains being realized
+                      — a business sale, concentrated-stock exit, or RSU diversification).
                     </>
                   ) : (
                     <>
                       Enhanced direct indexing with the QFAF overlay generates an estimated{' '}
-                      <strong style={{ color: M.good }}>
-                        {fmtCurrency(totalTaxSavings)}
-                      </strong>{' '}
-                      of net tax savings through {endYear},
-                      driven by ordinary loss deductions, NOL usage, and capital loss carryforwards.
+                      <strong style={{ color: M.good }}>{fmtCurrency(totalTaxSavings)}</strong> of
+                      net tax savings through {endYear}, driven by ordinary loss deductions, NOL
+                      usage, and capital loss carryforwards.
                     </>
                   )}
                   {!advancedSettings.financingFeesEnabled && (
@@ -2393,17 +2381,16 @@ export function MeetingMode({
                           {ediMode ? (
                             <>
                               realized savings are modest by design — the harvested losses are
-                              banked, not spent. Year over year the carryforward reserve
-                              compounds, reaching {fmtCurrency(lossReserve)} of contingent
-                              shelter by {endYear}. It pays off when a gain event lands: a sale
-                              up to {fmtCurrency(cfReserveBalance)} would be fully sheltered.
+                              banked, not spent. Year over year the carryforward reserve compounds,
+                              reaching {fmtCurrency(lossReserve)} of contingent shelter by {endYear}
+                              . It pays off when a gain event lands: a sale up to{' '}
+                              {fmtCurrency(cfReserveBalance)} would be fully sheltered.
                             </>
                           ) : (
                             <>
-                              year 1 saves roughly{' '}
-                              {fmtCurrency(detailYearData[0]?.save ?? 0)}. Because harvesting
-                              continues and NOL credits roll forward, the advantage compounds —
-                              so by {endYear} you reach{' '}
+                              year 1 saves roughly {fmtCurrency(detailYearData[0]?.save ?? 0)}.
+                              Because harvesting continues and NOL credits roll forward, the
+                              advantage compounds — so by {endYear} you reach{' '}
                               {fmtCurrency(totalTaxSavings)}. It's the compounding, not the rate,
                               that does the heavy lifting.
                             </>
@@ -2583,8 +2570,7 @@ export function MeetingMode({
                     Ready to go deeper?
                   </div>
                   <div style={{ fontSize: 12.5, color: M.inkSoft, marginTop: 2 }}>
-                    Show the year-by-year numbers, or walk through how the strategy actually
-                    works.
+                    Show the year-by-year numbers, or walk through how the strategy actually works.
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -2792,9 +2778,8 @@ export function MeetingMode({
               display: printMode ? 'none' : 'block',
             }}
           >
-            Estimates do not reflect advisory fees, financing costs, tracking error,
-            transaction costs, or behavioral effects. Actual results will vary. For discussion
-            purposes only.
+            Estimates do not reflect advisory fees, financing costs, tracking error, transaction
+            costs, or behavioral effects. Actual results will vary. For discussion purposes only.
           </div>
         </div>
       </main>

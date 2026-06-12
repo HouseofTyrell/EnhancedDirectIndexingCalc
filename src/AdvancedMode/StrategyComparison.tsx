@@ -129,7 +129,9 @@ export const StrategyComparison = memo(function StrategyComparison({
     <div className="strategy-comparison">
       <p className="section-description">
         Compare different strategies side-by-side to find the best fit for your situation. Select
-        2-3 strategies below.{baseInputs.qfafEnabled && ' Each strategy can use Fixed or Dynamic QFAF sizing independently.'}
+        2-3 strategies below.
+        {baseInputs.qfafEnabled &&
+          ' Each strategy can use Fixed or Dynamic QFAF sizing independently.'}
       </p>
 
       {/* Strategy Selector */}
@@ -209,9 +211,7 @@ export const StrategyComparison = memo(function StrategyComparison({
             <tbody>
               <tr className={getBest('qfafRequired') ? 'has-winner' : ''}>
                 <td>
-                  <InfoText contentKey="comp-qfaf-required">
-                    QFAF Required
-                  </InfoText>
+                  <InfoText contentKey="comp-qfaf-required">QFAF Required</InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -225,9 +225,7 @@ export const StrategyComparison = memo(function StrategyComparison({
 
               <tr>
                 <td>
-                  <InfoText contentKey="total-exposure">
-                    Total Exposure
-                  </InfoText>
+                  <InfoText contentKey="total-exposure">Total Exposure</InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -241,9 +239,7 @@ export const StrategyComparison = memo(function StrategyComparison({
 
               <tr>
                 <td>
-                  <InfoText contentKey="col-tax-savings">
-                    Year 1 Tax Savings
-                  </InfoText>
+                  <InfoText contentKey="col-tax-savings">Year 1 Tax Savings</InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -257,9 +253,7 @@ export const StrategyComparison = memo(function StrategyComparison({
 
               <tr>
                 <td>
-                  <InfoText contentKey="total-tax-savings">
-                    {years}-Year Tax Savings
-                  </InfoText>
+                  <InfoText contentKey="total-tax-savings">{years}-Year Tax Savings</InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -273,9 +267,7 @@ export const StrategyComparison = memo(function StrategyComparison({
 
               <tr>
                 <td>
-                  <InfoText contentKey="effective-tax-alpha">
-                    Tax Alpha
-                  </InfoText>
+                  <InfoText contentKey="effective-tax-alpha">Tax Alpha</InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -289,9 +281,7 @@ export const StrategyComparison = memo(function StrategyComparison({
 
               <tr>
                 <td>
-                  <InfoText contentKey="comp-tracking-error">
-                    Tracking Error
-                  </InfoText>
+                  <InfoText contentKey="comp-tracking-error">Tracking Error</InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td key={result.displayKey}>{result.trackingErrorDisplay}</td>

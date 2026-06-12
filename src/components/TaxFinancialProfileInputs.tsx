@@ -5,10 +5,7 @@ import { formatWithCommas, parseFormattedNumber, parseStateRate } from '../utils
 interface TaxFinancialProfileInputsProps {
   inputs: CalculatorInputs;
   validationWarnings: Record<string, string>;
-  onUpdateInput: <K extends keyof CalculatorInputs>(
-    key: K,
-    value: CalculatorInputs[K]
-  ) => void;
+  onUpdateInput: <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => void;
 }
 
 export function TaxFinancialProfileInputs({
@@ -56,7 +53,11 @@ export function TaxFinancialProfileInputs({
           <label htmlFor="state">
             State
             {getStateConformityWarning(inputs.stateCode) && (
-              <span className="conformity-indicator" tabIndex={0} aria-label="State tax conformity note">
+              <span
+                className="conformity-indicator"
+                tabIndex={0}
+                aria-label="State tax conformity note"
+              >
                 <span className="conformity-indicator__icon">&#9888;</span>
                 <span className="conformity-indicator__tooltip">
                   <strong>State Tax Conformity Note</strong>

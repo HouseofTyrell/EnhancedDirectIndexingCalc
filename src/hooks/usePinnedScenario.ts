@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import {
-  CalculatorInputs,
-  AdvancedSettings,
-  CalculationResult,
-  PinnedScenario,
-} from '../types';
+import { CalculatorInputs, AdvancedSettings, CalculationResult, PinnedScenario } from '../types';
 import { formatCurrencyAbbreviated } from '../utils/formatters';
 import { getEffectiveView } from '../utils/effectiveAllocation';
 
@@ -90,13 +85,23 @@ export interface UsePinnedScenarioReturn {
   /** Whether we can pin more (< MAX_SCENARIOS) */
   canPin: boolean;
   /** Pin current state as a new scenario */
-  pin: (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => void;
+  pin: (
+    inputs: CalculatorInputs,
+    settings: AdvancedSettings,
+    results: CalculationResult,
+    label?: string
+  ) => void;
   /** Remove a specific scenario by id */
   unpin: (id?: string) => void;
   /** Remove all pinned scenarios */
   unpinAll: () => void;
   /** Replace a specific scenario by id with new state */
-  replacePin: (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => void;
+  replacePin: (
+    inputs: CalculatorInputs,
+    settings: AdvancedSettings,
+    results: CalculationResult,
+    label?: string
+  ) => void;
   /** Get pinned state for restore (uses first scenario) */
   getPinnedState: () => { inputs: CalculatorInputs; advancedSettings: AdvancedSettings } | null;
 }
@@ -117,7 +122,12 @@ export function usePinnedScenario(): UsePinnedScenarioReturn {
   }, [scenarios]);
 
   const pin = useCallback(
-    (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => {
+    (
+      inputs: CalculatorInputs,
+      settings: AdvancedSettings,
+      results: CalculationResult,
+      label?: string
+    ) => {
       setScenarios(prev => {
         if (prev.length >= MAX_SCENARIOS) return prev; // silently reject if full
         const newScenario: PinnedScenario = {
@@ -149,7 +159,12 @@ export function usePinnedScenario(): UsePinnedScenarioReturn {
   }, []);
 
   const replacePin = useCallback(
-    (inputs: CalculatorInputs, settings: AdvancedSettings, results: CalculationResult, label?: string) => {
+    (
+      inputs: CalculatorInputs,
+      settings: AdvancedSettings,
+      results: CalculationResult,
+      label?: string
+    ) => {
       // Replace the most recent scenario, or add if none exist
       setScenarios(prev => {
         const newScenario: PinnedScenario = {

@@ -12,9 +12,7 @@ export function DisclaimerFooter() {
           <h4>Projection Limitations</h4>
           <ul>
             <li>Projections assume constant annual returns; actual markets are volatile</li>
-            <li>
-              Tax-loss harvesting effectiveness decays over time as easy losses are exhausted
-            </li>
+            <li>Tax-loss harvesting effectiveness decays over time as easy losses are exhausted</li>
             <li>Wash sale disallowance (5-15% of losses) reduces actual tax benefits</li>
             <li>Financing costs for leveraged positions reduce net returns</li>
           </ul>
@@ -27,17 +25,17 @@ export function DisclaimerFooter() {
             <li>NOL rules (80% offset limit) could be modified by future legislation</li>
             <li>State tax treatment varies; some states do not conform to federal rules</li>
             <li>
-              QFAF tax treatment depends on fund qualification and ongoing IRS guidance — see
-              the draft treatment description in the calculator (pending counsel review)
+              QFAF tax treatment depends on fund qualification and ongoing IRS guidance — see the
+              draft treatment description in the calculator (pending counsel review)
             </li>
             <li>
               Tax-loss harvesting reduces cost basis: a portion of projected savings is tax
-              deferral, not elimination, and becomes due if the portfolio is liquidated.
-              Deferral may become permanent via basis step-up at death or charitable transfer
+              deferral, not elimination, and becomes due if the portfolio is liquidated. Deferral
+              may become permanent via basis step-up at death or charitable transfer
             </li>
             <li>
-              Alternative Minimum Tax (AMT) is not modeled and may reduce actual benefits for
-              some taxpayers
+              Alternative Minimum Tax (AMT) is not modeled and may reduce actual benefits for some
+              taxpayers
             </li>
             <li>
               Straddle rules (IRC §1092) and passive activity rules (IRC §469) are not modeled;
@@ -70,9 +68,9 @@ export function DisclaimerFooter() {
       <p className="disclaimer-footer">
         This calculator provides estimates for illustrative purposes only and does not constitute
         investment, tax, or legal advice. Past performance does not guarantee future results.
-        Federal tax parameters (brackets, LTCG thresholds, §461(l) limits) verified against
-        Rev. Proc. 2025-32 in June 2026. WA's 2026 capital-gains exemption was unpublished at
-        review time (2025 figure used); verify state figures before relying on them.
+        Federal tax parameters (brackets, LTCG thresholds, §461(l) limits) verified against Rev.
+        Proc. 2025-32 in June 2026. WA's 2026 capital-gains exemption was unpublished at review time
+        (2025 figure used); verify state figures before relying on them.
       </p>
 
       <div className="version-indicator">v{version}</div>

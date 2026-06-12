@@ -42,7 +42,11 @@ function getAverageRate(rates: StrategyRateOverrides, strategyId: string): numbe
   return sum / 10;
 }
 
-export const StrategyRateEditor = memo(function StrategyRateEditor({ isOpen, onClose, onRatesChanged }: StrategyRateEditorProps) {
+export const StrategyRateEditor = memo(function StrategyRateEditor({
+  isOpen,
+  onClose,
+  onRatesChanged,
+}: StrategyRateEditorProps) {
   const [rates, setRates] = useState<StrategyRateOverrides>(() => {
     const defaults = getDefaultRates();
     const overrides = loadRateOverrides();

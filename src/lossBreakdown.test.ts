@@ -71,7 +71,9 @@ describe('buildLossBreakdown', () => {
     });
     expect(periods).toHaveLength(12);
     expect(periods.every(p => p.active)).toBe(true);
-    expect(periods.every(p => p.segments.length === 1 && p.segments[0].deploymentYear === 1)).toBe(true);
+    expect(periods.every(p => p.segments.length === 1 && p.segments[0].deploymentYear === 1)).toBe(
+      true
+    );
     // Sum of monthly ST losses equals annual.
     const stSum = periods.reduce((s, p) => s + p.stLosses, 0);
     expect(stSum).toBeCloseTo(120_000, 2);
@@ -204,19 +206,15 @@ describe('buildLossBreakdown', () => {
 
 describe('describeSegments', () => {
   it('formats single multi-month segment', () => {
-    expect(
-      describeSegments([
-        { deploymentYear: 1, monthsInDY: [7, 9], monthsInPeriod: 3 },
-      ])
-    ).toBe('D-Y1 mo 7–9');
+    expect(describeSegments([{ deploymentYear: 1, monthsInDY: [7, 9], monthsInPeriod: 3 }])).toBe(
+      'D-Y1 mo 7–9'
+    );
   });
 
   it('formats single-month segment', () => {
-    expect(
-      describeSegments([
-        { deploymentYear: 1, monthsInDY: [12, 12], monthsInPeriod: 1 },
-      ])
-    ).toBe('D-Y1 mo 12');
+    expect(describeSegments([{ deploymentYear: 1, monthsInDY: [12, 12], monthsInPeriod: 1 }])).toBe(
+      'D-Y1 mo 12'
+    );
   });
 
   it('joins straddling segments with +', () => {

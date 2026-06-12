@@ -160,10 +160,7 @@ describe('computeStepUpComparison (D-018)', () => {
     // Large pre-existing CF: liquidation is tax-free, and the excess CF would
     // die with the taxpayer — use it during life.
     const settings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.07 };
-    const result = calculate(
-      createInputs({ existingStLossCarryforward: 30000000 }),
-      settings
-    );
+    const result = calculate(createInputs({ existingStLossCarryforward: 30000000 }), settings);
     const exit = computeExitTaxAnalysis(result, COMBINED_LT_RATE, 0.07);
     expect(exit.remainingCapitalLossCf).toBeGreaterThan(exit.embeddedGain);
 
@@ -184,10 +181,7 @@ describe('computeStepUpComparison (D-018)', () => {
 
     const cmp = computeStepUpComparison(result, exit);
     expect(cmp.recommendation).toBe('partial_unwind');
-    expect(cmp.optimalUnwindPct).toBeCloseTo(
-      exit.remainingCapitalLossCf / exit.embeddedGain,
-      6
-    );
+    expect(cmp.optimalUnwindPct).toBeCloseTo(exit.remainingCapitalLossCf / exit.embeddedGain, 6);
     expect(cmp.optimalUnwindPct).toBeLessThan(1);
   });
 

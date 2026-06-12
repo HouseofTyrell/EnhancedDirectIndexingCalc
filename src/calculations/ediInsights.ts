@@ -40,8 +40,7 @@ export interface EdiInsights {
 }
 
 export function computeEdiInsights(result: CalculationResult): EdiInsights {
-  const { finalStCarryforward, finalLtCarryforward, lossReserveShelterValue } =
-    result.summary;
+  const { finalStCarryforward, finalLtCarryforward, lossReserveShelterValue } = result.summary;
   const cumulativeFinancingCost = safeNumber(
     result.years.reduce((sum, y) => sum + y.financingCostPaid, 0)
   );
@@ -115,8 +114,7 @@ export function computeStepUpComparison(
 
   // Optimal partial unwind: realize exactly enough gain to consume the CFs
   // (pro-rata lots → unwound fraction carries the same gain fraction).
-  const optimalUnwindPct =
-    embeddedGain > 0 ? Math.min(1, safeNumber(totalCf / embeddedGain)) : 0;
+  const optimalUnwindPct = embeddedGain > 0 ? Math.min(1, safeNumber(totalCf / embeddedGain)) : 0;
 
   let recommendation: StepUpComparison['recommendation'];
   let explanation: string;

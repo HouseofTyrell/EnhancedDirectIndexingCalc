@@ -34,7 +34,8 @@ export function QfafTestPage() {
       <header className="page-header">
         <h1>QFAF Test (By Year)</h1>
         <p className="page-description">
-          Model QFAF economics year-by-year with custom cash infusions, tax rates, and §461(l) carryforward projections.
+          Model QFAF economics year-by-year with custom cash infusions, tax rates, and §461(l)
+          carryforward projections.
         </p>
       </header>
 
@@ -63,11 +64,17 @@ export function QfafTestPage() {
         <h4>Important Limitations</h4>
         <ul>
           <li>This calculator models §461(l) excess business loss limitations only</li>
-          <li>Actual NOL carryforward utilization is subject to additional rules including the 80% taxable income limitation (§172)</li>
+          <li>
+            Actual NOL carryforward utilization is subject to additional rules including the 80%
+            taxable income limitation (§172)
+          </li>
           <li>Results assume the user is actively engaged in the business activity</li>
           <li>State tax treatment varies; some states do not conform to federal §461(l)</li>
           <li>The 2026 limitation amounts are estimates pending IRS publication</li>
-          <li>This tool provides estimates for planning purposes only and does not constitute tax advice</li>
+          <li>
+            This tool provides estimates for planning purposes only and does not constitute tax
+            advice
+          </li>
         </ul>
       </footer>
     </div>

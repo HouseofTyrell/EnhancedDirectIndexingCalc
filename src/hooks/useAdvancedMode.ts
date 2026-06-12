@@ -55,7 +55,14 @@ function isAdvancedModeState(value: unknown): value is AdvancedModeState {
   }
 
   const sections = obj.sections as Record<string, unknown>;
-  const requiredSections = ['yearByYear', 'sensitivity', 'scenarios', 'comparison', 'settings', 'qfafTest'];
+  const requiredSections = [
+    'yearByYear',
+    'sensitivity',
+    'scenarios',
+    'comparison',
+    'settings',
+    'qfafTest',
+  ];
 
   for (const section of requiredSections) {
     if (!hasOwnProperty.call(sections, section) || typeof sections[section] !== 'boolean') {

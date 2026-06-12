@@ -13,9 +13,9 @@ export function DeltaBadge({ delta, format = 'currency' }: DeltaBadgeProps) {
   if (delta === null) return null;
   const isPositive = delta > 0;
   const sign = isPositive ? '+' : '';
-  const formatted =
-    format === 'percent' ? formatPercent(delta) : formatCurrency(Math.abs(delta));
-  const display = format === 'currency' ? `${isPositive ? '+' : '-'}${formatted}` : `${sign}${formatted}`;
+  const formatted = format === 'percent' ? formatPercent(delta) : formatCurrency(Math.abs(delta));
+  const display =
+    format === 'currency' ? `${isPositive ? '+' : '-'}${formatted}` : `${sign}${formatted}`;
 
   return (
     <span

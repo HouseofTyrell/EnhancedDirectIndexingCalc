@@ -123,7 +123,8 @@ function PinnedDelta({ current, pinned }: { current: number; pinned: number }) {
   const cls = delta > 0 ? 'pinned-delta--positive' : 'pinned-delta--negative';
   return (
     <span className={`sticky-header__pinned-delta ${cls}`}>
-      vs pin: {sign}{formatCurrencyAbbreviated(delta)}
+      vs pin: {sign}
+      {formatCurrencyAbbreviated(delta)}
     </span>
   );
 }
@@ -214,7 +215,9 @@ export const StickyHeader = React.memo(function StickyHeader({
                 : 'First year benefit'}
             </span>
           )}
-          {pinnedValues && <PinnedDelta current={annualTaxSavings} pinned={pinnedValues.annualTaxSavings} />}
+          {pinnedValues && (
+            <PinnedDelta current={annualTaxSavings} pinned={pinnedValues.annualTaxSavings} />
+          )}
         </div>
         {year2TaxSavings !== undefined && year2TaxSavings > 0 && (
           <div className="sticky-header__metric sticky-header__metric--primary">
@@ -260,7 +263,9 @@ export const StickyHeader = React.memo(function StickyHeader({
                 <button
                   className="sticky-header__compare-link"
                   onClick={() => {
-                    document.querySelector('.comparison-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document
+                      .querySelector('.comparison-panel')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }}
                   title="Scroll to comparison panel"
                 >
@@ -300,7 +305,16 @@ export const StickyHeader = React.memo(function StickyHeader({
             aria-label="Reset to defaults"
             title="Reset all inputs to defaults"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
               <path d="M3 3v5h5" />
             </svg>

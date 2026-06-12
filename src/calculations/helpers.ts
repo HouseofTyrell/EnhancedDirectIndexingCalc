@@ -1,13 +1,5 @@
-import {
-  CalculatorInputs,
-  YearResult,
-  CalculatedSizing,
-  AdvancedSettings,
-} from '../types';
-import {
-  CAPITAL_LOSS_LIMITS,
-  NOL_OFFSET_PERCENTAGE,
-} from '../strategyData';
+import { CalculatorInputs, YearResult, CalculatedSizing, AdvancedSettings } from '../types';
+import { CAPITAL_LOSS_LIMITS, NOL_OFFSET_PERCENTAGE } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
 import { getNetCapitalLossRate } from '../utils/strategyRates';
 
@@ -20,7 +12,11 @@ import { getNetCapitalLossRate } from '../utils/strategyRates';
  * partial-year starts, callers must convert calendar years to the
  * appropriate operating-year blend — see `getCalendarYearStLossRate`.
  */
-export function getEffectiveStLossRate(strategyId: string, ltGainRate: number, year: number): number {
+export function getEffectiveStLossRate(
+  strategyId: string,
+  ltGainRate: number,
+  year: number
+): number {
   // Get the net capital loss rate (may be custom or default with decay)
   const netCapitalLossRate = getNetCapitalLossRate(strategyId, year);
   // ST Loss Rate = Net Capital Loss Rate + LT Gain Rate
@@ -242,8 +238,13 @@ export function calculateCarryforwards(
   // NOL can offset up to nolOffsetLimit of taxable income
   const yearIncome = effectiveIncome ?? inputs.annualIncome;
   const taxableIncomeBeforeNol =
-    yearIncome + taxableSt + taxableLt + eventTaxableSt + eventTaxableLt -
-    usableOrdinaryLoss - capitalLossUsedAgainstIncome;
+    yearIncome +
+    taxableSt +
+    taxableLt +
+    eventTaxableSt +
+    eventTaxableLt -
+    usableOrdinaryLoss -
+    capitalLossUsedAgainstIncome;
   const nolOffsetLimit = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
   const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * nolOffsetLimit;
   const nolUsed = Math.min(nolCarryforward, maxNolUsage);

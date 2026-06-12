@@ -23,25 +23,26 @@ export function InfoPopup({ title, children }: InfoPopupProps) {
         </svg>
       </button>
 
-      {isOpen && createPortal(
-        <div className="popup-overlay" onClick={() => setIsOpen(false)}>
-          <div className="popup-content" onClick={e => e.stopPropagation()}>
-            <div className="popup-header">
-              <h3>{title}</h3>
-              <button
-                type="button"
-                className="popup-close"
-                onClick={() => setIsOpen(false)}
-                aria-label="Close"
-              >
-                ×
-              </button>
+      {isOpen &&
+        createPortal(
+          <div className="popup-overlay" onClick={() => setIsOpen(false)}>
+            <div className="popup-content" onClick={e => e.stopPropagation()}>
+              <div className="popup-header">
+                <h3>{title}</h3>
+                <button
+                  type="button"
+                  className="popup-close"
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="popup-body">{children}</div>
             </div>
-            <div className="popup-body">{children}</div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }
@@ -113,43 +114,44 @@ export function InfoText({ contentKey, children, currentValue }: InfoTextProps) 
         {children}
       </span>
 
-      {isOpen && createPortal(
-        <div className="popup-overlay" onClick={() => setIsOpen(false)}>
-          <div className="popup-content" onClick={e => e.stopPropagation()}>
-            <div className="popup-header">
-              <h3>{content.title}</h3>
-              <button
-                type="button"
-                className="popup-close"
-                onClick={() => setIsOpen(false)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="popup-body">
-              <div className="field-popup">
-                <p className="field-definition">{content.definition}</p>
-                {content.formula && (
-                  <div className="field-formula">
-                    <strong>Formula:</strong>
-                    <code>{content.formula}</code>
-                  </div>
-                )}
-                {currentValue && (
-                  <div className="field-current-value">
-                    <strong>Your value:</strong> {currentValue}
-                  </div>
-                )}
-                <p className="field-impact">
-                  <strong>Impact:</strong> {content.impact}
-                </p>
+      {isOpen &&
+        createPortal(
+          <div className="popup-overlay" onClick={() => setIsOpen(false)}>
+            <div className="popup-content" onClick={e => e.stopPropagation()}>
+              <div className="popup-header">
+                <h3>{content.title}</h3>
+                <button
+                  type="button"
+                  className="popup-close"
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="popup-body">
+                <div className="field-popup">
+                  <p className="field-definition">{content.definition}</p>
+                  {content.formula && (
+                    <div className="field-formula">
+                      <strong>Formula:</strong>
+                      <code>{content.formula}</code>
+                    </div>
+                  )}
+                  {currentValue && (
+                    <div className="field-current-value">
+                      <strong>Your value:</strong> {currentValue}
+                    </div>
+                  )}
+                  <p className="field-impact">
+                    <strong>Impact:</strong> {content.impact}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </>
   );
 }

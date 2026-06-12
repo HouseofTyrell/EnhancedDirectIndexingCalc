@@ -64,7 +64,9 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
                   Federal Ordinary / ST
                 </InfoText>
               </span>
-              <span className="rate-value" ref={fedStFlash}>{formatRate(federalStRate)}</span>
+              <span className="rate-value" ref={fedStFlash}>
+                {formatRate(federalStRate)}
+              </span>
             </div>
             <div className="tax-rate-item">
               <span className="rate-label">
@@ -72,7 +74,9 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
                   Federal LT Cap Gains
                 </InfoText>
               </span>
-              <span className="rate-value" ref={fedLtFlash}>{formatRate(federalLtRate)}</span>
+              <span className="rate-value" ref={fedLtFlash}>
+                {formatRate(federalLtRate)}
+              </span>
             </div>
             <div className="tax-rate-item">
               <span className="rate-label">
@@ -80,7 +84,9 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
                   State
                 </InfoText>
               </span>
-              <span className="rate-value" ref={stateFlash}>{formatRate(stateRate)}</span>
+              <span className="rate-value" ref={stateFlash}>
+                {formatRate(stateRate)}
+              </span>
             </div>
           </div>
         </div>
@@ -93,7 +99,9 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
                   Combined Ordinary
                 </InfoText>
               </span>
-              <span className="rate-value" ref={combStFlash}>{formatRate(combinedStRate)}</span>
+              <span className="rate-value" ref={combStFlash}>
+                {formatRate(combinedStRate)}
+              </span>
             </div>
             <div className="tax-rate-item highlight">
               <span className="rate-label">
@@ -101,7 +109,9 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
                   Combined LT
                 </InfoText>
               </span>
-              <span className="rate-value" ref={combLtFlash}>{formatRate(combinedLtRate)}</span>
+              <span className="rate-value" ref={combLtFlash}>
+                {formatRate(combinedLtRate)}
+              </span>
             </div>
           </div>
         </div>

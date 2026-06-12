@@ -66,7 +66,9 @@ export function SizingSummary({
               Collateral
             </InfoText>
           </span>
-          <span className="sizing-value" ref={collateralFlash}>{formatCurrency(results.sizing.collateralValue)}</span>
+          <span className="sizing-value" ref={collateralFlash}>
+            {formatCurrency(results.sizing.collateralValue)}
+          </span>
           <span className="sizing-sublabel">{results.sizing.strategyName}</span>
           {results.sizing.splitLegs && results.sizing.splitLegs.length > 0 && (
             <div className="sizing-split-breakdown">
@@ -90,7 +92,9 @@ export function SizingSummary({
               Auto-Sized QFAF
             </InfoText>
           </span>
-          <span className="sizing-value" ref={qfafFlash}>{formatCurrency(results.sizing.qfafValue)}</span>
+          <span className="sizing-value" ref={qfafFlash}>
+            {formatCurrency(results.sizing.qfafValue)}
+          </span>
           <span className="sizing-sublabel">
             {formatPercent(results.sizing.qfafRatio)} of collateral
           </span>
@@ -104,7 +108,9 @@ export function SizingSummary({
               Total Exposure
             </InfoText>
           </span>
-          <span className="sizing-value" ref={exposureFlash}>{formatCurrency(results.sizing.totalExposure)}</span>
+          <span className="sizing-value" ref={exposureFlash}>
+            {formatCurrency(results.sizing.totalExposure)}
+          </span>
         </div>
         <div className="sizing-card">
           <span className="sizing-label">
@@ -115,10 +121,10 @@ export function SizingSummary({
               §461(l) Limit
             </InfoText>
           </span>
-          <span className="sizing-value" ref={limitFlash}>{formatCurrency(results.sizing.section461Limit)}</span>
-          <span className="sizing-sublabel">
-            {filingStatus === 'mfj' ? 'MFJ' : 'Single/Other'}
+          <span className="sizing-value" ref={limitFlash}>
+            {formatCurrency(results.sizing.section461Limit)}
           </span>
+          <span className="sizing-sublabel">{filingStatus === 'mfj' ? 'MFJ' : 'Single/Other'}</span>
         </div>
       </div>
 
@@ -131,250 +137,243 @@ export function SizingSummary({
           const useActuals = results.sizing.sizingYears === 1 && year1;
           const stLosses = useActuals ? year1.stLossesHarvested : results.sizing.year1StLosses;
           const stGains = useActuals ? year1.stGainsGenerated : results.sizing.year1StGains;
-          const ordLosses = useActuals ? year1.ordinaryLossesGenerated : results.sizing.year1OrdinaryLosses;
-          const usableOrd = useActuals ? year1.usableOrdinaryLoss : results.sizing.year1UsableOrdinaryLoss;
+          const ordLosses = useActuals
+            ? year1.ordinaryLossesGenerated
+            : results.sizing.year1OrdinaryLosses;
+          const usableOrd = useActuals
+            ? year1.usableOrdinaryLoss
+            : results.sizing.year1UsableOrdinaryLoss;
           const excessNol = useActuals ? year1.excessToNol : results.sizing.year1ExcessToNol;
           return (
             <>
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="year1-st-losses"
-              currentValue={formatCurrency(stLosses)}
-            >
-              {results.sizing.sizingYears === 1
-                ? 'Year 1 ST Losses (Collateral)'
-                : `Avg ST Losses, Yrs 1–${results.sizing.sizingYears} (Collateral)`}
-            </InfoText>
-          </span>
-          <span className="positive">{formatCurrency(stLosses)}</span>
-        </div>
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="year1-st-gains"
-              currentValue={formatCurrency(stGains)}
-            >
-              {results.sizing.sizingYears === 1
-                ? 'Year 1 ST Gains (QFAF)'
-                : 'Matched ST Gains (QFAF)'}
-            </InfoText>
-          </span>
-          <span className="negative">({formatCurrency(stGains)})</span>
-        </div>
-        {(() => {
-          const netSt = stLosses - stGains;
-          const isMatched = Math.abs(netSt) < 1;
-          const hasExcessGains = netSt < -1; // ST gains > ST losses
-          const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
-          const statusClass = isMatched ? 'success' : hasExcessGains ? 'danger' : 'success';
-          let label: string;
-                  if (isMatched) {
-            label = `Fully Matched${avgNote}`;
-          } else if (hasExcessGains) {
-            label = `${formatCurrency(Math.abs(netSt))} excess ST gains${avgNote}`;
-          } else {
-            label = `${formatCurrency(netSt)} excess ST losses${avgNote}`;
-          }
-          return (
-            <div className={`offset-row result ${statusClass}`}>
-              <span>
-                <InfoText contentKey="net-st-position" currentValue={isMatched ? '$0 (Fully Matched)' : formatCurrency(netSt)}>
-                  Net ST Position
-                </InfoText>
-              </span>
-              <span>{label}</span>
-            </div>
-          );
-        })()}
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="year1-ordinary-losses"
-              currentValue={formatCurrency(ordLosses)}
-            >
-              Year 1 Ordinary Loss (QFAF)
-            </InfoText>
-          </span>
-          <span className="positive">{formatCurrency(ordLosses)}</span>
-        </div>
-        <div className="offset-row">
-          <span>
-            <InfoText
-              contentKey="usable-ordinary-loss"
-              currentValue={formatCurrency(usableOrd)}
-            >
-              Usable Ordinary Loss
-            </InfoText>
-          </span>
-          <span className="positive">
-            {formatCurrency(usableOrd)}
-          </span>
-        </div>
-        {excessNol > 0 && (
-          <div className="offset-row">
-            <span>
-              <InfoText
-                contentKey="excess-to-nol"
-                currentValue={formatCurrency(excessNol)}
-              >
-                Excess → NOL Carryforward
-              </InfoText>
-            </span>
-            <span>{formatCurrency(excessNol)}</span>
-          </div>
-        )}
+              <div className="offset-row">
+                <span>
+                  <InfoText contentKey="year1-st-losses" currentValue={formatCurrency(stLosses)}>
+                    {results.sizing.sizingYears === 1
+                      ? 'Year 1 ST Losses (Collateral)'
+                      : `Avg ST Losses, Yrs 1–${results.sizing.sizingYears} (Collateral)`}
+                  </InfoText>
+                </span>
+                <span className="positive">{formatCurrency(stLosses)}</span>
+              </div>
+              <div className="offset-row">
+                <span>
+                  <InfoText contentKey="year1-st-gains" currentValue={formatCurrency(stGains)}>
+                    {results.sizing.sizingYears === 1
+                      ? 'Year 1 ST Gains (QFAF)'
+                      : 'Matched ST Gains (QFAF)'}
+                  </InfoText>
+                </span>
+                <span className="negative">({formatCurrency(stGains)})</span>
+              </div>
+              {(() => {
+                const netSt = stLosses - stGains;
+                const isMatched = Math.abs(netSt) < 1;
+                const hasExcessGains = netSt < -1; // ST gains > ST losses
+                const avgNote = results.sizing.sizingYears > 1 ? ' (on avg)' : '';
+                const statusClass = isMatched ? 'success' : hasExcessGains ? 'danger' : 'success';
+                let label: string;
+                if (isMatched) {
+                  label = `Fully Matched${avgNote}`;
+                } else if (hasExcessGains) {
+                  label = `${formatCurrency(Math.abs(netSt))} excess ST gains${avgNote}`;
+                } else {
+                  label = `${formatCurrency(netSt)} excess ST losses${avgNote}`;
+                }
+                return (
+                  <div className={`offset-row result ${statusClass}`}>
+                    <span>
+                      <InfoText
+                        contentKey="net-st-position"
+                        currentValue={isMatched ? '$0 (Fully Matched)' : formatCurrency(netSt)}
+                      >
+                        Net ST Position
+                      </InfoText>
+                    </span>
+                    <span>{label}</span>
+                  </div>
+                );
+              })()}
+              <div className="offset-row">
+                <span>
+                  <InfoText
+                    contentKey="year1-ordinary-losses"
+                    currentValue={formatCurrency(ordLosses)}
+                  >
+                    Year 1 Ordinary Loss (QFAF)
+                  </InfoText>
+                </span>
+                <span className="positive">{formatCurrency(ordLosses)}</span>
+              </div>
+              <div className="offset-row">
+                <span>
+                  <InfoText
+                    contentKey="usable-ordinary-loss"
+                    currentValue={formatCurrency(usableOrd)}
+                  >
+                    Usable Ordinary Loss
+                  </InfoText>
+                </span>
+                <span className="positive">{formatCurrency(usableOrd)}</span>
+              </div>
+              {excessNol > 0 && (
+                <div className="offset-row">
+                  <span>
+                    <InfoText contentKey="excess-to-nol" currentValue={formatCurrency(excessNol)}>
+                      Excess → NOL Carryforward
+                    </InfoText>
+                  </span>
+                  <span>{formatCurrency(excessNol)}</span>
+                </div>
+              )}
             </>
           );
         })()}
       </div>
 
       {/* Year 1 / Year 2+ Tax Benefit Breakdown with Timeline Connector */}
-      <div className={`tax-benefit-timeline ${!(results.years.length > 1 && qfafEnabled) ? 'tax-benefit-timeline--single' : ''}`}>
-      <div className="tax-benefit-summary">
-        <h3>
-          Estimated Year 1 Tax Benefit
-          <PartialYearBadge startMonth={startMonth} compact />
-        </h3>
-        <div className="benefit-cards">
-          <div className="benefit-card">
-            <span className="benefit-label">
-              <InfoText
-                contentKey="ordinary-loss-benefit"
-                currentValue={formatCurrency(results.years[0]?.ordinaryLossBenefit ?? 0)}
-              >
-                Ordinary Loss Benefit
-              </InfoText>
-            </span>
-            <span className="benefit-value positive">
-              +{formatCurrency(results.years[0]?.ordinaryLossBenefit ?? 0)}
-            </span>
-            <span className="benefit-formula">
-              {formatCurrency(results.years[0]?.usableOrdinaryLoss ?? 0)} ×{' '}
-              {formatPercent(combinedOrdinaryRate)}
-            </span>
-          </div>
-          {(results.years[0]?.ltGainsRealized ?? 0) > 0 && (
-            <div className="benefit-card">
-              <span className="benefit-label">
-                <InfoText
-                  contentKey="lt-gain-cost"
-                  currentValue={formatCurrency(results.years[0]?.ltGainsRealized * combinedLtRate)}
-                >
-                  LT Gain Cost
-                </InfoText>
-              </span>
-              <span className="benefit-value negative">
-                −{formatCurrency((results.years[0]?.ltGainsRealized ?? 0) * combinedLtRate)}
-              </span>
-              <span className="benefit-formula">
-                {formatCurrency(results.years[0]?.ltGainsRealized ?? 0)} ×{' '}
-                {formatPercent(combinedLtRate)}
-              </span>
-            </div>
-          )}
-          <div className="benefit-card highlight">
-            <span className="benefit-label">
-              <InfoText
-                contentKey="year1-tax-savings"
-                currentValue={formatCurrency(results.years[0]?.taxSavings ?? 0)}
-              >
-                Net Year 1 Tax Savings
-              </InfoText>
-            </span>
-            <span className="benefit-value" ref={year1Flash}>
-              {formatCurrency(results.years[0]?.taxSavings ?? 0)}
-              <DeltaBadge delta={year1Delta} />
-            </span>
-            <span className="benefit-formula">
-              {formatPercent((results.years[0]?.taxSavings ?? 0) / results.sizing.totalExposure)}{' '}
-              of exposure
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Year 2+ Tax Benefit Breakdown - shows how NOL starts being used */}
-      {results.years.length > 1 && qfafEnabled && (
-        <div className="tax-benefit-summary subsequent-year">
+      <div
+        className={`tax-benefit-timeline ${!(results.years.length > 1 && qfafEnabled) ? 'tax-benefit-timeline--single' : ''}`}
+      >
+        <div className="tax-benefit-summary">
           <h3>
-            Est. Year 2+ Tax Benefit <span className="year-note">(typical subsequent year)</span>
+            Estimated Year 1 Tax Benefit
+            <PartialYearBadge startMonth={startMonth} compact />
           </h3>
-          <div className="nol-carryforward-note">
-            <span className="nol-label">NOL Carryforward from Year 1:</span>
-            <span className="nol-value">
-              {formatCurrency(results.years[0]?.nolCarryforward ?? 0)}
-            </span>
-            <span className="nol-explanation">
-              → Available to offset up to 80% of Year 2 taxable income
-            </span>
-          </div>
           <div className="benefit-cards">
             <div className="benefit-card">
               <span className="benefit-label">
-                <InfoText contentKey="ordinary-loss-benefit">
+                <InfoText
+                  contentKey="ordinary-loss-benefit"
+                  currentValue={formatCurrency(results.years[0]?.ordinaryLossBenefit ?? 0)}
+                >
                   Ordinary Loss Benefit
                 </InfoText>
               </span>
               <span className="benefit-value positive">
-                +{formatCurrency(results.years[1]?.ordinaryLossBenefit ?? 0)}
+                +{formatCurrency(results.years[0]?.ordinaryLossBenefit ?? 0)}
               </span>
               <span className="benefit-formula">
-                {formatCurrency(results.years[1]?.usableOrdinaryLoss)} ×{' '}
+                {formatCurrency(results.years[0]?.usableOrdinaryLoss ?? 0)} ×{' '}
                 {formatPercent(combinedOrdinaryRate)}
               </span>
             </div>
-            <div className="benefit-card">
-              <span className="benefit-label">
-                <InfoText contentKey="nol-offset-benefit">
-                  NOL Offset Benefit
-                </InfoText>
-              </span>
-              <span className="benefit-value positive">
-                +{formatCurrency(results.years[1]?.nolUsageBenefit ?? 0)}
-              </span>
-              <span className="benefit-formula">
-                {formatCurrency(results.years[1]?.nolUsedThisYear ?? 0)} ×{' '}
-                {formatPercent(combinedOrdinaryRate)}
-              </span>
-            </div>
-            {(results.years[1]?.ltGainsRealized ?? 0) > 0 && (
+            {(results.years[0]?.ltGainsRealized ?? 0) > 0 && (
               <div className="benefit-card">
                 <span className="benefit-label">
-                  <InfoText contentKey="lt-gain-cost">
+                  <InfoText
+                    contentKey="lt-gain-cost"
+                    currentValue={formatCurrency(
+                      results.years[0]?.ltGainsRealized * combinedLtRate
+                    )}
+                  >
                     LT Gain Cost
                   </InfoText>
                 </span>
                 <span className="benefit-value negative">
-                  −{formatCurrency((results.years[1]?.ltGainsRealized ?? 0) * combinedLtRate)}
+                  −{formatCurrency((results.years[0]?.ltGainsRealized ?? 0) * combinedLtRate)}
                 </span>
                 <span className="benefit-formula">
-                  {formatCurrency(results.years[1]?.ltGainsRealized ?? 0)} ×{' '}
+                  {formatCurrency(results.years[0]?.ltGainsRealized ?? 0)} ×{' '}
                   {formatPercent(combinedLtRate)}
                 </span>
               </div>
             )}
             <div className="benefit-card highlight">
               <span className="benefit-label">
-                <InfoText contentKey="year2-tax-savings">
-                  Net Year 2 Tax Savings
+                <InfoText
+                  contentKey="year1-tax-savings"
+                  currentValue={formatCurrency(results.years[0]?.taxSavings ?? 0)}
+                >
+                  Net Year 1 Tax Savings
                 </InfoText>
               </span>
-              <span className="benefit-value" ref={year2Flash}>
-                {formatCurrency(results.years[1]?.taxSavings ?? 0)}
-                <DeltaBadge delta={year2Delta} />
+              <span className="benefit-value" ref={year1Flash}>
+                {formatCurrency(results.years[0]?.taxSavings ?? 0)}
+                <DeltaBadge delta={year1Delta} />
               </span>
               <span className="benefit-formula">
-                {formatPercent(
-                  (results.years[1]?.taxSavings ?? 0) / results.sizing.totalExposure
-                )}{' '}
+                {formatPercent((results.years[0]?.taxSavings ?? 0) / results.sizing.totalExposure)}{' '}
                 of exposure
               </span>
             </div>
           </div>
         </div>
-      )}
-      </div>{/* end tax-benefit-timeline */}
+
+        {/* Year 2+ Tax Benefit Breakdown - shows how NOL starts being used */}
+        {results.years.length > 1 && qfafEnabled && (
+          <div className="tax-benefit-summary subsequent-year">
+            <h3>
+              Est. Year 2+ Tax Benefit <span className="year-note">(typical subsequent year)</span>
+            </h3>
+            <div className="nol-carryforward-note">
+              <span className="nol-label">NOL Carryforward from Year 1:</span>
+              <span className="nol-value">
+                {formatCurrency(results.years[0]?.nolCarryforward ?? 0)}
+              </span>
+              <span className="nol-explanation">
+                → Available to offset up to 80% of Year 2 taxable income
+              </span>
+            </div>
+            <div className="benefit-cards">
+              <div className="benefit-card">
+                <span className="benefit-label">
+                  <InfoText contentKey="ordinary-loss-benefit">Ordinary Loss Benefit</InfoText>
+                </span>
+                <span className="benefit-value positive">
+                  +{formatCurrency(results.years[1]?.ordinaryLossBenefit ?? 0)}
+                </span>
+                <span className="benefit-formula">
+                  {formatCurrency(results.years[1]?.usableOrdinaryLoss)} ×{' '}
+                  {formatPercent(combinedOrdinaryRate)}
+                </span>
+              </div>
+              <div className="benefit-card">
+                <span className="benefit-label">
+                  <InfoText contentKey="nol-offset-benefit">NOL Offset Benefit</InfoText>
+                </span>
+                <span className="benefit-value positive">
+                  +{formatCurrency(results.years[1]?.nolUsageBenefit ?? 0)}
+                </span>
+                <span className="benefit-formula">
+                  {formatCurrency(results.years[1]?.nolUsedThisYear ?? 0)} ×{' '}
+                  {formatPercent(combinedOrdinaryRate)}
+                </span>
+              </div>
+              {(results.years[1]?.ltGainsRealized ?? 0) > 0 && (
+                <div className="benefit-card">
+                  <span className="benefit-label">
+                    <InfoText contentKey="lt-gain-cost">LT Gain Cost</InfoText>
+                  </span>
+                  <span className="benefit-value negative">
+                    −{formatCurrency((results.years[1]?.ltGainsRealized ?? 0) * combinedLtRate)}
+                  </span>
+                  <span className="benefit-formula">
+                    {formatCurrency(results.years[1]?.ltGainsRealized ?? 0)} ×{' '}
+                    {formatPercent(combinedLtRate)}
+                  </span>
+                </div>
+              )}
+              <div className="benefit-card highlight">
+                <span className="benefit-label">
+                  <InfoText contentKey="year2-tax-savings">Net Year 2 Tax Savings</InfoText>
+                </span>
+                <span className="benefit-value" ref={year2Flash}>
+                  {formatCurrency(results.years[1]?.taxSavings ?? 0)}
+                  <DeltaBadge delta={year2Delta} />
+                </span>
+                <span className="benefit-formula">
+                  {formatPercent(
+                    (results.years[1]?.taxSavings ?? 0) / results.sizing.totalExposure
+                  )}{' '}
+                  of exposure
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* end tax-benefit-timeline */}
     </CollapsibleSection>
   );
 }

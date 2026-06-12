@@ -29,7 +29,10 @@ function getYearLabel(yearNum: number, startMonth?: number): string {
 }
 
 // Memoized chart component to prevent unnecessary re-renders (016)
-export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data, startMonth }: WealthChartProps) {
+export const TaxSavingsChart = React.memo(function TaxSavingsChart({
+  data,
+  startMonth,
+}: WealthChartProps) {
   const { isDark } = useDarkMode();
 
   // Memoize chart data transformation with O(n) cumulative calculation (007)
@@ -54,7 +57,11 @@ export const TaxSavingsChart = React.memo(function TaxSavingsChart({ data, start
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e0e0e0'} />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} />
-          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} width={80} />
+          <YAxis
+            tickFormatter={formatCurrencyAbbreviated}
+            tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }}
+            width={80}
+          />
           <Tooltip
             formatter={value => (value !== null ? formatCurrency(value as number) : '')}
             labelStyle={{ fontWeight: 'bold', color: isDark ? '#f3f4f6' : undefined }}
@@ -193,7 +200,11 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
         <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#374151' : '#e0e0e0'} />
           <XAxis dataKey="year" tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} />
-          <YAxis tickFormatter={formatCurrencyAbbreviated} tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }} width={80} />
+          <YAxis
+            tickFormatter={formatCurrencyAbbreviated}
+            tick={{ fontSize: 12, fill: isDark ? '#9ca3af' : undefined }}
+            width={80}
+          />
           <Tooltip content={<CustomTooltip />} />
           <Legend verticalAlign="top" wrapperStyle={isDark ? { color: '#f3f4f6' } : undefined} />
           {/* Confidence band via stacked areas (no background masking needed) */}

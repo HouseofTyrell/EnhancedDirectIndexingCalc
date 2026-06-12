@@ -27,7 +27,7 @@ export const LONG_ONLY_TARGET = 'long-only';
  * ediOnly.ts trad-DI benchmark.
  */
 export const TRAD_DI_ST_LOSS_RATES = [
-  0.050, 0.035, 0.025, 0.020, 0.015, 0.015, 0.015, 0.015, 0.015, 0.015,
+  0.05, 0.035, 0.025, 0.02, 0.015, 0.015, 0.015, 0.015, 0.015, 0.015,
 ];
 
 /** Occasional rebalancing LT gain rate for traditional DI (no overlay). */
@@ -72,9 +72,7 @@ export interface DeleverageYearSchedule {
  * is disabled, malformed, or out of scope: split allocation wins when both
  * are enabled (v1 — the UI shows a "plan ignored" warning).
  */
-export function resolveDeleveragePlan(
-  inputs: CalculatorInputs
-): ResolvedDeleveragePlan | null {
+export function resolveDeleveragePlan(inputs: CalculatorInputs): ResolvedDeleveragePlan | null {
   const plan = inputs.deleveragePlan;
   if (!plan || !plan.enabled) return null;
   if (inputs.splitAllocation?.enabled) return null;
@@ -104,8 +102,7 @@ export function resolveDeleveragePlan(
     durationYears: Math.floor(plan.durationYears),
     target: plan.target,
     targetLabel,
-    unwindGainCharacter:
-      plan.unwindGainCharacter ?? (plan.startYear > 2 ? 'lt' : 'st'),
+    unwindGainCharacter: plan.unwindGainCharacter ?? (plan.startYear > 2 ? 'lt' : 'st'),
     lotSelectionHaircut: plan.lotSelectionHaircut ?? 1.0,
     shortCoverGainPct: plan.shortCoverGainPct ?? 0,
     source,
@@ -132,10 +129,7 @@ export function getExtensionWeight(
 /** Target ST loss rate for an operating year (seasoned: sampled at the CURRENT index). */
 function targetStLossRateForYear(plan: ResolvedDeleveragePlan, year: number): number {
   if (plan.target === LONG_ONLY_TARGET) {
-    const index = Math.min(
-      Math.max(0, year - 1),
-      TRAD_DI_ST_LOSS_RATES.length - 1
-    );
+    const index = Math.min(Math.max(0, year - 1), TRAD_DI_ST_LOSS_RATES.length - 1);
     return TRAD_DI_ST_LOSS_RATES[index];
   }
   // Composes through getEffectiveStLossRate so localStorage custom rates for
@@ -197,8 +191,7 @@ export function resolveDeleverageSchedule(
     plan.sourceShortRatio,
     settings
   );
-  const srcRateFn = (y: number) =>
-    getEffectiveStLossRate(plan.source.id, srcLt, y);
+  const srcRateFn = (y: number) => getEffectiveStLossRate(plan.source.id, srcLt, y);
   const tgtRateFn = (y: number) => targetStLossRateForYear(plan, y);
 
   const schedule: DeleverageYearSchedule[] = [];
