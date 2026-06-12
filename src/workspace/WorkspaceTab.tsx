@@ -18,7 +18,14 @@ import {
   getStateConformityWarning,
 } from '../taxData';
 import { STRATEGIES, getStrategy } from '../strategyData';
-import { calculate, calculateWithOverrides, computeExitTaxAnalysis, solveCollateralForTotal } from '../calculations';
+import {
+  calculate,
+  calculateWithOverrides,
+  computeExitTaxAnalysis,
+  computeEdiInsights,
+  computeStepUpComparison,
+  solveCollateralForTotal,
+} from '../calculations';
 import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
 import { exportToExcel } from '../utils/excelExport';
@@ -161,6 +168,13 @@ export function WorkspaceTab() {
     [results, rates, settings.growthEnabled, settings.defaultAnnualReturn, effectiveInputs.collateralCostBasis]
   );
 
+  // EDI-only mode (D-014/D-015): with QFAF off, the product is the loss
+  // reserve — contingent CF shelter — not NOL-driven realized savings.
+  const ediMode = !effectiveInputs.qfafEnabled;
+  const insights = useMemo(() => computeEdiInsights(results), [results]);
+  // Estate / step-up co-metric (D-018), both modes.
+  const stepUp = useMemo(() => computeStepUpComparison(results, exit), [results, exit]);
+
   const stateNote = useMemo(
     () => getQuantifiedStateWarning(inputs.stateCode, rates.profile.ordinaryRate, results.years),
     [inputs.stateCode, rates.profile.ordinaryRate, results.years]
@@ -248,9 +262,37 @@ export function WorkspaceTab() {
     });
   };
 
+  // Scenario presets (D-014 folded default): one-click starting points that
+  // fill the per-year events rows via the same setEvent machinery — every
+  // value stays hand-editable afterward.
+  const applyPreset = (preset: 'business-sale' | 'rsu-vesting' | 'concentrated-stock') => {
+    const collateral = results.sizing.collateralValue;
+    if (preset === 'business-sale') {
+      // Business exit: a large LT gain (2× collateral) once the reserve has
+      // had a couple of years to build.
+      const yr = Math.min(3, projYears);
+      setEvent(yr, { gainEvent: { amount: Math.round(collateral * 2), character: 'lt' } });
+    } else if (preset === 'rsu-vesting') {
+      // RSU vesting is ordinary income, not a capital gain — model it as a
+      // W-2 income bump (+50%) across the vesting years.
+      const bumped = Math.round(effectiveInputs.annualIncome * 1.5);
+      for (let yr = 1; yr <= Math.min(4, projYears); yr++) {
+        setEvent(yr, { w2Income: bumped });
+      }
+    } else {
+      // Diversify a concentrated position: LT gain of 50% of collateral early.
+      const yr = Math.min(2, projYears);
+      setEvent(yr, { gainEvent: { amount: Math.round(collateral * 0.5), character: 'lt' } });
+    }
+    setShowEventsEditor(true);
+  };
+
   const eventYears = results.years.filter(y => y.gainEventAmount > 0);
 
   const { summary } = results;
+  // §461(l)/NOL surfaces are QFAF-shaped: hide them whenever the projection
+  // generated no NOL (covers EDI-only mode without hardcoding on qfafEnabled).
+  const hasNol = summary.totalNolGenerated >= 1;
   // Peak income required across the projection (the year that needs the most
   // income to fully use the §461(l) deduction + prior NOL) — the advisor's
   // planning target, surfaced from the buried table column.
@@ -541,7 +583,8 @@ export function WorkspaceTab() {
           </button>
           <p className="ws-rail-note" style={{ padding: 0, marginTop: 6 }}>
             Model variable RSU/bonus years, cash infusions, and planned sale
-            events (business exit, IPO lockup).
+            events (business exit, IPO lockup). One-click scenario presets
+            inside.
           </p>
         </div>
 
@@ -609,18 +652,40 @@ export function WorkspaceTab() {
                 ` · PV ${formatCurrency(summary.totalTaxSavingsPV)}`}
             </span>
           </div>
-          <div className="ws-metric">
-            <span className="ws-metric-label">
-              <InfoText
-                contentKey="col-income-required"
-                currentValue={formatCurrency(peakIncomeReq.amount)}
-              >
-                Income to Fully Utilize
-              </InfoText>
-            </span>
-            <span className="ws-metric-value">{formatCurrency(peakIncomeReq.amount)}</span>
-            <span className="ws-metric-sub">peak need, year {peakIncomeReq.year} — per-year below</span>
-          </div>
+          {ediMode ? (
+            // EDI-only co-headline (D-015): the loss reserve IS the product —
+            // contingent shelter value, never folded into realized savings.
+            <div className="ws-metric ws-metric--primary">
+              <span className="ws-metric-label">
+                <InfoText
+                  contentKey="loss-reserve-built"
+                  currentValue={formatCurrency(summary.lossReserveShelterValue)}
+                >
+                  Loss Reserve Built
+                </InfoText>
+              </span>
+              <span className="ws-metric-value">
+                {formatCurrency(summary.lossReserveShelterValue)}
+              </span>
+              <span className="ws-metric-sub">
+                from {formatCurrency(summary.finalStCarryforward + summary.finalLtCarryforward)} of
+                loss carryforwards · contingent on future gains
+              </span>
+            </div>
+          ) : (
+            <div className="ws-metric">
+              <span className="ws-metric-label">
+                <InfoText
+                  contentKey="col-income-required"
+                  currentValue={formatCurrency(peakIncomeReq.amount)}
+                >
+                  Income to Fully Utilize
+                </InfoText>
+              </span>
+              <span className="ws-metric-value">{formatCurrency(peakIncomeReq.amount)}</span>
+              <span className="ws-metric-sub">peak need, year {peakIncomeReq.year} — per-year below</span>
+            </div>
+          )}
           <div className="ws-metric">
             <span className="ws-metric-label">Year 1 / Year 2+</span>
             <span className="ws-metric-value">
@@ -641,6 +706,21 @@ export function WorkspaceTab() {
 
         {showEventsEditor && (
           <div className="ws-events-editor">
+            <div className="ws-presets">
+              <span className="ws-presets-label">Scenario presets</span>
+              <button type="button" className="ws-preset-btn" onClick={() => applyPreset('business-sale')}>
+                Business sale
+              </button>
+              <button type="button" className="ws-preset-btn" onClick={() => applyPreset('rsu-vesting')}>
+                RSU vesting
+              </button>
+              <button type="button" className="ws-preset-btn" onClick={() => applyPreset('concentrated-stock')}>
+                Diversify concentrated stock
+              </button>
+              <span className="ws-presets-note">
+                starting points — each fills the rows below; edit amounts and years to fit the client
+              </span>
+            </div>
             <div className="ws-sched">
               <span className="ws-sched-label">Income schedule</span>
               <label className="ws-sched-field">
@@ -787,18 +867,33 @@ export function WorkspaceTab() {
                 </span>
                 <span className="ws-card-value">{formatCurrency(exit.incrementalDeferredTax)}</span>
                 <span className="ws-card-sub">
-                  after {formatCurrency(exit.cfShelterUsed)} carryforward shelter
+                  {exit.incrementalDeferredTax < 0
+                    ? `negative: exits ${formatCurrency(Math.abs(exit.incrementalDeferredTax))} cheaper than passive — loss-reserve advantage`
+                    : `after ${formatCurrency(exit.cfShelterUsed)} carryforward shelter`}
                 </span>
               </div>
               <div className="ws-card">
                 <span className="ws-card-label">
-                  <InfoText contentKey="total-nol-generated" currentValue={formatCurrency(summary.totalNolGenerated)}>
-                    NOL Generated
+                  <InfoText contentKey="net-if-held-to-step-up" currentValue={formatCurrency(stepUp.netIfHeldToStepUp)}>
+                    Net If Held to Step-Up
                   </InfoText>
                 </span>
-                <span className="ws-card-value">{formatCurrency(summary.totalNolGenerated)}</span>
-                <span className="ws-card-sub">offsets future income (80%/yr)</span>
+                <span className="ws-card-value">{formatCurrency(stepUp.netIfHeldToStepUp)}</span>
+                <span className="ws-card-sub">
+                  vs {formatCurrency(stepUp.netIfLiquidated)} if liquidated · mortality-contingent
+                </span>
               </div>
+              {hasNol && (
+                <div className="ws-card">
+                  <span className="ws-card-label">
+                    <InfoText contentKey="total-nol-generated" currentValue={formatCurrency(summary.totalNolGenerated)}>
+                      NOL Generated
+                    </InfoText>
+                  </span>
+                  <span className="ws-card-value">{formatCurrency(summary.totalNolGenerated)}</span>
+                  <span className="ws-card-sub">offsets future income (80%/yr)</span>
+                </div>
+              )}
               <div className="ws-card">
                 <span className="ws-card-label">Final Total Wealth</span>
                 <span className="ws-card-value">{formatCurrency(summary.finalTotalWealth)}</span>
@@ -808,7 +903,67 @@ export function WorkspaceTab() {
               </div>
             </div>
 
-            {incomeReqYears.length > 0 && (
+            {ediMode && (
+              <>
+                <span className="ws-cards-title">EDI Economics</span>
+                <div className="ws-cards">
+                  <div className="ws-card">
+                    <span className="ws-card-label">
+                      <InfoText
+                        contentKey="protection-ratio"
+                        currentValue={
+                          insights.protectionRatio !== null
+                            ? `${insights.protectionRatio.toFixed(1)}×`
+                            : '—'
+                        }
+                      >
+                        Protection Ratio
+                      </InfoText>
+                    </span>
+                    <span className="ws-card-value">
+                      {insights.protectionRatio !== null
+                        ? `${insights.protectionRatio.toFixed(1)}×`
+                        : '—'}
+                    </span>
+                    <span className="ws-card-sub">
+                      {insights.protectionRatio !== null
+                        ? 'shelter value ÷ cumulative financing cost'
+                        : 'financing costs disabled'}
+                    </span>
+                  </div>
+                  <div className="ws-card">
+                    <span className="ws-card-label">
+                      <InfoText
+                        contentKey="break-even-gain-event"
+                        currentValue={formatCurrency(insights.breakEvenGainEvent)}
+                      >
+                        Break-Even Gain Event
+                      </InfoText>
+                    </span>
+                    <span className="ws-card-value">{formatCurrency(insights.breakEvenGainEvent)}</span>
+                    <span className="ws-card-sub">a gain this size would be fully sheltered</span>
+                  </div>
+                  <div className="ws-card">
+                    <span className="ws-card-label">
+                      <InfoText
+                        contentKey="cumulative-financing-cost"
+                        currentValue={formatCurrency(insights.cumulativeFinancingCost)}
+                      >
+                        Cumulative Financing Cost
+                      </InfoText>
+                    </span>
+                    <span className="ws-card-value">{formatCurrency(insights.cumulativeFinancingCost)}</span>
+                    <span className="ws-card-sub">
+                      {settings.financingFeesEnabled
+                        ? `over ${results.years.length} years`
+                        : 'financing costs & fees disabled'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {hasNol && incomeReqYears.length > 0 && (
               <div className="ws-income-req">
                 <span className="ws-income-req-label">
                   <InfoText contentKey="col-income-required">
@@ -828,16 +983,80 @@ export function WorkspaceTab() {
               </div>
             )}
 
-            <p className="ws-narrative">
-              <strong>What this means:</strong> on a {formatCurrency(results.sizing.collateralValue)}{' '}
-              portfolio with {currentStrategy?.name ?? 'the selected strategy'}, the program is
-              estimated to save {formatCurrency(summary.totalTaxSavings)} over {results.years.length} years
-              at a combined ordinary rate of {formatPercent(rates.combinedOrdinary)}. A portion is
-              timing: full liquidation in year {projectionYears} would surrender{' '}
-              {formatCurrency(exit.incrementalDeferredTax)} of that, leaving{' '}
-              {formatCurrency(exit.netBenefitAfterLiquidation)}; holding through death (basis step-up)
-              or donating can make the deferral permanent.
-            </p>
+            {ediMode ? (
+              <p className="ws-narrative">
+                <strong>What this means:</strong> on a {formatCurrency(results.sizing.collateralValue)}{' '}
+                portfolio with {currentStrategy?.name ?? 'the selected strategy'}, the program's main
+                output is a loss reserve: an estimated{' '}
+                {formatCurrency(summary.finalStCarryforward + summary.finalLtCarryforward)} of loss
+                carryforwards by year {results.years.length}, worth{' '}
+                {formatCurrency(summary.lossReserveShelterValue)} of shelter against future capital
+                gains — contingent on those gains being realized (a business sale, concentrated-stock
+                exit, RSU diversification). Realized savings along the way are an estimated{' '}
+                {formatCurrency(summary.totalTaxSavings)} (the $3,000/yr deduction plus any gain
+                events the reserve shelters — model one with the presets above).{' '}
+                {exit.incrementalDeferredTax < 0 ? (
+                  <>
+                    And the reserve already covers the exit: full liquidation in year{' '}
+                    {projectionYears} would cost{' '}
+                    {formatCurrency(Math.abs(exit.incrementalDeferredTax))} <em>less</em> than the
+                    passive baseline, for a net benefit of{' '}
+                    {formatCurrency(exit.netBenefitAfterLiquidation)}.
+                  </>
+                ) : (
+                  <>
+                    Full liquidation in year {projectionYears} would surrender{' '}
+                    {formatCurrency(exit.incrementalDeferredTax)} of deferred tax, leaving{' '}
+                    {formatCurrency(exit.netBenefitAfterLiquidation)}; holding through death (basis
+                    step-up) or donating can make the deferral permanent.
+                  </>
+                )}
+              </p>
+            ) : (
+              <p className="ws-narrative">
+                <strong>What this means:</strong> on a {formatCurrency(results.sizing.collateralValue)}{' '}
+                portfolio with {currentStrategy?.name ?? 'the selected strategy'}, the program is
+                estimated to save {formatCurrency(summary.totalTaxSavings)} over {results.years.length} years
+                at a combined ordinary rate of {formatPercent(rates.combinedOrdinary)}.{' '}
+                {exit.incrementalDeferredTax < 0 ? (
+                  <>
+                    The exit math runs in the strategy's favor: liquidating in year {projectionYears}{' '}
+                    would cost {formatCurrency(Math.abs(exit.incrementalDeferredTax))} <em>less</em>{' '}
+                    than the passive baseline — the loss reserve more than covers the strategy's
+                    embedded gain — for a net benefit of{' '}
+                    {formatCurrency(exit.netBenefitAfterLiquidation)}.
+                  </>
+                ) : (
+                  <>
+                    A portion is timing: full liquidation in year {projectionYears} would surrender{' '}
+                    {formatCurrency(exit.incrementalDeferredTax)} of that, leaving{' '}
+                    {formatCurrency(exit.netBenefitAfterLiquidation)}; holding through death (basis
+                    step-up) or donating can make the deferral permanent.
+                  </>
+                )}
+              </p>
+            )}
+
+            <div className="ws-note ws-note--muted">
+              <strong>Step-up framing:</strong> "Net If Held to Step-Up" is mortality-contingent and
+              assumes basis step-up under current law (IRC §1014). Unused loss carryforwards are
+              lost at death (§1212) — their{' '}
+              {formatCurrency(stepUp.continueAndDie.carryforwardValueLost)} contingent shelter value
+              is NOT counted in either figure.
+              {stepUp.recommendation === 'partial_unwind' && (
+                <>
+                  {' '}With carryforwards covering only part of the embedded gain, the modeled
+                  optimum is a partial unwind of ~{Math.round(stepUp.optimalUnwindPct * 100)}%
+                  during life (sheltered by the reserve), holding the rest for step-up.
+                </>
+              )}
+              {stepUp.recommendation === 'unwind' && (
+                <>
+                  {' '}Here the carryforward exceeds the embedded gain, so a full unwind during
+                  life is tax-free — excess reserve would otherwise be lost at death.
+                </>
+              )}
+            </div>
 
             {nolExtensionYears > 0 && (
               <div className="ws-note ws-note--muted">
@@ -874,12 +1093,14 @@ export function WorkspaceTab() {
               combined ordinary {formatPercent(rates.combinedOrdinary)} / LT {formatPercent(rates.combinedLt)}.
               Wash-sale disallowance {formatPercent(settings.washSaleDisallowanceRate)}.
             </div>
-            <details className="ws-note ws-note--muted ws-details">
-              <summary>
-                <strong>How the QFAF's tax treatment works</strong> (draft — pending counsel review)
-              </summary>
-              <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
-            </details>
+            {!ediMode && (
+              <details className="ws-note ws-note--muted ws-details">
+                <summary>
+                  <strong>How the QFAF's tax treatment works</strong> (draft — pending counsel review)
+                </summary>
+                <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
+              </details>
+            )}
             <div className="ws-note ws-note--muted">
               Estimates only — not investment, tax, or legal advice. See full disclosures below.
             </div>

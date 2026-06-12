@@ -167,12 +167,12 @@ export function ResultsTable({
 
     cols += 1; // Tax Savings column
     cols += 1; // Cumulative column
-    if (expandSavings) cols += 5; // Ord Ded., NOL Ben., $3K Ben., LT Cost, ST Cost
+    if (expandSavings) cols += 6; // Ord Ded., NOL Ben., $3K Ben., LT Cost, ST Cost, Fin. Cost
     return cols;
   };
 
   // Savings breakdown columns count for starting row
-  const savingsDetailCols = expandSavings ? 5 : 0;
+  const savingsDetailCols = expandSavings ? 6 : 0;
 
   // Filter out quiet wind-down rows where only the routine $3K capital loss deduction is running.
   // Keep wind-down rows that have meaningful activity: NOL usage, ordinary loss benefits, or
@@ -439,6 +439,9 @@ export function ResultsTable({
                   </th>
                   <th className="col-detail cost-col">
                     <InfoText contentKey="col-st-leak-cost">ST Cost</InfoText>
+                  </th>
+                  <th className="col-detail cost-col">
+                    <InfoText contentKey="col-financing-cost">Fin. Cost</InfoText>
                   </th>
                 </>
               )}
@@ -741,6 +744,13 @@ export function ResultsTable({
                             ? `(${formatCurrency(year.remainingStGainCost)})`
                             : '—'}
                         </td>
+                        {/* Financing cost paid (reference: netted from portfolio
+                            growth, NOT part of the Savings component sum) */}
+                        <td className="negative cost-col">
+                          {year.financingCostPaid > 0
+                            ? `(${formatCurrency(year.financingCostPaid)})`
+                            : '—'}
+                        </td>
                       </>
                     )}
 
@@ -869,8 +879,10 @@ export function ResultsTable({
               Expand "Total Losses" for usable ordinary loss, gross losses, §461(l) cap overflow to NOL,
               and NOL usage; "Cap. CF" for ST/LT carryforward balances and the $3K deduction; and
               "Savings" for the full benefit/cost components, which sum exactly to the Savings column
-              (Ord. Ded. + NOL Ben. + $3K Ben. − LT Cost − ST Cost). Rows marked "W/D" are
-              post-strategy wind-down years where only carryforward usage continues.
+              (Ord. Ded. + NOL Ben. + $3K Ben. − LT Cost − ST Cost). Fin. Cost is shown for
+              reference only — financing fees are netted out of portfolio growth, not the Savings
+              column. Rows marked "W/D" are post-strategy wind-down years where only carryforward
+              usage continues.
             </em>
           </p>
         )}
@@ -1062,6 +1074,14 @@ function TransposedTable({
         label: 'ST Gain Cost',
         contentKey: 'col-st-leak-cost',
         cell: y => negMoney(y.remainingStGainCost),
+        className: () => 'negative',
+      },
+      {
+        // Reference row: financing fees are netted from portfolio growth,
+        // not subtracted from the Savings column.
+        label: 'Financing Cost',
+        contentKey: 'col-financing-cost',
+        cell: y => negMoney(y.financingCostPaid),
         className: () => 'negative',
       },
       {

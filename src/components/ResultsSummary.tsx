@@ -214,7 +214,9 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             </h3>
             <p className="big-number">{formatCurrency(exitTaxAnalysis.incrementalDeferredTax)}</p>
             <p className="subtext">
-              After {formatCurrency(exitTaxAnalysis.cfShelterUsed)} carryforward shelter
+              {exitTaxAnalysis.incrementalDeferredTax < 0
+                ? `Negative: exits ${formatCurrency(Math.abs(exitTaxAnalysis.incrementalDeferredTax))} cheaper than passive (loss-reserve advantage)`
+                : `After ${formatCurrency(exitTaxAnalysis.cfShelterUsed)} carryforward shelter`}
             </p>
           </div>
           <div className="card">
@@ -233,12 +235,26 @@ export const ResultsSummary = React.memo(function ResultsSummary({
       )}
       {exitTaxAnalysis && collateralAmount > 0 && (
         <div className="results-disclosure">
-          <strong>Permanent vs. deferred:</strong> A portion of the estimated savings is a timing
-          benefit — harvesting reduces cost basis, so {formatCurrency(exitTaxAnalysis.incrementalDeferredTax)} of
-          tax would come due on full liquidation in year {projectionYears}. If the portfolio is
-          instead held until death (basis step-up) or donated, the deferred portion may become
-          permanent. Assumes initial basis equals initial value; appreciated-stock (Overlay)
-          collateral carries additional pre-existing embedded gain not shown here.
+          {exitTaxAnalysis.incrementalDeferredTax < 0 ? (
+            <>
+              <strong>Permanent vs. deferred:</strong> The exit math runs in the strategy's
+              favor — liquidating in year {projectionYears} would cost{' '}
+              {formatCurrency(Math.abs(exitTaxAnalysis.incrementalDeferredTax))} LESS than the
+              passive baseline, because the remaining loss carryforwards more than cover the
+              strategy's embedded gain. Assumes initial basis equals initial value;
+              appreciated-stock (Overlay) collateral carries additional pre-existing embedded
+              gain not shown here.
+            </>
+          ) : (
+            <>
+              <strong>Permanent vs. deferred:</strong> A portion of the estimated savings is a timing
+              benefit — harvesting reduces cost basis, so {formatCurrency(exitTaxAnalysis.incrementalDeferredTax)} of
+              tax would come due on full liquidation in year {projectionYears}. If the portfolio is
+              instead held until death (basis step-up) or donated, the deferred portion may become
+              permanent. Assumes initial basis equals initial value; appreciated-stock (Overlay)
+              collateral carries additional pre-existing embedded gain not shown here.
+            </>
+          )}
         </div>
       )}
 
