@@ -184,6 +184,86 @@ describe('redeployQfafProceeds', () => {
   });
 });
 
+describe('gain events (D-012)', () => {
+  const eventOverride = (
+    year: number,
+    amount: number,
+    character: 'st' | 'lt',
+    w2: number
+  ) => [
+    { year, w2Income: w2, cashInfusion: 0, cashInfusionTaxType: 'gross' as const, note: '', gainEvent: { amount, character } },
+  ];
+
+  it('shelters a sale event with carryforwards (event-last) and reports the delta', () => {
+    // Collateral-only builds capital loss carryforwards for two years, then a
+    // \$5M LT sale in year 3 gets sheltered by whatever remains.
+    const inputs = createInputs({
+      qfafEnabled: false,
+      collateralAmount: 10000000,
+      annualIncome: 1000000,
+    });
+    const res = calculateWithOverrides(
+      inputs,
+      DEFAULT_SETTINGS,
+      eventOverride(3, 5000000, 'lt', 1000000)
+    );
+    const y3 = res.years[2];
+
+    expect(y3.gainEventAmount).toBe(5000000);
+    expect(y3.gainEventCfShelter).toBeGreaterThan(0);
+    // Tax due = unsheltered portion × combined LT (CA, \$1M income → 20%+3.8%+13.3%)
+    expect(y3.gainEventTax).toBeCloseTo(
+      (5000000 - y3.gainEventCfShelter) * 0.371,
+      0
+    );
+    expect(y3.gainEventTax).toBeLessThan(y3.gainEventTaxWithoutStrategy);
+    expect(y3.gainEventTaxWithoutStrategy).toBeCloseTo(5000000 * 0.371, 0);
+  });
+
+  it('lets the event absorb the §461(l) deduction when W-2 income is low', () => {
+    // Zero wages, but a \$2M LT sale in year 1: the deduction shelters the
+    // event income (precise §461(l) model), so usable > 0.
+    const inputs = createInputs({ collateralAmount: 10000000, annualIncome: 0 });
+    const withEvent = calculateWithOverrides(
+      inputs,
+      DEFAULT_SETTINGS,
+      eventOverride(1, 2000000, 'lt', 0)
+    );
+    const without = calculate({ ...inputs }, DEFAULT_SETTINGS);
+    expect(withEvent.years[0].usableOrdinaryLoss).toBeGreaterThan(
+      without.years[0].usableOrdinaryLoss
+    );
+  });
+
+  it('reduces the income required for full utilization in the event year', () => {
+    const inputs = createInputs({ collateralAmount: 10000000, annualIncome: 200000 });
+    const base = calculate(inputs, DEFAULT_SETTINGS);
+    const withEvent = calculateWithOverrides(
+      inputs,
+      DEFAULT_SETTINGS,
+      eventOverride(2, 3000000, 'lt', 200000)
+    );
+    expect(withEvent.years[1].incomeRequiredForFullUtilization).toBeLessThan(
+      base.years[1].incomeRequiredForFullUtilization
+    );
+  });
+
+  it('does not charge the event tax against strategy savings', () => {
+    const inputs = createInputs({ collateralAmount: 1000000, annualIncome: 3000000 });
+    const base = calculate(inputs, DEFAULT_SETTINGS);
+    const withEvent = calculateWithOverrides(
+      inputs,
+      DEFAULT_SETTINGS,
+      eventOverride(2, 10000000, 'lt', 3000000)
+    );
+    // Savings may RISE (NOL/CF monetize against the event) but must not be
+    // dragged down by the event's own tax bill.
+    expect(withEvent.summary.totalTaxSavings).toBeGreaterThanOrEqual(
+      base.summary.totalTaxSavings - 1
+    );
+  });
+});
+
 describe('calculate - basic behavior', () => {
   it('returns at least projectionYears of results (auto-extended by QFAF duration + 2)', () => {
     const result = calculate(createInputs());

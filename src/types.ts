@@ -175,6 +175,12 @@ export interface YearResult {
 
   // ST gain leakage: excess QFAF ST gains not offset by collateral ST losses (QFAF oversized)
   stGainLeakage: number;
+  // Planned gain event (D-012): amount, tax after shelter, and the
+  // counterfactual tax without the program's carryforwards
+  gainEventAmount: number;
+  gainEventTax: number;
+  gainEventTaxWithoutStrategy: number;
+  gainEventCfShelter: number; // event dollars absorbed by CFs/current losses
   // Cash returned from QFAF resizing (dynamic mode only, 0 in fixed mode)
   qfafCashReturned: number;
   // Whether the strategy is actively generating new tax events this year
@@ -211,6 +217,10 @@ export interface YearOverride {
   cashInfusion: number; // Additional capital added at year start
   cashInfusionTaxType: CashInfusionTaxType; // 'gross' = pre-tax, 'net' = after-tax (default: 'gross')
   note: string; // User note (e.g., "Retirement", "Bonus")
+  // Planned capital-gain event this year (business sale, IPO lockup, RSU
+  // sale): flows through the real netting — carryforwards shelter it
+  // (event-last), it absorbs the §461(l) deduction and widens the NOL base.
+  gainEvent?: { amount: number; character: 'st' | 'lt' };
 }
 
 // Sensitivity Analysis

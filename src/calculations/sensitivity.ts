@@ -427,7 +427,17 @@ function calculateYearWithSensitivity(
     year <= state.nolStateSuspension.throughProjectionYear &&
     inputs.annualIncome >= state.nolStateSuspension.magiThreshold;
   const nolStateRate = stateNolSuspended ? 0 : stateDeductionRate;
-  const nolUsageBenefit = safeNumber(nolUsed * (ordinaryRate + nolStateRate));
+  // Mirror core.ts: NOL overflow beyond the ordinary base valued at LT-no-NIIT
+  const ordinaryNolBase = Math.max(
+    0,
+    inputs.annualIncome + taxableSt - usableOrdinaryLoss - capitalLossUsedAgainstIncome
+  );
+  const nolAtOrdinary = Math.min(nolUsed, ordinaryNolBase);
+  const nolAtLt = nolUsed - nolAtOrdinary;
+  const ltNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038)) + nolStateRate;
+  const nolUsageBenefit = safeNumber(
+    nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate
+  );
 
   // Costs: charged on taxable (post-offset) LT gains — see core.ts (CPA finding E)
   const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
@@ -536,6 +546,10 @@ function calculateYearWithSensitivity(
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
     incomeRequiredForFullUtilization,
+    gainEventAmount: 0,
+    gainEventTax: 0,
+    gainEventTaxWithoutStrategy: 0,
+    gainEventCfShelter: 0,
     ordinaryLossBenefit,
     nolUsageBenefit,
     stToLtConversionBenefit: 0, // Deprecated: ST gains/losses wash by design

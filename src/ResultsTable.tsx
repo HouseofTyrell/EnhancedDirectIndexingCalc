@@ -1018,6 +1018,25 @@ function TransposedTable({
     });
   }
 
+  if (data.some(y => y.gainEventAmount > 0)) {
+    sections.push({
+      title: 'Gain Events',
+      rows: [
+        { label: 'Event Amount', cell: y => moneyOrDash(y.gainEventAmount) },
+        { label: 'CF Shelter Applied', cell: y => moneyOrDash(y.gainEventCfShelter) },
+        {
+          label: 'Event Tax Due',
+          cell: y => (y.gainEventAmount > 0 ? formatCurrency(y.gainEventTax) : '—'),
+          className: () => 'negative',
+        },
+        {
+          label: 'Tax Without Program',
+          cell: y => moneyOrDash(y.gainEventTaxWithoutStrategy),
+        },
+      ],
+    });
+  }
+
   sections.push({
     title: 'Capital Loss Carryforwards',
     rows: [
