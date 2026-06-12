@@ -560,6 +560,10 @@ export function Calculator() {
         collateralAmount={effectiveCollateral}
         exitTaxAnalysis={exitTaxAnalysis}
         stateMathWarning={stateMathWarning}
+        totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
+        presentValueEnabled={advancedSettings.presentValueEnabled}
+        discountRate={advancedSettings.discountRate}
+        grossOfCosts={!advancedSettings.financingFeesEnabled}
         stateCode={inputs.stateCode}
       />
       </PinnableSection>
@@ -724,6 +728,10 @@ export function Calculator() {
                 collateralAmount={effectiveCollateral}
                 exitTaxAnalysis={exitTaxAnalysis}
                 stateMathWarning={stateMathWarning}
+        totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
+        presentValueEnabled={advancedSettings.presentValueEnabled}
+        discountRate={advancedSettings.discountRate}
+        grossOfCosts={!advancedSettings.financingFeesEnabled}
                 stateCode={inputs.stateCode}
               />
             ),

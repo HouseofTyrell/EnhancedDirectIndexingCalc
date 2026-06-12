@@ -30,6 +30,12 @@ interface ResultsSummaryProps {
   exitTaxAnalysis?: ExitTaxAnalysis;
   /** Quantified state-math warning (D-005): PA/NJ/MA/WA dollar-impact note */
   stateMathWarning?: string;
+  /** Present value of total savings (D-006), shown when enabled */
+  totalTaxSavingsPV?: number;
+  presentValueEnabled?: boolean;
+  discountRate?: number;
+  /** True when financing fees are excluded (default view) — labels the headline as gross (D-011) */
+  grossOfCosts?: boolean;
   /** State code for conformity warning (e.g. "CA", "NY") */
   stateCode?: string;
 }
@@ -54,6 +60,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
   collateralAmount = 0,
   exitTaxAnalysis,
   stateMathWarning,
+  totalTaxSavingsPV,
+  presentValueEnabled = false,
+  discountRate = 0.05,
+  grossOfCosts = false,
   stateCode,
 }: ResultsSummaryProps) {
   const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
@@ -90,7 +100,17 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             {formatCurrency(totalTaxSavings)}
             <DeltaBadge delta={savingsDelta} />
           </p>
-          <p className="subtext">Over {projectionYears} years</p>
+          <p className="subtext">
+            Over {projectionYears} years
+            {grossOfCosts && (
+              <> — before financing costs &amp; fees (enable in Advanced Settings)</>
+            )}
+          </p>
+          {presentValueEnabled && totalTaxSavingsPV !== undefined && (
+            <p className="subtext">
+              Present value @ {formatPercent(discountRate)}: {formatCurrency(totalTaxSavingsPV)}
+            </p>
+          )}
         </div>
         <div className="headline-metric">
           <h3>

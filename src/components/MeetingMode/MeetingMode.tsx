@@ -2175,6 +2175,9 @@ export function MeetingMode({
                   </strong>{' '}
                   of net tax savings through {endYear},
                   driven by ordinary loss deductions, NOL usage, and capital loss carryforwards.
+                  {!advancedSettings.financingFeesEnabled && (
+                    <> Estimates are before financing costs and fees.</>
+                  )}
                 </p>
               </div>
 

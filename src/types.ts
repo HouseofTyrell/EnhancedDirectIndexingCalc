@@ -174,6 +174,8 @@ export interface CalculationResult {
     totalQfafCashReturned: number;
     /** finalPortfolioValue + totalQfafCashReturned: total wealth including returned cash */
     finalTotalWealth: number;
+    /** Σ taxSavings_n / (1 + discountRate)^n — present value of the nominal savings (D-006) */
+    totalTaxSavingsPV: number;
   };
 }
 
@@ -259,6 +261,10 @@ export interface AdvancedSettings {
   // NOL rules
   nolOffsetLimit: number; // Default: 0.80 (80% of taxable income)
 
+  // Present-value display (D-006): show discounted total savings alongside nominal
+  presentValueEnabled: boolean; // Default: false (opt-in complexity)
+  discountRate: number; // Default: 0.05 (5%/yr, used when presentValueEnabled)
+
   // Portfolio assumptions
   growthEnabled: boolean; // Default: false (no growth assumption)
   defaultAnnualReturn: number; // Default: 0.07 (7% when growth enabled)
@@ -296,6 +302,8 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
     hoh: 256000,
   },
   nolOffsetLimit: 0.8,
+  presentValueEnabled: false,
+  discountRate: 0.05,
   growthEnabled: false,
   defaultAnnualReturn: 0.07,
   qfafAnnualReturn: null, // null means use defaultAnnualReturn

@@ -226,8 +226,19 @@ export function calculateCarryforwards(
   };
 }
 
-export function calculateSummary(years: YearResult[], sizing: CalculatedSizing, qfafDuration?: number) {
+export function calculateSummary(
+  years: YearResult[],
+  sizing: CalculatedSizing,
+  qfafDuration?: number,
+  discountRate: number = 0.05
+) {
   const totalTaxSavings = years.reduce((sum, y) => sum + y.taxSavings, 0);
+  // Present value of the nominal savings stream (D-006); shown in the UI
+  // only when the user opts in via Advanced Settings.
+  const totalTaxSavingsPV = years.reduce(
+    (sum, y, i) => sum + y.taxSavings / Math.pow(1 + discountRate, i + 1),
+    0
+  );
   const totalNolGenerated = years.reduce((sum, y) => sum + y.excessToNol, 0);
   // Cash returned by QFAF dynamic resizing and the terminal unwind. Held
   // outside the strategy (modeled as uninvested), but part of total wealth.
@@ -244,6 +255,7 @@ export function calculateSummary(years: YearResult[], sizing: CalculatedSizing, 
 
   return {
     totalTaxSavings,
+    totalTaxSavingsPV: safeNumber(totalTaxSavingsPV),
     finalPortfolioValue,
     effectiveTaxAlpha,
     totalNolGenerated,

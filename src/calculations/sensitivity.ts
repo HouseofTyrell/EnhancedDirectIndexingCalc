@@ -278,7 +278,7 @@ export function calculateWithSensitivity(
   return {
     sizing,
     years,
-    summary: calculateSummary(years, sizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined),
+    summary: calculateSummary(years, sizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined, settings.discountRate),
   };
 }
 
