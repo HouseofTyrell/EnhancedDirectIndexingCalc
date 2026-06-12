@@ -414,6 +414,54 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     impact: 'Can offset 80% of future taxable income each year.',
   },
 
+  'col-lt-carryforward': {
+    title: 'LT Capital Loss Carryforward',
+    definition: 'Accumulated long-term capital losses not yet used.',
+    formula: 'Prior C/F − Used vs LT Gains − Cross-applied vs ST Gains − $3K Ordinary (after ST C/F)',
+    impact: 'Offsets future capital gains; applied after ST carryforward for the $3K deduction.',
+  },
+
+  'col-capital-cf': {
+    title: 'Capital Loss Carryforwards',
+    definition:
+      'Total unused capital loss carryforward (ST + LT) at the end of this year. Click to ' +
+      'expand for the ST/LT split and the $3K applied against ordinary income.',
+    formula: 'ST Carryforward + LT Carryforward (end of year)',
+    impact:
+      'This is the banked shelter available against future capital gains — concentrated stock ' +
+      'sales, business exits, or the embedded gain at liquidation.',
+  },
+
+  'col-cash-returned': {
+    title: 'QFAF Cash Returned',
+    definition:
+      'Cash returned to the client from the QFAF this year: dynamic resizing distributions ' +
+      'plus the full redemption at the end of the QFAF program.',
+    formula: 'Resizing reductions + terminal unwind proceeds (end-of-year value)',
+    impact:
+      'Held outside the strategy (modeled as uninvested). Included in Final Total Wealth but ' +
+      'not in the portfolio value column.',
+  },
+
+  'col-capital-loss-benefit': {
+    title: '$3K Deduction Benefit',
+    definition:
+      'Tax savings from applying up to $3,000 ($1,500 MFS) of capital loss carryforward ' +
+      'against ordinary income per IRC §1211(b).',
+    formula: 'Capital Loss Used vs Income × Combined Ordinary Rate (no NIIT)',
+    impact: 'Small but recurring; continues through wind-down years while carryforward remains.',
+  },
+
+  'col-st-leak-cost': {
+    title: 'ST Gain Cost',
+    definition:
+      'Tax on net short-term gains remaining after collateral ST losses and carryforwards ' +
+      'offset QFAF ST gains. Nonzero when the QFAF is oversized relative to harvested losses ' +
+      '(e.g., fixed sizing in later years as harvest rates decay).',
+    formula: 'max(0, Net ST Gain) × Combined ST Rate (incl. NIIT)',
+    impact: 'A drag to watch in fixed sizing mode; dynamic resizing keeps this near zero.',
+  },
+
   'col-net-capital': {
     title: 'Net Capital Activity',
     definition:
