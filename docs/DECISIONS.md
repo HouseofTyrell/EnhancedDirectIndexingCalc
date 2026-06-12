@@ -377,6 +377,18 @@ the owner's ask.
 surfaces are folded defaults the owner can override. QFAF interaction default: dynamic
 sizing self-corrects (QFAF shrinks); fixed mode shows an oversized-QFAF warning.
 **DECIDED:** (a) — glide-path plan, Workspace-only v1, all-at-once = duration 1.
+**Status: IMPLEMENTED (2026-06-12)** — `CalculatorInputs.deleveragePlan` +
+`src/calculations/deleverage.ts` (schedule resolution mirroring splitAllocation.ts);
+per-year blended rates/financing feed the existing `CalculateYearOverrides` hook;
+`financing.ts` refactored to a ratio-based core (`getFinancingCostForRatios`) so glide
+years price interpolated leverage. New per-year outputs (extensionFraction, unwind
+gain/character split, tax on unwind, financing saved) in the audit-complete table
+(conditional "Deleverage" group, both orientations), Workspace rail group, Overview
+note, CSV round-trip, and Excel export. Split allocation wins when both are enabled
+(plan ignored + warning chip); sensitivity grid stays un-delevered (D-013 precedent).
+Dynamic QFAF sizing self-corrects (consumes the blended rate); fixed sizing shows the
+oversized-QFAF leakage warning. Exit tax subtracts realized unwind gains from the
+basis reduction (no double taxation). 29 regression tests; suite at 352.
 
 #### D-017 — Tax character and rate assumptions for unwind (deleveraging defaults)
 **Context:** Deleveraging realizes gains on the long extension and covers shorts; the
@@ -398,6 +410,15 @@ Most cautious, likely overstates the unwind cost and undersells a real feature.
 **Recommendation:** (a) — each piece is the mechanically-accurate middle, and every
 knob stays exposed for a skeptical CPA to stress.
 **DECIDED:** (a) — defensible-middle bundle, all knobs overridable per plan.
+**Status: IMPLEMENTED (2026-06-12)** — with D-016. Long-extension unwind gains are LT
+once seasoned (startYear > 2; ST before), short covers realize 0% gain (disclosed in
+the rail while a plan is on), lot selection pro-rata (haircut 1.0), and the target
+loss-rate schedule is sampled at the CURRENT year index (seasoned — never restarted;
+long-only uses the canonical trad-DI rates from the retired ediOnly.ts). All three
+knobs (`unwindGainCharacter`, `lotSelectionHaircut`, `shortCoverGainPct`) live on the
+plan and round-trip through CSV. Unwind gains are endogenous: netted WITH strategy
+flows (harvest first, then CFs per §1211) and charged against taxSavings — proven by
+test against a same-year D-012 event, which still shelters event-LAST.
 
 #### D-018 — Exit framing when the end state is long-only (hold-to-step-up)
 **Context:** After deleveraging to long-only, the realistic UHNW endgame is often hold

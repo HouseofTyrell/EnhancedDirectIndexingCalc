@@ -48,6 +48,11 @@ import {
  * Split allocation: when enabled, ST loss and LT gain rates are blended across
  * legs by collateral weight before variance is applied. The tracking-error
  * multiplier uses each leg's tracking error weighted similarly.
+ *
+ * Scope (D-016, mirroring the D-013 precedent): deleverage plans are NOT
+ * modeled here — the grid compares relative deltas across rate assumptions,
+ * and per-cell glide paths would make cells incomparable. Every cell runs
+ * the un-delevered book (extensionFraction stays 1).
  */
 export function calculateWithSensitivity(
   inputs: CalculatorInputs,
@@ -581,5 +586,13 @@ function calculateYearWithSensitivity(
     qfafCashReturned: 0,
     financingCostPaid,
     strategyActive,
+    // Deleverage plans are out of scope for the sensitivity grid (see module
+    // doc comment): every cell reports the un-delevered book.
+    extensionFraction: 1,
+    deleverageGainRealized: 0,
+    deleverageGainSt: 0,
+    deleverageGainLt: 0,
+    deleverageTax: 0,
+    financingSaved: 0,
   };
 }

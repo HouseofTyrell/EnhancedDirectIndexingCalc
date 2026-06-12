@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import {
   CalculatorInputs,
   AdvancedSettings,
+  DeleveragePlan,
   DEFAULT_SETTINGS,
   FILING_STATUSES,
   FilingStatus,
@@ -17,7 +18,7 @@ import {
   getStateTaxProfile,
   getStateConformityWarning,
 } from '../taxData';
-import { STRATEGIES, getStrategy } from '../strategyData';
+import { STRATEGIES, getStrategy, getShortRatio } from '../strategyData';
 import {
   calculate,
   calculateWithOverrides,
@@ -25,6 +26,7 @@ import {
   computeEdiInsights,
   computeStepUpComparison,
   solveCollateralForTotal,
+  LONG_ONLY_TARGET,
 } from '../calculations';
 import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
@@ -308,6 +310,35 @@ export function WorkspaceTab() {
   const year2 = results.years[1]?.taxSavings ?? 0;
   const projectionYears = settings.projectionYears ?? 10;
   const currentStrategy = getStrategy(inputs.strategyId);
+
+  // Deleveraging plan (D-016/D-017)
+  const dlvPlan = inputs.deleveragePlan;
+  const setDlvPlan = (patch: Partial<DeleveragePlan>) =>
+    set('deleveragePlan', {
+      enabled: false,
+      startYear: Math.min(3, projYears),
+      durationYears: 1,
+      target: LONG_ONLY_TARGET,
+      ...dlvPlan,
+      ...patch,
+    });
+  // Eligible targets: long-only DI plus lower-leverage strategies of the
+  // same type as the current strategy (deleveraging, not restyling).
+  const dlvTargets = currentStrategy
+    ? STRATEGIES.filter(
+        s => s.type === currentStrategy.type && getShortRatio(s) < getShortRatio(currentStrategy)
+      )
+    : [];
+  const dlvTargetLabel =
+    dlvPlan?.target === LONG_ONLY_TARGET || !dlvPlan
+      ? 'long-only direct indexing'
+      : getStrategy(dlvPlan.target)?.name ?? dlvPlan.target;
+  // Active = the engine actually unwound something (false when the plan is
+  // ignored, e.g. split allocation on).
+  const dlvActive = results.years.some(y => y.extensionFraction < 1);
+  const dlvTotalGain = results.years.reduce((s, y) => s + y.deleverageGainRealized, 0);
+  const dlvTotalTax = results.years.reduce((s, y) => s + y.deleverageTax, 0);
+  const dlvTotalFinSaved = results.years.reduce((s, y) => s + y.financingSaved, 0);
   // The engine extends past the standard horizon when NOL remains unused
   // (mirrors core.ts: QFAF duration + partial-year start + 2 wind-down years).
   const baseHorizonYears = Math.max(
@@ -524,6 +555,67 @@ export function WorkspaceTab() {
                 />
                 <span>Redeploy redemptions into core</span>
               </label>
+            </>
+          )}
+        </div>
+
+        <div className="ws-rail-group">
+          <h4>
+            <InfoText contentKey="deleverage-plan">Deleveraging</InfoText>
+          </h4>
+          <label className="ws-toggle">
+            <input
+              type="checkbox"
+              checked={dlvPlan?.enabled === true}
+              onChange={e => setDlvPlan({ enabled: e.target.checked })}
+            />
+            <span>Plan deleveraging</span>
+          </label>
+          {dlvPlan?.enabled && (
+            <>
+              <label className="ws-field">
+                <span>Start year</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={projYears}
+                  value={dlvPlan.startYear}
+                  onChange={e =>
+                    setDlvPlan({
+                      startYear: Math.max(1, Math.min(projYears, Number(e.target.value) || 1)),
+                    })
+                  }
+                />
+              </label>
+              <label className="ws-field">
+                <span>
+                  Duration: {dlvPlan.durationYears} yr{dlvPlan.durationYears > 1 ? 's' : ''}
+                  {dlvPlan.durationYears === 1 ? ' (all at once)' : ''}
+                </span>
+                <input
+                  type="range" min={1} max={10}
+                  value={dlvPlan.durationYears}
+                  onChange={e => setDlvPlan({ durationYears: Number(e.target.value) })}
+                />
+              </label>
+              <label className="ws-field">
+                <span>Unwind to</span>
+                <select
+                  value={dlvPlan.target}
+                  onChange={e => setDlvPlan({ target: e.target.value })}
+                >
+                  <option value={LONG_ONLY_TARGET}>Long-only direct indexing</option>
+                  {dlvTargets.map(s => (
+                    <option key={s.id} value={s.id}>{s.name} — {s.label}</option>
+                  ))}
+                </select>
+              </label>
+              {/* D-017 disclosure — defaults stay visible while a plan is on */}
+              <p className="ws-rail-note" style={{ padding: 0, marginTop: 6 }}>
+                Assumes short covers realize no gain — shorts are continuously
+                loss-recycled; unwound long-extension gains realized as LT once
+                seasoned. Overridable in code.
+              </p>
             </>
           )}
         </div>
@@ -830,6 +922,18 @@ export function WorkspaceTab() {
           </div>
         )}
 
+        {dlvPlan?.enabled && inputs.qfafEnabled && inputs.qfafSizingMode === 'fixed' && (
+          <div className="ws-note">
+            ⚠️ <strong>Fixed QFAF sizing</strong> won't shrink with deleveraging — expect ST
+            gain leakage as the harvest rate glides down (switch to Dynamic).
+          </div>
+        )}
+        {dlvPlan?.enabled && inputs.splitAllocation?.enabled && (
+          <div className="ws-note">
+            ⚠️ Deleveraging isn't modeled with split allocation yet — plan ignored.
+          </div>
+        )}
+
         <div className="ws-subnav">
           {(['overview', 'table', 'charts'] as ResultsView[]).map(v => (
             <button
@@ -1058,6 +1162,31 @@ export function WorkspaceTab() {
               )}
             </div>
 
+            {dlvActive && dlvPlan && (
+              <div className="ws-note ws-note--muted">
+                <strong>Deleveraging:</strong> unwinding{' '}
+                {currentStrategy?.name ?? 'the current strategy'} to {dlvTargetLabel} starting
+                year {dlvPlan.startYear}
+                {dlvPlan.durationYears > 1
+                  ? ` over ${dlvPlan.durationYears} years`
+                  : ' all at once'}{' '}
+                realizes {formatCurrency(dlvTotalGain)} of unwind gains, of which only{' '}
+                {formatCurrency(dlvTotalTax)} is taxed — the remainder is absorbed by the
+                year's harvested losses and the loss-carryforward reserve.{' '}
+                {settings.financingFeesEnabled ? (
+                  <>Financing fees saved vs staying levered: {formatCurrency(dlvTotalFinSaved)}.</>
+                ) : (
+                  <>Enable financing costs &amp; fees to see the financing saved.</>
+                )}
+                {dlvPlan.target === LONG_ONLY_TARGET && (
+                  <>
+                    {' '}Once long-only, the realistic endgame for an estate-minded client is
+                    holding through basis step-up — the "Net If Held to Step-Up" card above
+                    shows that path with the deferred exit tax never paid.
+                  </>
+                )}
+              </div>
+            )}
             {nolExtensionYears > 0 && (
               <div className="ws-note ws-note--muted">
                 <strong>Projection extended to year {results.years.length}:</strong> NOL

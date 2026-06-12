@@ -739,6 +739,76 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
       'Shown for reference: financing fees are netted out of portfolio growth, not subtracted ' +
       'from the Savings column, so this column is NOT part of the Savings component sum.',
   },
+
+  // ============================================
+  // DELEVERAGING (D-016/D-017)
+  // ============================================
+
+  'deleverage-plan': {
+    title: 'Deleveraging Plan',
+    definition:
+      'Models unwinding the extension strategy to a lower-leverage target — all at once ' +
+      '(duration 1) or linearly over a glide path. Harvest and LT gain rates blend from the ' +
+      'current strategy to the target (sampled at the current year, never restarted — the ' +
+      'book is already seasoned), financing reprices at the interpolated leverage ratios, and ' +
+      'unwinding realizes a pro-rata share of the embedded gain. Net portfolio value is ' +
+      'unchanged: gross exposure falls, the collateral stays invested.',
+    impact:
+      'Unwind gains are strategy costs: they net against the year\'s harvested losses and ' +
+      'carryforwards first, and any residual tax is charged against the savings column — ' +
+      'unlike planned gain events, which are reported separately.',
+  },
+
+  'col-extension-fraction': {
+    title: 'Extension %',
+    definition:
+      'End-of-year extension weight: 100% = fully levered at the current strategy, 0% = fully ' +
+      'delevered to the plan target. Glides linearly from the plan\'s start year over its ' +
+      'duration (1 year = all at once).',
+    formula: '1 − (years elapsed since start ÷ duration), floored at 0',
+    impact:
+      'All blended quantities — harvest rate, LT gain rate, financing — move with this ' +
+      'weight, so the year-by-year economics transition smoothly to the target book.',
+  },
+
+  'col-deleverage-gain': {
+    title: 'Unwind Gain',
+    definition:
+      'Capital gain realized this year by selling down the long extension (plus any modeled ' +
+      'short-cover gain). Sized as the unwound extension dollars × the portfolio\'s pro-rata ' +
+      'embedded gain percentage. Character defaults to long-term once the position is ' +
+      'seasoned (plan starts after year 2), short-term before.',
+    formula: 'Lot Haircut × Embedded Gain % × Extension Dollars Unwound',
+    impact:
+      'Nets WITH the strategy\'s own flows: current-year harvested losses absorb it first, ' +
+      'then carryforwards (§1211 ordering). Only the unsheltered residue is taxed. Gains ' +
+      'realized here step up basis, so they are NOT taxed again at the horizon exit.',
+  },
+
+  'col-deleverage-tax': {
+    title: 'Tax on Unwind',
+    definition:
+      'Incremental tax attributable to this year\'s unwind gains after netting and ' +
+      'carryforward shelter, at the year\'s combined rates. Already included in the LT/ST ' +
+      'cost columns (and therefore charged against Savings) — shown here as a decomposition, ' +
+      'not an additional charge.',
+    formula: 'Taxable Unwind ST × Combined ST Rate + Taxable Unwind LT × Combined LT Rate',
+    impact:
+      '$0 means the harvested losses and carryforwards fully absorbed the unwind — the ' +
+      'deleveraging was executed tax-free out of the loss reserve.',
+  },
+
+  'col-financing-saved': {
+    title: 'Financing Saved',
+    definition:
+      'Financing fees avoided this year versus staying fully levered: (source strategy\'s ' +
+      'financing rate − the blended rate at this year\'s interpolated leverage) × collateral. ' +
+      '$0 when financing costs & fees are disabled in the Model panel.',
+    formula: '(Source Financing Rate − Blended Rate) × Collateral Value',
+    impact:
+      'The recurring economic benefit of deleveraging — it offsets the one-time unwind tax. ' +
+      'Like financing costs, it is informational: fees are netted out of portfolio growth.',
+  },
 };
 
 // Helper function to get popup content by key

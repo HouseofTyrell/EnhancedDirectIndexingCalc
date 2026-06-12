@@ -1,6 +1,7 @@
 import {
   CalculatorInputs,
   AdvancedSettings,
+  DeleveragePlan,
   FilingStatus,
   FILING_STATUSES,
   SplitAllocation,
@@ -131,6 +132,24 @@ export function exportInputsToCsv(
     lines.push(csvRow('collateralCostBasis', inputs.collateralCostBasis));
   }
   lines.push(csvRow('nycResident', inputs.nycResident ?? false));
+
+  // Deleveraging plan (D-016/D-017); optional knobs only when overridden
+  if (inputs.deleveragePlan) {
+    const plan = inputs.deleveragePlan;
+    lines.push(csvRow('deleveragePlan.enabled', plan.enabled));
+    lines.push(csvRow('deleveragePlan.startYear', plan.startYear));
+    lines.push(csvRow('deleveragePlan.durationYears', plan.durationYears));
+    lines.push(csvRow('deleveragePlan.target', plan.target));
+    if (plan.unwindGainCharacter !== undefined) {
+      lines.push(csvRow('deleveragePlan.unwindGainCharacter', plan.unwindGainCharacter));
+    }
+    if (plan.lotSelectionHaircut !== undefined) {
+      lines.push(csvRow('deleveragePlan.lotSelectionHaircut', plan.lotSelectionHaircut));
+    }
+    if (plan.shortCoverGainPct !== undefined) {
+      lines.push(csvRow('deleveragePlan.shortCoverGainPct', plan.shortCoverGainPct));
+    }
+  }
 
   // Split allocation
   if (inputs.splitAllocation) {
@@ -316,6 +335,60 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
   boolField('redeployQfafProceeds', b => { inputs.redeployQfafProceeds = b; });
   numField('collateralCostBasis', n => { inputs.collateralCostBasis = n; });
   boolField('nycResident', b => { inputs.nycResident = b; });
+
+  // Deleveraging plan: assemble whatever keys are present, then attach if any.
+  const dlv: Partial<DeleveragePlan> = {};
+  let dlvTouched = false;
+  {
+    const raw = map.get('deleveragePlan.enabled');
+    if (raw !== undefined) {
+      map.delete('deleveragePlan.enabled');
+      const b = parseBool(raw, warnings, 'deleveragePlan.enabled');
+      if (b !== undefined) { dlv.enabled = b; dlvTouched = true; }
+    }
+  }
+  for (const key of ['deleveragePlan.startYear', 'deleveragePlan.durationYears', 'deleveragePlan.lotSelectionHaircut', 'deleveragePlan.shortCoverGainPct'] as const) {
+    const raw = map.get(key);
+    if (raw === undefined) continue;
+    map.delete(key);
+    const n = parseNum(raw, warnings, key);
+    if (n === undefined) continue;
+    dlvTouched = true;
+    if (key === 'deleveragePlan.startYear') dlv.startYear = n;
+    else if (key === 'deleveragePlan.durationYears') dlv.durationYears = n;
+    else if (key === 'deleveragePlan.lotSelectionHaircut') dlv.lotSelectionHaircut = n;
+    else dlv.shortCoverGainPct = n;
+  }
+  {
+    const raw = map.get('deleveragePlan.target');
+    if (raw !== undefined) {
+      map.delete('deleveragePlan.target');
+      if (raw) { dlv.target = raw; dlvTouched = true; }
+    }
+  }
+  {
+    const raw = map.get('deleveragePlan.unwindGainCharacter');
+    if (raw !== undefined) {
+      map.delete('deleveragePlan.unwindGainCharacter');
+      if (raw === 'st' || raw === 'lt') {
+        dlv.unwindGainCharacter = raw;
+        dlvTouched = true;
+      } else if (raw) {
+        warnings.push(`deleveragePlan.unwindGainCharacter: expected "st" or "lt", got "${raw}" — ignoring.`);
+      }
+    }
+  }
+  if (dlvTouched) {
+    inputs.deleveragePlan = {
+      enabled: dlv.enabled ?? false,
+      startYear: dlv.startYear ?? 1,
+      durationYears: dlv.durationYears ?? 1,
+      target: dlv.target ?? 'long-only',
+      ...(dlv.unwindGainCharacter !== undefined && { unwindGainCharacter: dlv.unwindGainCharacter }),
+      ...(dlv.lotSelectionHaircut !== undefined && { lotSelectionHaircut: dlv.lotSelectionHaircut }),
+      ...(dlv.shortCoverGainPct !== undefined && { shortCoverGainPct: dlv.shortCoverGainPct }),
+    };
+  }
 
   // Split allocation: assemble whatever keys are present, then attach if any.
   const split: Partial<SplitAllocation> = {};

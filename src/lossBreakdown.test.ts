@@ -45,6 +45,12 @@ function makeYear(overrides: Partial<YearResult> = {}): YearResult {
     gainEventTaxWithoutStrategy: 0,
     gainEventCfShelter: 0,
     strategyActive: true,
+    extensionFraction: 1,
+    deleverageGainRealized: 0,
+    deleverageGainSt: 0,
+    deleverageGainLt: 0,
+    deleverageTax: 0,
+    financingSaved: 0,
     ...overrides,
   };
 }

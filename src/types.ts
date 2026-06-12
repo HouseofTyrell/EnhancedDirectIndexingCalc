@@ -20,6 +20,30 @@ export interface SplitAllocation {
   overlayAmount: number;
 }
 
+// Deleveraging plan (D-016/D-017): unwind the extension strategy to a
+// lower-leverage target, all at once (durationYears = 1) or linearly over a
+// glide path. The engine derives a per-year schedule that blends harvest/LT
+// rates and financing source→target and realizes pro-rata unwind gains as
+// endogenous strategy costs (charged against taxSavings, unlike D-012 gain
+// events). NAV is unchanged by deleveraging: gross exposure falls, the net
+// collateral stays invested.
+export interface DeleveragePlan {
+  enabled: boolean;
+  /** First year any unwind happens (>= 1) */
+  startYear: number;
+  /** Years to glide from full extension to target; 1 = all-at-once (default) */
+  durationYears: number;
+  /** 'long-only' (traditional DI) or the strategyId of a lower-leverage strategy */
+  target: 'long-only' | string;
+  // D-017 defensible-default knobs, all optional/overridable:
+  /** Character of unwound long-extension gains. Default: 'lt' once seasoned (startYear > 2), 'st' before. */
+  unwindGainCharacter?: 'lt' | 'st';
+  /** Lot-selection discount on pro-rata embedded gain (1.0 = pro-rata, <1 = HIFO discount). Default 1.0. */
+  lotSelectionHaircut?: number;
+  /** Fraction of covered short notional realized as ST gain. Default 0 (shorts continuously loss-recycled) — disclosed on screen. */
+  shortCoverGainPct?: number;
+}
+
 export interface CalculatorInputs {
   // Client profile
   filingStatus: FilingStatus;
@@ -80,6 +104,11 @@ export interface CalculatorInputs {
   // NYC resident (only meaningful when stateCode === 'NY'): adds the ~3.876%
   // NYC resident income tax on top of the NY state rate. Default: false.
   nycResident?: boolean;
+
+  // Deleveraging plan (D-016/D-017). Workspace-only v1; ignored when
+  // splitAllocation is enabled (UI shows a warning) and in sensitivity grids
+  // (D-013 precedent — cells must stay comparable).
+  deleveragePlan?: DeleveragePlan;
 }
 
 export interface SizingLeg {
@@ -188,6 +217,20 @@ export interface YearResult {
   financingCostPaid: number;
   // Whether the strategy is actively generating new tax events this year
   strategyActive: boolean;
+
+  // Deleveraging (D-016/D-017). All 0 (extensionFraction 1) when no plan is active.
+  /** End-of-year extension weight: 1 = fully levered, 0 = fully delevered to target */
+  extensionFraction: number;
+  /** Gains realized this year by unwinding the extension (long side + short cover) */
+  deleverageGainRealized: number;
+  /** ST-character portion of the unwind gain (incl. any short-cover gain) */
+  deleverageGainSt: number;
+  /** LT-character portion of the unwind gain */
+  deleverageGainLt: number;
+  /** Incremental tax attributable to the unwind gains after netting/CF shelter, at this year's rates */
+  deleverageTax: number;
+  /** (source financing rate − blended rate) × start-of-year collateral; 0 when fees disabled */
+  financingSaved: number;
 }
 
 export interface CalculationResult {

@@ -35,11 +35,12 @@ import {
   ResolvedAllocation,
   ResolvedLeg,
 } from './splitAllocation';
+import { resolveDeleveragePlan, resolveDeleverageSchedule } from './deleverage';
 
 /**
- * Optional per-year overrides used by the split-allocation path. When these
- * are supplied, `calculateYear` skips its single-strategy lookups and uses
- * the pre-blended values instead.
+ * Optional per-year overrides used by the split-allocation and deleverage
+ * paths. When these are supplied, `calculateYear` skips its single-strategy
+ * lookups and uses the pre-blended values instead.
  */
 export interface CalculateYearOverrides {
   effectiveStLossRate?: number;
@@ -48,6 +49,18 @@ export interface CalculateYearOverrides {
   /** Planned capital-gain event this year (D-012) */
   eventStGain?: number;
   eventLtGain?: number;
+  // Deleverage plan (D-016/D-017). Unlike D-012 gain events (exogenous,
+  // sheltered event-LAST, never charged to savings), unwind gains are
+  // ENDOGENOUS strategy costs: they net WITH strategy flows and their tax
+  // IS charged against taxSavings.
+  /** End-of-year extension weight (1 when no plan) */
+  extensionFraction?: number;
+  /** ST-character unwind gain realized this year (incl. short-cover gain) */
+  unwindStGain?: number;
+  /** LT-character unwind gain realized this year */
+  unwindLtGain?: number;
+  /** Financing-fee dollars saved vs the un-delevered source book this year */
+  deleverageFinancingSaved?: number;
 }
 
 /**
@@ -142,6 +155,25 @@ export function calculateWithOverrides(
   // horizon, keep projecting wind-down years until it is fully used (capped,
   // and stopping early if no income is consuming it).
   const hardCapYears = Math.max(effectiveProjectionYears, 40);
+
+  // Deleveraging (D-016/D-017): resolve the per-year glide schedule once.
+  // Null when the plan is disabled/invalid or split allocation is enabled
+  // (split wins in v1; the UI shows a "plan ignored" warning).
+  const dlvPlan = allocation.isSplit ? null : resolveDeleveragePlan(inputs);
+  const dlvSchedule = dlvPlan
+    ? resolveDeleverageSchedule(inputs, settings, hardCapYears)
+    : null;
+  // Running embedded-gain state for unwind-gain sizing (consistent with
+  // exitTax.ts: market appreciation + pre-existing gain + Σ(harvested ST
+  // losses − realized LT gains) − Σ prior unwind gains realized).
+  const dlvInitialCollateral = allocation.totalCollateral;
+  const dlvCostBasis =
+    inputs.collateralCostBasis !== undefined
+      ? Math.min(inputs.collateralCostBasis, dlvInitialCollateral)
+      : dlvInitialCollateral;
+  const dlvPreExistingGain = Math.max(0, dlvInitialCollateral - dlvCostBasis);
+  let dlvCumNetHarvest = 0;
+  let dlvCumUnwindRealized = 0;
   // Income for extension years continues the FINAL scheduled year's income
   // (e.g., a retirement schedule persists), not the base input.
   let carryIncome = inputs.annualIncome;
@@ -228,15 +260,22 @@ export function calculateWithOverrides(
 
     // Calendar-year rate blending + operating fraction (see core.ts for derivation).
     const opFraction = getOperatingFraction(year, inputs.startMonth ?? 1, qfafDuration);
-    const calStLossRate = allocation.isSplit
-      ? getBlendedCalendarYearStLossRate(yearAllocation, year, inputs.startMonth ?? 1, qfafDuration)
-      : getCalendarYearStLossRate(
-          allocation.primary.strategy.id,
-          allocation.primary.strategy.ltGainRate,
-          year,
-          inputs.startMonth ?? 1,
-          qfafDuration
-        );
+    const dlvYear = dlvSchedule ? dlvSchedule[year - 1] : undefined;
+    // Deleverage years replace the rate with the source→target blend; the
+    // dynamic-QFAF sizing below consumes the same blended rate, so dynamic
+    // sizing self-corrects as the book delevers (fixed sizing does not —
+    // the UI warns about ST gain leakage).
+    const calStLossRate = dlvYear
+      ? dlvYear.stLossRate
+      : allocation.isSplit
+        ? getBlendedCalendarYearStLossRate(yearAllocation, year, inputs.startMonth ?? 1, qfafDuration)
+        : getCalendarYearStLossRate(
+            allocation.primary.strategy.id,
+            allocation.primary.strategy.ltGainRate,
+            year,
+            inputs.startMonth ?? 1,
+            qfafDuration
+          );
 
     // Zero out QFAF after the strategy's last operating year (breakeven unwind)
     let effectiveQfafValue =
@@ -270,10 +309,51 @@ export function calculateWithOverrides(
         ltGainRate: blendedLt,
         financingCost: getBlendedFinancingCost(yearAllocation, settings),
       };
+    } else if (dlvYear && dlvPlan) {
+      strategyForCalc = { stLossRate: calStLossRate, ltGainRate: dlvYear.ltGainRate };
+      yearOverrides = {
+        effectiveStLossRate: calStLossRate,
+        ltGainRate: dlvYear.ltGainRate,
+        financingCost: dlvYear.financingCost,
+        extensionFraction: dlvYear.w,
+        deleverageFinancingSaved:
+          dlvYear.financingSavedRate * yearStartTotalCollateral * yearFractionForCall,
+      };
     } else {
       strategyForCalc = allocation.primary.strategy;
       yearOverrides = { effectiveStLossRate: calStLossRate };
     }
+
+    // Unwind gains for the fraction delevered this year (D-017 defaults:
+    // pro-rata embedded gain on the long extension, LT once seasoned; short
+    // covers realize shortCoverGainPct — 0 by default, shorts are
+    // continuously loss-recycled). Gains deplete the embedded-gain pool.
+    let dlvLongUnwindGain = 0;
+    if (dlvYear && dlvPlan && dlvYear.fracUnwoundThisYear > 0) {
+      const embeddedGain = Math.max(
+        0,
+        yearStartTotalCollateral - dlvInitialCollateral +
+          dlvPreExistingGain + dlvCumNetHarvest - dlvCumUnwindRealized
+      );
+      // Pro-rata: gain per dollar of the LONG book (NAV × (1 + long leverage)).
+      const grossLongValue = yearStartTotalCollateral * (1 + dlvPlan.sourceLongLeverage);
+      const embeddedGainPct = grossLongValue > 0 ? embeddedGain / grossLongValue : 0;
+      const longDollarsUnwound =
+        dlvYear.fracUnwoundThisYear *
+        Math.max(0, dlvPlan.sourceLongLeverage - dlvPlan.targetLongLeverage) *
+        yearStartTotalCollateral;
+      dlvLongUnwindGain = dlvPlan.lotSelectionHaircut * embeddedGainPct * longDollarsUnwound;
+      const shortDollarsCovered =
+        dlvYear.fracUnwoundThisYear *
+        Math.max(0, dlvPlan.sourceShortRatio - dlvPlan.targetShortRatio) *
+        yearStartTotalCollateral;
+      const shortCoverGain = dlvPlan.shortCoverGainPct * shortDollarsCovered;
+      yearOverrides.unwindStGain =
+        (dlvPlan.unwindGainCharacter === 'st' ? dlvLongUnwindGain : 0) + shortCoverGain;
+      yearOverrides.unwindLtGain =
+        dlvPlan.unwindGainCharacter === 'lt' ? dlvLongUnwindGain : 0;
+    }
+
     const ev = override?.gainEvent;
     if (ev && ev.amount > 0) {
       yearOverrides.eventStGain = ev.character === 'st' ? ev.amount : 0;
@@ -297,6 +377,12 @@ export function calculateWithOverrides(
       strategyActive,
       yearOverrides
     );
+
+    // Advance the embedded-gain pool: this year's net harvest deepens it,
+    // long-side unwind realizations deplete it (short-cover gains are not
+    // drawn from the long book's pool).
+    dlvCumNetHarvest += result.stLossesHarvested - result.ltGainsRealized;
+    dlvCumUnwindRealized += dlvLongUnwindGain;
 
     // In split mode, recompute per-leg next-year values.
     if (allocation.isSplit) {
@@ -425,8 +511,16 @@ export function calculateYear(
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
   const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * ltGainRate * yearFraction) : 0;
 
-  // Net ST position (should be ~0 with proper auto-sizing)
-  const grossNetSt = stGainsGenerated - stLossesHarvested;
+  // Deleverage unwind gains (D-016/D-017): ENDOGENOUS strategy costs, the
+  // opposite of D-012 gain events — they net WITH the strategy's own flows
+  // (current-year harvest first, then carryforwards per the existing §1211
+  // ordering) and their tax IS charged against taxSavings.
+  const unwindStGain = overrides?.unwindStGain ?? 0;
+  const unwindLtGain = overrides?.unwindLtGain ?? 0;
+
+  // Net ST position (should be ~0 with proper auto-sizing; unwind ST gains
+  // are absorbed by harvested losses before anything is taxable)
+  const grossNetSt = stGainsGenerated - stLossesHarvested + unwindStGain;
 
   // Apply ST carryforward to offset any remaining ST gains
   let netStGainLoss = grossNetSt;
@@ -459,7 +553,7 @@ export function calculateYear(
     eventTaxableLt,
   } = calculateCarryforwards(
     netStGainLoss,
-    ltGainsRealized,
+    ltGainsRealized + unwindLtGain,
     allowedOrdinaryLoss,
     stCarryforward - usedStCarryforward,
     ltCarryforward,
@@ -561,6 +655,18 @@ export function calculateYear(
 
   // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
+
+  // Deleverage tax (D-016): the incremental tax attributable to the unwind
+  // amounts at this year's rates — the taxable residue of each character
+  // after netting/CF shelter, capped at the unwind amount. This is a
+  // REPORTING decomposition: the dollars are already inside ltGainCost /
+  // remainingStGainCost (and so already charged against taxSavings), not a
+  // second subtraction.
+  const taxableUnwindSt = Math.min(unwindStGain, Math.max(0, netStGainLoss));
+  const taxableUnwindLt = Math.min(unwindLtGain, taxableLt);
+  const deleverageTax = safeNumber(
+    taxableUnwindSt * combinedStRate + taxableUnwindLt * combinedLtRate
+  );
 
   // Net tax savings: ordinary deductions minus capital gains costs
   // ST gains and ST losses wash (by design) — no phantom "conversion benefit"
@@ -709,5 +815,11 @@ export function calculateYear(
     qfafCashReturned: 0, // Set by the calling loop in dynamic mode
     financingCostPaid,
     strategyActive,
+    extensionFraction: overrides?.extensionFraction ?? 1,
+    deleverageGainRealized: safeNumber(unwindStGain + unwindLtGain),
+    deleverageGainSt: safeNumber(unwindStGain),
+    deleverageGainLt: safeNumber(unwindLtGain),
+    deleverageTax,
+    financingSaved: safeNumber(overrides?.deleverageFinancingSaved ?? 0),
   };
 }

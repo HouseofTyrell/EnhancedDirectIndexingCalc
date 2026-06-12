@@ -84,9 +84,15 @@ export function computeExitTaxAnalysis(
   const finalCollateralValue = lastYear?.collateralValue ?? initialCollateral;
 
   // Basis falls by harvested ST losses (already net of wash-sale disallowance)
-  // and rises by realized LT gains.
+  // and rises by realized LT gains. Deleverage unwind gains (D-016) were
+  // already realized — and taxed — during the glide, so they step basis up
+  // here; without the subtraction the horizon exit would tax them twice.
   const cumulativeBasisReduction = safeNumber(
-    years.reduce((sum, y) => sum + y.stLossesHarvested - y.ltGainsRealized, 0)
+    years.reduce(
+      (sum, y) =>
+        sum + y.stLossesHarvested - y.ltGainsRealized - y.deleverageGainRealized,
+      0
+    )
   );
 
   // Pre-existing gain: collateral contributed above its cost basis (the
