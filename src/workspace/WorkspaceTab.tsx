@@ -24,7 +24,7 @@ import { exportToExcel } from '../utils/excelExport';
 import { MeetingMode } from '../components/MeetingMode/MeetingMode';
 import { formatCurrency, formatPercent, formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 import { ResultsTable } from '../ResultsTable';
-import { WealthChart, TaxSavingsChart } from '../WealthChart';
+import { TaxSavingsChart, PortfolioValueChart } from '../WealthChart';
 import { DisclaimerFooter } from '../components/DisclaimerFooter';
 import { QualifiedPurchaserModal } from '../components/QualifiedPurchaserModal';
 import { useQualifiedPurchaser } from '../hooks/useQualifiedPurchaser';
@@ -583,8 +583,12 @@ export function WorkspaceTab() {
 
         {resultsView === 'charts' && (
           <div className="ws-charts">
-            <TaxSavingsChart data={results.years} startMonth={inputs.startMonth} />
-            <WealthChart data={results.years} startMonth={inputs.startMonth} />
+            <TaxSavingsChart data={results.years} startMonth={effectiveInputs.startMonth} />
+            <PortfolioValueChart
+              data={results.years}
+              trackingError={currentStrategy?.trackingError}
+              startMonth={effectiveInputs.startMonth}
+            />
           </div>
         )}
 
