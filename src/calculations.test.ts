@@ -805,19 +805,62 @@ describe('Per-state tax treatment (D-005)', () => {
   });
 
   it('applies the WA 7% LTCG excise above the annual exemption', () => {
-    // 10M × 2.4% = $240K LT gains → below the $270K exemption: no excise
+    // 10M × 2.4% = $240K LT gains → below the $278K exemption: no excise
     const small = calculate(createInputs({ ...base, stateCode: 'WA' }));
     expect(small.years[0].ltGainCost).toBeCloseTo(
       small.years[0].ltGainsRealized * 0.238,
       0
     );
-    // 20M × 2.4% = $480K LT gains → $210K above exemption × 7% excise
+    // 20M × 2.4% = $480K LT gains → $202K above the $278K exemption × 7%
     const large = calculate(createInputs({ ...base, stateCode: 'WA', collateralAmount: 20000000 }));
     const y1 = large.years[0];
     expect(y1.ltGainCost).toBeCloseTo(
-      y1.ltGainsRealized * 0.238 + (y1.ltGainsRealized - 270000) * 0.07,
+      y1.ltGainsRealized * 0.238 + (y1.ltGainsRealized - 278000) * 0.07,
       0
     );
+  });
+
+  it('applies the WA ESSB 5813 surcharge (2.9%) on taxed gains above $1M', () => {
+    // 60M × 2.4% = $1.44M LT gains → taxed = 1.44M − 278K = 1.162M:
+    // 7% on all taxed + 2.9% on the 162K above $1M
+    const result = calculate(createInputs({ ...base, stateCode: 'WA', collateralAmount: 60000000 }));
+    const y1 = result.years[0];
+    const taxed = y1.ltGainsRealized - 278000;
+    expect(y1.ltGainCost).toBeCloseTo(
+      y1.ltGainsRealized * 0.238 + taxed * 0.07 + (taxed - 1000000) * 0.029,
+      0
+    );
+  });
+
+  it('uses the 2026 LTCG thresholds (Rev. Proc. 2025-32)', () => {
+    // $98,000 MFJ taxable income is in the 0% LTCG bracket for 2026
+    // (the 0% ceiling rose from $96,700 in 2025 to $98,900)
+    const result = calculate(
+      createInputs({ stateCode: 'FL', annualIncome: 98000, collateralAmount: 100000 })
+    );
+    // Below the NIIT threshold too, so the LT gain cost is zero at 0% LTCG
+    expect(result.years[0].ltGainCost).toBe(0);
+  });
+
+  it('suspends the CA state NOL component in year 1 for MAGI ≥ $1M (SB 167)', () => {
+    // Existing NOL forces year-1 NOL usage; CA state benefit must be excluded
+    // in year 1 (tax year 2026) and restored in year 2 (2027)
+    const inputs = createInputs({
+      stateCode: 'CA',
+      annualIncome: 3000000,
+      collateralAmount: 1000000,
+      existingNolCarryforward: 500000,
+    });
+    const result = calculate(inputs);
+    const y1 = result.years[0];
+    const y2 = result.years[1];
+    expect(y1.nolUsedThisYear).toBeGreaterThan(0);
+    // Year 1: federal-only (37%)
+    expect(y1.nolUsageBenefit).toBeCloseTo(y1.nolUsedThisYear * 0.37, 0);
+    // Year 2: federal + CA (37% + 13.3%)
+    if (y2.nolUsedThisYear > 0) {
+      expect(y2.nolUsageBenefit).toBeCloseTo(y2.nolUsedThisYear * 0.503, 0);
+    }
   });
 });
 

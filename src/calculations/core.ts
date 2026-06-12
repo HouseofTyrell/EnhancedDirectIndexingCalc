@@ -7,7 +7,7 @@ import {
   DEFAULT_SETTINGS,
   YearOverride,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile, computeLtcgExcise } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -461,8 +461,15 @@ export function calculateYear(
   // 2. Capital loss carryforward used against ordinary income ($3k/yr limit)
   const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
 
-  // 3. NOL used against taxable income
-  const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
+  // 3. NOL used against taxable income. The STATE component is suppressed
+  // when the state suspends NOL deductions (CA SB 167: MAGI ≥ $1M through
+  // tax year 2026 = projection year 1).
+  const stateNolSuspended =
+    state.nolStateSuspension !== undefined &&
+    year <= state.nolStateSuspension.throughProjectionYear &&
+    effectiveIncome >= state.nolStateSuspension.magiThreshold;
+  const nolStateRate = stateNolSuspended ? 0 : stateDeductionRate;
+  const nolUsageBenefit = safeNumber(nolUsed * (ordinaryRate + nolStateRate));
 
   // Costs:
   // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption).
@@ -471,9 +478,7 @@ export function calculateYear(
   // losses are consumed by QFAF gains), but in collateral-only mode harvested
   // ST losses offset the LT gains and the cost would otherwise be overstated,
   // inflating the incremental benefit of adding the QFAF. (CPA review finding E.)
-  const ltcgExciseTax = state.ltcgExcise
-    ? Math.max(0, taxableLt - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
-    : 0;
+  const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
   const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
 
   // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates

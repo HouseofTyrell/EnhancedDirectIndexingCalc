@@ -1,4 +1,5 @@
 import { CalculationResult } from '../types';
+import { StateTaxProfile, computeLtcgExcise } from '../taxData';
 import { safeNumber } from '../utils/formatters';
 
 /**
@@ -64,7 +65,7 @@ export function computeExitTaxAnalysis(
   combinedLtRate: number,
   passiveAnnualReturn: number = 0,
   /** WA-style LTCG excise applied to a single-year full liquidation (D-005) */
-  ltcgExcise?: { rate: number; exemptionPerYear: number }
+  ltcgExcise?: StateTaxProfile['ltcgExcise']
 ): ExitTaxAnalysis {
   const years = result.years;
   const initialCollateral = result.sizing.collateralValue;
@@ -89,8 +90,7 @@ export function computeExitTaxAnalysis(
   );
   const cfShelterUsed = Math.min(remainingCapitalLossCf, embeddedGain);
   const taxableGainAfterShelter = Math.max(0, safeNumber(embeddedGain - cfShelterUsed));
-  const exciseOn = (gain: number) =>
-    ltcgExcise ? Math.max(0, gain - ltcgExcise.exemptionPerYear) * ltcgExcise.rate : 0;
+  const exciseOn = (gain: number) => computeLtcgExcise(gain, ltcgExcise);
   const exitTax = safeNumber(
     taxableGainAfterShelter * combinedLtRate + exciseOn(taxableGainAfterShelter)
   );
