@@ -26,7 +26,10 @@ export function DisclaimerFooter() {
             <li>Section 461(l) limits are inflation-adjusted annually and may change</li>
             <li>NOL rules (80% offset limit) could be modified by future legislation</li>
             <li>State tax treatment varies; some states do not conform to federal rules</li>
-            <li>QFAF tax treatment depends on ongoing IRS guidance</li>
+            <li>
+              QFAF tax treatment depends on fund qualification and ongoing IRS guidance — see
+              the draft treatment description in the calculator (pending counsel review)
+            </li>
             <li>
               Tax-loss harvesting reduces cost basis: a portion of projected savings is tax
               deferral, not elimination, and becomes due if the portfolio is liquidated.

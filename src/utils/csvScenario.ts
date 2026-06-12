@@ -130,6 +130,7 @@ export function exportInputsToCsv(
   if (inputs.collateralCostBasis !== undefined) {
     lines.push(csvRow('collateralCostBasis', inputs.collateralCostBasis));
   }
+  lines.push(csvRow('nycResident', inputs.nycResident ?? false));
 
   // Split allocation
   if (inputs.splitAllocation) {
@@ -314,6 +315,7 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
   boolField('ltGainsEnabled', b => { inputs.ltGainsEnabled = b; });
   boolField('redeployQfafProceeds', b => { inputs.redeployQfafProceeds = b; });
   numField('collateralCostBasis', n => { inputs.collateralCostBasis = n; });
+  boolField('nycResident', b => { inputs.nycResident = b; });
 
   // Split allocation: assemble whatever keys are present, then attach if any.
   const split: Partial<SplitAllocation> = {};

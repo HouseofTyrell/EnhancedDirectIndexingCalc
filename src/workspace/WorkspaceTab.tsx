@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   FILING_STATUSES,
   FilingStatus,
+  YearOverride,
 } from '../types';
 import {
   DEFAULTS,
@@ -17,7 +18,7 @@ import {
   getStateConformityWarning,
 } from '../taxData';
 import { STRATEGIES, getStrategy } from '../strategyData';
-import { calculate, computeExitTaxAnalysis, solveCollateralForTotal } from '../calculations';
+import { calculate, calculateWithOverrides, computeExitTaxAnalysis, solveCollateralForTotal } from '../calculations';
 import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
 import { exportToExcel } from '../utils/excelExport';
@@ -29,6 +30,7 @@ import { DisclaimerFooter } from '../components/DisclaimerFooter';
 import { QualifiedPurchaserModal } from '../components/QualifiedPurchaserModal';
 import { useQualifiedPurchaser } from '../hooks/useQualifiedPurchaser';
 import { InfoText } from '../InfoPopup';
+import { POPUP_CONTENT } from '../popupContent';
 import './workspace.css';
 
 type ResultsView = 'overview' | 'table' | 'charts';
@@ -59,6 +61,10 @@ export function WorkspaceTab() {
   const [totalAvailable, setTotalAvailable] = useState<number>(DEFAULTS.collateralAmount);
   const [isMeetingMode, setIsMeetingMode] = useState(false);
   const csvFileRef = useRef<HTMLInputElement>(null);
+  // Per-year events (D-012 + income-override graduation): sparse overrides
+  // keyed by year — income changes, cash infusions, and planned gain events.
+  const [yearEvents, setYearEvents] = useState<Map<number, YearOverride>>(new Map());
+  const [showEventsEditor, setShowEventsEditor] = useState(false);
 
   const set = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) =>
     setInputs(prev => ({ ...prev, [key]: value }));
@@ -78,7 +84,26 @@ export function WorkspaceTab() {
     return { ...inputs, collateralAmount: solved };
   }, [fundingMode, totalAvailable, inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate]);
 
-  const results = useMemo(() => calculate(effectiveInputs, settings), [effectiveInputs, settings]);
+  const projYears = settings.projectionYears ?? 10;
+  const activeOverrides = useMemo(() => {
+    const list: YearOverride[] = [];
+    yearEvents.forEach(o => {
+      const differs =
+        o.w2Income !== effectiveInputs.annualIncome ||
+        o.cashInfusion !== 0 ||
+        (o.gainEvent !== undefined && o.gainEvent.amount > 0);
+      if (differs) list.push(o);
+    });
+    return list;
+  }, [yearEvents, effectiveInputs.annualIncome]);
+
+  const results = useMemo(
+    () =>
+      activeOverrides.length > 0
+        ? calculateWithOverrides(effectiveInputs, settings, activeOverrides)
+        : calculate(effectiveInputs, settings),
+    [effectiveInputs, settings, activeOverrides]
+  );
   // Standard-DI comparison: in total-budget mode a DI-only client would put
   // the WHOLE budget into direct indexing, so compare against that.
   const collateralOnly = useMemo(
@@ -97,7 +122,7 @@ export function WorkspaceTab() {
   const rates = useMemo(() => {
     const stateRate =
       inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
-    const profile = getStateTaxProfile(inputs.stateCode, stateRate);
+    const profile = getStateTaxProfile(inputs.stateCode, stateRate, inputs.nycResident);
     const fedSt = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const fedLt = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
     const fedOrd = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
@@ -118,7 +143,7 @@ export function WorkspaceTab() {
         rateDifferential: fedSt - fedLt,
       },
     };
-  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
+  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate, inputs.nycResident]);
 
   const exit = useMemo(
     () =>
@@ -177,6 +202,23 @@ export function WorkspaceTab() {
     }
   };
 
+  const setEvent = (year: number, patch: Partial<YearOverride>) => {
+    setYearEvents(prev => {
+      const next = new Map(prev);
+      const existing = next.get(year) ?? {
+        year,
+        w2Income: effectiveInputs.annualIncome,
+        cashInfusion: 0,
+        cashInfusionTaxType: 'gross' as const,
+        note: '',
+      };
+      next.set(year, { ...existing, ...patch });
+      return next;
+    });
+  };
+
+  const eventYears = results.years.filter(y => y.gainEventAmount > 0);
+
   const { summary } = results;
   // Peak income required across the projection (the year that needs the most
   // income to fully use the §461(l) deduction + prior NOL) — the advisor's
@@ -219,6 +261,16 @@ export function WorkspaceTab() {
               ))}
             </select>
           </label>
+          {inputs.stateCode === 'NY' && (
+            <label className="ws-toggle">
+              <input
+                type="checkbox"
+                checked={inputs.nycResident === true}
+                onChange={e => set('nycResident', e.target.checked)}
+              />
+              <span>NYC resident (+3.876% local)</span>
+            </label>
+          )}
           <label className="ws-field">
             <span>Annual income</span>
             <input
@@ -439,6 +491,21 @@ export function WorkspaceTab() {
         </div>
 
         <div className="ws-rail-group">
+          <h4>Per-Year Events</h4>
+          <button
+            className="ws-action-btn"
+            onClick={() => setShowEventsEditor(v => !v)}
+          >
+            {showEventsEditor ? 'Hide' : 'Edit'} income &amp; events
+            {activeOverrides.length > 0 && ` (${activeOverrides.length} active)`}
+          </button>
+          <p className="ws-rail-note" style={{ padding: 0, marginTop: 6 }}>
+            Model variable RSU/bonus years, cash infusions, and planned sale
+            events (business exit, IPO lockup).
+          </p>
+        </div>
+
+        <div className="ws-rail-group">
           <h4>Actions</h4>
           <button className="ws-action-btn ws-action-btn--primary" onClick={() => setIsMeetingMode(true)}>
             Open Meeting Mode
@@ -479,8 +546,8 @@ export function WorkspaceTab() {
         </div>
 
         <p className="ws-rail-note">
-          Split allocation, year-by-year planning, and sensitivity analysis
-          live in the <strong>Classic Calculator</strong> tab.
+          Split allocation and sensitivity analysis live in the{' '}
+          <strong>Classic Calculator</strong> tab.
         </p>
       </aside>
 
@@ -530,6 +597,86 @@ export function WorkspaceTab() {
             <span className="ws-metric-sub">after deferred tax</span>
           </div>
         </div>
+
+        {showEventsEditor && (
+          <div className="ws-events-editor">
+            <div className="ws-events-head">
+              <span>Year</span>
+              <span>W-2 / ordinary income</span>
+              <span>Cash infusion</span>
+              <span>Gain event</span>
+              <span>Type</span>
+            </div>
+            {Array.from({ length: projYears }, (_, i) => i + 1).map(yr => {
+              const o = yearEvents.get(yr);
+              return (
+                <div className="ws-events-row" key={yr}>
+                  <span className="ws-events-yr">Yr {yr}</span>
+                  <input
+                    inputMode="numeric"
+                    value={formatWithCommas(o?.w2Income ?? effectiveInputs.annualIncome)}
+                    onChange={e => setEvent(yr, { w2Income: parseFormattedNumber(e.target.value) })}
+                  />
+                  <input
+                    inputMode="numeric"
+                    value={formatWithCommas(o?.cashInfusion ?? 0)}
+                    onChange={e => setEvent(yr, { cashInfusion: parseFormattedNumber(e.target.value) })}
+                  />
+                  <input
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={o?.gainEvent?.amount ? formatWithCommas(o.gainEvent.amount) : ''}
+                    onChange={e => {
+                      const amount = parseFormattedNumber(e.target.value);
+                      setEvent(yr, {
+                        gainEvent: amount > 0
+                          ? { amount, character: o?.gainEvent?.character ?? 'lt' }
+                          : undefined,
+                      });
+                    }}
+                  />
+                  <select
+                    value={o?.gainEvent?.character ?? 'lt'}
+                    onChange={e =>
+                      setEvent(yr, {
+                        gainEvent: o?.gainEvent
+                          ? { ...o.gainEvent, character: e.target.value as 'st' | 'lt' }
+                          : undefined,
+                      })
+                    }
+                  >
+                    <option value="lt">LT</option>
+                    <option value="st">ST</option>
+                  </select>
+                </div>
+              );
+            })}
+            <p className="ws-rail-note" style={{ marginTop: 8 }}>
+              Gain events flow through the real netting: carryforwards shelter them
+              (after the strategy's own gains), they absorb the §461(l) deduction,
+              and they widen the NOL base. Event tax is reported separately — it is
+              never charged against the strategy's savings.
+            </p>
+          </div>
+        )}
+
+        {eventYears.length > 0 && (
+          <div className="ws-note">
+            {eventYears.map(y => (
+              <div key={y.year}>
+                <strong>Year {y.year} gain event:</strong> {formatCurrency(y.gainEventAmount)} —{' '}
+                carryforwards shelter {formatCurrency(y.gainEventCfShelter)}, leaving{' '}
+                {formatCurrency(y.gainEventTax)} of tax due
+                {y.gainEventTaxWithoutStrategy - y.gainEventTax > 0.5 && (
+                  <> ({formatCurrency(y.gainEventTaxWithoutStrategy - y.gainEventTax)} less than
+                  without the program)</>
+                )}
+                . Any NOL absorbed by the event shows in that year's savings and the
+                income-utilization chips.
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="ws-subnav">
           {(['overview', 'table', 'charts'] as ResultsView[]).map(v => (
@@ -646,6 +793,12 @@ export function WorkspaceTab() {
               combined ordinary {formatPercent(rates.combinedOrdinary)} / LT {formatPercent(rates.combinedLt)}.
               Wash-sale disallowance {formatPercent(settings.washSaleDisallowanceRate)}.
             </div>
+            <details className="ws-note ws-note--muted ws-details">
+              <summary>
+                <strong>How the QFAF's tax treatment works</strong> (draft — pending counsel review)
+              </summary>
+              <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
+            </details>
             <div className="ws-note ws-note--muted">
               Estimates only — not investment, tax, or legal advice. See full disclosures below.
             </div>

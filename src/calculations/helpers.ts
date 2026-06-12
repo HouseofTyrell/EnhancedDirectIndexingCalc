@@ -127,7 +127,9 @@ export function calculateCarryforwards(
   nolCarryforward: number,
   inputs: CalculatorInputs,
   settings: AdvancedSettings,
-  effectiveIncome?: number // Optional income override
+  effectiveIncome?: number, // Optional income override
+  eventStGain: number = 0, // Planned ST gain event (D-012), sheltered event-LAST
+  eventLtGain: number = 0 // Planned LT gain event (D-012), sheltered event-LAST
 ): {
   newStCarryforward: number;
   newLtCarryforward: number;
@@ -136,6 +138,9 @@ export function calculateCarryforwards(
   /** Net taxable ST/LT gains after all offsets (pre-NOL) — used by the §461(l) shelter calc */
   taxableSt: number;
   taxableLt: number;
+  /** Event gains still taxable after remaining carryforwards (event-last shelter) */
+  eventTaxableSt: number;
+  eventTaxableLt: number;
 } {
   let taxableSt = netStGainLoss;
   let taxableLt = ltGains;
@@ -191,6 +196,32 @@ export function calculateCarryforwards(
     taxableSt = 0;
   }
 
+  // Step 5b: Planned gain events are sheltered LAST — strategy gains get
+  // first claim on carryforwards, then whatever remains offsets the event
+  // (same-character first, then cross-character per §1211).
+  let eventTaxableSt = eventStGain;
+  let eventTaxableLt = eventLtGain;
+  if (eventTaxableSt > 0 && stCarryforward > 0) {
+    const offset = Math.min(stCarryforward, eventTaxableSt);
+    eventTaxableSt -= offset;
+    stCarryforward -= offset;
+  }
+  if (eventTaxableLt > 0 && ltCarryforward > 0) {
+    const offset = Math.min(ltCarryforward, eventTaxableLt);
+    eventTaxableLt -= offset;
+    ltCarryforward -= offset;
+  }
+  if (eventTaxableLt > 0 && stCarryforward > 0) {
+    const offset = Math.min(stCarryforward, eventTaxableLt);
+    eventTaxableLt -= offset;
+    stCarryforward -= offset;
+  }
+  if (eventTaxableSt > 0 && ltCarryforward > 0) {
+    const offset = Math.min(ltCarryforward, eventTaxableSt);
+    eventTaxableSt -= offset;
+    ltCarryforward -= offset;
+  }
+
   // Step 6: Apply capital loss carryforward against ordinary income
   // Per IRC §1211(b): $3,000 limit for most filers, $1,500 for MFS
   const capitalLossLimit = CAPITAL_LOSS_LIMITS[inputs.filingStatus];
@@ -211,7 +242,8 @@ export function calculateCarryforwards(
   // NOL can offset up to nolOffsetLimit of taxable income
   const yearIncome = effectiveIncome ?? inputs.annualIncome;
   const taxableIncomeBeforeNol =
-    yearIncome + taxableSt + taxableLt - usableOrdinaryLoss - capitalLossUsedAgainstIncome;
+    yearIncome + taxableSt + taxableLt + eventTaxableSt + eventTaxableLt -
+    usableOrdinaryLoss - capitalLossUsedAgainstIncome;
   const nolOffsetLimit = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
   const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * nolOffsetLimit;
   const nolUsed = Math.min(nolCarryforward, maxNolUsage);
@@ -223,6 +255,8 @@ export function calculateCarryforwards(
     capitalLossUsedAgainstIncome: safeNumber(capitalLossUsedAgainstIncome),
     taxableSt: safeNumber(taxableSt),
     taxableLt: safeNumber(taxableLt),
+    eventTaxableSt: safeNumber(eventTaxableSt),
+    eventTaxableLt: safeNumber(eventTaxableLt),
   };
 }
 

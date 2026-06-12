@@ -210,14 +210,26 @@ the strategy and passive sides (so incremental deferred tax stays strategy-attri
 verified by test); embedded-gain card shows the split; an appreciated-stock caveat
 appears for Overlay strategies until a basis is entered.
 
-### D-012 — Liquidity-event modeling (from meeting A) — PENDING
-The main engine cannot represent a future capital-gain event (business sale, IPO lockup
-release). Options: (a) extend YearOverride with a gain event {year, amount, character}
-flowing through the netting/NIIT/excise machinery, + a simple Workspace field ("Planned
-gain event: year + amount"); (b) point users at the EDI-Only realization scenarios
-(disconnected from the QFAF program); (c) skip. **PM recommendation: (a)** — it is the
-liquidity-event archetype's core question and the engine's netting already supports
-taxable-gain inputs cleanly.
+### D-012 — Liquidity-event modeling — DECIDED & IMPLEMENTED (2026-06-12)
+**Decision:** Build gain-event modeling (option a). Also decided same batch: graduate
+income overrides to the Workspace, draft the QFAF treatment paragraph for counsel
+review, and add NYC resident local tax.
+**Status: IMPLEMENTED (2026-06-12)** —
+- `YearOverride.gainEvent {amount, character}`: events flow through the real netting
+  EVENT-LAST (strategy gains claim carryforwards first), absorb the §461(l) deduction,
+  and widen the NOL base. Event tax reported separately (`gainEventTax`,
+  `gainEventTaxWithoutStrategy`, `gainEventCfShelter`) and never charged against
+  strategy savings. NOL benefit now rate-allocated: ordinary-base first at the ordinary
+  rate, overflow at LT-without-NIIT (an NOL doesn't reduce NII).
+- **Workspace "Per-Year Events" editor**: income / cash infusion / gain event per year
+  (income-override graduation); event summary notes on Overview; "Gain Events" section
+  in the transposed table; income-utilization chips automatically reflect event income.
+- **QFAF treatment draft** (§475(f) trader-fund framing with qualification conditions
+  and IRS-scrutiny caveats), marked DRAFT pending counsel review — popup entry,
+  collapsible Overview note, footer reference. Replace with approved language when
+  available.
+- **NYC resident local tax** (+3.876% on all characters) via NY-state checkbox,
+  threaded through engines, classic, Workspace, CSV.
 
 ---
 

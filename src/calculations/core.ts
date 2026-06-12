@@ -45,6 +45,9 @@ export interface CalculateYearOverrides {
   effectiveStLossRate?: number;
   ltGainRate?: number;
   financingCost?: number;
+  /** Planned capital-gain event this year (D-012) */
+  eventStGain?: number;
+  eventLtGain?: number;
 }
 
 /**
@@ -92,7 +95,7 @@ export function calculateWithOverrides(
   // Pre-calculate base tax rates and the per-state treatment profile (D-005)
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
-  const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate);
+  const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate, inputs.nycResident);
 
   // Honor custom tax rates the same way calculate() does, so the standard
   // view and Year-by-Year Planning agree when custom rates are set.
@@ -257,6 +260,11 @@ export function calculateWithOverrides(
       strategyForCalc = allocation.primary.strategy;
       yearOverrides = { effectiveStLossRate: calStLossRate };
     }
+    const ev = override?.gainEvent;
+    if (ev && ev.amount > 0) {
+      yearOverrides.eventStGain = ev.character === 'st' ? ev.amount : 0;
+      yearOverrides.eventLtGain = ev.character === 'lt' ? ev.amount : 0;
+    }
 
     const result = calculateYear(
       year,
@@ -407,6 +415,9 @@ export function calculateYear(
   const allowedOrdinaryLoss = Math.min(ordinaryLossesGenerated, taxRates.section461Limit);
 
   // Calculate carryforwards and NOL usage
+  const eventStGain = overrides?.eventStGain ?? 0;
+  const eventLtGain = overrides?.eventLtGain ?? 0;
+
   const {
     newStCarryforward,
     newLtCarryforward,
@@ -414,6 +425,8 @@ export function calculateYear(
     capitalLossUsedAgainstIncome,
     taxableSt,
     taxableLt,
+    eventTaxableSt,
+    eventTaxableLt,
   } = calculateCarryforwards(
     netStGainLoss,
     ltGainsRealized,
@@ -423,14 +436,17 @@ export function calculateYear(
     nolCarryforward,
     inputs,
     settings,
-    effectiveIncome
+    effectiveIncome,
+    eventStGain,
+    eventLtGain
   );
 
   // Income actually sheltered this year by the §461(l) deduction. Capital
   // gain income absorbs deduction too (the cap base is full taxable income).
   const incomeAvailable = Math.max(
     0,
-    effectiveIncome + taxableSt + taxableLt - capitalLossUsedAgainstIncome
+    effectiveIncome + taxableSt + taxableLt + eventTaxableSt + eventTaxableLt -
+      capitalLossUsedAgainstIncome
   );
   const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
   const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
@@ -469,7 +485,19 @@ export function calculateYear(
     year <= state.nolStateSuspension.throughProjectionYear &&
     effectiveIncome >= state.nolStateSuspension.magiThreshold;
   const nolStateRate = stateNolSuspended ? 0 : stateDeductionRate;
-  const nolUsageBenefit = safeNumber(nolUsed * (ordinaryRate + nolStateRate));
+  // NOL displaces ordinary-rate income first; with a large gain event the
+  // overflow displaces LT-taxed dollars and is valued at the LT rate
+  // excluding NIIT (an NOL deduction does not reduce net investment income).
+  const ordinaryNolBase = Math.max(
+    0,
+    effectiveIncome + taxableSt + eventTaxableSt - usableOrdinaryLoss - capitalLossUsedAgainstIncome
+  );
+  const nolAtOrdinary = Math.min(nolUsed, ordinaryNolBase);
+  const nolAtLt = nolUsed - nolAtOrdinary;
+  const ltNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038)) + nolStateRate;
+  const nolUsageBenefit = safeNumber(
+    nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate
+  );
 
   // Costs:
   // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption).
@@ -480,6 +508,26 @@ export function calculateYear(
   // inflating the incremental benefit of adding the QFAF. (CPA review finding E.)
   const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
   const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
+
+  // Planned gain event (D-012): taxed separately — it is exogenous, so it is
+  // NOT charged against the strategy's taxSavings. The program's help shows
+  // up as carryforward shelter (event-last), §461(l) absorption, and NOL
+  // usage. Marginal excise above the strategy's own gains is event-borne.
+  const gainEventAmount = eventStGain + eventLtGain;
+  const totalExcise = computeLtcgExcise(taxableLt + eventTaxableLt, state.ltcgExcise);
+  const gainEventTax = safeNumber(
+    eventTaxableSt * combinedStRate +
+      eventTaxableLt * combinedLtRate +
+      (totalExcise - ltcgExciseTax)
+  );
+  const gainEventTaxWithoutStrategy = safeNumber(
+    eventStGain * combinedStRate +
+      eventLtGain * combinedLtRate +
+      computeLtcgExcise(eventLtGain, state.ltcgExcise)
+  );
+  const gainEventCfShelter = safeNumber(
+    eventStGain - eventTaxableSt + (eventLtGain - eventTaxableLt)
+  );
 
   // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
@@ -563,7 +611,9 @@ export function calculateYear(
         capitalLossUsedAgainstIncome +
         (nolLimitForRequired > 0 ? nolCarryforward / nolLimitForRequired : 0) -
         taxableSt -
-        taxableLt
+        taxableLt -
+        eventTaxableSt -
+        eventTaxableLt
     )
   );
 
@@ -606,6 +656,10 @@ export function calculateYear(
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
     incomeRequiredForFullUtilization,
+    gainEventAmount: safeNumber(gainEventAmount),
+    gainEventTax,
+    gainEventTaxWithoutStrategy,
+    gainEventCfShelter,
     ordinaryLossBenefit,
     nolUsageBenefit,
     stToLtConversionBenefit: 0, // Deprecated: ST gains/losses wash by design, no phantom conversion benefit

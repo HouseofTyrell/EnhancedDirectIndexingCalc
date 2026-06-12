@@ -152,7 +152,14 @@ export function computeLtcgExcise(
   return tax;
 }
 
-export function getStateTaxProfile(code: string, fallbackRate: number): StateTaxProfile {
+/** NYC resident income tax, top rate (applies to all income characters). */
+const NYC_LOCAL_RATE = 0.03876;
+
+export function getStateTaxProfile(
+  code: string,
+  fallbackRate: number,
+  nycResident: boolean = false
+): StateTaxProfile {
   switch (code) {
     case 'CA':
       // CA taxes gains as ordinary income (13.3% top) and has its own
@@ -166,16 +173,19 @@ export function getStateTaxProfile(code: string, fallbackRate: number): StateTax
         allowsLossOffsetAgainstIncome: true,
         nolStateSuspension: { throughProjectionYear: 1, magiThreshold: 1000000 },
       };
-    case 'NY':
+    case 'NY': {
       // NY taxes gains as ordinary (10.9% top) and RETAINED the §461(l)
       // limitation even when the CARES Act suspended it federally, so
-      // federal-parallel treatment is a reasonable model.
+      // federal-parallel treatment is a reasonable model. NYC residents add
+      // the ~3.876% city resident tax on all income characters.
+      const rate = 0.109 + (nycResident ? NYC_LOCAL_RATE : 0);
       return {
-        ordinaryRate: 0.109,
-        stRate: 0.109,
-        ltRate: 0.109,
+        ordinaryRate: rate,
+        stRate: rate,
+        ltRate: rate,
         allowsLossOffsetAgainstIncome: true,
       };
+    }
     case 'PA':
       return {
         ordinaryRate: 0.0307,
