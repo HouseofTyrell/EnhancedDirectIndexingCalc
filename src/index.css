@@ -36,6 +36,18 @@
   --qfaf-bg: #eff6ff;
   --qfaf-bg-light: rgba(219, 234, 254, 0.3);
   --qfaf-bg-hover: rgba(219, 234, 254, 0.6);
+  /* Aliases consumed by workspace.css and newer components. These reference
+     the canonical variables above, so the dark theme blocks below retheme
+     them automatically — only the non-alias values need dark overrides. */
+  --text-primary: var(--text);
+  --text-secondary: var(--text-light);
+  --border-color: var(--border);
+  --input-bg: var(--card-bg);
+  --section-bg: #f1f5f9;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --toggle-bg: #cbd5e1;
+  --danger: #ef4444;
+  --positive: var(--success);
 }
 
 /* Dark mode theme */
@@ -66,6 +78,8 @@
   --qfaf-bg-light: rgba(30, 64, 175, 0.3);
   --qfaf-bg-hover: rgba(30, 64, 175, 0.5);
   --toggle-bg: #4b5563;
+  --section-bg: #111827;
+  --hover-bg: rgba(255, 255, 255, 0.08);
 }
 
 /* Respect system preference when no explicit theme set */
@@ -95,6 +109,8 @@
     --qfaf-bg-light: rgba(30, 64, 175, 0.3);
     --qfaf-bg-hover: rgba(30, 64, 175, 0.5);
     --toggle-bg: #4b5563;
+    --section-bg: #111827;
+    --hover-bg: rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -6687,6 +6703,40 @@ select:focus:not(:focus-visible) {
   border-color: var(--warning);
 }
 
+/* Scenario table (Bull/Base/Bear/Expected columns) */
+[data-theme='dark'] .scenario-table th.scenario-bull {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  color: #86efac;
+}
+
+[data-theme='dark'] .scenario-table th.scenario-base {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+  color: #c7d2fe;
+}
+
+[data-theme='dark'] .scenario-table th.scenario-bear {
+  background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+  color: #fca5a5;
+}
+
+[data-theme='dark'] .scenario-table th.scenario-expected {
+  background: var(--gradient-amber);
+  color: #fcd34d;
+}
+
+[data-theme='dark'] .scenario-table td.scenario-bull {
+  color: #4ade80;
+}
+
+[data-theme='dark'] .scenario-table td.scenario-bear {
+  color: #f87171;
+}
+
+[data-theme='dark'] .scenario-table td.scenario-expected {
+  background: rgba(120, 53, 15, 0.2);
+  color: #fde68a;
+}
+
 /* Year table */
 [data-theme='dark'] .year-table thead th {
   background: var(--bg);
@@ -6965,6 +7015,39 @@ select:focus:not(:focus-visible) {
 
   :root:not([data-theme='light']) .sensitivity-slider::-moz-range-thumb {
     border-color: var(--card-bg);
+  }
+
+  :root:not([data-theme='light']) .scenario-table th.scenario-bull {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    color: #86efac;
+  }
+
+  :root:not([data-theme='light']) .scenario-table th.scenario-base {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
+    color: #c7d2fe;
+  }
+
+  :root:not([data-theme='light']) .scenario-table th.scenario-bear {
+    background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+    color: #fca5a5;
+  }
+
+  :root:not([data-theme='light']) .scenario-table th.scenario-expected {
+    background: var(--gradient-amber);
+    color: #fcd34d;
+  }
+
+  :root:not([data-theme='light']) .scenario-table td.scenario-bull {
+    color: #4ade80;
+  }
+
+  :root:not([data-theme='light']) .scenario-table td.scenario-bear {
+    color: #f87171;
+  }
+
+  :root:not([data-theme='light']) .scenario-table td.scenario-expected {
+    background: rgba(120, 53, 15, 0.2);
+    color: #fde68a;
   }
 }
 
