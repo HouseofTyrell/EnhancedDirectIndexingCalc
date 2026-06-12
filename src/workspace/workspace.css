@@ -536,6 +536,139 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── D-026: pinned-scenario comparison strip ── */
+.ws-pinstrip {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-left: 3px solid var(--primary, #2563eb);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.ws-pinstrip-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ws-pinstrip-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+}
+
+.ws-pinstrip-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.ws-pinstrip-age {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.ws-pinstrip-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.ws-pinstrip-btn {
+  padding: 3px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  background: var(--input-bg, #fff);
+  color: var(--text-primary, #1e293b);
+  cursor: pointer;
+}
+
+.ws-pinstrip-btn:hover {
+  border-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+}
+
+.ws-pinstrip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.ws-pinstrip-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ws-pinstrip-metric {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-pinstrip-values {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-pinstrip-values em {
+  font-style: normal;
+  color: var(--text-secondary, #94a3b8);
+  font-weight: 400;
+}
+
+.ws-pinstrip-delta {
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-pinstrip-delta--pos {
+  color: var(--success, #16a34a);
+}
+
+.ws-pinstrip-delta--neg {
+  color: var(--danger, #ef4444);
+}
+
+.ws-pinstrip-delta--neutral {
+  color: var(--text-primary, #1e293b);
+}
+
+.ws-pinstrip-delta--zero {
+  color: var(--text-secondary, #94a3b8);
+}
+
+/* Disabled rail action (pin limit) */
+.ws-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Compact amber warning inside a rail group (D-016 deleverage/split conflict,
+   split-leg validation). Same amber treatment as .ws-note. */
+.ws-rail-warn {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #713f12;
+}
+
 /* ── Dark mode ──
    Everything above themes through the variable aliases in index.css
    (--text-primary/--text-secondary/--border-color/--input-bg/--section-bg).
@@ -553,6 +686,12 @@
   color: var(--text-secondary);
 }
 
+[data-theme='dark'] .ws-rail-warn {
+  background: rgba(120, 53, 15, 0.2);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #fcd34d;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .ws-note {
     background: rgba(120, 53, 15, 0.2);
@@ -564,5 +703,11 @@
     background: var(--card-bg);
     border-color: var(--border-color);
     color: var(--text-secondary);
+  }
+
+  :root:not([data-theme='light']) .ws-rail-warn {
+    background: rgba(120, 53, 15, 0.2);
+    border-color: rgba(251, 191, 36, 0.3);
+    color: #fcd34d;
   }
 }

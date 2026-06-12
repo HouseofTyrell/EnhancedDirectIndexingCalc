@@ -2,10 +2,13 @@ import { useMemo, useRef, useState } from 'react';
 import {
   CalculatorInputs,
   AdvancedSettings,
+  CalculationResult,
   DeleveragePlan,
   DEFAULT_SETTINGS,
   FILING_STATUSES,
   FilingStatus,
+  PinnedScenario,
+  SplitAllocation,
   YearOverride,
 } from '../types';
 import { DEFAULTS, STATES, getFederalOrdinaryRate, getStateConformityWarning } from '../taxData';
@@ -22,9 +25,12 @@ import {
 import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
 import { exportToExcel } from '../utils/excelExport';
+import { getEffectiveView } from '../utils/effectiveAllocation';
+import { usePinnedScenario } from '../hooks/usePinnedScenario';
 import { MeetingSession, buildActiveOverrides, computeScenarioRates } from './MeetingSession';
 import {
   formatCurrency,
+  formatCurrencyAbbreviated,
   formatPercent,
   formatWithCommas,
   parseFormattedNumber,
@@ -41,6 +47,195 @@ import './workspace.css';
 type ResultsView = 'overview' | 'table' | 'charts';
 type FundingMode = 'collateral' | 'total';
 
+// ─── D-026: pinned-scenario comparison strip ───
+// The pin freezes inputs + settings + RESULTS via the SAME usePinnedScenario
+// hook (and localStorage key) the Classic tab's comparison panel uses, so a
+// scenario pinned in either tab is available in the other. Strip metrics for
+// the pinned side derive ONLY from the frozen snapshot — they are never
+// recomputed against live inputs. This is the durable cross-tab pin; Meeting
+// Mode's meeting-local ghost pin (D-024) is a separate, non-persisted feature.
+interface StripMetrics {
+  totalSavings: number;
+  lossReserve: number;
+  peakIncomeReq: number;
+  year1: number;
+  netIfLiquidated: number;
+  finalWealth: number;
+}
+
+function computeStripMetrics(
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings,
+  results: CalculationResult
+): StripMetrics {
+  // Same post-processing pipeline the live pane uses (one engine, D-014) —
+  // applied to the FROZEN snapshot, so the output is a pure function of the
+  // pinned data and cannot drift with live edits.
+  const rates = computeScenarioRates(inputs);
+  const exit = computeExitTaxAnalysis(
+    results,
+    rates.combinedLt,
+    settings.growthEnabled ? settings.defaultAnnualReturn : 0,
+    rates.profile.ltcgExcise,
+    inputs.collateralCostBasis
+  );
+  return {
+    totalSavings: results.summary.totalTaxSavings,
+    lossReserve: results.summary.lossReserveShelterValue,
+    peakIncomeReq: results.years.reduce(
+      (max, y) => Math.max(max, y.incomeRequiredForFullUtilization),
+      0
+    ),
+    year1: results.years[0]?.taxSavings ?? 0,
+    netIfLiquidated: exit.netBenefitAfterLiquidation,
+    finalWealth: results.summary.finalTotalWealth,
+  };
+}
+
+function formatPinAge(pinnedAt: number): string {
+  const age = Date.now() - pinnedAt;
+  if (age < 60_000) return 'just now';
+  if (age < 3_600_000) return `${Math.floor(age / 60_000)}m ago`;
+  if (age < 86_400_000) return `${Math.floor(age / 3_600_000)}h ago`;
+  return `${Math.floor(age / 86_400_000)}d ago`;
+}
+
+function PinComparisonStrip({
+  pinned,
+  current,
+  ediMode,
+  onUnpin,
+  onRepin,
+}: {
+  pinned: PinnedScenario;
+  current: StripMetrics;
+  ediMode: boolean;
+  onUnpin: () => void;
+  onRepin: () => void;
+}) {
+  const frozen = useMemo(
+    () => computeStripMetrics(pinned.inputs, pinned.advancedSettings, pinned.results),
+    [pinned]
+  );
+
+  // Row 2 follows the live pane's mode (D-015): loss reserve in EDI mode,
+  // peak income-to-fully-utilize otherwise. Both are computable on both
+  // sides, so the comparison stays apples-to-apples even if the pinned
+  // scenario was captured in the other mode.
+  const rows: Array<{
+    key: string;
+    label: string;
+    pinnedV: number;
+    currentV: number;
+    neutral?: boolean;
+  }> = [
+    {
+      key: 'total-savings',
+      label: 'Total Savings',
+      pinnedV: frozen.totalSavings,
+      currentV: current.totalSavings,
+    },
+    ediMode
+      ? {
+          key: 'loss-reserve',
+          label: 'Loss Reserve',
+          pinnedV: frozen.lossReserve,
+          currentV: current.lossReserve,
+        }
+      : {
+          key: 'income-utilize',
+          label: 'Income to Utilize',
+          pinnedV: frozen.peakIncomeReq,
+          currentV: current.peakIncomeReq,
+          neutral: true, // a planning target, not a better/worse outcome
+        },
+    { key: 'year-1', label: 'Year 1', pinnedV: frozen.year1, currentV: current.year1 },
+    {
+      key: 'net-liquidated',
+      label: 'Net If Liquidated',
+      pinnedV: frozen.netIfLiquidated,
+      currentV: current.netIfLiquidated,
+    },
+    {
+      key: 'final-wealth',
+      label: 'Final Wealth',
+      pinnedV: frozen.finalWealth,
+      currentV: current.finalWealth,
+    },
+  ];
+
+  return (
+    <div className="ws-pinstrip" data-testid="ws-pinstrip">
+      <div className="ws-pinstrip-head">
+        <span className="ws-pinstrip-title">&#128204; Pinned vs current</span>
+        <span className="ws-pinstrip-label">{pinned.label}</span>
+        <span className="ws-pinstrip-age">pinned {formatPinAge(pinned.pinnedAt)}</span>
+        <div className="ws-pinstrip-actions">
+          <button
+            type="button"
+            className="ws-pinstrip-btn"
+            onClick={onRepin}
+            data-testid="ws-pin-repin"
+            title="Replace the pin with the current scenario"
+          >
+            Re-pin
+          </button>
+          <button
+            type="button"
+            className="ws-pinstrip-btn"
+            onClick={onUnpin}
+            data-testid="ws-pin-unpin"
+            title="Remove the pinned scenario"
+          >
+            Unpin
+          </button>
+        </div>
+      </div>
+      <div className="ws-pinstrip-grid">
+        {rows.map(row => {
+          const delta = row.currentV - row.pinnedV;
+          const isZero = Math.abs(delta) < 0.5;
+          const deltaClass = isZero
+            ? 'ws-pinstrip-delta--zero'
+            : row.neutral
+              ? 'ws-pinstrip-delta--neutral'
+              : delta > 0
+                ? 'ws-pinstrip-delta--pos'
+                : 'ws-pinstrip-delta--neg';
+          const sign = delta > 0 ? '+' : '−';
+          const pct =
+            !isZero && Math.abs(row.pinnedV) > 0.5
+              ? ` (${sign}${Math.abs((delta / Math.abs(row.pinnedV)) * 100).toFixed(0)}%)`
+              : '';
+          return (
+            <div className="ws-pinstrip-cell" key={row.key}>
+              <span className="ws-pinstrip-metric">{row.label}</span>
+              <span className="ws-pinstrip-values">
+                <span data-testid={`ws-pin-pinned-${row.key}`} title={formatCurrency(row.pinnedV)}>
+                  {formatCurrencyAbbreviated(row.pinnedV)}
+                </span>
+                <em> → </em>
+                <span
+                  data-testid={`ws-pin-current-${row.key}`}
+                  title={formatCurrency(row.currentV)}
+                >
+                  {formatCurrencyAbbreviated(row.currentV)}
+                </span>
+              </span>
+              <span
+                className={`ws-pinstrip-delta ${deltaClass}`}
+                data-testid={`ws-pin-delta-${row.key}`}
+              >
+                {isZero ? '—' : `${sign}${formatCurrencyAbbreviated(Math.abs(delta))}${pct}`}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Workspace (Beta) — redesigned single-screen experience from the UI review.
  *
@@ -51,11 +246,15 @@ type FundingMode = 'collateral' | 'total';
  *   via Overview / Year-by-Year / Charts sub-views.
  * - One surface per number: the metric strip is the only headline; deep
  *   detail lives in the (audit-complete) table reused from the classic view.
- * - Power features (split allocation, sensitivity) intentionally stay in
- *   the classic tab; Meeting Mode and per-year planning launch from here.
+ * - Sensitivity analysis intentionally stays in the classic tab; split
+ *   allocation, scenario pinning (D-026), Meeting Mode and per-year planning
+ *   are first-class here.
  */
 export function WorkspaceTab() {
   const qualifiedPurchaser = useQualifiedPurchaser();
+  // D-026: same hook + storage as the Classic comparison panel — one shared
+  // pin store, so an advisor can pin here and compare there (or vice versa).
+  const pinnedScenario = usePinnedScenario();
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULTS);
   const [settings, setSettings] = useState<AdvancedSettings>(DEFAULT_SETTINGS);
   const [resultsView, setResultsView] = useState<ResultsView>('overview');
@@ -82,8 +281,11 @@ export function WorkspaceTab() {
 
   // In total-budget mode, solve for the collateral that makes
   // collateral + auto-sized QFAF equal the available portfolio.
+  // Split allocation sets the total from its two leg amounts and the engine
+  // ignores `collateralAmount`, so the solver has nothing to solve — total-
+  // budget mode is unavailable while split is on (UI enforces + explains).
   const effectiveInputs = useMemo<CalculatorInputs>(() => {
-    if (fundingMode !== 'total') return inputs;
+    if (fundingMode !== 'total' || inputs.splitAllocation?.enabled === true) return inputs;
     const solved = solveCollateralForTotal(
       totalAvailable,
       inputs,
@@ -284,6 +486,38 @@ export function WorkspaceTab() {
   const projectionYears = settings.projectionYears ?? 10;
   const currentStrategy = getStrategy(inputs.strategyId);
 
+  // Split allocation (D-026): the engine has supported `inputs.splitAllocation`
+  // since the Classic build — this is UI wiring only (one-engine rule).
+  const split: SplitAllocation = inputs.splitAllocation ?? {
+    enabled: false,
+    coreStrategyId: 'core-145-45',
+    coreAmount: 3000000,
+    overlayStrategyId: 'overlay-45-45',
+    overlayAmount: 7000000,
+  };
+  const splitOn = inputs.splitAllocation?.enabled === true;
+  const updateSplit = (patch: Partial<SplitAllocation>) =>
+    set('splitAllocation', { ...split, ...patch });
+  const splitTotal = split.coreAmount + split.overlayAmount;
+  // Effective view across legs — same helper Classic/MM/Excel use, so labels
+  // and totals agree everywhere in split mode.
+  const view = getEffectiveView(effectiveInputs);
+
+  // D-026 pinning: the Workspace strip compares against the most recent pin
+  // (the full multi-scenario table lives in the Classic tab).
+  const wsPin: PinnedScenario | null =
+    pinnedScenario.scenarios.length > 0
+      ? pinnedScenario.scenarios[pinnedScenario.scenarios.length - 1]
+      : null;
+  const currentStrip: StripMetrics = {
+    totalSavings: summary.totalTaxSavings,
+    lossReserve: summary.lossReserveShelterValue,
+    peakIncomeReq: peakIncomeReq.amount,
+    year1,
+    netIfLiquidated: exit.netBenefitAfterLiquidation,
+    finalWealth: summary.finalTotalWealth,
+  };
+
   // Deleveraging plan (D-016/D-017)
   const dlvPlan = inputs.deleveragePlan;
   const setDlvPlan = (patch: Partial<DeleveragePlan>) =>
@@ -373,64 +607,153 @@ export function WorkspaceTab() {
 
         <div className="ws-rail-group">
           <h4>Strategy</h4>
-          <label className="ws-field">
-            <span>Collateral strategy</span>
-            <select value={inputs.strategyId} onChange={e => set('strategyId', e.target.value)}>
-              {STRATEGIES.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — {s.label}
-                </option>
-              ))}
-            </select>
+          {/* D-026: split allocation as an expandable section (rail is too
+              tight for always-visible dual selectors). Same collapsible
+              pattern as the other rail toggles. */}
+          <label className="ws-toggle">
+            <input
+              type="checkbox"
+              checked={splitOn}
+              onChange={e => {
+                updateSplit({ enabled: e.target.checked });
+                // Total-budget solving has nothing to solve in split mode
+                // (leg amounts set the total) — fall back to collateral mode.
+                if (e.target.checked && fundingMode === 'total') setFundingMode('collateral');
+              }}
+            />
+            <span>Split allocation (core + overlay)</span>
           </label>
-          <div className="ws-field">
-            <span>Fund by</span>
-            <div className="ws-segment">
-              <button
-                type="button"
-                className={fundingMode === 'collateral' ? 'active' : ''}
-                onClick={() => setFundingMode('collateral')}
-              >
-                Collateral
-              </button>
-              <button
-                type="button"
-                className={fundingMode === 'total' ? 'active' : ''}
-                onClick={() => {
-                  // Seed the budget from the current total so the switch is seamless
-                  setTotalAvailable(Math.round(results.sizing.totalExposure));
-                  setFundingMode('total');
-                }}
-              >
-                Total portfolio
-              </button>
-            </div>
-          </div>
-          {fundingMode === 'collateral' ? (
-            <label className="ws-field">
-              <span>Collateral amount</span>
-              <input
-                inputMode="numeric"
-                value={formatWithCommas(inputs.collateralAmount)}
-                onChange={e => set('collateralAmount', parseFormattedNumber(e.target.value))}
-              />
-            </label>
+          {splitOn ? (
+            <>
+              <label className="ws-field">
+                <span>Core strategy (cash)</span>
+                <select
+                  value={split.coreStrategyId}
+                  onChange={e => updateSplit({ coreStrategyId: e.target.value })}
+                >
+                  {STRATEGIES.filter(s => s.type === 'core').map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="ws-field">
+                <span>Core amount</span>
+                <input
+                  inputMode="numeric"
+                  value={formatWithCommas(split.coreAmount)}
+                  onChange={e => updateSplit({ coreAmount: parseFormattedNumber(e.target.value) })}
+                />
+              </label>
+              <label className="ws-field">
+                <span>Overlay strategy (appreciated stock)</span>
+                <select
+                  value={split.overlayStrategyId}
+                  onChange={e => updateSplit({ overlayStrategyId: e.target.value })}
+                >
+                  {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="ws-field">
+                <span>Overlay amount</span>
+                <input
+                  inputMode="numeric"
+                  value={formatWithCommas(split.overlayAmount)}
+                  onChange={e =>
+                    updateSplit({ overlayAmount: parseFormattedNumber(e.target.value) })
+                  }
+                />
+              </label>
+              <p className="ws-derived" data-testid="ws-split-total">
+                → Total collateral {formatCurrency(splitTotal)}
+                {splitTotal > 0 && (
+                  <>
+                    {' '}
+                    ({formatPercent(split.coreAmount / splitTotal)} core /{' '}
+                    {formatPercent(split.overlayAmount / splitTotal)} overlay)
+                  </>
+                )}
+                {inputs.qfafEnabled && <> · QFAF auto-sizes against the combined ST losses</>}
+              </p>
+              {(split.coreAmount <= 0 || split.overlayAmount <= 0) && (
+                <p className="ws-rail-warn">
+                  Both legs need an amount above $0 — until then the projection falls back to the
+                  single-strategy inputs.
+                </p>
+              )}
+              <p className="ws-rail-note" style={{ padding: 0, margin: '6px 0 10px' }}>
+                Total-budget funding isn&apos;t available with split allocation — the two leg
+                amounts set the total.
+              </p>
+            </>
           ) : (
             <>
               <label className="ws-field">
-                <span>Total available portfolio</span>
-                <input
-                  inputMode="numeric"
-                  value={formatWithCommas(totalAvailable)}
-                  onChange={e => setTotalAvailable(parseFormattedNumber(e.target.value))}
-                />
+                <span>Collateral strategy</span>
+                <select value={inputs.strategyId} onChange={e => set('strategyId', e.target.value)}>
+                  {STRATEGIES.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.label}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <p className="ws-derived">
-                → Collateral {formatCurrency(results.sizing.collateralValue)}
-                {inputs.qfafEnabled && (
-                  <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
-                )} = {formatCurrency(results.sizing.totalExposure)}
-              </p>
+              <div className="ws-field">
+                <span>Fund by</span>
+                <div className="ws-segment">
+                  <button
+                    type="button"
+                    className={fundingMode === 'collateral' ? 'active' : ''}
+                    onClick={() => setFundingMode('collateral')}
+                  >
+                    Collateral
+                  </button>
+                  <button
+                    type="button"
+                    className={fundingMode === 'total' ? 'active' : ''}
+                    onClick={() => {
+                      // Seed the budget from the current total so the switch is seamless
+                      setTotalAvailable(Math.round(results.sizing.totalExposure));
+                      setFundingMode('total');
+                    }}
+                  >
+                    Total portfolio
+                  </button>
+                </div>
+              </div>
+              {fundingMode === 'collateral' ? (
+                <label className="ws-field">
+                  <span>Collateral amount</span>
+                  <input
+                    inputMode="numeric"
+                    value={formatWithCommas(inputs.collateralAmount)}
+                    onChange={e => set('collateralAmount', parseFormattedNumber(e.target.value))}
+                  />
+                </label>
+              ) : (
+                <>
+                  <label className="ws-field">
+                    <span>Total available portfolio</span>
+                    <input
+                      inputMode="numeric"
+                      value={formatWithCommas(totalAvailable)}
+                      onChange={e => setTotalAvailable(parseFormattedNumber(e.target.value))}
+                    />
+                  </label>
+                  <p className="ws-derived">
+                    → Collateral {formatCurrency(results.sizing.collateralValue)}
+                    {inputs.qfafEnabled && (
+                      <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
+                    )}{' '}
+                    = {formatCurrency(results.sizing.totalExposure)}
+                  </p>
+                </>
+              )}
             </>
           )}
           <label className="ws-field">
@@ -552,6 +875,13 @@ export function WorkspaceTab() {
             />
             <span>Plan deleveraging</span>
           </label>
+          {/* D-016/D-026: split wins when both are enabled — same wording as
+              the results-pane warning (core.ts ignores the plan). */}
+          {dlvPlan?.enabled && splitOn && (
+            <p className="ws-rail-warn" data-testid="ws-split-dlv-warn">
+              ⚠️ Deleveraging isn&apos;t modeled with split allocation yet — plan ignored.
+            </p>
+          )}
           {dlvPlan?.enabled && (
             <>
               <label className="ws-field">
@@ -692,6 +1022,20 @@ export function WorkspaceTab() {
           </button>
           <button
             className="ws-action-btn"
+            data-testid="ws-pin-btn"
+            disabled={!pinnedScenario.canPin}
+            title={
+              pinnedScenario.canPin
+                ? 'Freeze the current scenario (inputs + results) for side-by-side comparison'
+                : 'Pin limit reached (4) — unpin a scenario first'
+            }
+            onClick={() => pinnedScenario.pin(effectiveInputs, settings, results)}
+          >
+            Pin scenario
+            {pinnedScenario.scenarios.length > 0 && ` (${pinnedScenario.scenarios.length} pinned)`}
+          </button>
+          <button
+            className="ws-action-btn"
             onClick={() =>
               exportToExcel({
                 inputs: effectiveInputs,
@@ -727,8 +1071,7 @@ export function WorkspaceTab() {
         </div>
 
         <p className="ws-rail-note">
-          Split allocation and sensitivity analysis live in the <strong>Classic Calculator</strong>{' '}
-          tab.
+          Sensitivity analysis lives in the <strong>Classic Calculator</strong> tab.
         </p>
       </aside>
 
@@ -744,7 +1087,9 @@ export function WorkspaceTab() {
                 Est. Tax Savings
               </InfoText>
             </span>
-            <span className="ws-metric-value">{formatCurrency(summary.totalTaxSavings)}</span>
+            <span className="ws-metric-value" data-testid="ws-metric-total-savings">
+              {formatCurrency(summary.totalTaxSavings)}
+            </span>
             <span className="ws-metric-sub">
               {results.years.length} yrs
               {nolExtensionYears > 0 && ' (extended to use losses)'}
@@ -810,6 +1155,18 @@ export function WorkspaceTab() {
             <span className="ws-metric-sub">after deferred tax</span>
           </div>
         </div>
+
+        {/* D-026: compact pinned-vs-current comparison strip (frozen values
+            from localStorage; shared with the Classic comparison panel). */}
+        {wsPin && (
+          <PinComparisonStrip
+            pinned={wsPin}
+            current={currentStrip}
+            ediMode={ediMode}
+            onUnpin={() => pinnedScenario.unpin(wsPin.id)}
+            onRepin={() => pinnedScenario.replacePin(effectiveInputs, settings, results)}
+          />
+        )}
 
         {showEventsEditor && (
           <div className="ws-events-editor">
@@ -1143,9 +1500,8 @@ export function WorkspaceTab() {
             {ediMode ? (
               <p className="ws-narrative">
                 <strong>What this means:</strong> on a{' '}
-                {formatCurrency(results.sizing.collateralValue)} portfolio with{' '}
-                {currentStrategy?.name ?? 'the selected strategy'}, the program's main output is a
-                loss reserve: an estimated{' '}
+                {formatCurrency(results.sizing.collateralValue)} portfolio with {view.displayName},
+                the program's main output is a loss reserve: an estimated{' '}
                 {formatCurrency(summary.finalStCarryforward + summary.finalLtCarryforward)} of loss
                 carryforwards by year {results.years.length}, worth{' '}
                 {formatCurrency(summary.lossReserveShelterValue)} of shelter against future capital
@@ -1173,10 +1529,10 @@ export function WorkspaceTab() {
             ) : (
               <p className="ws-narrative">
                 <strong>What this means:</strong> on a{' '}
-                {formatCurrency(results.sizing.collateralValue)} portfolio with{' '}
-                {currentStrategy?.name ?? 'the selected strategy'}, the program is estimated to save{' '}
-                {formatCurrency(summary.totalTaxSavings)} over {results.years.length} years at a
-                combined ordinary rate of {formatPercent(rates.combinedOrdinary)}.{' '}
+                {formatCurrency(results.sizing.collateralValue)} portfolio with {view.displayName},
+                the program is estimated to save {formatCurrency(summary.totalTaxSavings)} over{' '}
+                {results.years.length} years at a combined ordinary rate of{' '}
+                {formatPercent(rates.combinedOrdinary)}.{' '}
                 {exit.incrementalDeferredTax < 0 ? (
                   <>
                     The exit math runs in the strategy's favor: liquidating in year{' '}
@@ -1264,7 +1620,7 @@ export function WorkspaceTab() {
                 table.
               </div>
             )}
-            {currentStrategy?.type === 'overlay' &&
+            {(view.isSplit || currentStrategy?.type === 'overlay') &&
               effectiveInputs.collateralCostBasis === undefined && (
                 <div className="ws-note">
                   ⚠️ <strong>Appreciated-stock collateral:</strong> the liquidation analysis assumes
@@ -1319,8 +1675,8 @@ export function WorkspaceTab() {
             projectionYears={projectionYears}
             startMonth={effectiveInputs.startMonth}
             qfafDuration={effectiveInputs.qfafDuration}
-            strategyId={effectiveInputs.strategyId}
-            ltGainRate={currentStrategy?.ltGainRate}
+            strategyId={view.isSplit ? undefined : effectiveInputs.strategyId}
+            ltGainRate={view.isSplit ? undefined : currentStrategy?.ltGainRate}
           />
         )}
 
@@ -1329,7 +1685,7 @@ export function WorkspaceTab() {
             <TaxSavingsChart data={results.years} startMonth={effectiveInputs.startMonth} />
             <PortfolioValueChart
               data={results.years}
-              trackingError={currentStrategy?.trackingError}
+              trackingError={view.primaryStrategy?.trackingError}
               startMonth={effectiveInputs.startMonth}
             />
           </div>
