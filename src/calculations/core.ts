@@ -92,7 +92,7 @@ export function calculateWithOverrides(
   // Pre-calculate base tax rates and the per-state treatment profile (D-005)
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
-  const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate);
+  const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate, inputs.nycResident);
 
   // Honor custom tax rates the same way calculate() does, so the standard
   // view and Year-by-Year Planning agree when custom rates are set.

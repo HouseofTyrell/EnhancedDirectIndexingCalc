@@ -76,6 +76,10 @@ export interface CalculatorInputs {
   // pre-existing embedded gain flows into the liquidation/exit-tax analysis.
   // Default: undefined = basis equals initial market value.
   collateralCostBasis?: number;
+
+  // NYC resident (only meaningful when stateCode === 'NY'): adds the ~3.876%
+  // NYC resident income tax on top of the NY state rate. Default: false.
+  nycResident?: boolean;
 }
 
 export interface SizingLeg {

@@ -46,6 +46,12 @@ export function getQuantifiedStateWarning(
         `deductions for MAGI ≥ $1M through tax year 2026, so the state portion of NOL ` +
         `benefits is excluded in year 1.`
       );
+    case 'NY':
+      return (
+        `Modeled per New York law: gains and wages at the 10.9% top rate with the §461(l) ` +
+        `limitation applied (NY retained it through the CARES suspension). For NYC residents, ` +
+        `enable the "NYC resident" option to add the ~3.876% city tax to all income characters.`
+      );
     default:
       return undefined;
   }

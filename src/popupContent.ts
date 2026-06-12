@@ -73,6 +73,15 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
       'QFAF generates 150% ST gains and 150% ordinary losses annually. Proper sizing ensures ST gains are fully offset.',
   },
 
+  'qfaf-treatment': {
+    title: 'QFAF Tax Treatment (Draft)',
+    definition:
+      "DRAFT — pending counsel review. The Quantinno Fundamental Arbitrage Fund (QFAF) is modeled as a limited partnership engaged in high-turnover arbitrage trading that has made a mark-to-market election under IRC §475(f). Under that election the fund's trading losses are ordinary in character, while an offsetting sleeve realizes short-term capital gains — modeled here as approximately 150% of fund value in ordinary losses and 150% in short-term gains annually, with limited net economic exposure. Ordinary losses of a §475(f) trader fund are generally non-passive (trading in financial instruments is excepted from the §469 passive-activity rules) and are therefore subject to the §461(l) excess-business-loss limitation modeled here. This treatment depends on, among other things, the fund qualifying as a trader (not an investor) in securities, a valid and timely §475(f) election, allocations respecting §704(b), and the arrangement's economic substance — structures designed primarily to manufacture tax benefits draw IRS scrutiny and could be challenged or recharacterized. Verify the actual fund's structure, elections, and tax opinions with counsel before relying on this model.",
+    impact:
+      'If the actual fund does not qualify for this treatment, the ordinary-loss benefits ' +
+      'modeled here may not be available. This description is a working draft, not tax advice.',
+  },
+
   'total-exposure': {
     title: 'Total Exposure',
     definition: 'Combined value of collateral and QFAF investments.',

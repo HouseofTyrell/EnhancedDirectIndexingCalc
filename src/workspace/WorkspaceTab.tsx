@@ -29,6 +29,7 @@ import { DisclaimerFooter } from '../components/DisclaimerFooter';
 import { QualifiedPurchaserModal } from '../components/QualifiedPurchaserModal';
 import { useQualifiedPurchaser } from '../hooks/useQualifiedPurchaser';
 import { InfoText } from '../InfoPopup';
+import { POPUP_CONTENT } from '../popupContent';
 import './workspace.css';
 
 type ResultsView = 'overview' | 'table' | 'charts';
@@ -97,7 +98,7 @@ export function WorkspaceTab() {
   const rates = useMemo(() => {
     const stateRate =
       inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
-    const profile = getStateTaxProfile(inputs.stateCode, stateRate);
+    const profile = getStateTaxProfile(inputs.stateCode, stateRate, inputs.nycResident);
     const fedSt = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const fedLt = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
     const fedOrd = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
@@ -118,7 +119,7 @@ export function WorkspaceTab() {
         rateDifferential: fedSt - fedLt,
       },
     };
-  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
+  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate, inputs.nycResident]);
 
   const exit = useMemo(
     () =>
@@ -219,6 +220,16 @@ export function WorkspaceTab() {
               ))}
             </select>
           </label>
+          {inputs.stateCode === 'NY' && (
+            <label className="ws-toggle">
+              <input
+                type="checkbox"
+                checked={inputs.nycResident === true}
+                onChange={e => set('nycResident', e.target.checked)}
+              />
+              <span>NYC resident (+3.876% local)</span>
+            </label>
+          )}
           <label className="ws-field">
             <span>Annual income</span>
             <input
@@ -646,6 +657,12 @@ export function WorkspaceTab() {
               combined ordinary {formatPercent(rates.combinedOrdinary)} / LT {formatPercent(rates.combinedLt)}.
               Wash-sale disallowance {formatPercent(settings.washSaleDisallowanceRate)}.
             </div>
+            <details className="ws-note ws-note--muted ws-details">
+              <summary>
+                <strong>How the QFAF's tax treatment works</strong> (draft — pending counsel review)
+              </summary>
+              <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
+            </details>
             <div className="ws-note ws-note--muted">
               Estimates only — not investment, tax, or legal advice. See full disclosures below.
             </div>

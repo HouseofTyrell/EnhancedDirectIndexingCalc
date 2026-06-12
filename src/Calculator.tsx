@@ -148,7 +148,7 @@ export function Calculator() {
     const stateRate =
       inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
     // Per-state treatment (D-005): character-specific rates and loss-offset rules
-    const stateProfile = getStateTaxProfile(inputs.stateCode, stateRate);
+    const stateProfile = getStateTaxProfile(inputs.stateCode, stateRate, inputs.nycResident);
     return {
       federalStRate,
       federalLtRate,
@@ -162,7 +162,7 @@ export function Calculator() {
         (stateProfile.allowsLossOffsetAgainstIncome ? stateProfile.ordinaryRate : 0),
       rateDifferential: federalStRate - federalLtRate,
     };
-  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
+  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate, inputs.nycResident]);
 
   const {
     federalStRate,

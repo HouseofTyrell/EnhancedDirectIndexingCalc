@@ -363,3 +363,12 @@
   color: #fff;
   font-weight: 700;
 }
+
+.ws-details summary {
+  cursor: pointer;
+}
+
+.ws-details p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}

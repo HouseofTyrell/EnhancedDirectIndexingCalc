@@ -65,7 +65,7 @@ export function calculateWithSensitivity(
 
   // Apply sensitivity adjustments to rates: shift each per-state rate by the
   // same delta, clamped at zero (D-005 state profiles).
-  const baseProfile = getStateTaxProfile(inputs.stateCode, baseStateRate);
+  const baseProfile = getStateTaxProfile(inputs.stateCode, baseStateRate, inputs.nycResident);
   const adjustedProfile = {
     ...baseProfile,
     ordinaryRate: Math.max(0, baseProfile.ordinaryRate + sensitivity.stateRateChange),
