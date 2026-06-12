@@ -9,21 +9,14 @@ interface TourStep {
   description: string;
 }
 
+// Ordered to match the advisor workflow: configure the client first,
+// see the results last (the tour used to open on the results section,
+// dropping first-time users mid-page under the overlay).
 const STEPS: TourStep[] = [
-  {
-    targetSelector: '.headline-metrics',
-    title: 'Projected Tax Savings',
-    description: 'Your estimated tax savings appear here. These update in real-time as you change inputs.',
-  },
   {
     targetSelector: '#strategy',
     title: 'Choose Your Strategy',
     description: 'Select a collateral strategy type. Core strategies use cash; overlays use appreciated stock.',
-  },
-  {
-    targetSelector: '.toggle-row',
-    title: 'Enable QFAF Overlay',
-    description: 'Toggle QFAF on to add short-term gains and ordinary losses to your strategy.',
   },
   {
     targetSelector: '#collateral',
@@ -31,9 +24,19 @@ const STEPS: TourStep[] = [
     description: 'Enter the investment amount. The calculator auto-sizes the QFAF position.',
   },
   {
+    targetSelector: '.toggle-row',
+    title: 'Enable QFAF Overlay',
+    description: 'Toggle QFAF on to model short-term gains and ordinary losses in your strategy.',
+  },
+  {
     targetSelector: '.advanced-options-toggle',
     title: 'Advanced Settings',
     description: 'Access carryforwards, formula constants, and year-by-year planning tools here.',
+  },
+  {
+    targetSelector: '.headline-metrics',
+    title: 'Projected Tax Savings',
+    description: 'Your estimated tax savings appear here. These update in real-time as you change inputs.',
   },
 ];
 

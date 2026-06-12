@@ -32,6 +32,14 @@ export function DisclaimerFooter() {
               deferral, not elimination, and becomes due if the portfolio is liquidated.
               Deferral may become permanent via basis step-up at death or charitable transfer
             </li>
+            <li>
+              Alternative Minimum Tax (AMT) is not modeled and may reduce actual benefits for
+              some taxpayers
+            </li>
+            <li>
+              Straddle rules (IRC §1092) and passive activity rules (IRC §469) are not modeled;
+              offsetting positions between the QFAF and collateral could defer loss recognition
+            </li>
           </ul>
         </div>
 
@@ -59,6 +67,8 @@ export function DisclaimerFooter() {
       <p className="disclaimer-footer">
         This calculator provides estimates for illustrative purposes only and does not constitute
         investment, tax, or legal advice. Past performance does not guarantee future results.
+        Federal and state tax parameters reflect 2026 tax-year figures (Rev. Proc. 2025-32 basis),
+        last reviewed June 2026; verify against current IRS guidance before relying on them.
       </p>
 
       <div className="version-indicator">v{version}</div>

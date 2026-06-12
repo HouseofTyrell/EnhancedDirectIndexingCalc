@@ -70,14 +70,14 @@ starts.
 **Status: IMPLEMENTED (2026-06-11)** — all 13 failing tests now pass.
 
 ### D-005 — State tax fidelity (phased)
-**Date:** 2026-06-12
-**Decision:** Phased — quantified warnings now, per-state engine adjustments later as a
-separate decision.
-**Status: PHASE 1 IMPLEMENTED (2026-06-12)** — `src/utils/stateTaxWarnings.ts` computes
-dollar-impact warnings from the actual projection: PA/NJ (state-level benefit on ordinary
-deductions unlikely to be available, ≈$ amount shown), MA (split ST/LT rates), WA (7%
-LTCG excise estimate). Shown in ResultsSummary alongside the CA/NY/PA conformity notes.
-Phase 2 (engine adjustments) returns to the queue when warnings prove insufficient.
+**Date:** 2026-06-12 (phase 2 decided same day)
+**Decision:** Owner upgraded to **full per-state engine math for all four states**.
+**Status: PHASE 2 IMPLEMENTED (2026-06-12)** — `getStateTaxProfile` (taxData.ts) drives
+character-specific treatment in the engine: PA/NJ give $0 state benefit on ordinary
+deductions/NOL (no wage offset, no individual carryforwards) while still taxing gains;
+MA splits ST (12.5%) vs wages/LT (9%); WA applies the 7% LTCG excise above ~$270K/yr
+including in the liquidation analysis. Other states keep the flat-conformity model.
+State warnings now describe the modeled treatment. Four per-state regression tests.
 
 ### D-007 — Official QFAF name
 **Date:** 2026-06-12
@@ -113,32 +113,34 @@ a new per-year output, surface it in the table.
 
 ### D-005 — State tax fidelity *(decided — see Decided section above)*
 
-### D-006 — Present-value option for multi-year savings
-"Total Tax Savings" is an undiscounted nominal sum over 10–30 years. Options:
-(a) NPV toggle with configurable discount rate; (b) show both nominal and PV;
-(c) leave nominal (consistent with D-002 high-level philosophy). Interacts with D-003's
-permanent-vs-deferral split. **PM recommendation: decide after D-003 ships.**
+### D-006 — Present-value option
+**Date:** 2026-06-12 · **Decision:** PV toggle, off by default.
+**Status: IMPLEMENTED (2026-06-12)** — Advanced Settings → "Show Present Value" with a
+configurable discount rate (default 5%); headline shows "Present value @ X%" beneath
+the nominal total when enabled. `summary.totalTaxSavingsPV` always computed.
 
 ### D-007 — Official QFAF name *(decided — see Decided section above)*
 
 ### D-008 — Print handout disclosures *(decided — see Decided section above)*
 
-### D-009 — Qualified purchaser gate hardening
-Gate is localStorage-only and trivially bypassable — fine for an educational tool,
-insufficient if distributed as part of an advisory pitch. Decide intended distribution
-model before investing here.
+### D-009 — Qualified purchaser gate
+**Date:** 2026-06-12 · **Decision:** Keep as-is; the localStorage acknowledgment is
+appropriate friction for an **advisor-internal educational tool** — real qualification
+happens in the subscription process. Revisit only if the tool is distributed externally
+(then consider Cloudflare Access on the Pages deployment: real enforcement, zero code).
 
 ### D-010 — §461(l) income-cap modeling
-`core.ts` caps the ordinary deduction at `min(losses, 461(l) limit, income)`. The income
-cap is conceptually wrong per the Feb 2026 tax review (excess becomes NOL via negative
-taxable income) and the cap base ignores capital-gain income. Decide: model precisely
-(negative taxable income → NOL) vs. keep the conservative approximation with a
-documented rationale.
+**Date:** 2026-06-12 · **Decision:** Model precisely.
+**Status: IMPLEMENTED (2026-06-12)** — the deduction caps at the statutory limit only;
+it shelters wages **plus net capital-gain income**; any unsheltered allowed amount flows
+to NOL (negative taxable income → NOL, IRC §172) instead of being lost. Closes the Feb
+2026 tax review's High-priority finding #2.
 
-### D-011 — Labeling of the high-level (gross) default view
-Follows from D-002. Defaults stay gross/simple; decide the exact qualifier shown on
-headline metrics and the print handout (e.g., "before financing costs and fees —
-enable Advanced Settings to include them").
+### D-011 — Labeling of the gross default view
+**Date:** 2026-06-12 · **Decision:** Subtext under headline.
+**Status: IMPLEMENTED (2026-06-12)** — "before financing costs & fees (enable in
+Advanced Settings)" under the Estimated Tax Savings headline and in the Meeting Mode
+hero, shown only while financing fees are disabled.
 
 ---
 
@@ -180,11 +182,12 @@ enable Advanced Settings to include them").
     break-between (not after) pagination, app-nav hidden in print, compact footer.
     Verified: exactly 3 sheets, disclosures on every page.
 
-**UX polish queue (no decision required, not yet fixed):**
-- Onboarding tour step 1 targets the results section, so first-time users land
-  mid-page under a dimmed overlay; should start at Step 1 (Client Profile).
-- Year-by-year table has no sticky Year column; auditing the right-hand columns at
-  2,500px width loses row identity.
-- Wind-down divider label is centered across the full table width and lands
-  off-screen at either horizontal scroll extreme.
-- Sticky-header delta badges overlap the metric values right after an input change.
+**UX polish queue — ALL FIXED 2026-06-12:**
+- ~~Tour started at results~~ → reordered to start at strategy/inputs, end at results.
+- ~~No sticky Year column~~ → Year column now sticky during horizontal scroll.
+- ~~Wind-down divider label off-screen~~ → label sticks to the visible viewport.
+- ~~Sticky-header delta badge overlap~~ → badges suppressed in the sticky header only.
+
+**Also closed 2026-06-12 (cleanup slice):** engine consolidation (one projection loop;
+`financing.ts` shared), AMT-not-modeled disclosure, §1092/§469 disclosure, and a
+"tax parameters as of June 2026" line in the footer.

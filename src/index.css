@@ -7009,3 +7009,34 @@ select:focus:not(:focus-visible) {
     print-color-adjust: exact !important;
   }
 }
+
+/* ============================================
+   UX polish from the advisor usability session
+   ============================================ */
+
+/* Sticky Year column: keep row identity while horizontally scrolling the
+   wide expanded table. */
+.year-breakdown-table th.col-year,
+.year-breakdown-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card-bg, #fff);
+}
+.year-breakdown-table thead th.col-year {
+  z-index: 3;
+}
+
+/* Wind-down divider label: anchor to the visible viewport of the scroll
+   container instead of centering across the full (wider) table. */
+.wind-down-divider-text {
+  position: sticky;
+  left: 16px;
+  display: inline-block;
+}
+
+/* Sticky-header delta badges briefly overlap the metric values after an
+   input change; the full cards below still show deltas. */
+.sticky-header .delta-badge {
+  display: none;
+}
