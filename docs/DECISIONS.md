@@ -256,6 +256,63 @@ be planned for."
   added (extension-until-exhausted, no-extension baseline, stall guard, income
   continuation, 40-year cap); suite at 363.
 
+### D-026 — Workspace feature-parity ports, slice 1: scenario pinning + split allocation
+**Date:** 2026-06-12
+**Context:** a full Classic-vs-Workspace inventory (post-#59) found the Workspace ahead
+on funding/eventing/Meeting Mode but missing: scenario pinning with side-by-side
+comparison, split allocation, the strategy rate editor, custom tax-rate overrides,
+keyboard shortcuts, year-by-year free-form planning, the sensitivity grid, and
+multi-strategy comparison.
+**Decision (owner):** port **scenario pinning + side-by-side comparison** and **split
+allocation** to the Workspace now. The other gaps stay in the queue (sensitivity and
+strategy comparison are large and need their own decision; small items batched later).
+Split allocation lands as an expandable section in the rail's Strategy group (rail is
+too tight for always-visible dual selectors); the D-016 deleverage-conflict warning
+must be surfaced in the rail when both are enabled.
+**Status: IMPLEMENTED (2026-06-12)** —
+- **Scenario pinning**: "Pin scenario" in the Workspace Actions rail group freezes the
+  current scenario (inputs + settings + RESULTS, via `structuredClone`) through the
+  SAME `usePinnedScenario` hook and localStorage slot the Classic comparison panel
+  uses — one shared pin store, so a scenario pinned in either tab is comparable in the
+  other (tab switches unmount/remount, so each tab reloads the store on entry). A
+  compact "Pinned vs current" strip renders under the metric strip with five metrics
+  (Total Savings; Loss Reserve in EDI mode / peak Income-to-Utilize otherwise — chosen
+  by the LIVE pane's mode, computed on both sides; Year 1; Net If Liquidated; Final
+  Wealth), signed deltas with %, the auto-generated label + pinned-at age, and
+  Re-pin/Unpin controls. Pinned-side values derive ONLY from the frozen snapshot (exit
+  analysis re-derived from the frozen results/settings — a pure function of pinned
+  data, never of live inputs). The strip compares against the most recent pin; the full
+  4-slot multi-scenario table remains the Classic panel. Distinct from Meeting Mode's
+  meeting-local, non-persisted ghost pin (D-024) — not merged.
+- **Split allocation**: rail Strategy group gains the toggle "Split allocation (core +
+  overlay)" expanding to core/overlay strategy selectors + amounts and a derived
+  "Total collateral $X (Y% core / Z% overlay)" line (the single strategy/collateral
+  inputs hide, mirroring Classic's `resolveAllocation` treatment). Pure UI wiring over
+  the existing engine support — proven by test that the Workspace headline equals
+  `calculate()` with the same `inputs.splitAllocation`. Total-budget funding mode is
+  unavailable while split is on (the solver solves `collateralAmount`, which the engine
+  ignores in split mode): enabling split forces collateral mode, hides the Fund-by
+  segment, and shows a one-line note; `effectiveInputs` also guards the solver. The
+  D-016 conflict warning ("Deleveraging isn't modeled with split allocation yet — plan
+  ignored.", same wording as the results-pane note) now also renders in the rail's
+  Deleveraging group when both toggles are on. Split-aware display fixes: narratives
+  use `getEffectiveView().displayName` ("Split: Core 145/45 + Overlay 45/45"),
+  ResultsTable gets `strategyId`/`ltGainRate` only in single mode (Classic parity),
+  charts use the primary leg's tracking error, and the appreciated-stock-basis caveat
+  fires in split mode (there is always an overlay leg). CSV (already round-tripping
+  `splitAllocation.*`), Excel, and Meeting Mode launch all consume the same
+  `CalculationResult`/`getEffectiveView` and were re-verified.
+- 8 Workspace-level tests added (`src/workspace/WorkspaceTab.test.tsx`): pin freezes
+  under input changes / survives remount via localStorage / unpin clears storage /
+  re-pin replaces in place; split engine-equivalence (toggle and leg-edit), rail
+  conflict warning + engine actually ignoring the plan, split CSV round-trip through
+  the Workspace export path. Suite at 397. Browser-verified with Playwright in light
+  AND dark (`/tmp/uxtest/shots/d026-*.png`): pin → income change shows frozen old vs
+  new with −$605K (−26%) delta; split flips the headline $2,338,950 → $2,686,020 and
+  the conflict warning appears with deleverage on. New CSS themes entirely through the
+  variable layer (PR #60 dark-mode pass), with explicit dark-amber overrides for the rail warning
+  matching `.ws-note`.
+
 ---
 
 ## Pending decision queue (next batches)
