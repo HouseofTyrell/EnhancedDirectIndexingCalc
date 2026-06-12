@@ -293,6 +293,10 @@ hero, shown only while financing fees are disabled.
 
 ### Pending decision queue — EDI-only & deleveraging (2026-06-12)
 
+**ALL FIVE DECIDED 2026-06-12** (owner batch) — outcomes recorded under each item.
+Implementation in two waves: Wave 1 = D-014/D-015/D-018 + exit-tax clamp fix;
+Wave 2 = D-016/D-017 deleveraging.
+
 Owner request: "Can we work more on the EDI-only part? … helpful to be able to run just
 EDI. I think we have the pieces but don't have a good display or output for it. I'd also
 like to model deleveraging, all at once or over time." Two reviews (EDI-only persona
@@ -323,6 +327,13 @@ can override): scenario presets (business sale / RSU / concentrated stock) gradu
 the Workspace per-year-events editor; EDI-only mode inherits Workspace defaults (growth
 off, fees off), not the tab's (7% growth, financing on); the "Under Development" banner
 comes off only the surfaces that pass this refactor.
+**DECIDED (owner's words):** "I want to get rid of the edi only tab and have everything
+in the workspace tab. If there is too much information to fold into that we should see
+if we can add it to the classic tab. Open to other ideas." → Stronger than (a): the
+EDI-Only tab is REMOVED entirely (not kept as a deep-dive); its unique analytics fold
+into the Workspace, with the Classic tab as overflow if the Workspace gets crowded.
+Single engine (`core.ts`); duplicate projection loop retired. Folded defaults above
+apply.
 
 #### D-015 — EDI-only headline metric & Meeting Mode framing
 **Context:** With QFAF off, `calculateSummary` credits carryforward *building* at $0, so
@@ -342,6 +353,8 @@ CPA bar.
 Zero engine work, but the default view kills the conversation.
 **Recommendation:** (a) — defensible and it teaches the product: protection, not
 deductions. Consistent with D-002 (high-level default, honest attribution).
+**DECIDED:** (a) — realized + co-equal loss-reserve headline; EDI-specific Meeting
+Mode copy.
 
 #### D-016 — Deleveraging v1: scope, plan shape, and defaults
 **Context:** Owner wants deleveraging "all at once or over time." Design review
@@ -363,6 +376,7 @@ the owner's ask.
 **Recommendation:** (a) — one build delivers both of the owner's cases; deferred
 surfaces are folded defaults the owner can override. QFAF interaction default: dynamic
 sizing self-corrects (QFAF shrinks); fixed mode shows an oversized-QFAF warning.
+**DECIDED:** (a) — glide-path plan, Workspace-only v1, all-at-once = duration 1.
 
 #### D-017 — Tax character and rate assumptions for unwind (deleveraging defaults)
 **Context:** Deleveraging realizes gains on the long extension and covers shorts; the
@@ -383,6 +397,7 @@ CPA defense.
 Most cautious, likely overstates the unwind cost and undersells a real feature.
 **Recommendation:** (a) — each piece is the mechanically-accurate middle, and every
 knob stays exposed for a skeptical CPA to stress.
+**DECIDED:** (a) — defensible-middle bundle, all knobs overridable per plan.
 
 #### D-018 — Exit framing when the end state is long-only (hold-to-step-up)
 **Context:** After deleveraging to long-only, the realistic UHNW endgame is often hold
@@ -400,6 +415,7 @@ for exactly the clients who'd use it (concentrated/estate-minded).
 outcome as the base case — fails the CPA bar.
 **Recommendation:** (a) — both numbers shown, liquidation stays the conservative
 anchor, step-up is disclosed upside.
+**DECIDED:** (a) — co-equal "Net If Held to Step-Up" with estate disclosure.
 
 #### Bugs / work items from this triage — no decision required
 
