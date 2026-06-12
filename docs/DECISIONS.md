@@ -523,6 +523,23 @@ one-pager (flagged during the D-015 build).
 **Decision (owner):** close the gap now — advisors should not hand clients a sheet
 missing the headline EDI numbers. Contingent values stay labeled contingent in every
 export surface.
+**Status: IMPLEMENTED (2026-06-12)** — Excel Summary sheet gains three blocks computed
+inside `excelExport.ts` via `computeEdiInsights`/`computeStepUpComparison` from the
+`CalculationResult` + `ExitTaxAnalysis` it now receives (`exitAnalysis` wired from
+WorkspaceTab and, via a new `ResultsChartsSection` prop, the Classic tab): Loss Reserve
+Built (final ST/LT CFs + shelter value, header reads "contingent on future gains, NOT
+added to savings"), EDI Economics (Protection Ratio prints "—" when no financing cost
+was modeled, Break-Even Gain Event, Cumulative Financing Cost), and Step-Up Comparison
+(Net If Held to Step-Up, Net If Liquidated, SIGNED Step-Up Advantage, Carryforward
+Value Lost at Death). Meeting Mode page 1 (screen + printed handout) gains a compact
+step-up co-metric strip in BOTH modes — net-if-held vs net-if-liquidated with the IRC
+§1014 / CFs-lost-at-death disclosure line, plus the protection ratio in EDI mode when
+financing fees are on; the EDI hero/KPI cards already carried realized savings and the
+contingent-labeled loss reserve. Print pagination re-verified at exactly 3 sheets via
+headless-Chromium PDF render in QFAF, EDI, and EDI+fees scenarios. Tests: 10 added
+(`excelExportEdi.test.ts` parses the workbook back, incl. "—" ratio and negative
+signed advantage; `MeetingMode.test.tsx` asserts the new handout text both modes);
+suite at 370.
 
 ---
 

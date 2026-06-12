@@ -9,6 +9,8 @@ import { Strategy, STRATEGIES } from '../../strategyData';
 import { STATES } from '../../taxData';
 import { formatWithCommas, parseFormattedNumber } from '../../utils/formatters';
 import { getEffectiveView } from '../../utils/effectiveAllocation';
+import { ExitTaxAnalysis } from '../../calculations/exitTax';
+import { computeEdiInsights, computeStepUpComparison } from '../../calculations/ediInsights';
 
 // Design tokens from EDI Calc Meeting Mode.html
 const M = {
@@ -63,6 +65,12 @@ interface MeetingModeProps {
   results: CalculationResult;
   collateralOnlyResults: CalculationResult;
   taxRates: TaxRates;
+  /**
+   * Exit-tax analysis computed from `results` by the caller (D-003) — feeds
+   * the step-up co-metric (D-018) on the screen and the printed one-pager
+   * (D-021 export parity).
+   */
+  exitAnalysis: ExitTaxAnalysis;
   advancedSettings: AdvancedSettings;
   currentStrategy: Strategy | undefined;
   onExitMeetingMode: () => void;
@@ -1730,6 +1738,7 @@ export function MeetingMode({
   // call-site compatibility.
   collateralOnlyResults: _collateralOnlyResults,
   taxRates,
+  exitAnalysis,
   advancedSettings,
   currentStrategy,
   onExitMeetingMode,
@@ -1816,6 +1825,14 @@ export function MeetingMode({
   const lossReserve = results.summary.lossReserveShelterValue;
   const cfReserveBalance =
     results.summary.finalStCarryforward + results.summary.finalLtCarryforward;
+  // Step-up co-metric (D-018) + EDI economics (D-014) for the printed
+  // handout (D-021): same pure post-processing of core outputs the
+  // Workspace uses — one engine, one set of numbers.
+  const stepUp = useMemo(
+    () => computeStepUpComparison(results, exitAnalysis),
+    [results, exitAnalysis]
+  );
+  const insights = useMemo(() => computeEdiInsights(results), [results]);
 
   const [yearIdx, setYearIdx] = useState(breakdownData.length);
   useEffect(() => {
@@ -2492,6 +2509,62 @@ export function MeetingMode({
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Step-up co-metric (D-018) + EDI protection ratio — included in
+                  the printed handout per D-021 (export parity). Compact strip
+                  so the page-1 print pagination (exactly 3 sheets) holds. */}
+              <div
+                style={{
+                  padding: '14px 18px',
+                  background: 'white',
+                  borderRadius: 12,
+                  border: `1px solid ${M.line}`,
+                  marginBottom: 20,
+                  fontSize: 12.5,
+                  color: M.inkSoft,
+                  lineHeight: 1.55,
+                }}
+              >
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'baseline' }}>
+                  <span>
+                    <strong style={{ color: M.ink }}>Net if held to step-up:</strong>{' '}
+                    <strong
+                      style={{
+                        color: M.good,
+                        fontFamily: M.mono,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {fmtCurrency(stepUp.netIfHeldToStepUp)}
+                    </strong>
+                  </span>
+                  <span>
+                    vs{' '}
+                    <strong style={{ fontFamily: M.mono, fontVariantNumeric: 'tabular-nums' }}>
+                      {fmtCurrency(stepUp.netIfLiquidated)}
+                    </strong>{' '}
+                    net if liquidated
+                  </span>
+                  {ediMode && advancedSettings.financingFeesEnabled && (
+                    <span>
+                      <strong style={{ color: M.ink }}>Protection ratio:</strong>{' '}
+                      <strong style={{ fontFamily: M.mono, fontVariantNumeric: 'tabular-nums' }}>
+                        {insights.protectionRatio !== null
+                          ? `${insights.protectionRatio.toFixed(1)}×`
+                          : '—'}
+                      </strong>{' '}
+                      — loss-reserve shelter value ÷ {fmtCurrency(insights.cumulativeFinancingCost)}{' '}
+                      cumulative financing cost
+                    </span>
+                  )}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 11, color: M.inkFaint }}>
+                  &ldquo;Net if held to step-up&rdquo; is mortality-contingent and assumes basis
+                  step-up under current law (IRC §1014). Unused loss carryforwards are lost at death
+                  — their {fmtCurrency(stepUp.continueAndDie.carryforwardValueLost)} contingent
+                  shelter value is not counted in either figure.
+                </div>
               </div>
 
               <div

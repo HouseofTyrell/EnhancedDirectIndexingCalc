@@ -217,6 +217,7 @@ export function WorkspaceTab() {
         results={results}
         collateralOnlyResults={collateralOnly}
         taxRates={rates.full}
+        exitAnalysis={exit}
         advancedSettings={settings}
         currentStrategy={getStrategy(effectiveInputs.strategyId)}
         onExitMeetingMode={() => setIsMeetingMode(false)}
@@ -748,6 +749,7 @@ export function WorkspaceTab() {
                 results,
                 settings,
                 taxRates: rates.full,
+                exitAnalysis: exit,
               })
             }
           >

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ResultsTable } from '../ResultsTable';
 import { CalculatorInputs, AdvancedSettings, CalculationResult } from '../types';
+import { ExitTaxAnalysis } from '../calculations/exitTax';
 import { Strategy } from '../strategyData';
 import { formatShortcut } from '../hooks/useKeyboardShortcuts';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
@@ -28,6 +29,8 @@ interface ResultsChartsSectionProps {
   advancedSettings: AdvancedSettings;
   currentStrategy?: Strategy;
   taxRates: TaxRates;
+  /** Exit-tax analysis for the EDI metric blocks in the Excel export (D-021) */
+  exitTaxAnalysis: ExitTaxAnalysis;
   projectionYears: number;
   startMonth?: number;
   onPrintRef?: (handler: () => void) => void;
@@ -45,6 +48,7 @@ export function ResultsChartsSection({
   advancedSettings,
   currentStrategy,
   taxRates,
+  exitTaxAnalysis,
   projectionYears,
   startMonth,
   onPrintRef,
@@ -65,8 +69,9 @@ export function ResultsChartsSection({
       results,
       settings: advancedSettings,
       taxRates,
+      exitAnalysis: exitTaxAnalysis,
     });
-  }, [inputs, results, advancedSettings, taxRates]);
+  }, [inputs, results, advancedSettings, taxRates, exitTaxAnalysis]);
 
   const handleExportCsv = useCallback(() => {
     downloadInputsCsv(inputs, advancedSettings);

@@ -322,6 +322,7 @@ export function Calculator() {
         results={results}
         collateralOnlyResults={collateralOnlyResults}
         taxRates={taxRates}
+        exitAnalysis={exitTaxAnalysis}
         advancedSettings={advancedSettings}
         currentStrategy={currentStrategy}
         onExitMeetingMode={() => setIsMeetingMode(false)}
@@ -588,6 +589,7 @@ export function Calculator() {
               advancedSettings={advancedSettings}
               currentStrategy={currentStrategy}
               taxRates={taxRates}
+              exitTaxAnalysis={exitTaxAnalysis}
               projectionYears={advancedSettings.projectionYears}
               startMonth={inputs.startMonth}
               onPrintRef={handler => setPrintHandler(() => handler)}
@@ -924,6 +926,7 @@ export function Calculator() {
                       advancedSettings={advancedSettings}
                       currentStrategy={currentStrategy}
                       taxRates={taxRates}
+                      exitTaxAnalysis={exitTaxAnalysis}
                       projectionYears={advancedSettings.projectionYears}
                       startMonth={inputs.startMonth}
                     />
