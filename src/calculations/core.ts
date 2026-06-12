@@ -2,17 +2,17 @@ import {
   CalculatorInputs,
   YearResult,
   CalculationResult,
+  CalculatedSizing,
   AdvancedSettings,
   DEFAULT_SETTINGS,
+  YearOverride,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getStateRate } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
   CAPITAL_LOSS_LIMITS,
   SECTION_461L_LIMITS,
-  getLongLeverageRatio,
-  getShortRatio,
   Strategy,
 } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
@@ -24,9 +24,11 @@ import {
   calculateCarryforwards,
   calculateSummary,
 } from './helpers';
+import { getEffectiveFinancingCost, getBlendedFinancingCost } from './financing';
 import { calculateSizing } from './sizing';
 import {
   resolveAllocation,
+  getBlendedStLossRate,
   getBlendedLtGainRate,
   getBlendedCalendarYearStLossRate,
   ResolvedAllocation,
@@ -45,126 +47,142 @@ export interface CalculateYearOverrides {
 }
 
 /**
- * Calculate the effective financing cost based on strategy leverage and user settings.
- * Simple mode: wealth management fee + manager fees (base rate × leverage% + fixed component).
- * Detailed mode: calculates cost from individual component rates and strategy leverage.
- * @param strategy - The investment strategy (determines leverage ratios)
- * @param settings - Advanced settings with financing cost configuration
- * @returns Effective financing cost as a decimal (e.g., 0.025 = 2.5% of portfolio per year)
+ * Standard projection. Thin wrapper over the unified projection loop with no
+ * per-year overrides — `calculate()` and `calculateWithOverrides()` used to
+ * be two near-identical loops that repeatedly drifted apart (custom rates,
+ * auto-extension, unwind accounting). There is now exactly one loop.
  */
-function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSettings): number {
-  if (!settings.financingFeesEnabled) return 0;
-
-  if (settings.financingMode === 'simple') {
-    // Simple mode: two components
-    // 1. Wealth management fee (flat, e.g. 55 bps)
-    // 2. Manager fees: base rate × leverage% + fixed component (e.g. 90bp × 45% + 14.2bp)
-    const leveragePct = getShortRatio(strategy);
-    const managerFee = settings.simpleManagerFeeBase * leveragePct + settings.simpleManagerFeeFixed;
-    return settings.simpleWealthMgmtFee + managerFee;
-  } else {
-    // Detailed mode: calculate from component rates
-    const longLeverage = getLongLeverageRatio(strategy);
-    const shortRatio = getShortRatio(strategy);
-
-    // Margin interest cost: broker rate × long leverage
-    const marginCost = settings.brokerMarginRate * longLeverage;
-
-    // Short position costs: (borrow fees + dividend payments) × short ratio
-    const shortCosts = (settings.shortBorrowRate + settings.shortDividendRate) * shortRatio;
-
-    // Wealth management advisory fee: applied to entire portfolio
-    const advisoryFee = settings.wealthManagementFeeRate;
-
-    return marginCost + shortCosts + advisoryFee;
-  }
-}
-
-/**
- * Compute the collateral-weighted financing cost across all legs of an
- * allocation. In single-strategy mode this just returns the one leg's cost.
- */
-function getBlendedFinancingCost(
-  allocation: ResolvedAllocation,
-  settings: AdvancedSettings
-): number {
-  if (allocation.totalCollateral <= 0) return 0;
-  let weightedSum = 0;
-  for (const leg of allocation.legs) {
-    weightedSum += leg.collateralAmount * getEffectiveFinancingCost(leg.strategy, settings);
-  }
-  return weightedSum / allocation.totalCollateral;
-}
-
 export function calculate(
   inputs: CalculatorInputs,
   settings: AdvancedSettings = DEFAULT_SETTINGS
 ): CalculationResult {
-  const sizing = calculateSizing(inputs, settings.qfafMultiplier);
+  return calculateWithOverrides(inputs, settings, []);
+}
+
+/**
+ * Unified projection loop with optional year-by-year overrides for income
+ * and cash infusions.
+ *
+ * - Income overrides: change W-2 income for specific years (affects 461(l)
+ *   limits, NOL usage, and that year's bracket-based tax rates)
+ * - Cash infusions: add/remove capital in specific years (affects collateral
+ *   and QFAF sizing)
+ *
+ * Split allocation: when enabled, cash infusions are added to the Core (cash)
+ * leg only — appreciated-stock contributions to Overlay are not modeled here.
+ */
+export function calculateWithOverrides(
+  inputs: CalculatorInputs,
+  settings: AdvancedSettings = DEFAULT_SETTINGS,
+  overrides: YearOverride[] = []
+): CalculationResult {
+
   const allocation = resolveAllocation(inputs);
 
-  // Pre-calculate tax rates once before the loop (013 - redundant lookups)
-  // Use settings section461Limits if provided, otherwise fall back to defaults
-  const section461Limit =
-    settings.section461Limits[inputs.filingStatus] ?? SECTION_461L_LIMITS[inputs.filingStatus];
+  // Build a map of overrides by year for quick lookup
+  const overrideMap = new Map<number, YearOverride>();
+  for (const override of overrides) {
+    overrideMap.set(override.year, override);
+  }
 
-  // Determine tax rates: use custom settings if different from defaults, otherwise use bracket lookup
+  // Calculate initial sizing (will be adjusted for infusions)
+  const baseSizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
+
+  // Pre-calculate base tax rates and the per-state treatment profile (D-005)
+  const baseStateRate =
+    inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+  const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate);
+
+  // Honor custom tax rates the same way calculate() does, so the standard
+  // view and Year-by-Year Planning agree when custom rates are set.
   const useCustomRates =
     settings.stcgRate !== DEFAULT_SETTINGS.stcgRate ||
     settings.ltcgRate !== DEFAULT_SETTINGS.ltcgRate ||
     settings.niitRate !== DEFAULT_SETTINGS.niitRate;
 
-  const bracketStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
-  const bracketLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
-  const stateRate =
-    inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
-
-  // When using custom rates, apply them directly; otherwise use bracket-based rates
-  // NIIT is added on top of LT rate when applicable (income > $250k MFJ, $200k single)
-  const taxRates: TaxRates = {
-    stRate: useCustomRates ? settings.stcgRate : bracketStRate,
-    ltRate: useCustomRates ? settings.ltcgRate + settings.niitRate : bracketLtRate,
-    stateRate,
-    section461Limit,
-  };
-
   const years: YearResult[] = [];
 
-  let qfafValue = sizing.qfafValue;
-  const initialQfafValue = sizing.qfafValue;
-  const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
-  // Track each leg's collateral separately so per-leg financing fees compound
-  // correctly. In single-strategy mode this collapses to one leg.
+  let qfafValue = baseSizing.qfafValue;
+  // Track each leg's collateral. In split mode, cash infusions go to the core leg
+  // (the leg with type === 'core' if present, otherwise leg 0).
   const legCollateral = allocation.legs.map(leg => leg.collateralAmount);
+  const coreLegIndex = allocation.legs.findIndex(l => l.strategy.type === 'core');
+  const infusionTargetIndex = coreLegIndex >= 0 ? coreLegIndex : 0;
   let stCarryforward = inputs.existingStLossCarryforward;
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
 
+  // Track cumulative infusions for sizing recalculation
+  let cumulativeInfusion = 0;
+  const initialQfafValue = baseSizing.qfafValue;
+  const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
+
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
 
-  // QFAF duration determines when strategy ends; wind-down continues until carryforwards exhausted
+  // Auto-extend projection to show at least 2 post-QFAF years.
+  // Partial-year starts extend the strategy's life by one calendar year.
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
-  const maxProjectionYears = Math.max(projectionYears, 30); // Safety cap
-
-  // Partial year: month 1 = full year (12/12), month 4 = 9/12, month 12 = 1/12.
-  // For partial-year starts (yf < 1), the strategy spans qfafDuration + 1
-  // calendar years (with Y1 and the final year being partial).
   const yf = (13 - (inputs.startMonth ?? 1)) / 12;
   const isPartialStart = yf < 1;
-  // Last calendar year in which the strategy is still operating.
   const strategyLastCalendarYear =
     qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
+  const minProjection =
+    qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
+  const effectiveProjectionYears = Math.max(projectionYears, minProjection);
 
-  for (let year = 1; year <= maxProjectionYears; year++) {
-    // In wind-down mode: stop if all carryforwards are exhausted
-    const inWindDown = strategyLastCalendarYear > 0 && year > strategyLastCalendarYear;
-    if (inWindDown && stCarryforward <= 0 && ltCarryforward <= 0 && nolCarryforward <= 0) {
-      break;
+  for (let year = 1; year <= effectiveProjectionYears; year++) {
+    const override = overrideMap.get(year);
+
+    // Get effective income for this year
+    const yearIncome = override?.w2Income ?? inputs.annualIncome;
+
+    // Calculate tax rates for this year's income (needed for cash infusion tax adjustment)
+    const yearTaxRates: TaxRates = {
+      stRate: useCustomRates
+        ? settings.stcgRate
+        : getFederalStRate(yearIncome, inputs.filingStatus),
+      ltRate: useCustomRates
+        ? settings.ltcgRate + settings.niitRate
+        : getFederalLtRate(yearIncome, inputs.filingStatus),
+      ordinaryRate: useCustomRates
+        ? settings.stcgRate
+        : getFederalOrdinaryRate(yearIncome, inputs.filingStatus),
+      state: stateProfile,
+      section461Limit:
+        settings.section461Limits[inputs.filingStatus] ??
+        SECTION_461L_LIMITS[inputs.filingStatus],
+    };
+
+    // Apply cash infusion at the start of the year
+    const rawCashInfusion = override?.cashInfusion ?? 0;
+    const cashInfusionTaxType = override?.cashInfusionTaxType ?? 'gross';
+    let cashInfusion = rawCashInfusion;
+    if (rawCashInfusion !== 0 && cashInfusionTaxType === 'gross') {
+      const combinedStRate = yearTaxRates.stRate + yearTaxRates.state.stRate;
+      cashInfusion = rawCashInfusion * (1 - combinedStRate);
     }
-    // If no QFAF (pure collateral), respect projectionYears as before
-    if (qfafDuration === 0 && year > projectionYears) {
-      break;
+    if (cashInfusion !== 0) {
+      legCollateral[infusionTargetIndex] += cashInfusion;
+      cumulativeInfusion += cashInfusion;
+
+      // Resize QFAF to match new combined ST loss capacity (if QFAF is enabled)
+      if (inputs.qfafEnabled !== false) {
+        const updatedAllocation: ResolvedAllocation = {
+          isSplit: allocation.isSplit,
+          totalCollateral: legCollateral.reduce((s, v) => s + v, 0),
+          primary: allocation.primary,
+          legs: allocation.legs.map((leg, i) => ({
+            strategy: leg.strategy,
+            collateralAmount: legCollateral[i],
+          })),
+        };
+        const yearOneStLossRate = allocation.isSplit
+          ? getBlendedStLossRate(updatedAllocation, 1)
+          : allocation.primary.strategy.stLossRate;
+        const newStLossCapacity = updatedAllocation.totalCollateral * yearOneStLossRate;
+        qfafValue = newStLossCapacity / (settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE);
+      }
     }
 
     // Snapshot the per-leg state for this year's computations.
@@ -180,11 +198,8 @@ export function calculate(
       legs: yearStartLegs,
     };
 
-    // Operating fraction: how much of this calendar year the strategy is
-    // active. Y1 = yf, Y2..duration = 1.0, Y_{duration+1} = 1-yf, after = 0.
+    // Calendar-year rate blending + operating fraction (see core.ts for derivation).
     const opFraction = getOperatingFraction(year, inputs.startMonth ?? 1, qfafDuration);
-    // Calendar-year time-weighted ST loss rate: blends two operating years
-    // when start month != January. Already encodes the fractional weighting.
     const calStLossRate = allocation.isSplit
       ? getBlendedCalendarYearStLossRate(yearAllocation, year, inputs.startMonth ?? 1, qfafDuration)
       : getCalendarYearStLossRate(
@@ -199,36 +214,24 @@ export function calculate(
     let effectiveQfafValue =
       strategyLastCalendarYear > 0 && year > strategyLastCalendarYear ? 0 : qfafValue;
 
-    // Dynamic resizing: shrink QFAF to match this calendar year's collateral
-    // ST losses. Both sides scale with operating fraction, so it cancels out
-    // of the sizing target, but we use the calendar-year-blended rate.
+    // Dynamic resizing: shrink QFAF to match this calendar year's collateral ST losses.
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0 && opFraction > 0) {
-      // calStLossRate already includes the operating fraction; QFAF gains
-      // also include opFraction. Setting them equal:
-      //   qfaf × mult × opFrac = collateral × calRate
-      // Both calRate and (mult × opFrac) for an operating-year-aligned year
-      // simplify to give the steady-state QFAF size.
       const neededQfaf =
         yearStartTotalCollateral *
         calStLossRate *
         (1 - settings.washSaleDisallowanceRate) /
-        (QFAF_ST_GAIN_RATE * opFraction) *
+        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
         (1 - (inputs.qfafSizingCushion ?? 0));
-      // Can only shrink, never grow beyond initial or current value
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
       effectiveQfafValue = cappedQfaf;
     }
 
-    // Strategy is active (harvesting) only while opFraction > 0.
     const strategyActive = opFraction > 0;
-    // Operating fraction passed to calculateYear: drives QFAF activity, LT
-    // gains, growth, and fees. After strategy ends, growth still applies for
-    // a full year (wind-down).
     const yearFractionForCall = strategyActive ? opFraction : 1.0;
 
-    // For split mode, pre-compute the blended rates the inner math needs.
+    // Pre-blend rates for split mode.
     let yearOverrides: CalculateYearOverrides | undefined;
     let strategyForCalc: StrategyRates;
     if (allocation.isSplit) {
@@ -253,38 +256,39 @@ export function calculate(
       nolCarryforward,
       inputs,
       strategyForCalc,
-      taxRates,
+      yearTaxRates,
       settings,
-      undefined, // yearIncome (not overridden)
-      allocation.isSplit ? undefined : allocation.primary.strategy, // Pass full strategy for financing cost calculation
+      yearIncome,
+      allocation.isSplit ? undefined : allocation.primary.strategy,
       yearFractionForCall,
       strategyActive,
       yearOverrides
     );
 
-    // In split mode, calculateYear returns the combined growth-applied collateral,
-    // but we want to track each leg's value separately so next year's blends
-    // reflect their diverging financing/growth costs. Recompute per leg here
-    // and override the displayed totals with the leg-tracked sum.
+    // In split mode, recompute per-leg next-year values.
     if (allocation.isSplit) {
       const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
       for (let i = 0; i < legCollateral.length; i++) {
         const legStrategy = yearStartLegs[i].strategy;
         const legFinancing = getEffectiveFinancingCost(legStrategy, settings);
         const grown = legCollateral[i] * (1 + baseReturn * yearFractionForCall);
-        legCollateral[i] = safeNumber(grown * (1 - legFinancing * yearFractionForCall));
+        legCollateral[i] = grown * (1 - legFinancing * yearFractionForCall);
       }
       const legSum = legCollateral.reduce((s, v) => s + v, 0);
       result.collateralValue = legSum;
       result.totalValue = result.qfafValue + legSum;
     } else {
-      // Single-strategy mode: keep behavior identical to legacy code by
-      // pulling the next year's start value from calculateYear's result.
       legCollateral[0] = result.collateralValue;
     }
 
-    years.push({ ...result, qfafCashReturned: cashReturned });
-    // Don't track QFAF growth after the strategy's final calendar year.
+    // Terminal unwind: return the QFAF's end-of-year value as cash in the
+    // last operating calendar year (see core.ts for rationale).
+    const terminalProceeds =
+      strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
+    years.push({ ...result, qfafCashReturned: cashReturned + terminalProceeds });
+
+    // Update QFAF state for next year. Don't track QFAF growth after the
+    // strategy's final calendar year.
     qfafValue =
       strategyLastCalendarYear > 0 && year >= strategyLastCalendarYear ? 0 : result.qfafValue;
     stCarryforward = result.stLossCarryforward;
@@ -292,10 +296,27 @@ export function calculate(
     nolCarryforward = result.nolCarryforward;
   }
 
+  // Recalculate sizing to reflect any infusions
+  const yearOneInfusion = overrideMap.get(1)?.cashInfusion ?? 0;
+  const yearOneStLossRateForSizing = allocation.isSplit
+    ? baseSizing.avgStLossRate
+    : allocation.primary.strategy.stLossRate;
+  const adjustedSizing: CalculatedSizing = {
+    ...baseSizing,
+    collateralValue: baseSizing.collateralValue + yearOneInfusion,
+    totalExposure:
+      baseSizing.totalExposure +
+      cumulativeInfusion +
+      (inputs.qfafEnabled !== false
+        ? (cumulativeInfusion * yearOneStLossRateForSizing) /
+          (settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE)
+        : 0),
+  };
+
   return {
-    sizing,
+    sizing: adjustedSizing,
     years,
-    summary: calculateSummary(years, sizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined),
+    summary: calculateSummary(years, adjustedSizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined, settings.discountRate),
   };
 }
 
@@ -357,51 +378,83 @@ export function calculateYear(
     netStGainLoss -= usedStCarryforward;
   }
 
-  // Section 461(l) limitation on ordinary losses
-  // Cannot deduct more than: (1) losses generated, (2) statutory limit, (3) taxable income
-  const usableOrdinaryLoss = Math.min(
-    ordinaryLossesGenerated,
-    taxRates.section461Limit,
-    effectiveIncome
-  );
-  const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
+  // Section 461(l) limitation on ordinary losses — precise model (D-010):
+  // the current-year deduction is capped only by the statutory limit; the
+  // excess business loss becomes NOL. If the allowed deduction exceeds the
+  // income available to shelter (wages + net capital gains − $3K usage), the
+  // shortfall ALSO flows to NOL (negative taxable income → NOL, IRC §172)
+  // rather than being lost.
+  const allowedOrdinaryLoss = Math.min(ordinaryLossesGenerated, taxRates.section461Limit);
 
   // Calculate carryforwards and NOL usage
-  const { newStCarryforward, newLtCarryforward, nolUsed, capitalLossUsedAgainstIncome } =
-    calculateCarryforwards(
-      netStGainLoss,
-      ltGainsRealized,
-      usableOrdinaryLoss,
-      stCarryforward - usedStCarryforward,
-      ltCarryforward,
-      nolCarryforward,
-      inputs,
-      settings,
-      effectiveIncome
-    );
+  const {
+    newStCarryforward,
+    newLtCarryforward,
+    nolUsed,
+    capitalLossUsedAgainstIncome,
+    taxableSt,
+    taxableLt,
+  } = calculateCarryforwards(
+    netStGainLoss,
+    ltGainsRealized,
+    allowedOrdinaryLoss,
+    stCarryforward - usedStCarryforward,
+    ltCarryforward,
+    nolCarryforward,
+    inputs,
+    settings,
+    effectiveIncome
+  );
+
+  // Income actually sheltered this year by the §461(l) deduction. Capital
+  // gain income absorbs deduction too (the cap base is full taxable income).
+  const incomeAvailable = Math.max(
+    0,
+    effectiveIncome + taxableSt + taxableLt - capitalLossUsedAgainstIncome
+  );
+  const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
+  const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
+  const excessToNol = safeNumber(
+    ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol
+  );
 
   // Update NOL carryforward: add excess, subtract used
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
 
   // Calculate tax savings directly as sum of benefits minus costs
   // This matches the Year 1 Tax Benefit breakdown in the UI
-  const { stRate, ltRate, stateRate } = taxRates;
-  const combinedStRate = stRate + stateRate;
-  const combinedLtRate = ltRate + stateRate;
+  // State rates are character-specific (D-005): PA/NJ give no state benefit
+  // for deductions against wages, MA splits ST/LT rates, WA adds an excise.
+  const { stRate, ltRate, ordinaryRate, state } = taxRates;
+  const combinedStRate = stRate + state.stRate;
+  const combinedLtRate = ltRate + state.ltRate;
+  // Deductions against ordinary income (wages) don't reduce net investment
+  // income, so NIIT is excluded from their value (IRC §1411). This matches
+  // the treatment already used in ediOnly.ts for the $3K deduction.
+  const stateDeductionRate = state.allowsLossOffsetAgainstIncome ? state.ordinaryRate : 0;
+  const combinedOrdinaryRate = ordinaryRate + stateDeductionRate;
 
   // Benefits:
   // 1. Ordinary loss reduces W2 income tax
-  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
+  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
 
   // 2. Capital loss carryforward used against ordinary income ($3k/yr limit)
-  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
+  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
 
   // 3. NOL used against taxable income
-  const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
+  const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
   // Costs:
-  // 1. LT gains are taxed at LT rates
-  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
+  // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption).
+  // Charged on TAXABLE LT gains (after carryforward and current-year ST loss
+  // offsets), not gross realization — in QFAF mode these are identical (ST
+  // losses are consumed by QFAF gains), but in collateral-only mode harvested
+  // ST losses offset the LT gains and the cost would otherwise be overstated,
+  // inflating the incremental benefit of adding the QFAF. (CPA review finding E.)
+  const ltcgExciseTax = state.ltcgExcise
+    ? Math.max(0, taxableLt - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
+    : 0;
+  const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
 
   // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
@@ -427,15 +480,15 @@ export function calculateYear(
 
   // For display/debugging: calculate what taxes would be without benefits
   const grossInvestmentTax = safeNumber(
-    Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
+    Math.max(0, netStGainLoss) * combinedStRate + taxableLt * combinedLtRate
   );
   const federalTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stRate / combinedStRate)
+      (combinedStRate > 0 ? stRate / combinedStRate : 1)
   );
   const stateTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stateRate / combinedStRate)
+      (combinedStRate > 0 ? state.stRate / combinedStRate : 0)
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 

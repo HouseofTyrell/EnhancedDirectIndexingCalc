@@ -6,6 +6,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { useValueFlash } from '../hooks/useValueFlash';
 import { useDelta } from '../hooks/useDelta';
 import { DeltaBadge } from './DeltaBadge';
+import type { ExitTaxAnalysis } from '../calculations';
 
 /**
  * Props for the ResultsSummary component.
@@ -25,6 +26,16 @@ interface ResultsSummaryProps {
   collateralOnlyTaxSavings?: number;
   /** Total collateral amount for context */
   collateralAmount?: number;
+  /** Exit-tax / deferred-gain analysis (D-003): permanent vs deferred split */
+  exitTaxAnalysis?: ExitTaxAnalysis;
+  /** Quantified state-math warning (D-005): PA/NJ/MA/WA dollar-impact note */
+  stateMathWarning?: string;
+  /** Present value of total savings (D-006), shown when enabled */
+  totalTaxSavingsPV?: number;
+  presentValueEnabled?: boolean;
+  discountRate?: number;
+  /** True when financing fees are excluded (default view) — labels the headline as gross (D-011) */
+  grossOfCosts?: boolean;
   /** State code for conformity warning (e.g. "CA", "NY") */
   stateCode?: string;
 }
@@ -47,6 +58,12 @@ export const ResultsSummary = React.memo(function ResultsSummary({
   projectionYears = 10,
   collateralOnlyTaxSavings = 0,
   collateralAmount = 0,
+  exitTaxAnalysis,
+  stateMathWarning,
+  totalTaxSavingsPV,
+  presentValueEnabled = false,
+  discountRate = 0.05,
+  grossOfCosts = false,
   stateCode,
 }: ResultsSummaryProps) {
   const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
@@ -83,7 +100,17 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             {formatCurrency(totalTaxSavings)}
             <DeltaBadge delta={savingsDelta} />
           </p>
-          <p className="subtext">Over {projectionYears} years</p>
+          <p className="subtext">
+            Over {projectionYears} years
+            {grossOfCosts && (
+              <> — before financing costs &amp; fees (enable in Advanced Settings)</>
+            )}
+          </p>
+          {presentValueEnabled && totalTaxSavingsPV !== undefined && (
+            <p className="subtext">
+              Present value @ {formatPercent(discountRate)}: {formatCurrency(totalTaxSavingsPV)}
+            </p>
+          )}
         </div>
         <div className="headline-metric">
           <h3>
@@ -158,6 +185,63 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         )}
       </div>
 
+      {/* Deferred gain / liquidation analysis (D-003) */}
+      {exitTaxAnalysis && collateralAmount > 0 && (
+        <div className="summary-cards liquidation-analysis">
+          <div className="card">
+            <h3>
+              <InfoText
+                contentKey="embedded-gain-at-horizon"
+                currentValue={formatCurrency(exitTaxAnalysis.embeddedGain)}
+              >
+                Est. Embedded Gain at Year {projectionYears}
+              </InfoText>
+            </h3>
+            <p className="big-number">{formatCurrency(exitTaxAnalysis.embeddedGain)}</p>
+            <p className="subtext">
+              Incl. {formatCurrency(exitTaxAnalysis.cumulativeBasisReduction)} basis reduction
+              from harvesting
+            </p>
+          </div>
+          <div className="card">
+            <h3>
+              <InfoText
+                contentKey="incremental-deferred-tax"
+                currentValue={formatCurrency(exitTaxAnalysis.incrementalDeferredTax)}
+              >
+                Est. Deferred Tax (If Liquidated)
+              </InfoText>
+            </h3>
+            <p className="big-number">{formatCurrency(exitTaxAnalysis.incrementalDeferredTax)}</p>
+            <p className="subtext">
+              After {formatCurrency(exitTaxAnalysis.cfShelterUsed)} carryforward shelter
+            </p>
+          </div>
+          <div className="card">
+            <h3>
+              <InfoText
+                contentKey="net-benefit-after-liquidation"
+                currentValue={formatCurrency(exitTaxAnalysis.netBenefitAfterLiquidation)}
+              >
+                Est. Net Benefit After Liquidation
+              </InfoText>
+            </h3>
+            <p className="big-number">{formatCurrency(exitTaxAnalysis.netBenefitAfterLiquidation)}</p>
+            <p className="subtext">Tax savings less deferred tax if fully sold in year {projectionYears}</p>
+          </div>
+        </div>
+      )}
+      {exitTaxAnalysis && collateralAmount > 0 && (
+        <div className="results-disclosure">
+          <strong>Permanent vs. deferred:</strong> A portion of the estimated savings is a timing
+          benefit — harvesting reduces cost basis, so {formatCurrency(exitTaxAnalysis.incrementalDeferredTax)} of
+          tax would come due on full liquidation in year {projectionYears}. If the portfolio is
+          instead held until death (basis step-up) or donated, the deferred portion may become
+          permanent. Assumes initial basis equals initial value; appreciated-stock (Overlay)
+          collateral carries additional pre-existing embedded gain not shown here.
+        </div>
+      )}
+
       {/* Exclusion disclosure */}
       <div className="results-disclosure">
         <strong>Note:</strong> Estimates do not reflect advisory fees, financing costs, tracking error
@@ -170,6 +254,14 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         <div className="state-conformity-warning">
           <strong>⚠️ State Tax Conformity:</strong>
           <p>{getStateConformityWarning(stateCode)}</p>
+        </div>
+      )}
+
+      {/* Quantified state-math warning for PA/NJ/MA/WA (D-005 phase 1) */}
+      {stateMathWarning && (
+        <div className="state-conformity-warning">
+          <strong>⚠️ State Tax Estimate:</strong>
+          <p>{stateMathWarning}</p>
         </div>
       )}
     </CollapsibleSection>

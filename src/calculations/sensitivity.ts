@@ -7,14 +7,12 @@ import {
   SensitivityParams,
   DEFAULT_SENSITIVITY,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getStateRate } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
   CAPITAL_LOSS_LIMITS,
   SECTION_461L_LIMITS,
-  getLongLeverageRatio,
-  getShortRatio,
   Strategy,
 } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
@@ -26,6 +24,7 @@ import {
   calculateCarryforwards,
   calculateSummary,
 } from './helpers';
+import { getEffectiveFinancingCost, getBlendedFinancingCost } from './financing';
 import { calculateSizing } from './sizing';
 import {
   resolveAllocation,
@@ -34,49 +33,6 @@ import {
   ResolvedAllocation,
   ResolvedLeg,
 } from './splitAllocation';
-
-/**
- * Calculate the effective financing cost based on strategy leverage and user settings.
- * In simple mode, uses the user-specified rate directly.
- * In detailed mode, calculates cost from component rates and strategy leverage.
- * @param strategy - The investment strategy (determines leverage ratios)
- * @param settings - Advanced settings with financing cost configuration
- * @returns Effective financing cost as a decimal (e.g., 0.025 = 2.5% of portfolio per year)
- */
-function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSettings): number {
-  if (!settings.financingFeesEnabled) return 0;
-
-  if (settings.financingMode === 'simple') {
-    // Simple mode: wealth management fee + manager fees (base × leverage% + fixed)
-    const leveragePct = getShortRatio(strategy);
-    const managerFee = settings.simpleManagerFeeBase * leveragePct + settings.simpleManagerFeeFixed;
-    return settings.simpleWealthMgmtFee + managerFee;
-  } else {
-    // Detailed mode: calculate from component rates
-    const longLeverage = getLongLeverageRatio(strategy);
-    const shortRatio = getShortRatio(strategy);
-
-    // Margin interest cost: broker rate × long leverage
-    const marginCost = settings.brokerMarginRate * longLeverage;
-
-    // Short position costs: (borrow fees + dividend payments) × short ratio
-    const shortCosts = (settings.shortBorrowRate + settings.shortDividendRate) * shortRatio;
-
-    // Wealth management advisory fee: applied to entire portfolio
-    const advisoryFee = settings.wealthManagementFeeRate;
-
-    return marginCost + shortCosts + advisoryFee;
-  }
-}
-
-function getBlendedFinancingCost(allocation: ResolvedAllocation, settings: AdvancedSettings): number {
-  if (allocation.totalCollateral <= 0) return 0;
-  let weightedSum = 0;
-  for (const leg of allocation.legs) {
-    weightedSum += leg.collateralAmount * getEffectiveFinancingCost(leg.strategy, settings);
-  }
-  return weightedSum / allocation.totalCollateral;
-}
 
 /**
  * Calculate with sensitivity analysis adjustments.
@@ -100,14 +56,21 @@ export function calculateWithSensitivity(
   const allocation = resolveAllocation(inputs);
 
   // Calculate initial sizing
-  const sizing = calculateSizing(inputs, settings.qfafMultiplier);
+  const sizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
 
   // Get base state rate
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
 
-  // Apply sensitivity adjustments to rates
-  const adjustedStateRate = Math.max(0, baseStateRate + sensitivity.stateRateChange);
+  // Apply sensitivity adjustments to rates: shift each per-state rate by the
+  // same delta, clamped at zero (D-005 state profiles).
+  const baseProfile = getStateTaxProfile(inputs.stateCode, baseStateRate);
+  const adjustedProfile = {
+    ...baseProfile,
+    ordinaryRate: Math.max(0, baseProfile.ordinaryRate + sensitivity.stateRateChange),
+    stRate: Math.max(0, baseProfile.stRate + sensitivity.stateRateChange),
+    ltRate: Math.max(0, baseProfile.ltRate + sensitivity.stateRateChange),
+  };
 
   // Tracking error: in split mode, blend by collateral weight.
   const blendedTrackingError = allocation.isSplit && allocation.totalCollateral > 0
@@ -204,7 +167,7 @@ export function calculateWithSensitivity(
         yearStartTotalCollateral *
         calStLossRate *
         (1 - settings.washSaleDisallowanceRate) /
-        (QFAF_ST_GAIN_RATE * opFraction) *
+        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
         (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -214,10 +177,12 @@ export function calculateWithSensitivity(
     // Calculate tax rates with sensitivity adjustments
     const baseFederalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const baseFederalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+    const baseFederalOrdinaryRate = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
 
     // Apply federal rate change (affects both ST and LT rates proportionally)
     const adjustedFederalStRate = Math.max(0, baseFederalStRate + sensitivity.federalRateChange);
     const adjustedFederalLtRate = Math.max(0, baseFederalLtRate + sensitivity.federalRateChange);
+    const adjustedFederalOrdinaryRate = Math.max(0, baseFederalOrdinaryRate + sensitivity.federalRateChange);
 
     // Use settings section461Limits if provided
     const section461Limit =
@@ -226,7 +191,8 @@ export function calculateWithSensitivity(
     const yearTaxRates: TaxRates = {
       stRate: adjustedFederalStRate,
       ltRate: adjustedFederalLtRate,
-      stateRate: adjustedStateRate,
+      ordinaryRate: adjustedFederalOrdinaryRate,
+      state: adjustedProfile,
       section461Limit,
     };
 
@@ -294,7 +260,11 @@ export function calculateWithSensitivity(
       legCollateral[0] = result.collateralValue;
     }
 
-    years.push({ ...result, qfafCashReturned: cashReturned });
+    // Terminal unwind: return the QFAF's end-of-year value as cash in the
+    // last operating calendar year (see core.ts for rationale).
+    const terminalProceeds =
+      strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
+    years.push({ ...result, qfafCashReturned: cashReturned + terminalProceeds });
 
     // Update QFAF state for next year. Don't track QFAF growth after the
     // strategy's final calendar year.
@@ -308,7 +278,7 @@ export function calculateWithSensitivity(
   return {
     sizing,
     years,
-    summary: calculateSummary(years, sizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined),
+    summary: calculateSummary(years, sizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined, settings.discountRate),
   };
 }
 
@@ -387,20 +357,22 @@ function calculateYearWithSensitivity(
     netStGainLoss -= usedStCarryforward;
   }
 
-  // Section 461(l) limitation on ordinary losses
-  const usableOrdinaryLoss = Math.min(
-    ordinaryLossesGenerated,
-    taxRates.section461Limit,
-    inputs.annualIncome
-  );
-  const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
+  // Section 461(l) limitation — precise model (D-010), mirrors core.ts
+  const allowedOrdinaryLoss = Math.min(ordinaryLossesGenerated, taxRates.section461Limit);
 
   // Calculate carryforwards and NOL usage
-  const { newStCarryforward, newLtCarryforward, nolUsed, capitalLossUsedAgainstIncome } =
+  const {
+    newStCarryforward,
+    newLtCarryforward,
+    nolUsed,
+    capitalLossUsedAgainstIncome,
+    taxableSt,
+    taxableLt,
+  } =
     calculateCarryforwards(
       netStGainLoss,
       ltGainsRealized,
-      usableOrdinaryLoss,
+      allowedOrdinaryLoss,
       stCarryforward - usedStCarryforward,
       ltCarryforward,
       nolCarryforward,
@@ -408,21 +380,38 @@ function calculateYearWithSensitivity(
       settings
     );
 
+  // Income actually sheltered this year (capital gains absorb deduction too)
+  const incomeAvailable = Math.max(
+    0,
+    inputs.annualIncome + taxableSt + taxableLt - capitalLossUsedAgainstIncome
+  );
+  const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
+  const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
+  const excessToNol = safeNumber(
+    ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol
+  );
+
   // Update NOL carryforward
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
 
-  // Calculate tax savings
-  const { stRate, ltRate, stateRate } = taxRates;
-  const combinedStRate = stRate + stateRate;
-  const combinedLtRate = ltRate + stateRate;
+  // Calculate tax savings (state rates are character-specific — see core.ts)
+  const { stRate, ltRate, ordinaryRate, state } = taxRates;
+  const combinedStRate = stRate + state.stRate;
+  const combinedLtRate = ltRate + state.ltRate;
+  // NIIT excluded from deductions against ordinary income (IRC §1411) — see core.ts
+  const stateDeductionRate = state.allowsLossOffsetAgainstIncome ? state.ordinaryRate : 0;
+  const combinedOrdinaryRate = ordinaryRate + stateDeductionRate;
 
   // Benefits
-  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedStRate);
-  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedStRate);
-  const nolUsageBenefit = safeNumber(nolUsed * combinedStRate);
+  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
+  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
+  const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
-  // Costs
-  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
+  // Costs: charged on taxable (post-offset) LT gains — see core.ts (CPA finding E)
+  const ltcgExciseTax = state.ltcgExcise
+    ? Math.max(0, taxableLt - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
+    : 0;
+  const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
 
   // Net tax savings: ordinary deductions minus capital gains costs
@@ -441,15 +430,15 @@ function calculateYearWithSensitivity(
 
   // Tax breakdown for display
   const grossInvestmentTax = safeNumber(
-    Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
+    Math.max(0, netStGainLoss) * combinedStRate + taxableLt * combinedLtRate
   );
   const federalTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stRate / combinedStRate)
+      (combinedStRate > 0 ? stRate / combinedStRate : 1)
   );
   const stateTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stateRate / combinedStRate)
+      (combinedStRate > 0 ? state.stRate / combinedStRate : 0)
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 

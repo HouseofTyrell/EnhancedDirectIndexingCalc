@@ -51,6 +51,8 @@ interface TaxRates {
   stateRate: number;
   combinedStRate: number;
   combinedLtRate: number;
+  /** Combined ordinary rate WITHOUT NIIT — what deductions against wages actually save */
+  combinedOrdinaryRate: number;
 }
 
 type UpdateInput = <K extends keyof CalculatorInputs>(
@@ -644,6 +646,7 @@ function Rail({
               ['QFAF value', fmtCurrency(results.sizing.qfafValue), '#38bdf8'],
               ['Total exposure', fmtCurrency(results.sizing.totalExposure), '#60a5fa'],
               ['Combined ST', fmtPercent(taxRates.combinedStRate), '#fb7185'],
+              ['Ordinary (deductions)', fmtPercent(taxRates.combinedOrdinaryRate), '#34d399'],
             ] as const
           ).map(([k, v, dot]) => (
             <div
@@ -1439,18 +1442,28 @@ function PrintPageFooter() {
   return (
     <div
       style={{
-        marginTop: 32,
-        paddingTop: 12,
+        marginTop: 14,
+        paddingTop: 8,
         borderTop: `1px solid ${M.line}`,
-        fontSize: 9.5,
+        fontSize: 7,
         color: M.inkFaint,
-        lineHeight: 1.5,
+        lineHeight: 1.35,
         fontFamily: M.sans,
       }}
     >
-      Estimates do not reflect advisory fees, financing costs, tracking error,
-      transaction costs, or behavioral effects. Actual results will vary. For
-      discussion purposes only.
+      <strong>Important disclosures.</strong> This is a hypothetical illustration for
+      discussion purposes only — not investment, tax, or legal advice, and not an offer of any
+      security. Estimates do not reflect advisory fees, financing costs, tracking error,
+      transaction costs, or behavioral effects; actual results will vary. Tax-loss harvesting
+      reduces cost basis: a portion of projected savings is tax deferral that becomes due if the
+      portfolio is liquidated (it may become permanent via basis step-up at death or charitable
+      transfer). Ordinary loss deductions are limited by IRC §461(l) ($512K MFJ / $256K others,
+      2026); excess becomes an NOL usable against up to 80% of future taxable income. Projections
+      assume 0–15% of harvested losses are disallowed as wash sales and that the QFAF (Quantinno
+      Fundamental Arbitrage Fund) qualifies for the modeled tax treatment under current IRS
+      guidance, which may change. State treatment varies — CA, NY, PA, NJ, MA, and WA differ
+      materially from the federal rules modeled here. Consult qualified tax, legal, and
+      investment advisors before acting. Past performance does not guarantee future results.
     </div>
   );
 }
@@ -1477,7 +1490,7 @@ function MechanicsView({
       title: 'Establish QFAF',
       tone: M.accent,
       body:
-        'A Qualified Fund-of-Funds overlay is established against collateral, giving structured exposure without a taxable sale of the underlying.',
+        'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.',
       metric: fmtCurrency(qfafValue),
       metricLabel: 'QFAF value',
     },
@@ -1493,7 +1506,7 @@ function MechanicsView({
       n: 3,
       title: 'Loss harvesting generates NOL',
       tone: '#f59e0b',
-      body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedStRate)}), with the balance carried forward as NOL.`,
+      body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedOrdinaryRate)} ordinary rate), with the balance carried forward as NOL.`,
       metric: fmtCurrency(totalNol),
       metricLabel: 'NOL generated',
     },
@@ -1502,7 +1515,7 @@ function MechanicsView({
       title: 'Tax savings compound',
       tone: M.good,
       body:
-        'Savings compound year over year — amplifying the baseline return and compounding the advantage vs. standard direct indexing.',
+        'Estimated tax savings, if reinvested, can compound over time — potentially adding to after-tax results vs. standard direct indexing.',
       metric: fmtCurrency(totalTaxSavings),
       metricLabel: 'Est. cumulative savings',
     },
@@ -1676,6 +1689,7 @@ function MechanicsView({
               ['Fed LT', fmtPercent(taxRates.federalLtRate), false],
               ['State', fmtPercent(taxRates.stateRate), false],
               ['Combined ST', fmtPercent(taxRates.combinedStRate), true],
+              ['Ordinary (deductions)', fmtPercent(taxRates.combinedOrdinaryRate), true],
               ['Combined LT', fmtPercent(taxRates.combinedLtRate), true],
             ] as const
           ).map(([k, v, h]) => (
@@ -1796,9 +1810,9 @@ export function MeetingMode({
   const effectiveCollateral = useMemo(() => getEffectiveView(inputs).totalCollateral, [inputs]);
   const finalPortfolio =
     visibleYears[visibleYears.length - 1]?.totalValue ?? effectiveCollateral;
-  const totalNol =
-    visibleYears[visibleYears.length - 1]?.nolCarryforward ??
-    results.summary.totalNolGenerated;
+  // Total NOL generated over the program (the final-year *balance* is often $0
+  // once the NOL has been consumed, which made these labels read "$0 of NOL").
+  const totalNol = results.summary.totalNolGenerated;
 
   const [yearIdx, setYearIdx] = useState(breakdownData.length);
   useEffect(() => {
@@ -1859,7 +1873,7 @@ export function MeetingMode({
         label: 'Year 1 harvest',
         value: year1,
         color: M.accent,
-        note: `Loss harvest × ${fmtPercent1(taxRates.combinedStRate)} combined rate`,
+        note: `Loss harvest × ${fmtPercent1(taxRates.combinedOrdinaryRate)} combined ordinary rate`,
         inBar: true,
       },
       {
@@ -1873,7 +1887,7 @@ export function MeetingMode({
         label: 'NOL carry-forward',
         value: nolBenefit,
         color: '#f59e0b',
-        note: `${fmtCurrency(totalNol)} of NOL offsetting future income`,
+        note: `From ${fmtCurrency(totalNol)} of NOL generated, applied against future income`,
         inBar: true,
       },
       {
@@ -1895,7 +1909,7 @@ export function MeetingMode({
     totalTaxSavings,
     totalNol,
     visibleYears,
-    taxRates.combinedStRate,
+    taxRates.combinedOrdinaryRate,
     advancedSettings.growthEnabled,
     advancedSettings.defaultAnnualReturn,
     endYear,
@@ -2161,6 +2175,9 @@ export function MeetingMode({
                   </strong>{' '}
                   of net tax savings through {endYear},
                   driven by ordinary loss deductions, NOL usage, and capital loss carryforwards.
+                  {!advancedSettings.financingFeesEnabled && (
+                    <> Estimates are before financing costs and fees.</>
+                  )}
                 </p>
               </div>
 

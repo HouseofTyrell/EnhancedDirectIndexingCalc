@@ -5,7 +5,7 @@ import {
   AdvancedSettings,
   CalculationResult,
 } from '../types';
-import { formatCurrency, formatPercent, formatCurrencyAbbreviated } from '../utils/formatters';
+import { formatPercent, formatCurrencyAbbreviated } from '../utils/formatters';
 import { getEffectiveView } from '../utils/effectiveAllocation';
 import './ScenarioComparisonPanel.css';
 
@@ -154,9 +154,6 @@ export function ScenarioComparisonPanel(props: ScenarioComparisonPanelProps | Le
 
 function MultiScenarioPanel({
   scenarios,
-  currentInputs,
-  currentSettings,
-  currentResults,
   canPin,
   onPin,
   onUnpin,
@@ -278,8 +275,6 @@ function MultiScenarioPanel({
 
 function LegacyPanel({
   pinned,
-  currentInputs,
-  currentSettings,
   currentResults,
   onUnpin,
   onRestore,

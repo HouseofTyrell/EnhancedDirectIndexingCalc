@@ -83,6 +83,76 @@ export const STATE_TAX_CONFORMITY_WARNINGS: Record<string, string> = {
 };
 
 /**
+ * Per-state tax treatment used by the calculation engine (D-005 phase 2).
+ *
+ * The generic model applies one flat state rate to everything and assumes
+ * full federal conformity. These profiles correct the four states whose
+ * treatment differs most materially:
+ * - PA (3.07% flat): class-based income system — business/investment losses
+ *   cannot offset wages, and individuals get no loss/NOL carryforwards.
+ * - NJ (10.75% top): losses in one category cannot offset wages; no NOL or
+ *   loss carryforwards for individuals.
+ * - MA: wages/LT gains 5% + 4% millionaire surtax (9% top); ST gains 8.5% +
+ *   surtax (12.5% top).
+ * - WA: no income tax; 7% excise on LT capital gains above an annual
+ *   exemption (~$270K, inflation adjusted). ST gains and ordinary income
+ *   untaxed.
+ */
+export interface StateTaxProfile {
+  /** Rate on wages/ordinary income (the rate a deduction would save, if allowed) */
+  ordinaryRate: number;
+  /** Rate on short-term capital gains */
+  stRate: number;
+  /** Rate on long-term capital gains */
+  ltRate: number;
+  /** Whether business/investment losses and NOLs can offset wage income */
+  allowsLossOffsetAgainstIncome: boolean;
+  /** Excise layered on LT gains above an annual exemption (WA) */
+  ltcgExcise?: { rate: number; exemptionPerYear: number };
+}
+
+export function getStateTaxProfile(code: string, fallbackRate: number): StateTaxProfile {
+  switch (code) {
+    case 'PA':
+      return {
+        ordinaryRate: 0.0307,
+        stRate: 0.0307,
+        ltRate: 0.0307,
+        allowsLossOffsetAgainstIncome: false,
+      };
+    case 'NJ':
+      return {
+        ordinaryRate: 0.1075,
+        stRate: 0.1075,
+        ltRate: 0.1075,
+        allowsLossOffsetAgainstIncome: false,
+      };
+    case 'MA':
+      return {
+        ordinaryRate: 0.09,
+        stRate: 0.125,
+        ltRate: 0.09,
+        allowsLossOffsetAgainstIncome: true,
+      };
+    case 'WA':
+      return {
+        ordinaryRate: 0,
+        stRate: 0,
+        ltRate: 0,
+        allowsLossOffsetAgainstIncome: true,
+        ltcgExcise: { rate: 0.07, exemptionPerYear: 270000 },
+      };
+    default:
+      return {
+        ordinaryRate: fallbackRate,
+        stRate: fallbackRate,
+        ltRate: fallbackRate,
+        allowsLossOffsetAgainstIncome: true,
+      };
+  }
+}
+
+/**
  * Check if a state has known conformity issues with Section 461(l).
  * @param stateCode - Two-letter state code
  * @returns Warning message if state has conformity issues, undefined otherwise
@@ -171,16 +241,16 @@ function getNiitThreshold(status: string) {
 }
 
 /**
- * Compute the federal marginal short-term capital gains tax rate for a given
- * income level and filing status. Includes the 3.8% Net Investment Income Tax
- * (NIIT) when income exceeds the applicable threshold.
+ * Compute the federal marginal ordinary income tax rate (bracket rate only,
+ * WITHOUT the 3.8% NIIT). Use this to value deductions taken against ordinary
+ * income (W-2 wages, etc.): such deductions do not reduce net investment
+ * income, so the NIIT does not apply to them (IRC §1411).
  * @param income - Total taxable income in dollars
  * @param status - Filing status code ("single", "mfj", "mfs", or "hoh")
- * @returns The combined marginal federal short-term rate as a decimal
+ * @returns The marginal federal ordinary rate as a decimal
  */
-export function getFederalStRate(income: number, status: string): number {
+export function getFederalOrdinaryRate(income: number, status: string): number {
   const brackets = getBrackets(status);
-  const niitThreshold = getNiitThreshold(status);
 
   let marginalRate = 0.1;
   for (let i = brackets.length - 1; i >= 0; i--) {
@@ -190,7 +260,23 @@ export function getFederalStRate(income: number, status: string): number {
     }
   }
 
-  // Add NIIT for high earners
+  return marginalRate;
+}
+
+/**
+ * Compute the federal marginal short-term capital gains tax rate for a given
+ * income level and filing status. Includes the 3.8% Net Investment Income Tax
+ * (NIIT) when income exceeds the applicable threshold.
+ * @param income - Total taxable income in dollars
+ * @param status - Filing status code ("single", "mfj", "mfs", or "hoh")
+ * @returns The combined marginal federal short-term rate as a decimal
+ */
+export function getFederalStRate(income: number, status: string): number {
+  const niitThreshold = getNiitThreshold(status);
+
+  let marginalRate = getFederalOrdinaryRate(income, status);
+
+  // Add NIIT for high earners (ST gains are net investment income)
   if (income > niitThreshold) {
     marginalRate += NIIT_RATE;
   }

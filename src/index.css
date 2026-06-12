@@ -6919,6 +6919,21 @@ select:focus:not(:focus-visible) {
     background: white !important;
   }
 
+  /* App chrome (tab nav, theme toggle) printed as a stray leading page. */
+  .app-nav,
+  .theme-toggle {
+    display: none !important;
+  }
+
+  /* Viewport-height minimums force a trailing blank sheet. */
+  html,
+  body,
+  #root,
+  .app {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
   .meeting-mode-print {
     background: white !important;
     min-height: auto !important;
@@ -6942,16 +6957,21 @@ select:focus:not(:focus-visible) {
      page's break is suppressed so we don't emit a trailing blank
      sheet. */
   .meeting-mode-print .meeting-mode-print-page {
-    page-break-after: always;
-    break-after: page;
     page-break-inside: avoid;
     break-inside: avoid;
     padding-top: 0 !important;
+    /* The handout is designed at desktop width; un-zoomed it reflows into
+       the ~7.5in printable width and each page overflows one sheet, pushing
+       the disclosure footer onto its own page. Zoom keeps one logical page
+       per printed sheet. */
+    zoom: 0.62;
   }
 
-  .meeting-mode-print .meeting-mode-print-page:last-of-type {
-    page-break-after: auto;
-    break-after: auto;
+  /* Break BETWEEN pages (not after the last one): a trailing sibling div
+     defeats :last-of-type and used to emit a blank final sheet. */
+  .meeting-mode-print .meeting-mode-print-page + .meeting-mode-print-page {
+    page-break-before: always;
+    break-before: page;
   }
 
   /* Allow internal cards to break across pages only as a last resort. */
@@ -6988,4 +7008,35 @@ select:focus:not(:focus-visible) {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+}
+
+/* ============================================
+   UX polish from the advisor usability session
+   ============================================ */
+
+/* Sticky Year column: keep row identity while horizontally scrolling the
+   wide expanded table. */
+.year-breakdown-table th.col-year,
+.year-breakdown-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card-bg, #fff);
+}
+.year-breakdown-table thead th.col-year {
+  z-index: 3;
+}
+
+/* Wind-down divider label: anchor to the visible viewport of the scroll
+   container instead of centering across the full (wider) table. */
+.wind-down-divider-text {
+  position: sticky;
+  left: 16px;
+  display: inline-block;
+}
+
+/* Sticky-header delta badges briefly overlap the metric values after an
+   input change; the full cards below still show deltas. */
+.sticky-header .delta-badge {
+  display: none;
 }

@@ -11,8 +11,9 @@ interface SizingSummaryProps {
   results: CalculationResult;
   filingStatus: string;
   qfafEnabled: boolean;
-  combinedStRate: number;
   combinedLtRate: number;
+  /** Combined ordinary rate WITHOUT NIIT — used for deduction benefits (§1411) */
+  combinedOrdinaryRate: number;
   qfafMultiplier?: number;
   startMonth?: number;
 }
@@ -21,8 +22,8 @@ export function SizingSummary({
   results,
   filingStatus,
   qfafEnabled,
-  combinedStRate,
   combinedLtRate,
+  combinedOrdinaryRate,
   qfafMultiplier,
   startMonth = 1,
 }: SizingSummaryProps) {
@@ -240,19 +241,17 @@ export function SizingSummary({
             <span className="benefit-label">
               <InfoText
                 contentKey="ordinary-loss-benefit"
-                currentValue={formatCurrency(
-                  (results.years[0]?.usableOrdinaryLoss ?? 0) * combinedStRate
-                )}
+                currentValue={formatCurrency(results.years[0]?.ordinaryLossBenefit ?? 0)}
               >
                 Ordinary Loss Benefit
               </InfoText>
             </span>
             <span className="benefit-value positive">
-              +{formatCurrency((results.years[0]?.usableOrdinaryLoss ?? 0) * combinedStRate)}
+              +{formatCurrency(results.years[0]?.ordinaryLossBenefit ?? 0)}
             </span>
             <span className="benefit-formula">
               {formatCurrency(results.years[0]?.usableOrdinaryLoss ?? 0)} ×{' '}
-              {formatPercent(combinedStRate)}
+              {formatPercent(combinedOrdinaryRate)}
             </span>
           </div>
           {(results.years[0]?.ltGainsRealized ?? 0) > 0 && (
@@ -318,11 +317,11 @@ export function SizingSummary({
                 </InfoText>
               </span>
               <span className="benefit-value positive">
-                +{formatCurrency(results.years[1]?.usableOrdinaryLoss * combinedStRate)}
+                +{formatCurrency(results.years[1]?.ordinaryLossBenefit ?? 0)}
               </span>
               <span className="benefit-formula">
                 {formatCurrency(results.years[1]?.usableOrdinaryLoss)} ×{' '}
-                {formatPercent(combinedStRate)}
+                {formatPercent(combinedOrdinaryRate)}
               </span>
             </div>
             <div className="benefit-card">
@@ -332,11 +331,11 @@ export function SizingSummary({
                 </InfoText>
               </span>
               <span className="benefit-value positive">
-                +{formatCurrency((results.years[1]?.nolUsedThisYear ?? 0) * combinedStRate)}
+                +{formatCurrency(results.years[1]?.nolUsageBenefit ?? 0)}
               </span>
               <span className="benefit-formula">
                 {formatCurrency(results.years[1]?.nolUsedThisYear ?? 0)} ×{' '}
-                {formatPercent(combinedStRate)}
+                {formatPercent(combinedOrdinaryRate)}
               </span>
             </div>
             {(results.years[1]?.ltGainsRealized ?? 0) > 0 && (

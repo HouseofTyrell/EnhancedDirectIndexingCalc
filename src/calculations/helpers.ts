@@ -133,6 +133,9 @@ export function calculateCarryforwards(
   newLtCarryforward: number;
   nolUsed: number;
   capitalLossUsedAgainstIncome: number;
+  /** Net taxable ST/LT gains after all offsets (pre-NOL) — used by the §461(l) shelter calc */
+  taxableSt: number;
+  taxableLt: number;
 } {
   let taxableSt = netStGainLoss;
   let taxableLt = ltGains;
@@ -218,20 +221,45 @@ export function calculateCarryforwards(
     newLtCarryforward: safeNumber(ltCarryforward),
     nolUsed: safeNumber(nolUsed),
     capitalLossUsedAgainstIncome: safeNumber(capitalLossUsedAgainstIncome),
+    taxableSt: safeNumber(taxableSt),
+    taxableLt: safeNumber(taxableLt),
   };
 }
 
-export function calculateSummary(years: YearResult[], sizing: CalculatedSizing, qfafDuration?: number) {
+export function calculateSummary(
+  years: YearResult[],
+  sizing: CalculatedSizing,
+  qfafDuration?: number,
+  discountRate: number = 0.05
+) {
   const totalTaxSavings = years.reduce((sum, y) => sum + y.taxSavings, 0);
+  // Present value of the nominal savings stream (D-006); shown in the UI
+  // only when the user opts in via Advanced Settings.
+  const totalTaxSavingsPV = years.reduce(
+    (sum, y, i) => sum + y.taxSavings / Math.pow(1 + discountRate, i + 1),
+    0
+  );
   const totalNolGenerated = years.reduce((sum, y) => sum + y.excessToNol, 0);
+  // Cash returned by QFAF dynamic resizing and the terminal unwind. Held
+  // outside the strategy (modeled as uninvested), but part of total wealth.
+  const totalQfafCashReturned = years.reduce((sum, y) => sum + y.qfafCashReturned, 0);
   // Safe array access (005 - fix unchecked array access)
   const lastYear = years.length > 0 ? years[years.length - 1] : undefined;
   const finalPortfolioValue = lastYear?.totalValue ?? 0;
+  const finalTotalWealth = finalPortfolioValue + totalQfafCashReturned;
   // Annualize tax alpha over QFAF duration (not full projection length)
   // This measures per-year efficiency of the QFAF program specifically
   const numYears = qfafDuration ?? (years.length || 1);
   const effectiveTaxAlpha =
     sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / numYears : 0;
 
-  return { totalTaxSavings, finalPortfolioValue, effectiveTaxAlpha, totalNolGenerated };
+  return {
+    totalTaxSavings,
+    totalTaxSavingsPV: safeNumber(totalTaxSavingsPV),
+    finalPortfolioValue,
+    effectiveTaxAlpha,
+    totalNolGenerated,
+    totalQfafCashReturned,
+    finalTotalWealth,
+  };
 }

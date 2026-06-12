@@ -34,6 +34,8 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
     settings.qfafGrowthEnabled !== DEFAULT_SETTINGS.qfafGrowthEnabled ||
     settings.washSaleDisallowanceRate !== DEFAULT_SETTINGS.washSaleDisallowanceRate ||
     settings.nolOffsetLimit !== DEFAULT_SETTINGS.nolOffsetLimit ||
+    settings.presentValueEnabled !== DEFAULT_SETTINGS.presentValueEnabled ||
+    settings.discountRate !== DEFAULT_SETTINGS.discountRate ||
     settings.growthEnabled !== DEFAULT_SETTINGS.growthEnabled ||
     settings.defaultAnnualReturn !== DEFAULT_SETTINGS.defaultAnnualReturn ||
     settings.qfafAnnualReturn !== DEFAULT_SETTINGS.qfafAnnualReturn ||
@@ -217,6 +219,41 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
               onChange={e => {
                 const val = parseFloat(e.target.value.replace('%', '')) / 100;
                 if (!isNaN(val) && val >= 0 && val <= 1) handleChange('nolOffsetLimit', val);
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Present Value (D-006) */}
+        <div className="settings-section">
+          <h4>Present Value</h4>
+
+          <div className="setting-row">
+            <div className="setting-label">
+              <span className="setting-name">Show Present Value</span>
+              <span className="setting-hint">
+                Display discounted total savings alongside the nominal sum
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.presentValueEnabled}
+              onChange={e => handleChange('presentValueEnabled', e.target.checked)}
+            />
+          </div>
+
+          <div className="setting-row">
+            <div className="setting-label">
+              <span className="setting-name">Discount Rate</span>
+              <span className="setting-hint">Annual rate for discounting future savings</span>
+            </div>
+            <input
+              type="text"
+              className={`setting-input ${settings.discountRate !== DEFAULT_SETTINGS.discountRate ? 'modified' : ''}`}
+              value={formatPercent(settings.discountRate)}
+              onChange={e => {
+                const val = parseFloat(e.target.value.replace('%', '')) / 100;
+                if (!isNaN(val) && val >= 0 && val <= 0.2) handleChange('discountRate', val);
               }}
             />
           </div>

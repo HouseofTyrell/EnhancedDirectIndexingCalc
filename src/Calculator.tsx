@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { calculate, calculateWithOverrides, calculateWithSensitivity } from './calculations';
-import { DEFAULTS, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
+import { calculate, calculateWithOverrides, calculateWithSensitivity, computeExitTaxAnalysis } from './calculations';
+import { DEFAULTS, getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
+import { getQuantifiedStateWarning } from './utils/stateTaxWarnings';
 import {
   CalculatorInputs,
   YearOverride,
@@ -142,14 +143,23 @@ export function Calculator() {
   const taxRates = useMemo(() => {
     const federalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const federalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+    // Ordinary rate excludes NIIT: deductions against wages don't reduce NII (§1411)
+    const federalOrdinaryRate = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
     const stateRate =
       inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+    // Per-state treatment (D-005): character-specific rates and loss-offset rules
+    const stateProfile = getStateTaxProfile(inputs.stateCode, stateRate);
     return {
       federalStRate,
       federalLtRate,
+      federalOrdinaryRate,
       stateRate,
-      combinedStRate: federalStRate + stateRate,
-      combinedLtRate: federalLtRate + stateRate,
+      stateProfile,
+      combinedStRate: federalStRate + stateProfile.stRate,
+      combinedLtRate: federalLtRate + stateProfile.ltRate,
+      combinedOrdinaryRate:
+        federalOrdinaryRate +
+        (stateProfile.allowsLossOffsetAgainstIncome ? stateProfile.ordinaryRate : 0),
       rateDifferential: federalStRate - federalLtRate,
     };
   }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
@@ -160,7 +170,29 @@ export function Calculator() {
     stateRate,
     combinedStRate,
     combinedLtRate,
+    combinedOrdinaryRate,
   } = taxRates;
+
+  // Quantified state-math warning (D-005 phase 1): PA/NJ/MA/WA dollar-impact
+  // notes where the flat-state-rate assumption is materially wrong.
+  const stateMathWarning = useMemo(
+    () => getQuantifiedStateWarning(inputs.stateCode, stateRate, results.years),
+    [inputs.stateCode, stateRate, results.years]
+  );
+
+  // Exit-tax / deferred-gain analysis (D-003): quantifies the embedded gain
+  // created by basis erosion and splits projected savings into permanent vs
+  // deferred components.
+  const exitTaxAnalysis = useMemo(
+    () =>
+      computeExitTaxAnalysis(
+        results,
+        combinedLtRate,
+        advancedSettings.growthEnabled ? advancedSettings.defaultAnnualReturn : 0,
+        taxRates.stateProfile.ltcgExcise
+      ),
+    [results, combinedLtRate, taxRates.stateProfile, advancedSettings.growthEnabled, advancedSettings.defaultAnnualReturn]
+  );
 
   const updateInput = useCallback(
     <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => {
@@ -467,8 +499,8 @@ export function Calculator() {
         results={results}
         filingStatus={inputs.filingStatus}
         qfafEnabled={inputs.qfafEnabled}
-        combinedStRate={combinedStRate}
         combinedLtRate={combinedLtRate}
+        combinedOrdinaryRate={combinedOrdinaryRate}
         qfafMultiplier={advancedSettings.qfafMultiplier}
         startMonth={inputs.startMonth}
       />
@@ -526,6 +558,12 @@ export function Calculator() {
         projectionYears={advancedSettings.projectionYears}
         collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
         collateralAmount={effectiveCollateral}
+        exitTaxAnalysis={exitTaxAnalysis}
+        stateMathWarning={stateMathWarning}
+        totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
+        presentValueEnabled={advancedSettings.presentValueEnabled}
+        discountRate={advancedSettings.discountRate}
+        grossOfCosts={!advancedSettings.financingFeesEnabled}
         stateCode={inputs.stateCode}
       />
       </PinnableSection>
@@ -688,6 +726,12 @@ export function Calculator() {
                 projectionYears={advancedSettings.projectionYears}
                 collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
                 collateralAmount={effectiveCollateral}
+                exitTaxAnalysis={exitTaxAnalysis}
+                stateMathWarning={stateMathWarning}
+        totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
+        presentValueEnabled={advancedSettings.presentValueEnabled}
+        discountRate={advancedSettings.discountRate}
+        grossOfCosts={!advancedSettings.financingFeesEnabled}
                 stateCode={inputs.stateCode}
               />
             ),
@@ -716,8 +760,8 @@ export function Calculator() {
                 results={results}
                 filingStatus={inputs.filingStatus}
                 qfafEnabled={inputs.qfafEnabled}
-                combinedStRate={combinedStRate}
                 combinedLtRate={combinedLtRate}
+                combinedOrdinaryRate={combinedOrdinaryRate}
                 qfafMultiplier={advancedSettings.qfafMultiplier}
               />
             ),

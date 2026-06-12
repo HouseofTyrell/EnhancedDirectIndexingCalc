@@ -21,7 +21,11 @@ import { resolveAllocation, getBlendedAverageStLossRate } from './splitAllocatio
  * Core (cash) and Overlay (appreciated stock) legs. The QFAF is auto-sized
  * against the combined ST losses so a single QFAF position offsets both legs.
  */
-export function calculateSizing(inputs: CalculatorInputs, qfafMultiplier?: number): CalculatedSizing {
+export function calculateSizing(
+  inputs: CalculatorInputs,
+  qfafMultiplier?: number,
+  washSaleDisallowanceRate: number = 0
+): CalculatedSizing {
   const allocation = resolveAllocation(inputs);
 
   const collateralValue = allocation.totalCollateral;
@@ -45,11 +49,13 @@ export function calculateSizing(inputs: CalculatorInputs, qfafMultiplier?: numbe
   let year1OrdinaryLosses = 0;
 
   if (inputs.qfafEnabled !== false) {
-    // Auto-size QFAF so ST gains = average ST losses (or use override)
-    // Apply sizing cushion to reduce QFAF by up to 10%
+    // Auto-size QFAF so its ST gains (at the actual generation multiplier)
+    // equal the collateral's harvestable ST losses net of expected wash-sale
+    // disallowance. Matches the dynamic-resizing target in core.ts so fixed
+    // and dynamic modes agree in Year 1.
     const cushion = inputs.qfafSizingCushion ?? 0;
-    // Size QFAF based on default 150% rate (sizing target is always to match ST losses at full rate)
-    const baseSizing = inputs.qfafOverride ?? year1StLosses / QFAF_ST_GAIN_RATE;
+    const harvestableStLosses = year1StLosses * (1 - washSaleDisallowanceRate);
+    const baseSizing = inputs.qfafOverride ?? harvestableStLosses / stGainRate;
     qfafValue = baseSizing * (1 - cushion);
     // QFAF generates ST gains and ordinary losses at the user-selected generation rate
     year1StGains = qfafValue * stGainRate;

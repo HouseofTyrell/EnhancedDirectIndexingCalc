@@ -1,7 +1,7 @@
 import { useState, Fragment } from 'react';
 import { YearResult, CalculatedSizing } from './types';
 import { InfoText } from './InfoPopup';
-import { formatCurrency } from './utils/formatters';
+import { formatCurrency, formatPercent } from './utils/formatters';
 import {
   buildLossBreakdown,
   describeSegments,
@@ -69,6 +69,7 @@ export function ResultsTable({
   const [expandPortfolio, setExpandPortfolio] = useState(false);
   const [expandCapital, setExpandCapital] = useState(false);
   const [expandOrdLoss, setExpandOrdLoss] = useState(false);
+  const [expandCf, setExpandCf] = useState(false);
   const [expandSavings, setExpandSavings] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('combined');
@@ -119,6 +120,7 @@ export function ResultsTable({
     setExpandPortfolio(newState);
     setExpandCapital(newState);
     setExpandOrdLoss(newState);
+    setExpandCf(newState);
     setExpandSavings(newState);
   };
 
@@ -140,11 +142,11 @@ export function ResultsTable({
     // Net Capital column - only in combined and collateral-only
     if (showCollateral) cols += 1;
 
-    // Expanded Portfolio Details - only in combined mode
-    if (expandPortfolio && qfafEnabled && viewMode === 'combined') cols += 2;
+    // Expanded Portfolio Details - Collateral, QFAF, Cash Returned (combined mode)
+    if (expandPortfolio && qfafEnabled && viewMode === 'combined') cols += 3;
 
-    // Expanded Capital Details - ST Losses, LT Gains (collateral)
-    if (expandCapital && showCollateral) cols += 2;
+    // Expanded Capital Details - ST Losses, LT Gains, Harvest Rate (collateral)
+    if (expandCapital && showCollateral) cols += 3;
 
     // QFAF ST Gains column
     if (viewMode === 'qfaf-only') cols += 1;
@@ -156,14 +158,18 @@ export function ResultsTable({
       if (expandOrdLoss) cols += 5; // Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover
     }
 
+    // Capital loss carryforward group (always shown)
+    cols += 1; // Cap. CF headline
+    if (expandCf) cols += 3; // ST CF, LT CF, $3K Used
+
     cols += 1; // Tax Savings column
     cols += 1; // Cumulative column
-    if (expandSavings) cols += 3; // Ord Ded., NOL Ben., LT Cost
+    if (expandSavings) cols += 5; // Ord Ded., NOL Ben., $3K Ben., LT Cost, ST Cost
     return cols;
   };
 
   // Savings breakdown columns count for starting row
-  const savingsDetailCols = expandSavings ? 3 : 0;
+  const savingsDetailCols = expandSavings ? 5 : 0;
 
   // Filter out quiet wind-down rows where only the routine $3K capital loss deduction is running.
   // Keep wind-down rows that have meaningful activity: NOL usage, ordinary loss benefits, or
@@ -197,7 +203,7 @@ export function ResultsTable({
               <button
                 className={`view-mode-btn ${viewMode === 'qfaf-only' ? 'active' : ''}`}
                 onClick={() => setViewMode('qfaf-only')}
-                title="Qualified Financial Asset Fund — generates ordinary losses and short-term gains"
+                title="Quantinno Fundamental Arbitrage Fund — generates ordinary losses and short-term gains"
               >
                 QFAF Only
               </button>
@@ -258,6 +264,9 @@ export function ResultsTable({
                   <th className="col-detail qfaf-col">
                     <InfoText contentKey="col-qfaf-value">QFAF</InfoText>
                   </th>
+                  <th className="col-detail qfaf-col">
+                    <InfoText contentKey="col-cash-returned">Cash Out</InfoText>
+                  </th>
                 </>
               )}
 
@@ -284,6 +293,9 @@ export function ResultsTable({
                   </th>
                   <th className="col-detail collateral-col">
                     <InfoText contentKey="col-lt-gains">LT Gain</InfoText>
+                  </th>
+                  <th className="col-detail collateral-col">
+                    <InfoText contentKey="col-eff-rate">Harvest %</InfoText>
                   </th>
                 </>
               )}
@@ -339,6 +351,34 @@ export function ResultsTable({
                 </>
               )}
 
+              {/* Capital loss carryforward balances - Collapsible */}
+              <th
+                className="col-expandable col-capital-cf"
+                onClick={() => setExpandCf(!expandCf)}
+              >
+                <span className="expandable-header">
+                  <span className="expand-icon">
+                    {expandCf ? <ChevronDown /> : <ChevronRight />}
+                  </span>
+                  <InfoText contentKey="col-capital-cf">Cap. CF</InfoText>
+                </span>
+              </th>
+
+              {/* Expanded Carryforward Details */}
+              {expandCf && (
+                <>
+                  <th className="col-detail">
+                    <InfoText contentKey="col-st-carryforward">ST CF</InfoText>
+                  </th>
+                  <th className="col-detail">
+                    <InfoText contentKey="col-lt-carryforward">LT CF</InfoText>
+                  </th>
+                  <th className="col-detail">
+                    <InfoText contentKey="col-cap-loss-income">$3K Used</InfoText>
+                  </th>
+                </>
+              )}
+
               {/* Tax Savings - Collapsible to show benefit breakdown */}
               <th
                 className="col-expandable col-savings"
@@ -354,7 +394,7 @@ export function ResultsTable({
                 </span>
               </th>
 
-              {/* Expanded Savings Breakdown */}
+              {/* Expanded Savings Breakdown — components sum exactly to Savings */}
               {expandSavings && (
                 <>
                   <th className="col-detail benefit-col">
@@ -363,8 +403,14 @@ export function ResultsTable({
                   <th className="col-detail benefit-col">
                     <InfoText contentKey="col-nol-benefit">NOL Ben.</InfoText>
                   </th>
+                  <th className="col-detail benefit-col">
+                    <InfoText contentKey="col-capital-loss-benefit">$3K Ben.</InfoText>
+                  </th>
                   <th className="col-detail cost-col">
                     <InfoText contentKey="col-lt-gain-cost">LT Cost</InfoText>
+                  </th>
+                  <th className="col-detail cost-col">
+                    <InfoText contentKey="col-st-leak-cost">ST Cost</InfoText>
                   </th>
                 </>
               )}
@@ -393,11 +439,13 @@ export function ResultsTable({
                     {formatCurrency(sizing.collateralValue)}
                   </td>
                   <td className="starting-note qfaf-col">{formatCurrency(sizing.qfafValue)}</td>
+                  <td className="starting-note qfaf-col">—</td>
                 </>
               )}
               {showCollateral && <td className="starting-note">—</td>}
               {expandCapital && showCollateral && (
                 <>
+                  <td className="starting-note collateral-col">—</td>
                   <td className="starting-note collateral-col">—</td>
                   <td className="starting-note collateral-col">—</td>
                 </>
@@ -418,6 +466,14 @@ export function ResultsTable({
                       <td className="starting-note qfaf-col">—</td>
                     </>
                   )}
+                </>
+              )}
+              <td className="starting-note">—</td>
+              {expandCf && (
+                <>
+                  <td className="starting-note">—</td>
+                  <td className="starting-note">—</td>
+                  <td className="starting-note">—</td>
                 </>
               )}
               <td className="starting-note">—</td>
@@ -506,6 +562,11 @@ export function ResultsTable({
                       <>
                         <td className="collateral-col">{formatCurrency(year.collateralValue)}</td>
                         <td className="qfaf-col">{formatCurrency(year.qfafValue)}</td>
+                        <td className="qfaf-col">
+                          {year.qfafCashReturned > 0.01
+                            ? formatCurrency(year.qfafCashReturned)
+                            : '—'}
+                        </td>
                       </>
                     )}
 
@@ -528,6 +589,9 @@ export function ResultsTable({
                         </td>
                         <td className="collateral-col">
                           {isWindDown ? '—' : formatCurrency(year.ltGainsRealized)}
+                        </td>
+                        <td className="collateral-col">
+                          {isWindDown ? '—' : formatPercent(year.effectiveStLossRate)}
                         </td>
                       </>
                     )}
@@ -584,6 +648,24 @@ export function ResultsTable({
                       </>
                     )}
 
+                    {/* Capital loss carryforward balances (real data through wind-down) */}
+                    <td>
+                      {formatCurrency(year.stLossCarryforward + year.ltLossCarryforward)}
+                    </td>
+
+                    {/* Expanded Carryforward Details */}
+                    {expandCf && (
+                      <>
+                        <td>{formatCurrency(year.stLossCarryforward)}</td>
+                        <td>{formatCurrency(year.ltLossCarryforward)}</td>
+                        <td className="positive">
+                          {year.capitalLossUsedAgainstIncome > 0
+                            ? formatCurrency(year.capitalLossUsedAgainstIncome)
+                            : '—'}
+                        </td>
+                      </>
+                    )}
+
                     {/* Tax Savings (collapsed: net number) */}
                     <td className={`highlight ${displayedBenefit < 0 ? 'negative' : ''}`}>
                       {displayedBenefit < 0
@@ -591,7 +673,7 @@ export function ResultsTable({
                         : formatCurrency(displayedBenefit)}
                     </td>
 
-                    {/* Expanded Savings Breakdown */}
+                    {/* Expanded Savings Breakdown — sums exactly to Savings */}
                     {expandSavings && (
                       <>
                         {/* Ordinary Deduction Benefit */}
@@ -606,10 +688,22 @@ export function ResultsTable({
                             ? formatCurrency(year.nolUsageBenefit)
                             : '—'}
                         </td>
+                        {/* $3K Capital Loss Deduction Benefit */}
+                        <td className="positive benefit-col">
+                          {year.capitalLossBenefit > 0
+                            ? formatCurrency(year.capitalLossBenefit)
+                            : '—'}
+                        </td>
                         {/* LT Gain Cost */}
                         <td className="negative cost-col">
                           {year.ltGainCost > 0
                             ? `(${formatCurrency(year.ltGainCost)})`
+                            : '—'}
+                        </td>
+                        {/* Net ST Gain Cost (leakage) */}
+                        <td className="negative cost-col">
+                          {year.remainingStGainCost > 0
+                            ? `(${formatCurrency(year.remainingStGainCost)})`
                             : '—'}
                         </td>
                       </>
@@ -734,9 +828,11 @@ export function ResultsTable({
         {qfafEnabled && (
           <p className="carryforward-explanation">
             <em>
-              Expand "Total Losses" to see usable ordinary loss, gross losses, §461(l) cap overflow to NOL,
-              and NOL usage details. Rows marked "W/D" are post-strategy wind-down years
-              where only carryforward usage continues.
+              Expand "Total Losses" for usable ordinary loss, gross losses, §461(l) cap overflow to NOL,
+              and NOL usage; "Cap. CF" for ST/LT carryforward balances and the $3K deduction; and
+              "Savings" for the full benefit/cost components, which sum exactly to the Savings column
+              (Ord. Ded. + NOL Ben. + $3K Ben. − LT Cost − ST Cost). Rows marked "W/D" are
+              post-strategy wind-down years where only carryforward usage continues.
             </em>
           </p>
         )}

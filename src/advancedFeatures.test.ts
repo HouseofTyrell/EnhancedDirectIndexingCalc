@@ -203,25 +203,41 @@ describe('Advanced Features - Income Overrides', () => {
         overrides
       );
 
-      // Year 5 usable ordinary loss should be capped by lower income
+      // Year 5 usable ordinary loss should be capped by available income
       const year5 = resultWithOverride.years[4];
 
-      // With $300K income, usable ordinary loss is limited to $300K
-      // (lower than the $512K MFJ limit)
-      expect(year5.usableOrdinaryLoss).toBeLessThanOrEqual(300000);
+      // D-010 precise model: shelter = wages + net capital gain income,
+      // capped at the $512K MFJ statutory limit. The unsheltered remainder
+      // flows to NOL instead of being lost.
+      expect(year5.usableOrdinaryLoss).toBeLessThanOrEqual(512000);
+      expect(year5.usableOrdinaryLoss).toBeLessThanOrEqual(
+        300000 + year5.ltGainsRealized + year5.netStGainLoss + 1
+      );
+      expect(year5.excessToNol).toBeCloseTo(
+        year5.ordinaryLossesGenerated - year5.usableOrdinaryLoss,
+        2
+      );
     });
 
     it('should increase NOL generation when income drops', () => {
-      const overrides = generateDefaultOverrides(baseClient.annualIncome);
-      // Drop income to $200K in year 3
-      overrides[2].w2Income = 200000;
+      // D-010: capital-gain income also absorbs the deduction, so use a
+      // client with no LT gains and dynamic sizing (no ST leakage) so the
+      // income drop genuinely binds the shelter.
+      const client: CalculatorInputs = {
+        ...baseClient,
+        qfafSizingMode: 'dynamic',
+        ltGainsEnabled: false,
+      };
+      const overrides = generateDefaultOverrides(client.annualIncome);
+      // Drop income to $0 in year 3 so the shelter limit truly binds
+      overrides[2].w2Income = 0;
 
       const resultWithOverride = calculateWithOverrides(
-        baseClient,
+        client,
         DEFAULT_SETTINGS,
         overrides
       );
-      const resultWithoutOverride = calculate(baseClient, DEFAULT_SETTINGS);
+      const resultWithoutOverride = calculate(client, DEFAULT_SETTINGS);
 
       // Year 3 should generate more excess to NOL (since less can be used)
       const year3With = resultWithOverride.years[2];
@@ -286,12 +302,17 @@ describe('Advanced Features - Income Overrides', () => {
 
       const year6 = resultWithOverride.years[5];
 
-      // With $0 income, usable ordinary loss should be $0
-      // (can't deduct more than taxable income)
-      expect(year6.usableOrdinaryLoss).toBe(0);
+      // D-010 precise model: with $0 wages, only net capital-gain income can
+      // absorb the deduction; the unsheltered remainder flows to NOL.
+      expect(year6.usableOrdinaryLoss).toBeLessThanOrEqual(
+        year6.ltGainsRealized + year6.netStGainLoss + 1
+      );
 
-      // All ordinary losses should go to NOL
-      expect(year6.excessToNol).toBe(year6.ordinaryLossesGenerated);
+      // Sheltered + NOL = total losses generated
+      expect(year6.excessToNol).toBeCloseTo(
+        year6.ordinaryLossesGenerated - year6.usableOrdinaryLoss,
+        2
+      );
     });
   });
 
@@ -317,9 +338,11 @@ describe('Advanced Features - Income Overrides', () => {
       const year5 = result.years[4];
       expect(year5.totalValue).toBeGreaterThan(8000000);
 
-      // Year 6 should show limited ordinary loss usage
+      // Year 6 should show limited ordinary loss usage (wages + gains shelter)
       const year6 = result.years[5];
-      expect(year6.usableOrdinaryLoss).toBeLessThanOrEqual(100000);
+      expect(year6.usableOrdinaryLoss).toBeLessThanOrEqual(
+        100000 + year6.ltGainsRealized + year6.netStGainLoss + 1
+      );
     });
 
     it('should model career income growth', () => {
@@ -389,9 +412,11 @@ describe('Advanced Features - Income Overrides', () => {
       // Year 3 should have full 461(l) usage due to high income
       expect(year3.usableOrdinaryLoss).toBe(512000); // MFJ limit
 
-      // Year 4+ should have reduced usable ordinary loss
+      // Year 4+ should have reduced usable ordinary loss (wages + gains shelter)
       const year4 = result.years[3];
-      expect(year4.usableOrdinaryLoss).toBeLessThanOrEqual(200000);
+      expect(year4.usableOrdinaryLoss).toBeLessThanOrEqual(
+        200000 + year4.ltGainsRealized + year4.netStGainLoss + 1
+      );
     });
   });
 });

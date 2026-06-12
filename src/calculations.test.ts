@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculate, calculateSizing } from './calculations';
+import { calculate, calculateSizing, calculateWithOverrides } from './calculations';
 import { CalculatorInputs, DEFAULT_SETTINGS, AdvancedSettings } from './types';
 
 // Helper to create base inputs
@@ -147,19 +147,23 @@ describe('calculate - Section 461(l) behavior', () => {
     expect(result.years[0].nolCarryforward).toBeGreaterThan(0);
   });
 
-  it('limits 461(l) by taxable income when income is lower than cap', () => {
-    // Low income person cannot use full 461(l) limit
+  it('shelters wages plus capital-gain income; shortfall flows to NOL (D-010)', () => {
+    // Precise §461(l) model: the deduction is allowed up to the statutory
+    // limit; it shelters wages AND net capital gain income. Any allowed
+    // amount that exceeds available income becomes NOL instead of being lost.
     const inputs = createInputs({
       annualIncome: 100000,
       collateralAmount: 10000000,
     });
     const result = calculate(inputs);
+    const y1 = result.years[0];
 
-    // Usable = min(losses, cap, income) = min(1M, 626K, 100K) = 100K
-    expect(result.years[0].usableOrdinaryLoss).toBe(100000);
+    // Income available = $100K wages + $240K taxable LT gains (10M × 2.4%)
+    expect(y1.usableOrdinaryLoss).toBeCloseTo(340000, 0);
 
-    // Excess goes to NOL
-    expect(result.years[0].excessToNol).toBeGreaterThan(0);
+    // Everything not sheltered this year flows to NOL
+    expect(y1.excessToNol).toBeCloseTo(y1.ordinaryLossesGenerated - y1.usableOrdinaryLoss, 2);
+    expect(y1.excessToNol).toBeGreaterThan(0);
   });
 });
 
@@ -451,19 +455,22 @@ describe('calculate - edge cases', () => {
 
 describe('fixed issues', () => {
   /**
-   * FIXED: 461(l) now limits based on taxable income
-   * Was: min(losses, limit)
-   * Now: min(losses, limit, taxableIncome)
+   * D-010 precise model: the deduction caps at the statutory limit; the
+   * income shelter includes capital gains, and any shortfall becomes NOL
+   * (negative taxable income → NOL per IRC §172) rather than being lost.
    */
-  it('461(l) should be limited by taxable income', () => {
+  it('461(l) deduction shelters available income; the rest becomes NOL', () => {
     const inputs = createInputs({
       annualIncome: 50000,
       collateralAmount: 10000000,
     });
     const result = calculate(inputs);
+    const y1 = result.years[0];
 
-    // Cannot deduct more losses than you have income
-    expect(result.years[0].usableOrdinaryLoss).toBeLessThanOrEqual(50000);
+    // $50K wages + $240K LT gains of shelterable income
+    expect(y1.usableOrdinaryLoss).toBeCloseTo(290000, 0);
+    expect(y1.usableOrdinaryLoss).toBeLessThanOrEqual(512000);
+    expect(y1.excessToNol).toBeCloseTo(y1.ordinaryLossesGenerated - y1.usableOrdinaryLoss, 2);
   });
 
   /**
@@ -594,6 +601,169 @@ describe('QFAF Duration', () => {
   });
 });
 
+describe('QFAF sizing consistency', () => {
+  it('matches ST gains to ST losses with a custom multiplier', () => {
+    // With a 1.0x multiplier, sizing must divide by 1.0 (not the 1.5 default)
+    // so gains still offset losses.
+    const settings = { ...DEFAULT_SETTINGS, qfafMultiplier: 1.0 };
+    const result = calculate(createInputs({ qfafSizingYears: 1 }), settings);
+    const y1 = result.years[0];
+    expect(y1.stGainsGenerated).toBeCloseTo(y1.stLossesHarvested, 0);
+    expect(y1.stGainLeakage).toBeCloseTo(0, 0);
+  });
+
+  it('sizes against harvestable losses net of wash-sale disallowance', () => {
+    // With 10% wash-sale disallowance, fixed-mode Year 1 should not leak
+    // ST gains: the QFAF is sized to the net harvestable losses.
+    const settings = { ...DEFAULT_SETTINGS, washSaleDisallowanceRate: 0.1 };
+    const result = calculate(
+      createInputs({ qfafSizingYears: 1, qfafSizingMode: 'fixed' }),
+      settings
+    );
+    const y1 = result.years[0];
+    expect(y1.stGainLeakage).toBeCloseTo(0, 0);
+  });
+});
+
+describe('calculateWithOverrides custom-rate parity', () => {
+  it('uses custom tax rates like calculate() does', () => {
+    const settings = { ...DEFAULT_SETTINGS, stcgRate: 0.45, ltcgRate: 0.25 };
+    const inputs = createInputs();
+    const base = calculate(inputs, settings);
+    const withOverrides = calculateWithOverrides(inputs, settings, []);
+    expect(withOverrides.years[0].taxSavings).toBeCloseTo(base.years[0].taxSavings, 0);
+    expect(withOverrides.years[0].ordinaryLossBenefit).toBeCloseTo(
+      base.years[0].ordinaryLossBenefit,
+      0
+    );
+  });
+});
+
+describe('LT gain cost uses taxable gains after offsets (CPA finding E)', () => {
+  it('charges no LT cost in collateral-only mode when ST losses fully offset LT gains', () => {
+    // QFAF off: harvested ST losses (23% Y1) far exceed LT gains (2.4%),
+    // so taxable LT gains are $0 — the cost must be $0, not gross × rate.
+    const inputs = createInputs({ qfafEnabled: false, collateralAmount: 10000000 });
+    const result = calculate(inputs);
+    const y1 = result.years[0];
+    expect(y1.ltGainsRealized).toBeGreaterThan(0);
+    expect(y1.ltGainCost).toBe(0);
+  });
+
+  it('still charges full LT cost in QFAF mode (ST losses consumed by QFAF gains)', () => {
+    // $3M MFJ income → top LTCG bracket 20% + 3.8% NIIT
+    const inputs = createInputs({
+      annualIncome: 3000000,
+      collateralAmount: 10000000,
+      qfafSizingYears: 1,
+    });
+    const result = calculate(inputs);
+    const y1 = result.years[0];
+    // CA: fed LT 23.8% + 13.3% state
+    expect(y1.ltGainCost).toBeCloseTo(y1.ltGainsRealized * (0.238 + 0.133), 0);
+  });
+});
+
+describe('Per-state tax treatment (D-005)', () => {
+  // Income $3M MFJ → fed ordinary 37%, fed ST 40.8% (incl. NIIT), fed LT 23.8%
+  const base = { annualIncome: 3000000, collateralAmount: 10000000 };
+
+  it('gives no PA state benefit for deductions against wages', () => {
+    // PA's class-based system doesn't allow these losses to offset wages
+    const result = calculate(createInputs({ ...base, stateCode: 'PA' }));
+    const y1 = result.years[0];
+    expect(y1.ordinaryLossBenefit).toBeCloseTo(y1.usableOrdinaryLoss * 0.37, 0);
+  });
+
+  it('gives no NJ state benefit for deductions against wages', () => {
+    const result = calculate(createInputs({ ...base, stateCode: 'NJ' }));
+    const y1 = result.years[0];
+    expect(y1.ordinaryLossBenefit).toBeCloseTo(y1.usableOrdinaryLoss * 0.37, 0);
+    // NJ still taxes the LT gains at 10.75%
+    expect(y1.ltGainCost).toBeCloseTo(y1.ltGainsRealized * (0.238 + 0.1075), 0);
+  });
+
+  it('splits MA short-term and long-term rates', () => {
+    // Fixed sizing decays harvests but not QFAF gains → later-year ST leakage
+    const result = calculate(
+      createInputs({ ...base, stateCode: 'MA', qfafSizingYears: 1, qfafSizingMode: 'fixed' })
+    );
+    const y1 = result.years[0];
+    // LT gains: fed 23.8% + MA 9% (5% + 4% surtax)
+    expect(y1.ltGainCost).toBeCloseTo(y1.ltGainsRealized * (0.238 + 0.09), 0);
+    // Net ST gains: fed 40.8% + MA 12.5% (8.5% + 4% surtax)
+    const leakYear = result.years.find(y => y.netStGainLoss > 1000);
+    expect(leakYear).toBeDefined();
+    expect(leakYear!.remainingStGainCost).toBeCloseTo(
+      leakYear!.netStGainLoss * (0.408 + 0.125),
+      0
+    );
+  });
+
+  it('applies the WA 7% LTCG excise above the annual exemption', () => {
+    // 10M × 2.4% = $240K LT gains → below the $270K exemption: no excise
+    const small = calculate(createInputs({ ...base, stateCode: 'WA' }));
+    expect(small.years[0].ltGainCost).toBeCloseTo(
+      small.years[0].ltGainsRealized * 0.238,
+      0
+    );
+    // 20M × 2.4% = $480K LT gains → $210K above exemption × 7% excise
+    const large = calculate(createInputs({ ...base, stateCode: 'WA', collateralAmount: 20000000 }));
+    const y1 = large.years[0];
+    expect(y1.ltGainCost).toBeCloseTo(
+      y1.ltGainsRealized * 0.238 + (y1.ltGainsRealized - 270000) * 0.07,
+      0
+    );
+  });
+});
+
+describe('NIIT treatment of ordinary deductions', () => {
+  // Deductions against ordinary income (wages) don't reduce net investment
+  // income, so the 3.8% NIIT must be excluded from their value (IRC §1411).
+  // ST gains/losses themselves remain NIIT-rated. Matches ediOnly.ts treatment.
+  it('values ordinary loss benefit at the bracket rate without NIIT', () => {
+    // $500K MFJ income → 32% bracket, above the $250K NIIT threshold
+    const inputs = createInputs();
+    const result = calculate(inputs, DEFAULT_SETTINGS);
+    const y1 = result.years[0];
+
+    const expectedCombinedOrdinaryRate = 0.32 + 0.133; // bracket + CA, NO 3.8% NIIT
+    expect(y1.ordinaryLossBenefit).toBeCloseTo(
+      y1.usableOrdinaryLoss * expectedCombinedOrdinaryRate,
+      2
+    );
+  });
+
+  it('values NOL usage benefit without NIIT', () => {
+    // Large collateral so losses exceed the 461(l) limit and build NOL
+    const inputs = createInputs({ collateralAmount: 10000000, annualIncome: 3000000 });
+    const result = calculate(inputs, DEFAULT_SETTINGS);
+    const yearWithNol = result.years.find(y => y.nolUsedThisYear > 0);
+    expect(yearWithNol).toBeDefined();
+
+    const expectedCombinedOrdinaryRate = 0.37 + 0.133; // top bracket + CA, NO NIIT
+    expect(yearWithNol!.nolUsageBenefit).toBeCloseTo(
+      yearWithNol!.nolUsedThisYear * expectedCombinedOrdinaryRate,
+      2
+    );
+  });
+
+  it('still applies NIIT to net ST gain costs', () => {
+    // Disable QFAF sizing match by leaving fixed sizing in later years:
+    // leakage years have remaining ST gains taxed at the full ST+NIIT rate
+    const inputs = createInputs({ qfafSizingYears: 1, qfafSizingMode: 'fixed' });
+    const result = calculate(inputs, DEFAULT_SETTINGS);
+    const leakYear = result.years.find(y => y.netStGainLoss > 0);
+    expect(leakYear).toBeDefined();
+
+    const expectedCombinedStRate = 0.32 + 0.038 + 0.133; // bracket + NIIT + CA
+    expect(leakYear!.remainingStGainCost).toBeCloseTo(
+      leakYear!.netStGainLoss * expectedCombinedStRate,
+      2
+    );
+  });
+});
+
 describe('ST Gain Leakage', () => {
   it('should report zero leakage when QFAF is properly sized (Year 1)', () => {
     const inputs = createInputs({ qfafSizingYears: 1 });
@@ -607,12 +777,37 @@ describe('ST Gain Leakage', () => {
     expect(result.years[4].stGainLeakage).toBeGreaterThan(0);
   });
 
-  it('should default qfafCashReturned to 0 in fixed mode', () => {
+  it('should only return cash at terminal unwind in fixed mode', () => {
+    // Fixed mode never resizes, so the only cash event is the terminal
+    // unwind: the QFAF is redeemed at its end-of-year value in the last
+    // operating calendar year (duration 10, January start → year 10).
     const inputs = createInputs({ qfafSizingMode: 'fixed' });
     const result = calculate(inputs);
     for (const year of result.years) {
-      expect(year.qfafCashReturned).toBe(0);
+      if (year.year === 10) {
+        // Terminal proceeds equal the QFAF's end-of-year value
+        expect(year.qfafCashReturned).toBeCloseTo(year.qfafValue, 2);
+        expect(year.qfafCashReturned).toBeGreaterThan(0);
+      } else {
+        expect(year.qfafCashReturned).toBe(0);
+      }
     }
+  });
+
+  it('should include returned QFAF cash in finalTotalWealth', () => {
+    const inputs = createInputs({ qfafSizingMode: 'fixed' });
+    const result = calculate(inputs);
+    const totalReturned = result.years.reduce((s, y) => s + y.qfafCashReturned, 0);
+    expect(result.summary.totalQfafCashReturned).toBeCloseTo(totalReturned, 2);
+    expect(result.summary.finalTotalWealth).toBeCloseTo(
+      result.summary.finalPortfolioValue + totalReturned,
+      2
+    );
+    // The QFAF principal must not vanish from total wealth: with growth
+    // disabled, final wealth ≈ collateral + initial QFAF value.
+    expect(result.summary.finalTotalWealth).toBeGreaterThan(
+      result.summary.finalPortfolioValue
+    );
   });
 });
 
