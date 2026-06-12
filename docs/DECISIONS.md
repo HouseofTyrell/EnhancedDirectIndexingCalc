@@ -178,6 +178,23 @@ Workspace; graduate features into the Workspace; extend state fidelity to CA/NY.
   Conformity warnings rewritten to describe modeled treatment. New tests: WA surcharge,
   2026 LTCG boundary, CA suspension year-1 vs year-2 (353 total).
 
+### Owner directive — mock client-meeting findings (advisor / UHNW client / CPA)
+**Date:** 2026-06-12
+**Directive:** Remove-or-discuss the "vs. Standard DI" box; make client-meeting details
+(esp. the income-required figure) clearly findable.
+**Meeting findings:** (1) vs-DI box read $4,013,243 total vs $3,998,873 "incremental" —
+99.6% identical, because totalTaxSavings credits standalone DI's carryforward *building*
+at $0; mathematically true but reads as noise, and the honest CF-credited comparison
+already lives in the EDI-Only tab. (2) Income-required was 1 sub-tab + 1 group-expansion
+deep. (3) No rate breakdown visible for a CPA. (4) No wash-sale visibility/control in
+the Workspace.
+**Status: IMPLEMENTED (2026-06-12)** — vs-DI metric replaced with **"Income to Fully
+Utilize" (peak + year)**; Overview gains a per-year income-required chip row (peak
+highlighted); a "Rates assumed" line (fed ordinary/ST/LT incl. NIIT, state split,
+combined, wash-sale %) for the CPA; and a wash-sale disallowance slider (0–15%) in the
+Model group. If a DI comparison returns, it should credit carryforward value on both
+sides (EDI-Only-tab methodology).
+
 ---
 
 ## Pending decision queue (next batches)
