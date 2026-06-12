@@ -60,8 +60,8 @@ type FundingMode = 'collateral' | 'total';
  *   via Overview / Year-by-Year / Charts sub-views.
  * - One surface per number: the metric strip is the only headline; deep
  *   detail lives in the (audit-complete) table reused from the classic view.
- * - Power features (split allocation, year-by-year planning, sensitivity,
- *   meeting mode) intentionally stay in the classic tab.
+ * - Power features (split allocation, sensitivity) intentionally stay in
+ *   the classic tab; Meeting Mode and per-year planning launch from here.
  */
 export function WorkspaceTab() {
   const qualifiedPurchaser = useQualifiedPurchaser();
@@ -1301,8 +1301,8 @@ export function WorkspaceTab() {
                 {baseHorizonYears}-year horizon, so the model keeps running wind-down years while
                 something is consuming them (capped at 40). Extension years assume income continues
                 at the final scheduled year's level (your last income-schedule row, if set). A
-                capital-loss reserve consumed only by the $3,000/yr ordinary offset does not
-                extend the projection — raise “Projection years” to see more of it.
+                capital-loss reserve consumed only by the $3,000/yr ordinary offset does not extend
+                the projection — raise “Projection years” to see more of it.
               </div>
             )}
             {currentStrategy?.type === 'overlay' &&

@@ -1,175 +1,101 @@
-# Tax Optimization Calculator
+# Enhanced Direct Indexing Calculator
 
-A React-based financial calculator for high-net-worth individuals to model tax optimization strategies using direct indexing with the Quantinno Fundamental Arbitrage Fund (QFAF).
+A React + TypeScript calculator for financial advisors to model the tax impact of pairing
+enhanced direct indexing (long/short tax-loss harvesting) with the Quantinno Fundamental
+Arbitrage Fund (QFAF) for ultra-high-net-worth qualified purchasers. It projects
+year-by-year tax savings, carryforward balances, and liquidation/estate outcomes from a
+single calculation engine.
 
-## Overview
+## The two tabs
 
-This calculator helps financial advisors and qualified purchasers evaluate the tax benefits of pairing direct indexing strategies with QFAF investments. It models:
+- **Workspace** (default) — single-screen experience: a persistent input rail (client,
+  strategy, carryforwards, QFAF, deleveraging, model toggles, per-year events, actions)
+  beside a results-first pane with a headline metric strip and Overview / Year-by-Year /
+  Charts sub-views. Fund by collateral amount or by total portfolio budget (the tool
+  solves collateral + QFAF = total). Meeting Mode, Excel export, and CSV scenario
+  import/export launch from the Actions group.
+- **Classic Calculator** — the full-detail legacy view. Split allocation (Core cash leg +
+  Overlay appreciated-stock leg), sensitivity analysis, and year-by-year planning panels
+  deliberately live here.
 
-- **Direct Indexing Strategies**: Core (cash-funded) and Overlay (appreciated stock collateral) approaches with varying leverage ratios
-- **QFAF Tax Mechanics**: 150% short-term gains offset by 150% ordinary losses
-- **Multi-Year Projections**: Configurable projection horizon (default 10 years, up to 30) with wealth and tax savings forecasts
-- **Advanced Tax Rules**: Section 461(l) limits, NOL carryforwards, capital loss limitations per IRC §1211(b)
+A hidden QFAF Test planner is reachable via `Ctrl+Shift+Q` or `?view=qfaf-test`.
 
-## Features
+## Key modeling capabilities
 
-- **Strategy Comparison**: Compare 8 different direct indexing strategies (4 Core, 4 Overlay)
-- **Auto-Sizing**: QFAF position automatically sized to offset collateral's short-term losses
-- **State Tax Support**: All 50 states + DC with 2026 tax rates
-- **Filing Status**: Single, Married Filing Jointly, Married Filing Separately, Head of Household
-- **Advanced Mode**: Year-by-year planning, sensitivity analysis, scenario modeling
-- **Interactive Charts**: Wealth accumulation and tax savings visualizations
+- **QFAF mechanics** — 150% ST gains / 150% ordinary losses (configurable multiplier),
+  auto-sizing against the collateral's harvested ST losses, fixed or dynamic (yearly
+  resize) modes, sizing window/cushion, duration with breakeven unwind, optional
+  redeployment of redemptions into the core.
+- **Federal tax rules** — 2026 brackets and LTCG thresholds (Rev. Proc. 2025-32), §461(l)
+  excess-business-loss limits ($256K/$512K) modeled precisely with NOL spillover, NOL 80%
+  offset limit, §1211(b) capital-loss limits ($3K/$1.5K MFS), NIIT placement (excluded
+  from the value of ordinary deductions per §1411).
+- **Per-state tax engine** — character-specific profiles for CA (incl. SB 167 NOL
+  suspension), NY (incl. optional NYC resident tax), PA/NJ (no loss offset against wages,
+  gains still taxed), MA (split ST/LT rates), WA (LTCG excise + surcharge tier); flat
+  conformity for other states.
+- **Exit-tax / embedded-gain analysis** — basis reduction from harvesting, optional
+  collateral cost basis for concentrated stock, carryforward shelter at exit, signed
+  incremental deferred tax vs. a passive baseline, and a hold-to-step-up estate comparison.
+- **EDI-only mode** — with the QFAF off, the Workspace becomes a first-class EDI-only
+  view: realized savings plus a co-equal "loss reserve built" headline (contingent
+  carryforward shelter value, never added to realized savings), protection ratio, and
+  break-even gain event.
+- **Deleveraging glide path** — unwind the extension to long-only (or a lower-leverage
+  strategy) all at once or over a glide, with defensible-default unwind-gain character,
+  short-cover, and lot-selection assumptions, all overridable.
+- **Per-year events and schedules** — income overrides and an income schedule builder,
+  cash infusions, planned capital-gain events (sheltered event-last), scenario presets
+  (business sale / RSU vesting / concentrated stock), and an NOL run-until-used
+  projection extension.
+- **Meeting Mode** — full-screen client presentation with a compliance disclosure block
+  and a 3-sheet print handout.
+- **CSV / Excel** — scenario inputs round-trip through CSV; full results export to Excel.
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm 9+
-
-### Installation
+## Quick start
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd EnhancedDirectIndexingCalc
-
-# Install dependencies
 npm install
+npm run dev        # Vite dev server (http://localhost:5173)
+npm run test:run   # vitest suite (352 tests)
+npm run build      # tsc type-check + vite build (single-file HTML output)
 ```
 
-### Environment Variables
+Node 20.19+ (or 22.12+) is required by Vite 7. `npm run lint` / `npm run format` cover
+ESLint and Prettier.
 
-No environment variables are required for local development or production builds. All configuration is embedded in TypeScript source files.
-
-### Development
-
-```bash
-# Start development server (hot reload enabled)
-npm run dev
-
-# The app will be available at http://localhost:5173
-```
-
-### Build
-
-```bash
-# Type-check and build for production
-npm run build
-
-# Preview the production build
-npm run preview
-```
-
-The build outputs a single HTML file (via `vite-plugin-singlefile`) for easy distribution. `TaxOptimizationCalculator.html` in the repo root is a pre-built distribution copy for offline sharing.
-
-### Testing
-
-```bash
-# Run tests in watch mode
-npm test
-
-# Run tests once
-npm run test:run
-```
-
-## Project Structure
+## Project layout
 
 ```
 src/
-├── Calculator.tsx          # Main calculator component (orchestrates all sections)
-├── ResultsTable.tsx        # Year-by-year results display
-├── WealthChart.tsx         # Portfolio growth visualization (Tax Savings & Portfolio charts)
-├── InfoPopup.tsx           # Field-level help popups
-├── calculations/           # Core tax calculation engine
-│   ├── core.ts             # Main calculate() function
-│   ├── sizing.ts           # QFAF auto-sizing logic
-│   └── types.ts            # Calculation-specific types
-├── types.ts                # TypeScript interfaces
-├── taxData.ts              # Federal/state tax rates (2026)
-├── strategyData.ts         # Strategy definitions and constants
-├── popupContent.ts         # UI help content (tooltip definitions)
-├── index.css               # Styles
-├── main.tsx                # App entry point
-├── hooks/
-│   ├── useAdvancedMode.ts      # Advanced mode state management
-│   ├── useQualifiedPurchaser.ts # QP verification modal
-│   └── useScrollHeader.ts       # Sticky header behavior
-├── components/
-│   ├── ResultsSummary.tsx      # Estimated Tax Savings headline metrics (Step 5)
-│   ├── ResultsChartsSection.tsx # Charts + table container
-│   ├── SizingSummary.tsx       # Strategy sizing cards + tax benefit breakdown
-│   ├── StickyHeader.tsx        # Scroll-aware header
-│   ├── ScenarioComparisonPanel.tsx # Pinned scenario A/B comparison
-│   ├── StrategySelectionInputs.tsx # Strategy & QFAF configuration inputs
-│   └── Formulas/               # Formula documentation components
-│       └── ProjectionFormula.tsx
-├── AdvancedMode/
-│   ├── AdvancedModeToggle.tsx  # Mode switch control
-│   ├── SettingsPanel.tsx       # Advanced settings (projection years, growth, fees)
-│   ├── StrategyComparison.tsx  # Compare strategies with per-strategy sizing modes
-│   ├── StrategyRateEditor.tsx  # Custom rate overrides per year
-│   ├── SensitivityAnalysis.tsx # Parameter sensitivity stress testing
-│   ├── ScenarioAnalysis.tsx    # Bull/Base/Bear scenario modeling
-│   ├── YearByYearPlanning.tsx  # Annual income/infusion overrides
-│   ├── QfafTestByYear.tsx      # Standalone QFAF subscription planner
-│   └── CollapsibleSection.tsx  # Accordion UI component
-└── utils/
-    ├── formatters.ts           # Number formatting utilities
-    └── strategyRates.ts        # Rate override management
+├── calculations/        # The engine (see docs/ARCHITECTURE.md)
+│   ├── core.ts          # calculate() / calculateWithOverrides() — the one projection loop
+│   ├── helpers.ts       # §1211/§1212 netting, $3K, NOL ordering, summary
+│   ├── sizing.ts        # QFAF auto-sizing + total-budget solver
+│   ├── splitAllocation.ts, deleverage.ts, financing.ts
+│   ├── exitTax.ts, ediInsights.ts, sensitivity.ts, lossBreakdown.ts
+│   └── index.ts         # Public surface (see docs/API.md)
+├── workspace/           # Workspace tab (primary UI)
+├── components/          # Shared UI incl. MeetingMode/
+├── AdvancedMode/        # Classic-tab planning panels
+├── taxData.ts           # 2026 federal brackets + state profiles
+├── strategyData.ts      # 10 strategies (5 Core, 5 Overlay) + constants
+└── popupContent.ts      # Tooltip/help entries for every visible metric
 ```
 
-## Investment Strategies
+- `docs/DECISIONS.md` — the product decision log (D-001…D-018 + owner directives).
+  Binding source of truth for all future work.
+- `docs/reviews/` — historical point-in-time analyses; `docs/plans/` — past plans.
+- **Baseline (D-001):** the pre-improvement version is frozen at the
+  `baseline-2026-06-11` branch (commit `b6a8d4e`); `TaxOptimizationCalculator.html` in
+  the repo root is its pre-built distributable. Compare with
+  `git diff origin/baseline-2026-06-11..HEAD`. No work is committed directly to `main`.
 
-### Core Strategies (Cash-Funded)
+## Disclaimers
 
-| Strategy | Leverage | ST Loss Rate | LT Gain Rate | Tracking Error |
-|----------|----------|--------------|--------------|----------------|
-| Core 130/30 | 1.3x | 10% | 2.4% | 1.3-1.5% |
-| Core 145/45 | 1.45x | 13% | 2.9% | 1.8-2.0% |
-| Core 175/75 | 1.75x | 19% | 3.8% | 2.5-3.0% |
-| Core 225/125 | 2.25x | 29% | 5.3% | 4.0-4.5% |
-
-### Overlay Strategies (Appreciated Stock Collateral)
-
-| Strategy | Leverage | ST Loss Rate | LT Gain Rate | Tracking Error |
-|----------|----------|--------------|--------------|----------------|
-| Overlay 30/30 | 0.3x | 6% | 0.9% | 1.0% |
-| Overlay 45/45 | 0.45x | 9% | 1.4% | 1.5% |
-| Overlay 75/75 | 0.75x | 15% | 2.3% | 2.5% |
-| Overlay 125/125 | 1.25x | 25% | 3.8% | 4.2% |
-
-## Tax Rules Implemented
-
-- **Section 461(l)**: Excess business loss limitations ($256K single / $512K MFJ for 2026)
-- **IRC §1211(b)**: Capital loss deduction limits ($3,000 / $1,500 for MFS)
-- **NOL Carryforwards**: 80% taxable income offset limitation
-- **NIIT**: 3.8% Net Investment Income Tax
-- **Tax-Loss Harvesting Decay**: 7% annual decay with 30% floor
-
-## Tech Stack
-
-- **React 19** - UI framework
-- **TypeScript 5.9** - Type safety
-- **Vite 7** - Build tool
-- **Recharts 3** - Data visualization
-- **Vitest 4** - Testing framework
-
-## Configuration
-
-The calculator uses sensible defaults that can be adjusted in Advanced Mode:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Annual Return | 7% | Expected market return |
-| Projection Years | 10 | Forecast horizon (configurable 1–30) |
-| QFAF Multiplier | 1.50x | ST gain and ordinary loss rates |
-| NOL Offset Limit | 80% | Maximum taxable income offset |
-
-## License
-
-Private - All rights reserved.
-
-## Contributing
-
-This is a private project. Please contact the maintainers for contribution guidelines.
+This is an advisor-internal educational tool producing **estimates, not tax or
+investment advice**. Headline savings are **gross by default** (D-002): financing fees,
+wash-sale haircuts, present-value discounting, and other complexity are opt-in layers,
+shown with explicit labeling while disabled. QFAF tax treatment is contingent on
+qualification; AMT, §1092 straddles, and §469 are not modeled (disclosed in-app). Clients
+should consult their own tax advisors.
