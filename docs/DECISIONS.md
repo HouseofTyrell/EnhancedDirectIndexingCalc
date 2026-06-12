@@ -139,6 +139,22 @@ segmented control with a live derived breakdown (e.g. $20M → Collateral $18,01
 QFAF $1,981,982). In total-budget mode the standard-DI comparison puts the WHOLE budget
 into direct indexing for a true apples-to-apples baseline.
 
+### Owner directive — full-utilization income target + QFAF redeployment
+**Date:** 2026-06-12
+**Directive:** (1) Show, per year, the maximum income required to fully utilize the
+prior-year NOL carryover and the §461(l) maximum. (2) Add a toggle to redeploy QFAF
+redemptions into the core automatically.
+**Status: IMPLEMENTED (2026-06-12)** — `YearResult.incomeRequiredForFullUtilization` =
+§461(l) deduction + $3K used + (start-of-year NOL ÷ 80%) − net taxable gains, computed
+in both engines and proven by test: at that income the entire prior-year NOL is consumed,
+below it NOL strands. Surfaced as the "Inc. Req'd" column in the table's Total Losses
+group with a planning-oriented tooltip. `inputs.redeployQfafProceeds` (default off,
+Workspace toggle "Redeploy redemptions into core") routes dynamic-resize distributions
+and terminal unwind proceeds into the collateral at the start of the following year —
+cash bucket reports $0 (no double counting), totals conserve exactly with growth off,
+and in dynamic mode the larger core increases harvesting and savings. CSV round-trip
+covered.
+
 ---
 
 ## Pending decision queue (next batches)

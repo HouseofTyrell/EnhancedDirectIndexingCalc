@@ -372,4 +372,7 @@ export const DEFAULTS: CalculatorInputs = {
 
   // LT gains toggle (off by default)
   ltGainsEnabled: false,
+
+  // QFAF redemptions held as cash by default (toggle to redeploy into core)
+  redeployQfafProceeds: false,
 };

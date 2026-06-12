@@ -155,7 +155,7 @@ export function ResultsTable({
     // QFAF columns - Total Losses Realized (expandable)
     if (showQfaf && qfafEnabled) {
       cols += 1; // Total Losses headline
-      if (expandOrdLoss) cols += 5; // Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover
+      if (expandOrdLoss) cols += 6; // Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover, Inc. Req'd
     }
 
     // Capital loss carryforward group (always shown)
@@ -346,6 +346,9 @@ export function ResultsTable({
                       <th className="col-detail qfaf-col">
                         <InfoText contentKey="col-nol-carryforward">NOL Carryover</InfoText>
                       </th>
+                      <th className="col-detail qfaf-col">
+                        <InfoText contentKey="col-income-required">Inc. Req&apos;d</InfoText>
+                      </th>
                     </>
                   )}
                 </>
@@ -459,6 +462,7 @@ export function ResultsTable({
                   <td className="starting-note">—</td>
                   {expandOrdLoss && (
                     <>
+                      <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
                       <td className="starting-note qfaf-col">—</td>
@@ -643,6 +647,12 @@ export function ResultsTable({
                             </td>
                             {/* NOL Carryover */}
                             <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
+                            {/* Income required to fully utilize §461(l) + NOL this year */}
+                            <td className="qfaf-col">
+                              {year.incomeRequiredForFullUtilization > 0
+                                ? formatCurrency(year.incomeRequiredForFullUtilization)
+                                : '—'}
+                            </td>
                           </>
                         )}
                       </>

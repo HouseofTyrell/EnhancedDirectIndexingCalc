@@ -126,6 +126,7 @@ export function exportInputsToCsv(
   // Misc
   lines.push(csvRow('startMonth', inputs.startMonth));
   lines.push(csvRow('ltGainsEnabled', inputs.ltGainsEnabled ?? true));
+  lines.push(csvRow('redeployQfafProceeds', inputs.redeployQfafProceeds ?? false));
 
   // Split allocation
   if (inputs.splitAllocation) {
@@ -308,6 +309,7 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
   });
   numField('startMonth', n => { inputs.startMonth = n; });
   boolField('ltGainsEnabled', b => { inputs.ltGainsEnabled = b; });
+  boolField('redeployQfafProceeds', b => { inputs.redeployQfafProceeds = b; });
 
   // Split allocation: assemble whatever keys are present, then attach if any.
   const split: Partial<SplitAllocation> = {};

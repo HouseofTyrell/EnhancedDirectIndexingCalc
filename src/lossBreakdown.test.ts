@@ -38,6 +38,7 @@ function makeYear(overrides: Partial<YearResult> = {}): YearResult {
     collateralTaxBenefit: 0,
     stGainLeakage: 0,
     qfafCashReturned: 0,
+    incomeRequiredForFullUtilization: 0,
     strategyActive: true,
     ...overrides,
   };
