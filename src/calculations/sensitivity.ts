@@ -13,6 +13,7 @@ import {
   QFAF_ST_GAIN_RATE,
   CAPITAL_LOSS_LIMITS,
   SECTION_461L_LIMITS,
+  NOL_OFFSET_PERCENTAGE,
   Strategy,
 } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
@@ -105,6 +106,9 @@ export function calculateWithSensitivity(
   let nolCarryforward = inputs.existingNolCarryforward;
   const initialQfafValue = sizing.qfafValue;
   const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
+  // QFAF redemptions awaiting redeployment into the collateral (toggle).
+  const redeployProceeds = inputs.redeployQfafProceeds === true;
+  let pendingRedeploy = 0;
 
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;
@@ -121,6 +125,12 @@ export function calculateWithSensitivity(
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
 
   for (let year = 1; year <= effectiveProjectionYears; year++) {
+    // Redeploy last year's QFAF redemptions into the collateral
+    if (redeployProceeds && pendingRedeploy > 0) {
+      legCollateral[0] += pendingRedeploy;
+      pendingRedeploy = 0;
+    }
+
     // Snapshot per-leg state for this year's blends.
     const yearStartLegs: ResolvedLeg[] = allocation.legs.map((leg, i) => ({
       strategy: leg.strategy,
@@ -260,11 +270,17 @@ export function calculateWithSensitivity(
       legCollateral[0] = result.collateralValue;
     }
 
-    // Terminal unwind: return the QFAF's end-of-year value as cash in the
-    // last operating calendar year (see core.ts for rationale).
+    // Terminal unwind (see core.ts). Redeployment routes all redemptions
+    // back into the collateral at the start of the next year.
     const terminalProceeds =
       strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
-    years.push({ ...result, qfafCashReturned: cashReturned + terminalProceeds });
+    const totalRedeemed = cashReturned + terminalProceeds;
+    if (redeployProceeds) {
+      pendingRedeploy += totalRedeemed;
+      years.push({ ...result, qfafCashReturned: 0 });
+    } else {
+      years.push({ ...result, qfafCashReturned: totalRedeemed });
+    }
 
     // Update QFAF state for next year. Don't track QFAF growth after the
     // strategy's final calendar year.
@@ -469,6 +485,19 @@ function calculateYearWithSensitivity(
     usableOrdinaryLoss + nolUsed + capitalLossUsedAgainstIncome
   );
 
+  // Minimum W-2 income to fully utilize this year's shelter (see core.ts)
+  const nolLimitForRequired = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
+  const incomeRequiredForFullUtilization = safeNumber(
+    Math.max(
+      0,
+      allowedOrdinaryLoss +
+        capitalLossUsedAgainstIncome +
+        (nolLimitForRequired > 0 ? nolCarryforward / nolLimitForRequired : 0) -
+        taxableSt -
+        taxableLt
+    )
+  );
+
   // Calculate maximum income offset capacity for this year
   // Uses section 461(l) limit + start-of-year NOL + capital loss limit
   // (see core.ts calculateYear for detailed explanation)
@@ -502,6 +531,7 @@ function calculateYearWithSensitivity(
     effectiveStLossRate: adjustedStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
+    incomeRequiredForFullUtilization,
     ordinaryLossBenefit,
     nolUsageBenefit,
     stToLtConversionBenefit: 0, // Deprecated: ST gains/losses wash by design

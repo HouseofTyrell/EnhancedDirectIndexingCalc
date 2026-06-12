@@ -270,6 +270,14 @@ export function WorkspaceTab() {
                   <option value="fixed">Fixed at inception</option>
                 </select>
               </label>
+              <label className="ws-toggle">
+                <input
+                  type="checkbox"
+                  checked={inputs.redeployQfafProceeds === true}
+                  onChange={e => set('redeployQfafProceeds', e.target.checked)}
+                />
+                <span>Redeploy redemptions into core</span>
+              </label>
             </>
           )}
         </div>

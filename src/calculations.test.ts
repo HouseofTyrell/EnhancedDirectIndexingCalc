@@ -112,6 +112,78 @@ describe('solveCollateralForTotal (total-budget sizing)', () => {
   });
 });
 
+describe('incomeRequiredForFullUtilization', () => {
+  it('equals the 461(l) deduction net of gain income when no NOL exists (Year 1)', () => {
+    // collateral 1M core-130-30: losses 230K (< 512K limit), LT gains 24K
+    // required = 230K allowed − 24K taxable LT gains = 206K
+    const result = calculate(createInputs());
+    expect(result.years[0].incomeRequiredForFullUtilization).toBeCloseTo(206000, 0);
+  });
+
+  it('is exactly the income at which the start-of-year NOL is fully consumed', () => {
+    const inputs = createInputs({ collateralAmount: 10000000, annualIncome: 200000 });
+    const base = calculate(inputs);
+    const startNolY2 = base.years[0].nolCarryforward;
+    expect(startNolY2).toBeGreaterThan(0);
+    const required = base.years[1].incomeRequiredForFullUtilization;
+
+    const mkOverride = (w2: number) => [
+      { year: 2, w2Income: w2, cashInfusion: 0, cashInfusionTaxType: 'gross' as const, note: '' },
+    ];
+
+    // At the required income, the entire prior-year NOL is applied
+    const atRequired = calculateWithOverrides(inputs, DEFAULT_SETTINGS, mkOverride(required + 1));
+    expect(atRequired.years[1].nolUsedThisYear).toBeCloseTo(startNolY2, 0);
+
+    // Below it, NOL is stranded
+    const below = calculateWithOverrides(inputs, DEFAULT_SETTINGS, mkOverride(required * 0.5));
+    expect(below.years[1].nolUsedThisYear).toBeLessThan(startNolY2);
+  });
+});
+
+describe('redeployQfafProceeds', () => {
+  it('routes terminal unwind proceeds into the collateral instead of outside cash', () => {
+    const base = calculate(createInputs({ qfafSizingMode: 'fixed', qfafDuration: 5 }));
+    const redeployed = calculate(
+      createInputs({ qfafSizingMode: 'fixed', qfafDuration: 5, redeployQfafProceeds: true })
+    );
+
+    // No outside cash bucket when redeploying
+    expect(redeployed.summary.totalQfafCashReturned).toBe(0);
+    expect(redeployed.summary.finalTotalWealth).toBeCloseTo(
+      redeployed.summary.finalPortfolioValue,
+      2
+    );
+
+    // Conservation (growth & fees off): redeployed collateral absorbs exactly
+    // what the base case held as outside cash
+    expect(redeployed.summary.finalPortfolioValue).toBeCloseTo(
+      base.summary.finalPortfolioValue + base.summary.totalQfafCashReturned,
+      0
+    );
+  });
+
+  it('increases harvesting (and savings) in dynamic mode by growing the core mid-life', () => {
+    const mk = (redeploy: boolean) =>
+      calculate(
+        createInputs({
+          strategyId: 'overlay-45-45',
+          collateralAmount: 10000000,
+          annualIncome: 3000000,
+          qfafSizingMode: 'dynamic',
+          qfafSizingYears: 1,
+          qfafDuration: 5,
+          redeployQfafProceeds: redeploy,
+        })
+      );
+    const without = mk(false);
+    const withRedeploy = mk(true);
+    expect(withRedeploy.summary.totalTaxSavings).toBeGreaterThan(
+      without.summary.totalTaxSavings
+    );
+  });
+});
+
 describe('calculate - basic behavior', () => {
   it('returns at least projectionYears of results (auto-extended by QFAF duration + 2)', () => {
     const result = calculate(createInputs());

@@ -65,6 +65,11 @@ export interface CalculatorInputs {
   // Toggle LT gains on/off (when off, no LT gains are realized each year).
   // Optional: all consumers treat undefined as enabled (`!== false`).
   ltGainsEnabled?: boolean;
+
+  // Redeploy QFAF redemptions (dynamic-resize distributions + terminal
+  // unwind proceeds) into the core/collateral at the start of the following
+  // year, instead of holding them as uninvested cash. Default: false.
+  redeployQfafProceeds?: boolean;
 }
 
 export interface SizingLeg {
@@ -141,6 +146,10 @@ export interface YearResult {
   // Income offset tracking
   incomeOffsetAmount: number; // Total income offset: ordinary loss + NOL used + capital loss used
   maxIncomeOffsetCapacity: number; // Max income that could be offset (useful for option exercise planning)
+  // Minimum W-2/ordinary income this year that fully absorbs the §461(l)
+  // deduction AND lets the 80% limit consume the entire start-of-year NOL
+  // balance (planning target for bonuses/option exercises)
+  incomeRequiredForFullUtilization: number;
 
   // Tax benefit breakdown (gross benefits and costs)
   ordinaryLossBenefit: number; // usableOrdinaryLoss × combined ST rate
