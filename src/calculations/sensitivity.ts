@@ -7,7 +7,7 @@ import {
   SensitivityParams,
   DEFAULT_SENSITIVITY,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile, computeLtcgExcise } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -421,12 +421,16 @@ function calculateYearWithSensitivity(
   // Benefits
   const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
   const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
-  const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
+  // State NOL component suppressed under CA-style suspension (see core.ts)
+  const stateNolSuspended =
+    state.nolStateSuspension !== undefined &&
+    year <= state.nolStateSuspension.throughProjectionYear &&
+    inputs.annualIncome >= state.nolStateSuspension.magiThreshold;
+  const nolStateRate = stateNolSuspended ? 0 : stateDeductionRate;
+  const nolUsageBenefit = safeNumber(nolUsed * (ordinaryRate + nolStateRate));
 
   // Costs: charged on taxable (post-offset) LT gains — see core.ts (CPA finding E)
-  const ltcgExciseTax = state.ltcgExcise
-    ? Math.max(0, taxableLt - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
-    : 0;
+  const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
   const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
 

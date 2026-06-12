@@ -155,6 +155,29 @@ cash bucket reports $0 (no double counting), totals conserve exactly with growth
 and in dynamic mode the larger core increases harvesting and savings. CSV round-trip
 covered.
 
+### Owner directive — 2026 figure verification, Workspace completeness, CA/NY modeling
+**Date:** 2026-06-12
+**Directive:** Open items 2–5: verify 2026 tax figures; add carryforward inputs to the
+Workspace; graduate features into the Workspace; extend state fidelity to CA/NY.
+**Status: IMPLEMENTED (2026-06-12)**
+- **Figures verified against Rev. Proc. 2025-32**: ordinary brackets ✓ correct;
+  §461(l) $256K/$512K ✓ correct (OBBBA reset confirmed); **LTCG thresholds were stale
+  2025 values — corrected** (MFJ 0%≤$98,900/15%≤$613,700; Single $49,450/$545,500;
+  HoH $66,200/$579,600; MFS half-MFJ). WA exemption updated to $278K (published 2025;
+  2026 pending DOR) **plus the ESSB 5813 surcharge tier: +2.9% on taxed gains above $1M
+  (9.9% top)**, applied to annual gains and the liquidation analysis. Footer records the
+  verification.
+- **Carryforwards in Workspace**: rail group with existing ST/LT/NOL inputs.
+- **Feature graduation**: Meeting Mode launches from the Workspace (full-screen, Esc
+  returns), Excel export, CSV scenario export/import — all in a new Actions group.
+  Split allocation, year-by-year planning, and sensitivity deliberately remain
+  Classic-only.
+- **CA/NY engine profiles**: CA 13.3% with SB 167 NOL suspension modeled (state NOL
+  component excluded in year 1/tax-year 2026 for MAGI ≥ $1M; carryover-character nuance
+  approximated); NY 10.9% with §461(l) retained (NY decoupled from the CARES suspension).
+  Conformity warnings rewritten to describe modeled treatment. New tests: WA surcharge,
+  2026 LTCG boundary, CA suspension year-1 vs year-2 (353 total).
+
 ---
 
 ## Pending decision queue (next batches)

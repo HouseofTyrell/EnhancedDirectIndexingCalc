@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   CalculatorInputs,
   AdvancedSettings,
@@ -9,6 +9,7 @@ import {
 import {
   DEFAULTS,
   STATES,
+  getFederalStRate,
   getFederalLtRate,
   getFederalOrdinaryRate,
   getStateRate,
@@ -18,6 +19,9 @@ import {
 import { STRATEGIES, getStrategy } from '../strategyData';
 import { calculate, computeExitTaxAnalysis, solveCollateralForTotal } from '../calculations';
 import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
+import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
+import { exportToExcel } from '../utils/excelExport';
+import { MeetingMode } from '../components/MeetingMode/MeetingMode';
 import { formatCurrency, formatPercent, formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 import { ResultsTable } from '../ResultsTable';
 import { WealthChart, TaxSavingsChart } from '../WealthChart';
@@ -53,6 +57,8 @@ export function WorkspaceTab() {
   // (no more guessing collateral sizes to hit a budget).
   const [fundingMode, setFundingMode] = useState<FundingMode>('collateral');
   const [totalAvailable, setTotalAvailable] = useState<number>(DEFAULTS.collateralAmount);
+  const [isMeetingMode, setIsMeetingMode] = useState(false);
+  const csvFileRef = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) =>
     setInputs(prev => ({ ...prev, [key]: value }));
@@ -92,12 +98,25 @@ export function WorkspaceTab() {
     const stateRate =
       inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
     const profile = getStateTaxProfile(inputs.stateCode, stateRate);
+    const fedSt = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
+    const fedLt = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
     const fedOrd = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
     return {
       profile,
-      combinedLt: getFederalLtRate(inputs.annualIncome, inputs.filingStatus) + profile.ltRate,
+      combinedLt: fedLt + profile.ltRate,
       combinedOrdinary:
         fedOrd + (profile.allowsLossOffsetAgainstIncome ? profile.ordinaryRate : 0),
+      // Full shape for Meeting Mode and Excel export (matches the classic memo)
+      full: {
+        federalStRate: fedSt,
+        federalLtRate: fedLt,
+        stateRate,
+        combinedStRate: fedSt + profile.stRate,
+        combinedLtRate: fedLt + profile.ltRate,
+        combinedOrdinaryRate:
+          fedOrd + (profile.allowsLossOffsetAgainstIncome ? profile.ordinaryRate : 0),
+        rateDifferential: fedSt - fedLt,
+      },
     };
   }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
 
@@ -121,6 +140,41 @@ export function WorkspaceTab() {
   if (!qualifiedPurchaser.isAcknowledged) {
     return <QualifiedPurchaserModal onAcknowledge={qualifiedPurchaser.acknowledge} />;
   }
+
+  if (isMeetingMode) {
+    return (
+      <MeetingMode
+        inputs={effectiveInputs}
+        results={results}
+        collateralOnlyResults={collateralOnly}
+        taxRates={rates.full}
+        advancedSettings={settings}
+        currentStrategy={getStrategy(effectiveInputs.strategyId)}
+        onExitMeetingMode={() => setIsMeetingMode(false)}
+        onPinScenario={() => {}}
+        canPin={false}
+        onUpdateInput={set}
+        onUpdateSettings={setSettings}
+      />
+    );
+  }
+
+  const applyCsvFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = parseInputsFromCsv(text);
+      if (parsed.inputs && Object.keys(parsed.inputs).length > 0) {
+        setInputs(prev => ({ ...prev, ...parsed.inputs }));
+        // CSV carries an explicit collateral amount, so leave total-budget mode
+        setFundingMode('collateral');
+      }
+      if (parsed.settings && Object.keys(parsed.settings).length > 0) {
+        setSettings(prev => ({ ...prev, ...parsed.settings }));
+      }
+    } catch (err) {
+      window.alert(`Could not import scenario: ${err instanceof Error ? err.message : err}`);
+    }
+  };
 
   const { summary } = results;
   const incremental = summary.totalTaxSavings - collateralOnly.summary.totalTaxSavings;
@@ -241,6 +295,34 @@ export function WorkspaceTab() {
         </div>
 
         <div className="ws-rail-group">
+          <h4>Carryforwards</h4>
+          <label className="ws-field">
+            <span>Existing ST loss c/f</span>
+            <input
+              inputMode="numeric"
+              value={formatWithCommas(inputs.existingStLossCarryforward)}
+              onChange={e => set('existingStLossCarryforward', parseFormattedNumber(e.target.value))}
+            />
+          </label>
+          <label className="ws-field">
+            <span>Existing LT loss c/f</span>
+            <input
+              inputMode="numeric"
+              value={formatWithCommas(inputs.existingLtLossCarryforward)}
+              onChange={e => set('existingLtLossCarryforward', parseFormattedNumber(e.target.value))}
+            />
+          </label>
+          <label className="ws-field">
+            <span>Existing NOL c/f</span>
+            <input
+              inputMode="numeric"
+              value={formatWithCommas(inputs.existingNolCarryforward)}
+              onChange={e => set('existingNolCarryforward', parseFormattedNumber(e.target.value))}
+            />
+          </label>
+        </div>
+
+        <div className="ws-rail-group">
           <h4>QFAF overlay</h4>
           <label className="ws-toggle">
             <input
@@ -318,9 +400,49 @@ export function WorkspaceTab() {
           </label>
         </div>
 
+        <div className="ws-rail-group">
+          <h4>Actions</h4>
+          <button className="ws-action-btn ws-action-btn--primary" onClick={() => setIsMeetingMode(true)}>
+            Open Meeting Mode
+          </button>
+          <button
+            className="ws-action-btn"
+            onClick={() =>
+              exportToExcel({
+                inputs: effectiveInputs,
+                results,
+                settings,
+                taxRates: rates.full,
+              })
+            }
+          >
+            Export to Excel
+          </button>
+          <button
+            className="ws-action-btn"
+            onClick={() => downloadInputsCsv(effectiveInputs, settings)}
+          >
+            Export Scenario (CSV)
+          </button>
+          <button className="ws-action-btn" onClick={() => csvFileRef.current?.click()}>
+            Import Scenario (CSV)
+          </button>
+          <input
+            ref={csvFileRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={e => {
+              const f = e.target.files?.[0];
+              if (f) applyCsvFile(f);
+              e.target.value = '';
+            }}
+          />
+        </div>
+
         <p className="ws-rail-note">
-          Split allocation, year-by-year planning, sensitivity, and Meeting Mode
-          live in the <strong>Tax Calculator</strong> tab.
+          Split allocation, year-by-year planning, and sensitivity analysis
+          live in the <strong>Classic Calculator</strong> tab.
         </p>
       </aside>
 

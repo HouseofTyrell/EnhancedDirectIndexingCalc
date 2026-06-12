@@ -77,9 +77,19 @@ export function getStateRate(code: string): number {
  * Some states do not conform to federal IRC Section 461(l) or have their own variations.
  */
 export const STATE_TAX_CONFORMITY_WARNINGS: Record<string, string> = {
-  'CA': 'California has its own excess business loss rules that differ from federal treatment. Disallowed losses remain as excess business losses (not NOLs) and have different carryforward treatment. State tax estimates shown are based on federal rules and may not reflect actual California state tax liability.',
-  'NY': 'New York does not conform to federal IRC changes after March 1, 2020, including Section 461(l) excess business loss limitations. State tax treatment may differ significantly from federal calculations shown.',
-  'PA': 'Pennsylvania has selective IRC conformity. State tax treatment of excess business losses may differ from federal calculations. Consult a tax professional for precise Pennsylvania state tax calculations.',
+  'CA':
+    'California modeling: gains and wages at 13.3% top rate with a federal-parallel excess ' +
+    'business loss limit. CA NOL deductions are suspended for MAGI ≥ $1M through tax year ' +
+    '2026 (SB 167) — the state portion of NOL benefits is excluded for year 1 accordingly. ' +
+    "CA's excess-business-loss carryover character (business loss, not NOL) is approximated.",
+  'NY':
+    'New York modeling: gains and wages at the 10.9% top rate with the §461(l) limitation ' +
+    'applied (NY retained the limitation even when the CARES Act suspended it federally). ' +
+    'NY-specific NOL recomputation rules are approximated by federal-parallel treatment.',
+  'PA':
+    "Pennsylvania modeling: no PA state benefit for ordinary deductions or NOL (PA's " +
+    'class-based system does not allow these losses to offset wages); the 3.07% flat rate ' +
+    'still applies to gains.',
 };
 
 /**
@@ -107,12 +117,65 @@ export interface StateTaxProfile {
   ltRate: number;
   /** Whether business/investment losses and NOLs can offset wage income */
   allowsLossOffsetAgainstIncome: boolean;
-  /** Excise layered on LT gains above an annual exemption (WA) */
-  ltcgExcise?: { rate: number; exemptionPerYear: number };
+  /**
+   * Excise layered on LT gains above an annual exemption (WA). ESSB 5813
+   * (2025) adds a surcharge tier on taxed gains above $1M (7% → 9.9%).
+   */
+  ltcgExcise?: {
+    rate: number;
+    exemptionPerYear: number;
+    surchargeRate?: number;
+    surchargeThreshold?: number;
+  };
+  /**
+   * State-level NOL deduction suspension (CA SB 167: tax years 2024–2026,
+   * MAGI ≥ $1M). Suppresses the STATE component of NOL usage benefits for
+   * projection years at or before `throughProjectionYear` (year 1 = 2026).
+   */
+  nolStateSuspension?: { throughProjectionYear: number; magiThreshold: number };
+}
+
+/**
+ * Compute a WA-style LTCG excise on a taxable gain amount, including the
+ * ESSB 5813 surcharge tier when configured.
+ */
+export function computeLtcgExcise(
+  taxableGain: number,
+  excise: StateTaxProfile['ltcgExcise']
+): number {
+  if (!excise) return 0;
+  const taxed = Math.max(0, taxableGain - excise.exemptionPerYear);
+  let tax = taxed * excise.rate;
+  if (excise.surchargeRate && excise.surchargeThreshold !== undefined) {
+    tax += Math.max(0, taxed - excise.surchargeThreshold) * excise.surchargeRate;
+  }
+  return tax;
 }
 
 export function getStateTaxProfile(code: string, fallbackRate: number): StateTaxProfile {
   switch (code) {
+    case 'CA':
+      // CA taxes gains as ordinary income (13.3% top) and has its own
+      // excess-business-loss regime that parallels the federal limit. SB 167
+      // suspends CA NOL deductions for MAGI ≥ $1M through tax year 2026
+      // (projection year 1 when projections start in 2026).
+      return {
+        ordinaryRate: 0.133,
+        stRate: 0.133,
+        ltRate: 0.133,
+        allowsLossOffsetAgainstIncome: true,
+        nolStateSuspension: { throughProjectionYear: 1, magiThreshold: 1000000 },
+      };
+    case 'NY':
+      // NY taxes gains as ordinary (10.9% top) and RETAINED the §461(l)
+      // limitation even when the CARES Act suspended it federally, so
+      // federal-parallel treatment is a reasonable model.
+      return {
+        ordinaryRate: 0.109,
+        stRate: 0.109,
+        ltRate: 0.109,
+        allowsLossOffsetAgainstIncome: true,
+      };
     case 'PA':
       return {
         ordinaryRate: 0.0307,
@@ -140,7 +203,15 @@ export function getStateTaxProfile(code: string, fallbackRate: number): StateTax
         stRate: 0,
         ltRate: 0,
         allowsLossOffsetAgainstIncome: true,
-        ltcgExcise: { rate: 0.07, exemptionPerYear: 270000 },
+        // Exemption: $278K is the published 2025 standard deduction; the 2026
+        // figure was not yet published by WA DOR as of June 2026. ESSB 5813
+        // adds a 2.9% surcharge on taxed gains above $1M (not indexed).
+        ltcgExcise: {
+          rate: 0.07,
+          exemptionPerYear: 278000,
+          surchargeRate: 0.029,
+          surchargeThreshold: 1000000,
+        },
       };
     default:
       return {
@@ -296,24 +367,26 @@ export function getFederalStRate(income: number, status: string): number {
 export function getFederalLtRate(income: number, status: string): number {
   const niitThreshold = getNiitThreshold(status);
 
-  // LTCG brackets for 2026 (inflation adjusted)
+  // LTCG brackets for 2026 per Rev. Proc. 2025-32 (verified June 2026).
+  // Previous values in this file were the 2025 thresholds.
   let ltRate: number;
   if (status === 'mfj') {
-    if (income > 610350) ltRate = 0.2;
-    else if (income > 96700) ltRate = 0.15;
+    if (income > 613700) ltRate = 0.2;
+    else if (income > 98900) ltRate = 0.15;
     else ltRate = 0;
   } else if (status === 'mfs') {
-    if (income > 305175) ltRate = 0.2;
-    else if (income > 48350) ltRate = 0.15;
+    // MFS thresholds are half of MFJ per §1(h)
+    if (income > 306850) ltRate = 0.2;
+    else if (income > 49450) ltRate = 0.15;
     else ltRate = 0;
   } else if (status === 'hoh') {
-    if (income > 578100) ltRate = 0.2;
-    else if (income > 64750) ltRate = 0.15;
+    if (income > 579600) ltRate = 0.2;
+    else if (income > 66200) ltRate = 0.15;
     else ltRate = 0;
   } else {
     // Single
-    if (income > 542050) ltRate = 0.2;
-    else if (income > 48350) ltRate = 0.15;
+    if (income > 545500) ltRate = 0.2;
+    else if (income > 49450) ltRate = 0.15;
     else ltRate = 0;
   }
 

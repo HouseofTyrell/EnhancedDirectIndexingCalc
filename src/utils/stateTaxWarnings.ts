@@ -36,8 +36,15 @@ export function getQuantifiedStateWarning(
     case 'WA':
       return (
         `Modeled per Washington law: no tax on wages or short-term gains; a 7% excise applies ` +
-        `to long-term gains above ~$270K/yr (also applied to the liquidation analysis). ` +
-        `Charitable deductions and other WA excise adjustments are not modeled.`
+        `to long-term gains above the annual exemption ($278K, the published 2025 figure — ` +
+        `2026 pending), plus the ESSB 5813 surcharge of 2.9% on taxed gains above $1M ` +
+        `(9.9% top). Applied to annual LT gains and the liquidation analysis.`
+      );
+    case 'CA':
+      return (
+        `Modeled per California law: gains and wages at 13.3%; SB 167 suspends CA NOL ` +
+        `deductions for MAGI ≥ $1M through tax year 2026, so the state portion of NOL ` +
+        `benefits is excluded in year 1.`
       );
     default:
       return undefined;
