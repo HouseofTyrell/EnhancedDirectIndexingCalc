@@ -44,28 +44,47 @@ function createInputs(overrides: Partial<CalculatorInputs> = {}): CalculatorInpu
   };
 }
 
-function renderMeetingMode(inputs: CalculatorInputs, settings: AdvancedSettings) {
+function buildProps(inputs: CalculatorInputs, settings: AdvancedSettings) {
   const results = calculate(inputs, settings);
-  const collateralOnly = calculate({ ...inputs, qfafEnabled: false }, settings);
   const exit = computeExitTaxAnalysis(results, COMBINED_LT_RATE, 0);
-  const utils = render(
-    <MeetingMode
-      inputs={inputs}
-      results={results}
-      collateralOnlyResults={collateralOnly}
-      taxRates={TAX_RATES}
-      exitAnalysis={exit}
-      advancedSettings={settings}
-      currentStrategy={getStrategy(inputs.strategyId)}
-      onExitMeetingMode={() => {}}
-      onPinScenario={() => {}}
-      canPin={false}
-      onUpdateInput={() => {}}
-      onUpdateSettings={() => {}}
-    />
-  );
-  return { ...utils, results, exit, stepUp: computeStepUpComparison(results, exit) };
+  return {
+    inputs,
+    results,
+    taxRates: TAX_RATES,
+    exitAnalysis: exit,
+    advancedSettings: settings,
+    currentStrategy: getStrategy(inputs.strategyId),
+    onExitMeetingMode: () => {},
+    onUpdateInput: () => {},
+    onUpdateSettings: () => {},
+  };
 }
+
+function renderMeetingMode(inputs: CalculatorInputs, settings: AdvancedSettings) {
+  const props = buildProps(inputs, settings);
+  const utils = render(<MeetingMode {...props} />);
+  return {
+    ...utils,
+    results: props.results,
+    exit: props.exitAnalysis,
+    stepUp: computeStepUpComparison(props.results, props.exitAnalysis),
+  };
+}
+
+// Mirror of Meeting Mode's compact currency formatter, for asserting the
+// exact chip/pin strings.
+const fmtCompact = (n: number): string => {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}K`;
+  return `${sign}$${Math.round(abs).toLocaleString()}`;
+};
+
+const visibleHeadline = (results: ReturnType<typeof calculate>, settings: AdvancedSettings) =>
+  results.years
+    .slice(0, settings.projectionYears)
+    .reduce((s: number, y: { taxSavings: number }) => s + y.taxSavings, 0);
 
 afterEach(cleanup);
 
@@ -224,11 +243,6 @@ describe('Meeting Mode mechanics view (mock-meeting review)', () => {
     expect(text).toContain('Modeled per California law');
   });
 
-  it('hides the unwired Pin Scenario button (D-024 lands in Wave B)', () => {
-    const { queryByText } = renderMeetingMode(createInputs(), DEFAULT_SETTINGS);
-    expect(queryByText('Pin scenario')).toBeNull();
-  });
-
   it('explains the dead tail when the QFAF stops before the projection ends', () => {
     // $10M income consumes the NOL fast: years 6–10 show $0 new savings
     // once the 5-year QFAF stops — the chart must say why.
@@ -241,5 +255,96 @@ describe('Meeting Mode mechanics view (mock-meeting review)', () => {
     const text = container.textContent ?? '';
     expect(text).toContain('savings concentrate in years 1–5');
     expect(text).toContain('run off the remaining carryforwards');
+  });
+});
+
+// ─── D-024: comparison memory — auto Was→Now chip + real pin ───
+describe('Meeting Mode comparison memory (D-024)', () => {
+  it('shows the Was→Now chip with the correct old/new values and dismisses to re-baseline', () => {
+    const settings = DEFAULT_SETTINGS;
+    const p1 = buildProps(createInputs({ qfafEnabled: true }), settings);
+    const { rerender, queryByTestId, getByTestId, getByLabelText } = render(
+      <MeetingMode {...p1} />
+    );
+    // No change yet → no chip.
+    expect(queryByTestId('mm-change-chip')).toBeNull();
+
+    // A meeting-local change (collateral halves → different savings).
+    const p2 = buildProps(createInputs({ qfafEnabled: true, collateralAmount: 5000000 }), settings);
+    rerender(<MeetingMode {...p2} />);
+
+    const oldHeadline = visibleHeadline(p1.results, settings);
+    const newHeadline = visibleHeadline(p2.results, settings);
+    expect(Math.abs(oldHeadline - newHeadline)).toBeGreaterThan(1); // scenario really moved
+    const chip = getByTestId('mm-change-chip');
+    expect(chip.textContent).toContain(
+      `Was ${fmtCompact(oldHeadline)} → Now ${fmtCompact(newHeadline)}`
+    );
+
+    // Dismiss → chip disappears (baseline re-captured at "now").
+    fireEvent.click(getByLabelText('Dismiss comparison'));
+    expect(queryByTestId('mm-change-chip')).toBeNull();
+
+    // A further change compares against the NEW baseline, not entry.
+    const p3 = buildProps(
+      createInputs({ qfafEnabled: true, collateralAmount: 20000000 }),
+      settings
+    );
+    rerender(<MeetingMode {...p3} />);
+    expect(getByTestId('mm-change-chip').textContent).toContain(
+      `Was ${fmtCompact(newHeadline)} → Now ${fmtCompact(visibleHeadline(p3.results, settings))}`
+    );
+  });
+
+  it('EDI mode: the chip also reports a loss-reserve move', () => {
+    const settings = DEFAULT_SETTINGS;
+    const p1 = buildProps(createInputs(), settings); // qfafEnabled false → EDI
+    const { rerender, getByTestId } = render(<MeetingMode {...p1} />);
+    const p2 = buildProps(createInputs({ collateralAmount: 20000000 }), settings);
+    rerender(<MeetingMode {...p2} />);
+    const chip = getByTestId('mm-change-chip');
+    expect(chip.textContent).toContain(
+      `reserve ${fmtCompact(p1.results.summary.lossReserveShelterValue)} → ${fmtCompact(
+        p2.results.summary.lossReserveShelterValue
+      )}`
+    );
+  });
+
+  it('pin freezes values: later edits never mutate the pinned row; repin replaces; unpin removes', () => {
+    const settings = DEFAULT_SETTINGS;
+    const p1 = buildProps(createInputs({ qfafEnabled: true }), settings);
+    const { rerender, getByTestId, queryByTestId, getByLabelText, getByText } = render(
+      <MeetingMode {...p1} />
+    );
+    expect(queryByTestId('mm-pinned-row')).toBeNull();
+
+    fireEvent.click(getByTestId('mm-pin-button'));
+    const frozen = getByTestId('mm-pinned-row').textContent ?? '';
+    expect(frozen).toContain('Pinned:');
+    expect(frozen).toContain(fmtCompact(visibleHeadline(p1.results, settings)));
+    expect(frozen).toContain(fmtCompact(p1.results.summary.finalTotalWealth));
+
+    // Change the scenario — the pinned row must NOT move.
+    const p2 = buildProps(
+      createInputs({ qfafEnabled: true, collateralAmount: 20000000 }),
+      settings
+    );
+    rerender(<MeetingMode {...p2} />);
+    expect(getByTestId('mm-pinned-row').textContent).toBe(frozen);
+
+    // Pin state survives level switches.
+    fireEvent.click(getByText('Detail'));
+    fireEvent.click(getByText('High level'));
+    expect(getByTestId('mm-pinned-row').textContent).toBe(frozen);
+
+    // Repin replaces the single slot with the CURRENT numbers.
+    fireEvent.click(getByTestId('mm-pin-button'));
+    expect(getByTestId('mm-pinned-row').textContent).toContain(
+      fmtCompact(visibleHeadline(p2.results, settings))
+    );
+
+    // Unpin removes the row entirely.
+    fireEvent.click(getByLabelText('Unpin scenario'));
+    expect(queryByTestId('mm-pinned-row')).toBeNull();
   });
 });

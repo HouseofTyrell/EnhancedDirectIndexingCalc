@@ -8,16 +8,7 @@ import {
   FilingStatus,
   YearOverride,
 } from '../types';
-import {
-  DEFAULTS,
-  STATES,
-  getFederalStRate,
-  getFederalLtRate,
-  getFederalOrdinaryRate,
-  getStateRate,
-  getStateTaxProfile,
-  getStateConformityWarning,
-} from '../taxData';
+import { DEFAULTS, STATES, getFederalOrdinaryRate, getStateConformityWarning } from '../taxData';
 import { STRATEGIES, getStrategy, getShortRatio } from '../strategyData';
 import {
   calculate,
@@ -31,7 +22,7 @@ import {
 import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
 import { exportToExcel } from '../utils/excelExport';
-import { MeetingMode } from '../components/MeetingMode/MeetingMode';
+import { MeetingSession, buildActiveOverrides, computeScenarioRates } from './MeetingSession';
 import {
   formatCurrency,
   formatPercent,
@@ -109,17 +100,11 @@ export function WorkspaceTab() {
   ]);
 
   const projYears = settings.projectionYears ?? 10;
-  const activeOverrides = useMemo(() => {
-    const list: YearOverride[] = [];
-    yearEvents.forEach(o => {
-      const differs =
-        o.w2Income !== effectiveInputs.annualIncome ||
-        o.cashInfusion !== 0 ||
-        (o.gainEvent !== undefined && o.gainEvent.amount > 0);
-      if (differs) list.push(o);
-    });
-    return list;
-  }, [yearEvents, effectiveInputs.annualIncome]);
+  // Shared with the Meeting Mode session (one pipeline, one engine).
+  const activeOverrides = useMemo(
+    () => buildActiveOverrides(yearEvents, effectiveInputs.annualIncome),
+    [yearEvents, effectiveInputs.annualIncome]
+  );
 
   const results = useMemo(
     () =>
@@ -128,52 +113,10 @@ export function WorkspaceTab() {
         : calculate(effectiveInputs, settings),
     [effectiveInputs, settings, activeOverrides]
   );
-  // Standard-DI comparison: in total-budget mode a DI-only client would put
-  // the WHOLE budget into direct indexing, so compare against that.
-  const collateralOnly = useMemo(
-    () =>
-      calculate(
-        {
-          ...effectiveInputs,
-          qfafEnabled: false,
-          collateralAmount:
-            fundingMode === 'total' ? totalAvailable : effectiveInputs.collateralAmount,
-        },
-        settings
-      ),
-    [effectiveInputs, fundingMode, totalAvailable, settings]
-  );
 
-  const rates = useMemo(() => {
-    const stateRate =
-      inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
-    const profile = getStateTaxProfile(inputs.stateCode, stateRate, inputs.nycResident);
-    const fedSt = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
-    const fedLt = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
-    const fedOrd = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
-    return {
-      profile,
-      combinedLt: fedLt + profile.ltRate,
-      combinedOrdinary: fedOrd + (profile.allowsLossOffsetAgainstIncome ? profile.ordinaryRate : 0),
-      // Full shape for Meeting Mode and Excel export (matches the classic memo)
-      full: {
-        federalStRate: fedSt,
-        federalLtRate: fedLt,
-        stateRate,
-        combinedStRate: fedSt + profile.stRate,
-        combinedLtRate: fedLt + profile.ltRate,
-        combinedOrdinaryRate:
-          fedOrd + (profile.allowsLossOffsetAgainstIncome ? profile.ordinaryRate : 0),
-        rateDifferential: fedSt - fedLt,
-      },
-    };
-  }, [
-    inputs.annualIncome,
-    inputs.filingStatus,
-    inputs.stateCode,
-    inputs.stateRate,
-    inputs.nycResident,
-  ]);
+  // Shared with the Meeting Mode session so both surfaces compose rates
+  // identically (computeScenarioRates in MeetingSession.tsx).
+  const rates = useMemo(() => computeScenarioRates(inputs), [inputs]);
 
   const exit = useMemo(
     () =>
@@ -211,20 +154,26 @@ export function WorkspaceTab() {
   }
 
   if (isMeetingMode) {
+    // D-025: the meeting runs SANDBOXED. MeetingSession snapshots the
+    // effective inputs/settings/events at entry, computes its own results
+    // from the meeting-local copy (same engine path as above), and only
+    // touches Workspace state via the explicit "Keep changes" prompt.
     return (
-      <MeetingMode
-        inputs={effectiveInputs}
-        results={results}
-        collateralOnlyResults={collateralOnly}
-        taxRates={rates.full}
-        exitAnalysis={exit}
-        advancedSettings={settings}
-        currentStrategy={getStrategy(effectiveInputs.strategyId)}
-        onExitMeetingMode={() => setIsMeetingMode(false)}
-        onPinScenario={() => {}}
-        canPin={false}
-        onUpdateInput={set}
-        onUpdateSettings={setSettings}
+      <MeetingSession
+        baseInputs={effectiveInputs}
+        baseSettings={settings}
+        baseYearEvents={yearEvents}
+        onKeep={({ inputs: kept, settings: keptSettings, yearEvents: keptEvents }) => {
+          setInputs(kept);
+          setSettings(keptSettings);
+          setYearEvents(keptEvents);
+          // Kept inputs carry an explicit collateral amount (the snapshot was
+          // taken AFTER total-budget solving), so leave total-budget mode —
+          // same convention as CSV scenario import.
+          setFundingMode('collateral');
+          setIsMeetingMode(false);
+        }}
+        onDiscard={() => setIsMeetingMode(false)}
       />
     );
   }

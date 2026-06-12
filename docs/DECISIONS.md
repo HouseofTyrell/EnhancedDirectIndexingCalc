@@ -583,6 +583,14 @@ event, market drop, growth) forced exiting Meeting Mode mid-meeting.
 (year + new income), gain event (year + size), growth on/off + return, financing fees
 on/off — running through the one engine via existing overrides. Defaults stay off per
 D-002. Full events editor stays in the Workspace.
+**Status: IMPLEMENTED (2026-06-12)** — collapsible "Client questions" rail group (labeled
+"answers reset unless kept") with the four what-ifs, all off by default. Retirement
+step-down and the LT gain event are composed into the SAME sparse `YearOverride` map the
+Workspace events editor feeds (`composeWhatIfOverrides` in
+`src/workspace/MeetingSession.tsx`) and run through `calculateWithOverrides` — proven
+equivalent to hand-built overrides by test. Growth (+ 0–12% return slider) and financing
+fees toggle the meeting-local settings copy. Workspace-host only: the Classic-tab Meeting
+Mode is not sandboxed, so the group is hidden there.
 
 #### D-024 — Comparison memory: auto before/after chip AND real pinning
 **Date:** 2026-06-12
@@ -591,6 +599,18 @@ Scenario button was hard-wired dead (`canPin={false}`) with a misleading tooltip
 **Decision (owner):** both — any live MM change shows a dismissible "Was → Now" chip
 under the hero automatically, and scenario pinning is wired for real with a pinned
 ghost comparison row in MM for deliberate A/B setups.
+**Status: IMPLEMENTED (2026-06-12)** — (1) Auto chip: baseline captured at MM entry and
+at each dismissal; any change to the visible-window savings (or the EDI loss reserve in
+EDI mode) renders a one-line dismissible "Was X → Now Y" chip under the hero (derived
+state — it can never show stale values). (2) Real pin: "Pin current scenario" in the
+advisor rail freezes a small struct (headline, year-1, net-if-liquidated, loss reserve,
+final wealth) — NOT live results — into a single replace-on-repin slot; a ghost row with
+an Unpin control renders under the hero, survives level switches, and dies with MM exit
+(not persisted). The print one-pager gains a compact "Compared with pinned scenario"
+line on page 1; pagination re-verified at exactly 3 sheets (QFAF + EDI, pin + preset
+active). The old dead pin button / misleading tooltip path and the unused
+`onPinScenario`/`canPin`/`collateralOnlyResults` props were removed from both hosts.
+Tests cover chip old/new + re-baselining and pin freezing under input changes.
 
 #### D-025 — Meeting Mode runs sandboxed with a keep prompt
 **Date:** 2026-06-12
@@ -598,6 +618,18 @@ ghost comparison row in MM for deliberate A/B setups.
 **Decision (owner):** MM operates on a copy of inputs/settings; on exit, ask "Keep the
 changes made during the meeting?" — discard is the default, keep applies them to the
 Workspace. No silent mutation.
+**Status: IMPLEMENTED (2026-06-12)** — new `MeetingSession` (`src/workspace/
+MeetingSession.tsx`) wraps Meeting Mode from the Workspace: it snapshots the effective
+inputs/settings/per-year events at entry and holds the meeting-local copies; all MM rail
+edits and D-023 what-ifs hit the copy, computed through the shared
+`calculate`/`calculateWithOverrides` + rates pipeline (`computeScenarioRates`/
+`buildActiveOverrides`, now used by both the Workspace pane and the session). Dirty exit
+shows the keep prompt (Discard autofocused/default; backdrop click returns to the
+meeting); Keep applies inputs + settings and materializes active what-ifs into the
+Workspace events map (and drops total-budget funding mode, CSV-import convention).
+Clean exits skip the prompt. The Classic-tab Meeting Mode host remains un-sandboxed
+(live edits, as before) and is labeled accordingly in code. Workspace-level test proves
+Discard leaves inputs bit-identical and Keep applies them.
 
 ---
 

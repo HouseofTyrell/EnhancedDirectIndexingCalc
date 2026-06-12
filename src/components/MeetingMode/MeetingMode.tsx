@@ -132,10 +132,42 @@ interface TaxRates {
 type UpdateInput = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => void;
 type UpdateSettings = (updater: (prev: AdvancedSettings) => AdvancedSettings) => void;
 
+// ─── D-023: bounded meeting-rail what-ifs ───
+// The four live client questions that used to force exiting Meeting Mode.
+// Retirement step-down and the gain event are composed into YearOverrides by
+// the sandboxed host (MeetingSession) and flow through the ONE engine via
+// calculateWithOverrides — never a parallel calculation. Growth and financing
+// fees edit the meeting-local AdvancedSettings copy directly, so they need no
+// state here. All off by default (D-002).
+export interface MeetingWhatIfs {
+  retirementEnabled: boolean;
+  /** First year of the new (lower) income; persists through the horizon. */
+  retirementYear: number;
+  retirementIncome: number;
+  gainEventEnabled: boolean;
+  gainEventYear: number;
+  /** LT gain event amount (D-012 semantics: sheltered event-LAST, tax reported separately). */
+  gainEventAmount: number;
+}
+
+// ─── D-024: real scenario pin ───
+// A small FROZEN struct of key metrics captured at pin time — deliberately
+// not live results, so later edits can't mutate the comparison row. Meeting-
+// local (dies with Meeting Mode exit); single slot, replace-on-repin.
+export interface PinnedMeetingScenario {
+  label: string;
+  ediMode: boolean;
+  /** Σ taxSavings over the visible window at pin time (the hero number). */
+  headline: number;
+  year1: number;
+  netIfLiquidated: number;
+  lossReserve: number;
+  finalWealth: number;
+}
+
 interface MeetingModeProps {
   inputs: CalculatorInputs;
   results: CalculationResult;
-  collateralOnlyResults: CalculationResult;
   taxRates: TaxRates;
   /**
    * Exit-tax analysis computed from `results` by the caller (D-003) — feeds
@@ -146,11 +178,17 @@ interface MeetingModeProps {
   advancedSettings: AdvancedSettings;
   currentStrategy: Strategy | undefined;
   onExitMeetingMode: () => void;
-  onPinScenario: () => void;
-  canPin: boolean;
   onExport?: () => void;
   onUpdateInput: UpdateInput;
   onUpdateSettings: UpdateSettings;
+  /**
+   * D-023 what-ifs. Provided by sandboxed hosts (Workspace's MeetingSession);
+   * when omitted (Classic tab host) the "Client questions" rail group is
+   * hidden — Classic edits are not sandboxed, so "answers reset unless kept"
+   * would be untrue there.
+   */
+  whatIfs?: MeetingWhatIfs;
+  onUpdateWhatIfs?: (patch: Partial<MeetingWhatIfs>) => void;
 }
 
 // Dark-rail input styling (shared across select/input)
@@ -193,6 +231,10 @@ function Rail({
   advancedSettings,
   onUpdateInput,
   onUpdateSettings,
+  whatIfs,
+  onUpdateWhatIfs,
+  onPinScenario,
+  hasPin,
 }: {
   collapsed: boolean;
   onToggle: () => void;
@@ -204,7 +246,13 @@ function Rail({
   advancedSettings: AdvancedSettings;
   onUpdateInput: UpdateInput;
   onUpdateSettings: UpdateSettings;
+  whatIfs?: MeetingWhatIfs;
+  onUpdateWhatIfs?: (patch: Partial<MeetingWhatIfs>) => void;
+  onPinScenario: () => void;
+  hasPin: boolean;
 }) {
+  const projYears = advancedSettings.projectionYears;
+  const clampYear = (raw: string) => Math.max(1, Math.min(projYears, parseInt(raw, 10) || 1));
   const filingLabel =
     FILING_STATUSES.find(f => f.value === inputs.filingStatus)
       ?.label.replace('Married Filing Jointly', 'MFJ')
@@ -719,6 +767,277 @@ function Rail({
               style={{ accentColor: M.accent, cursor: 'pointer' }}
             />
           </label>
+
+          {/* ─── D-023: Client questions — bounded what-ifs ─── Only rendered
+              for sandboxed hosts (whatIfs provided). Retirement/gain-event
+              compose YearOverrides in the MeetingSession; growth/fees edit
+              the meeting-local settings copy. All opt-in, off by default. */}
+          {whatIfs && onUpdateWhatIfs && (
+            <details
+              data-testid="mm-client-questions"
+              style={{
+                marginBottom: 14,
+                borderRadius: 8,
+                border: `1px solid ${M.sidebarLine}`,
+                background: 'rgba(255,255,255,0.02)',
+                padding: '10px 12px',
+              }}
+            >
+              <summary
+                style={{
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: M.sidebarFaint,
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                }}
+              >
+                Client questions
+              </summary>
+              <div
+                style={{
+                  fontSize: 10.5,
+                  color: M.sidebarFaint,
+                  lineHeight: 1.45,
+                  margin: '8px 0 10px',
+                  fontStyle: 'italic',
+                }}
+              >
+                What-ifs for live questions — answers reset unless kept on exit.
+              </div>
+
+              {/* Retirement step-down */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12,
+                  color: M.sidebarInk,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  data-testid="mm-whatif-retirement"
+                  type="checkbox"
+                  checked={whatIfs.retirementEnabled}
+                  onChange={e => onUpdateWhatIfs({ retirementEnabled: e.target.checked })}
+                  style={{ accentColor: M.accent, cursor: 'pointer' }}
+                />
+                Retirement step-down
+              </label>
+              {whatIfs.retirementEnabled && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '64px 1fr',
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <div>
+                    <label style={railLabelStyle} htmlFor="mm-whatif-retirement-year">
+                      From yr
+                    </label>
+                    <input
+                      id="mm-whatif-retirement-year"
+                      data-testid="mm-whatif-retirement-year"
+                      type="number"
+                      min={1}
+                      max={projYears}
+                      value={whatIfs.retirementYear}
+                      onChange={e => onUpdateWhatIfs({ retirementYear: clampYear(e.target.value) })}
+                      style={{ ...railFieldStyle, fontFamily: M.mono }}
+                    />
+                  </div>
+                  <div>
+                    <label style={railLabelStyle} htmlFor="mm-whatif-retirement-income">
+                      New income
+                    </label>
+                    <input
+                      id="mm-whatif-retirement-income"
+                      data-testid="mm-whatif-retirement-income"
+                      type="text"
+                      inputMode="numeric"
+                      value={formatWithCommas(whatIfs.retirementIncome)}
+                      onChange={e =>
+                        onUpdateWhatIfs({ retirementIncome: parseFormattedNumber(e.target.value) })
+                      }
+                      style={{ ...railFieldStyle, fontFamily: M.mono }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Gain event (LT, D-012 semantics) */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12,
+                  color: M.sidebarInk,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  data-testid="mm-whatif-gain"
+                  type="checkbox"
+                  checked={whatIfs.gainEventEnabled}
+                  onChange={e => onUpdateWhatIfs({ gainEventEnabled: e.target.checked })}
+                  style={{ accentColor: M.accent, cursor: 'pointer' }}
+                />
+                Gain event (LT)
+              </label>
+              {whatIfs.gainEventEnabled && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '64px 1fr',
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <div>
+                    <label style={railLabelStyle} htmlFor="mm-whatif-gain-year">
+                      Year
+                    </label>
+                    <input
+                      id="mm-whatif-gain-year"
+                      data-testid="mm-whatif-gain-year"
+                      type="number"
+                      min={1}
+                      max={projYears}
+                      value={whatIfs.gainEventYear}
+                      onChange={e => onUpdateWhatIfs({ gainEventYear: clampYear(e.target.value) })}
+                      style={{ ...railFieldStyle, fontFamily: M.mono }}
+                    />
+                  </div>
+                  <div>
+                    <label style={railLabelStyle} htmlFor="mm-whatif-gain-amount">
+                      Amount
+                    </label>
+                    <input
+                      id="mm-whatif-gain-amount"
+                      data-testid="mm-whatif-gain-amount"
+                      type="text"
+                      inputMode="numeric"
+                      value={formatWithCommas(whatIfs.gainEventAmount)}
+                      onChange={e =>
+                        onUpdateWhatIfs({ gainEventAmount: parseFormattedNumber(e.target.value) })
+                      }
+                      style={{ ...railFieldStyle, fontFamily: M.mono }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Market growth (meeting-local settings copy) */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12,
+                  color: M.sidebarInk,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  data-testid="mm-whatif-growth"
+                  type="checkbox"
+                  checked={advancedSettings.growthEnabled}
+                  onChange={e => {
+                    const on = e.target.checked;
+                    onUpdateSettings(prev => ({ ...prev, growthEnabled: on }));
+                  }}
+                  style={{ accentColor: M.accent, cursor: 'pointer' }}
+                />
+                Market growth
+              </label>
+              {advancedSettings.growthEnabled && (
+                <div style={{ marginBottom: 10 }}>
+                  <label style={railLabelStyle} htmlFor="mm-whatif-return">
+                    Annual return: {fmtPercent1(advancedSettings.defaultAnnualReturn)}
+                  </label>
+                  <input
+                    id="mm-whatif-return"
+                    data-testid="mm-whatif-return"
+                    type="range"
+                    min={0}
+                    max={12}
+                    step={1}
+                    value={Math.round(advancedSettings.defaultAnnualReturn * 100)}
+                    onChange={e => {
+                      const r = Number(e.target.value) / 100;
+                      onUpdateSettings(prev => ({ ...prev, defaultAnnualReturn: r }));
+                    }}
+                    style={{ width: '100%', accentColor: M.accent }}
+                  />
+                </div>
+              )}
+
+              {/* Financing costs & fees (meeting-local settings copy) */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12,
+                  color: M.sidebarInk,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  data-testid="mm-whatif-fees"
+                  type="checkbox"
+                  checked={advancedSettings.financingFeesEnabled}
+                  onChange={e => {
+                    const on = e.target.checked;
+                    onUpdateSettings(prev => ({ ...prev, financingFeesEnabled: on }));
+                  }}
+                  style={{ accentColor: M.accent, cursor: 'pointer' }}
+                />
+                Financing costs &amp; fees
+              </label>
+            </details>
+          )}
+
+          {/* ─── D-024: real scenario pin — captures a frozen snapshot of the
+              current meeting numbers for deliberate A/B; single slot,
+              replace-on-repin; dies with Meeting Mode exit. */}
+          <button
+            data-testid="mm-pin-button"
+            onClick={onPinScenario}
+            title={
+              hasPin
+                ? 'Replace the pinned comparison with the current numbers'
+                : 'Freeze the current numbers as a comparison row under the headline'
+            }
+            style={{
+              width: '100%',
+              marginBottom: 14,
+              padding: '9px 12px',
+              background: 'rgba(79,70,229,0.18)',
+              color: 'white',
+              border: '1px solid rgba(79,70,229,0.45)',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: M.sans,
+            }}
+          >
+            {hasPin ? 'Repin current scenario' : 'Pin current scenario'}
+          </button>
 
           {/* Derived values shown as read-only tiles */}
           <div
@@ -2033,24 +2352,16 @@ function MechanicsView({
 export function MeetingMode({
   inputs,
   results,
-  // collateralOnlyResults was used to draw the EDI-vs-baseline comparison; the
-  // Meeting Mode page now focuses on the strategy's own tax mechanics, so the
-  // baseline series is no longer rendered here. Kept in the prop signature for
-  // call-site compatibility.
-  collateralOnlyResults: _collateralOnlyResults,
   taxRates,
   exitAnalysis,
   advancedSettings,
   currentStrategy,
   onExitMeetingMode,
-  // Pin Scenario stays unwired until D-024 (Wave B). The dead button (with
-  // its lying "Pin limit reached" tooltip) is hidden entirely until then;
-  // props are kept so call sites don't churn when it's wired for real.
-  onPinScenario: _onPinScenario,
-  canPin: _canPin,
   onExport,
   onUpdateInput,
   onUpdateSettings,
+  whatIfs,
+  onUpdateWhatIfs,
 }: MeetingModeProps) {
   const [level, setLevel] = useState<Level>('high');
   const [railCollapsed, setRailCollapsed] = useState(false);
@@ -2145,6 +2456,26 @@ export function MeetingMode({
     // When years change (e.g. projection years change), clamp index.
     setYearIdx(idx => Math.min(idx, breakdownData.length));
   }, [breakdownData.length]);
+
+  // ─── D-024: comparison memory ───
+  // Auto chip: baseline captured at Meeting Mode entry (this component mounts
+  // once per meeting) and re-captured on every dismissal. The chip renders
+  // whenever the live hero numbers differ from the baseline — pure derived
+  // state, no effects, so it can never show a stale comparison.
+  const [chipBaseline, setChipBaseline] = useState(() => ({
+    savings: totalTaxSavings,
+    reserve: lossReserve,
+  }));
+  const chipSavingsMoved = Math.abs(totalTaxSavings - chipBaseline.savings) > 0.5;
+  const chipReserveMoved = ediMode && Math.abs(lossReserve - chipBaseline.reserve) > 0.5;
+  const showChangeChip = chipSavingsMoved || chipReserveMoved;
+  const dismissChangeChip = () =>
+    setChipBaseline({ savings: totalTaxSavings, reserve: lossReserve });
+
+  // Real pin (single slot, replace-on-repin). Values are FROZEN at pin time —
+  // a small struct, not live results — so later edits can't mutate the row.
+  // Meeting-local: state dies when Meeting Mode unmounts on exit.
+  const [pinned, setPinned] = useState<PinnedMeetingScenario | null>(null);
 
   // Hide the app chrome (tab bar incl. the theme toggle) while Meeting Mode
   // is mounted — on screen, not just in print (mock-meeting review, 7a).
@@ -2370,6 +2701,18 @@ export function MeetingMode({
     getEffectiveView(inputs).totalCollateral
   )} · ${inputs.stateCode} ${filingLabel}`;
 
+  // D-024: capture the current meeting numbers as the (single) pin.
+  const pinCurrentScenario = () =>
+    setPinned({
+      label: `${getEffectiveView(inputs).displayName} · ${fmtCurrency(effectiveCollateral)} · ${inputs.stateCode} ${filingLabel}`,
+      ediMode,
+      headline: totalTaxSavings,
+      year1: visibleYears[0]?.taxSavings ?? 0,
+      netIfLiquidated: exitAnalysis.netBenefitAfterLiquidation,
+      lossReserve,
+      finalWealth: results.summary.finalTotalWealth,
+    });
+
   const levelSubheadingStyle: CSSProperties = {
     fontSize: 12,
     fontWeight: 700,
@@ -2402,6 +2745,10 @@ export function MeetingMode({
           advancedSettings={advancedSettings}
           onUpdateInput={onUpdateInput}
           onUpdateSettings={onUpdateSettings}
+          whatIfs={whatIfs}
+          onUpdateWhatIfs={onUpdateWhatIfs}
+          onPinScenario={pinCurrentScenario}
+          hasPin={pinned !== null}
         />
       )}
 
@@ -2460,9 +2807,8 @@ export function MeetingMode({
             >
               <span style={{ width: 6, height: 6, borderRadius: 999, background: M.good }} /> LIVE
             </div>
-            {/* Pin Scenario button intentionally absent: it was hard-wired
-                dead with a misleading tooltip. D-024 (Wave B) wires pinning
-                for real and brings the button back. */}
+            {/* Scenario pinning (D-024) lives in the advisor rail ("Pin
+                current scenario"), not up here in the client-visible header. */}
             <button
               onClick={() => {
                 if (onExport) onExport();
@@ -2626,6 +2972,140 @@ export function MeetingMode({
                     <> Estimates are before financing costs and fees.</>
                   )}
                 </p>
+
+                {/* ─── D-024 auto before/after chip ─── one line, subtle,
+                    client-presentable; dismissing re-baselines to "now". */}
+                {showChangeChip && !printMode && (
+                  <div
+                    data-testid="mm-change-chip"
+                    style={{
+                      marginTop: 14,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '7px 12px',
+                      borderRadius: 999,
+                      background: M.accentFaint,
+                      border: `1px solid ${M.accentSoft}`,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      color: M.accentDeep,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {chipSavingsMoved && (
+                      <span>
+                        Was {fmtCurrency(chipBaseline.savings)} → Now {fmtCurrency(totalTaxSavings)}
+                      </span>
+                    )}
+                    {chipReserveMoved && (
+                      <span>
+                        {chipSavingsMoved && '· '}reserve {fmtCurrency(chipBaseline.reserve)} →{' '}
+                        {fmtCurrency(lossReserve)}
+                      </span>
+                    )}
+                    <button
+                      aria-label="Dismiss comparison"
+                      onClick={dismissChangeChip}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: M.accentDeep,
+                        cursor: 'pointer',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        padding: 0,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {/* ─── D-024 pinned ghost row ─── frozen comparison numbers
+                    captured by "Pin current scenario" in the rail. */}
+                {pinned && !printMode && (
+                  <div
+                    data-testid="mm-pinned-row"
+                    style={{
+                      marginTop: 12,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'baseline',
+                      gap: 14,
+                      padding: '9px 14px',
+                      borderRadius: 10,
+                      background: 'rgba(11,16,32,0.04)',
+                      border: `1px dashed ${M.line}`,
+                      fontSize: 12.5,
+                      color: M.inkSoft,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, color: M.ink }}>Pinned: {pinned.label}</span>
+                    <span>
+                      savings <strong>{fmtCurrency(pinned.headline)}</strong>
+                    </span>
+                    <span>
+                      yr 1 <strong>{fmtCurrency(pinned.year1)}</strong>
+                    </span>
+                    <span>
+                      net if liquidated <strong>{fmtCurrency(pinned.netIfLiquidated)}</strong>
+                    </span>
+                    {pinned.ediMode && (
+                      <span>
+                        reserve <strong>{fmtCurrency(pinned.lossReserve)}</strong>
+                      </span>
+                    )}
+                    <span>
+                      final wealth <strong>{fmtCurrency(pinned.finalWealth)}</strong>
+                    </span>
+                    <button
+                      onClick={() => setPinned(null)}
+                      aria-label="Unpin scenario"
+                      style={{
+                        marginLeft: 'auto',
+                        border: `1px solid ${M.line}`,
+                        background: 'white',
+                        color: M.inkSoft,
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        borderRadius: 6,
+                        padding: '3px 8px',
+                      }}
+                    >
+                      Unpin
+                    </button>
+                  </div>
+                )}
+
+                {/* Print variant: one compact comparison line on page 1. */}
+                {pinned && printMode && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 11,
+                      color: M.inkSoft,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    <strong style={{ color: M.ink }}>Compared with pinned scenario</strong> (
+                    {pinned.label}): savings {fmtCurrency(pinned.headline)} →{' '}
+                    {fmtCurrency(totalTaxSavings)} · net if liquidated{' '}
+                    {fmtCurrency(pinned.netIfLiquidated)} →{' '}
+                    {fmtCurrency(exitAnalysis.netBenefitAfterLiquidation)}
+                    {pinned.ediMode && ediMode && (
+                      <>
+                        {' '}
+                        · reserve {fmtCurrency(pinned.lossReserve)} → {fmtCurrency(lossReserve)}
+                      </>
+                    )}{' '}
+                    · final wealth {fmtCurrency(pinned.finalWealth)} →{' '}
+                    {fmtCurrency(results.summary.finalTotalWealth)}
+                  </div>
+                )}
               </div>
 
               {showDecomp && (
