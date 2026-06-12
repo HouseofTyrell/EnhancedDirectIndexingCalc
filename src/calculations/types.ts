@@ -1,4 +1,5 @@
 import { Strategy } from '../strategyData';
+import { StateTaxProfile } from '../taxData';
 
 // Type for strategy rates needed in calculations
 export type StrategyRates = Pick<Strategy, 'stLossRate' | 'ltGainRate'>;
@@ -16,6 +17,7 @@ export interface TaxRates {
    * so the 3.8% NIIT doesn't apply to them (IRC §1411).
    */
   ordinaryRate: number;
-  stateRate: number;
+  /** Per-state treatment: rates by character + loss-offset rules (D-005) */
+  state: StateTaxProfile;
   section461Limit: number;
 }

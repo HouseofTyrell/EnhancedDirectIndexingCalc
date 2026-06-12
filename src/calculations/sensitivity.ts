@@ -7,7 +7,7 @@ import {
   SensitivityParams,
   DEFAULT_SENSITIVITY,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -62,8 +62,15 @@ export function calculateWithSensitivity(
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
 
-  // Apply sensitivity adjustments to rates
-  const adjustedStateRate = Math.max(0, baseStateRate + sensitivity.stateRateChange);
+  // Apply sensitivity adjustments to rates: shift each per-state rate by the
+  // same delta, clamped at zero (D-005 state profiles).
+  const baseProfile = getStateTaxProfile(inputs.stateCode, baseStateRate);
+  const adjustedProfile = {
+    ...baseProfile,
+    ordinaryRate: Math.max(0, baseProfile.ordinaryRate + sensitivity.stateRateChange),
+    stRate: Math.max(0, baseProfile.stRate + sensitivity.stateRateChange),
+    ltRate: Math.max(0, baseProfile.ltRate + sensitivity.stateRateChange),
+  };
 
   // Tracking error: in split mode, blend by collateral weight.
   const blendedTrackingError = allocation.isSplit && allocation.totalCollateral > 0
@@ -185,7 +192,7 @@ export function calculateWithSensitivity(
       stRate: adjustedFederalStRate,
       ltRate: adjustedFederalLtRate,
       ordinaryRate: adjustedFederalOrdinaryRate,
-      stateRate: adjustedStateRate,
+      state: adjustedProfile,
       section461Limit,
     };
 
@@ -350,20 +357,22 @@ function calculateYearWithSensitivity(
     netStGainLoss -= usedStCarryforward;
   }
 
-  // Section 461(l) limitation on ordinary losses (income clamped ≥ 0, see core.ts)
-  const usableOrdinaryLoss = Math.min(
-    ordinaryLossesGenerated,
-    taxRates.section461Limit,
-    Math.max(0, inputs.annualIncome)
-  );
-  const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
+  // Section 461(l) limitation — precise model (D-010), mirrors core.ts
+  const allowedOrdinaryLoss = Math.min(ordinaryLossesGenerated, taxRates.section461Limit);
 
   // Calculate carryforwards and NOL usage
-  const { newStCarryforward, newLtCarryforward, nolUsed, capitalLossUsedAgainstIncome } =
+  const {
+    newStCarryforward,
+    newLtCarryforward,
+    nolUsed,
+    capitalLossUsedAgainstIncome,
+    taxableSt,
+    taxableLt,
+  } =
     calculateCarryforwards(
       netStGainLoss,
       ltGainsRealized,
-      usableOrdinaryLoss,
+      allowedOrdinaryLoss,
       stCarryforward - usedStCarryforward,
       ltCarryforward,
       nolCarryforward,
@@ -371,23 +380,38 @@ function calculateYearWithSensitivity(
       settings
     );
 
+  // Income actually sheltered this year (capital gains absorb deduction too)
+  const incomeAvailable = Math.max(
+    0,
+    inputs.annualIncome + taxableSt + taxableLt - capitalLossUsedAgainstIncome
+  );
+  const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
+  const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
+  const excessToNol = safeNumber(
+    ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol
+  );
+
   // Update NOL carryforward
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
 
-  // Calculate tax savings
-  const { stRate, ltRate, ordinaryRate, stateRate } = taxRates;
-  const combinedStRate = stRate + stateRate;
-  const combinedLtRate = ltRate + stateRate;
+  // Calculate tax savings (state rates are character-specific — see core.ts)
+  const { stRate, ltRate, ordinaryRate, state } = taxRates;
+  const combinedStRate = stRate + state.stRate;
+  const combinedLtRate = ltRate + state.ltRate;
   // NIIT excluded from deductions against ordinary income (IRC §1411) — see core.ts
-  const combinedOrdinaryRate = ordinaryRate + stateRate;
+  const stateDeductionRate = state.allowsLossOffsetAgainstIncome ? state.ordinaryRate : 0;
+  const combinedOrdinaryRate = ordinaryRate + stateDeductionRate;
 
   // Benefits
   const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
   const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
   const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
-  // Costs
-  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
+  // Costs (+ WA-style LTCG excise above the annual exemption)
+  const ltcgExciseTax = state.ltcgExcise
+    ? Math.max(0, ltGainsRealized - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
+    : 0;
+  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate + ltcgExciseTax);
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
 
   // Net tax savings: ordinary deductions minus capital gains costs
@@ -410,11 +434,11 @@ function calculateYearWithSensitivity(
   );
   const federalTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stRate / combinedStRate)
+      (combinedStRate > 0 ? stRate / combinedStRate : 1)
   );
   const stateTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stateRate / combinedStRate)
+      (combinedStRate > 0 ? state.stRate / combinedStRate : 0)
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 

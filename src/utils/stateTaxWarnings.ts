@@ -1,72 +1,44 @@
 import { YearResult } from '../types';
-import { formatCurrency } from './formatters';
 
 /**
- * Quantified state-math warnings (D-005, phase 1).
+ * Per-state modeled-treatment notes (D-005 phase 2).
  *
- * The engine applies one flat state rate to every benefit and cost, assuming
- * full federal conformity. For a handful of states that assumption is
- * materially wrong. Until per-state engine adjustments land (D-005 phase 2),
- * these warnings tell the user *which direction* and *roughly how much* the
- * state-level numbers are off, computed from the actual projection.
+ * The engine now applies character-specific state treatment for PA, NJ, MA,
+ * and WA (see `getStateTaxProfile` in taxData.ts). These notes tell the user
+ * what the engine is doing for their state so the numbers aren't a surprise.
  */
-
-/** WA long-term capital gains excise: 7% above the annual standard deduction. */
-const WA_LTCG_EXCISE_RATE = 0.07;
-const WA_LTCG_EXEMPTION = 270000; // ~2024-26 standard deduction, inflation adjusted
-
 export function getQuantifiedStateWarning(
   stateCode: string,
-  stateRate: number,
-  years: YearResult[]
+  _stateRate: number,
+  _years: YearResult[]
 ): string | undefined {
-  // State-rate benefit modeled on deductions against ordinary income
-  // (ordinary losses, NOL usage, $3K capital loss deduction).
-  const stateOrdinaryBenefit =
-    years.reduce(
-      (s, y) => s + y.usableOrdinaryLoss + y.nolUsedThisYear + y.capitalLossUsedAgainstIncome,
-      0
-    ) * stateRate;
-
   switch (stateCode) {
     case 'PA':
       return (
-        `Pennsylvania's class-based income tax does not allow business/investment losses to ` +
-        `offset wages, and individuals get no loss or NOL carryforwards. Approximately ` +
-        `${formatCurrency(stateOrdinaryBenefit)} of the projected savings is Pennsylvania ` +
-        `state-level benefit (3.07% on ordinary deductions) that is unlikely to be available. ` +
-        `Treat the state portion of these projections as federal-only.`
+        `Modeled per Pennsylvania law: no PA state-level benefit is included for ordinary ` +
+        `deductions or NOL usage (PA's class-based income system does not allow these losses ` +
+        `to offset wages, and individuals get no loss carryforwards). PA's 3.07% flat rate ` +
+        `still applies to gains. Federal treatment is unchanged.`
       );
     case 'NJ':
       return (
-        `New Jersey does not allow losses in one income category to offset wages and provides ` +
-        `no NOL or capital loss carryforwards for individuals. Approximately ` +
-        `${formatCurrency(stateOrdinaryBenefit)} of the projected savings is New Jersey ` +
-        `state-level benefit that is unlikely to be available. Treat the state portion of ` +
-        `these projections as federal-only.`
+        `Modeled per New Jersey law: no NJ state-level benefit is included for ordinary ` +
+        `deductions or NOL usage (NJ does not allow losses in one category to offset wages ` +
+        `and provides no individual loss carryforwards). NJ's 10.75% top rate still applies ` +
+        `to gains. Federal treatment is unchanged.`
       );
     case 'MA':
       return (
-        `Massachusetts taxes short-term gains at 8.5% and long-term gains at 5% (each plus ` +
-        `the 4% surtax on income over $1M). The single state rate used here approximates wage ` +
-        `and LT treatment but misstates the value of ST losses and the cost of ST gains at ` +
-        `the state level. Consult a Massachusetts tax advisor for precise figures.`
+        `Modeled per Massachusetts law: short-term gains taxed at 12.5% (8.5% + 4% surtax) ` +
+        `and wages/long-term gains at 9% (5% + 4% surtax), assuming top-bracket income over ` +
+        `$1M. Massachusetts carryforward nuances are not modeled.`
       );
-    case 'WA': {
-      const excise = years.reduce(
-        (s, y) => s + Math.max(0, y.ltGainsRealized - WA_LTCG_EXEMPTION) * WA_LTCG_EXCISE_RATE,
-        0
-      );
+    case 'WA':
       return (
-        `Washington has no income tax but levies a 7% excise on long-term capital gains above ` +
-        `~${formatCurrency(WA_LTCG_EXEMPTION)} per year, which is not modeled` +
-        (excise > 0
-          ? ` (approximately ${formatCurrency(excise)} over this projection)`
-          : '') +
-        `. A full liquidation of embedded gains would also likely trigger this excise. ` +
-        `Harvested losses can offset WA gains realized in the same year.`
+        `Modeled per Washington law: no tax on wages or short-term gains; a 7% excise applies ` +
+        `to long-term gains above ~$270K/yr (also applied to the liquidation analysis). ` +
+        `Charitable deductions and other WA excise adjustments are not modeled.`
       );
-    }
     default:
       return undefined;
   }

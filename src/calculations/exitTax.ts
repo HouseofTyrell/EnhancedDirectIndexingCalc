@@ -62,7 +62,9 @@ export interface ExitTaxAnalysis {
 export function computeExitTaxAnalysis(
   result: CalculationResult,
   combinedLtRate: number,
-  passiveAnnualReturn: number = 0
+  passiveAnnualReturn: number = 0,
+  /** WA-style LTCG excise applied to a single-year full liquidation (D-005) */
+  ltcgExcise?: { rate: number; exemptionPerYear: number }
 ): ExitTaxAnalysis {
   const years = result.years;
   const initialCollateral = result.sizing.collateralValue;
@@ -87,14 +89,18 @@ export function computeExitTaxAnalysis(
   );
   const cfShelterUsed = Math.min(remainingCapitalLossCf, embeddedGain);
   const taxableGainAfterShelter = Math.max(0, safeNumber(embeddedGain - cfShelterUsed));
-  const exitTax = safeNumber(taxableGainAfterShelter * combinedLtRate);
+  const exciseOn = (gain: number) =>
+    ltcgExcise ? Math.max(0, gain - ltcgExcise.exemptionPerYear) * ltcgExcise.rate : 0;
+  const exitTax = safeNumber(
+    taxableGainAfterShelter * combinedLtRate + exciseOn(taxableGainAfterShelter)
+  );
 
   // Passive baseline: buy-and-hold the same initial collateral at the same
   // return with no financing drag and no basis change.
   const horizonYears = years.length;
   const passiveValue = initialCollateral * Math.pow(1 + passiveAnnualReturn, horizonYears);
   const passiveGain = Math.max(0, safeNumber(passiveValue - initialCollateral));
-  const passiveExitTax = safeNumber(passiveGain * combinedLtRate);
+  const passiveExitTax = safeNumber(passiveGain * combinedLtRate + exciseOn(passiveGain));
 
   const incrementalDeferredTax = Math.max(0, safeNumber(exitTax - passiveExitTax));
   const totalTaxSavings = result.summary.totalTaxSavings;

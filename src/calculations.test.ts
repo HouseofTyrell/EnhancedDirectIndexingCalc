@@ -147,19 +147,23 @@ describe('calculate - Section 461(l) behavior', () => {
     expect(result.years[0].nolCarryforward).toBeGreaterThan(0);
   });
 
-  it('limits 461(l) by taxable income when income is lower than cap', () => {
-    // Low income person cannot use full 461(l) limit
+  it('shelters wages plus capital-gain income; shortfall flows to NOL (D-010)', () => {
+    // Precise §461(l) model: the deduction is allowed up to the statutory
+    // limit; it shelters wages AND net capital gain income. Any allowed
+    // amount that exceeds available income becomes NOL instead of being lost.
     const inputs = createInputs({
       annualIncome: 100000,
       collateralAmount: 10000000,
     });
     const result = calculate(inputs);
+    const y1 = result.years[0];
 
-    // Usable = min(losses, cap, income) = min(1M, 626K, 100K) = 100K
-    expect(result.years[0].usableOrdinaryLoss).toBe(100000);
+    // Income available = $100K wages + $240K taxable LT gains (10M × 2.4%)
+    expect(y1.usableOrdinaryLoss).toBeCloseTo(340000, 0);
 
-    // Excess goes to NOL
-    expect(result.years[0].excessToNol).toBeGreaterThan(0);
+    // Everything not sheltered this year flows to NOL
+    expect(y1.excessToNol).toBeCloseTo(y1.ordinaryLossesGenerated - y1.usableOrdinaryLoss, 2);
+    expect(y1.excessToNol).toBeGreaterThan(0);
   });
 });
 
@@ -451,19 +455,22 @@ describe('calculate - edge cases', () => {
 
 describe('fixed issues', () => {
   /**
-   * FIXED: 461(l) now limits based on taxable income
-   * Was: min(losses, limit)
-   * Now: min(losses, limit, taxableIncome)
+   * D-010 precise model: the deduction caps at the statutory limit; the
+   * income shelter includes capital gains, and any shortfall becomes NOL
+   * (negative taxable income → NOL per IRC §172) rather than being lost.
    */
-  it('461(l) should be limited by taxable income', () => {
+  it('461(l) deduction shelters available income; the rest becomes NOL', () => {
     const inputs = createInputs({
       annualIncome: 50000,
       collateralAmount: 10000000,
     });
     const result = calculate(inputs);
+    const y1 = result.years[0];
 
-    // Cannot deduct more losses than you have income
-    expect(result.years[0].usableOrdinaryLoss).toBeLessThanOrEqual(50000);
+    // $50K wages + $240K LT gains of shelterable income
+    expect(y1.usableOrdinaryLoss).toBeCloseTo(290000, 0);
+    expect(y1.usableOrdinaryLoss).toBeLessThanOrEqual(512000);
+    expect(y1.excessToNol).toBeCloseTo(y1.ordinaryLossesGenerated - y1.usableOrdinaryLoss, 2);
   });
 
   /**
@@ -627,6 +634,59 @@ describe('calculateWithOverrides custom-rate parity', () => {
     expect(withOverrides.years[0].taxSavings).toBeCloseTo(base.years[0].taxSavings, 0);
     expect(withOverrides.years[0].ordinaryLossBenefit).toBeCloseTo(
       base.years[0].ordinaryLossBenefit,
+      0
+    );
+  });
+});
+
+describe('Per-state tax treatment (D-005)', () => {
+  // Income $3M MFJ → fed ordinary 37%, fed ST 40.8% (incl. NIIT), fed LT 23.8%
+  const base = { annualIncome: 3000000, collateralAmount: 10000000 };
+
+  it('gives no PA state benefit for deductions against wages', () => {
+    // PA's class-based system doesn't allow these losses to offset wages
+    const result = calculate(createInputs({ ...base, stateCode: 'PA' }));
+    const y1 = result.years[0];
+    expect(y1.ordinaryLossBenefit).toBeCloseTo(y1.usableOrdinaryLoss * 0.37, 0);
+  });
+
+  it('gives no NJ state benefit for deductions against wages', () => {
+    const result = calculate(createInputs({ ...base, stateCode: 'NJ' }));
+    const y1 = result.years[0];
+    expect(y1.ordinaryLossBenefit).toBeCloseTo(y1.usableOrdinaryLoss * 0.37, 0);
+    // NJ still taxes the LT gains at 10.75%
+    expect(y1.ltGainCost).toBeCloseTo(y1.ltGainsRealized * (0.238 + 0.1075), 0);
+  });
+
+  it('splits MA short-term and long-term rates', () => {
+    // Fixed sizing decays harvests but not QFAF gains → later-year ST leakage
+    const result = calculate(
+      createInputs({ ...base, stateCode: 'MA', qfafSizingYears: 1, qfafSizingMode: 'fixed' })
+    );
+    const y1 = result.years[0];
+    // LT gains: fed 23.8% + MA 9% (5% + 4% surtax)
+    expect(y1.ltGainCost).toBeCloseTo(y1.ltGainsRealized * (0.238 + 0.09), 0);
+    // Net ST gains: fed 40.8% + MA 12.5% (8.5% + 4% surtax)
+    const leakYear = result.years.find(y => y.netStGainLoss > 1000);
+    expect(leakYear).toBeDefined();
+    expect(leakYear!.remainingStGainCost).toBeCloseTo(
+      leakYear!.netStGainLoss * (0.408 + 0.125),
+      0
+    );
+  });
+
+  it('applies the WA 7% LTCG excise above the annual exemption', () => {
+    // 10M × 2.4% = $240K LT gains → below the $270K exemption: no excise
+    const small = calculate(createInputs({ ...base, stateCode: 'WA' }));
+    expect(small.years[0].ltGainCost).toBeCloseTo(
+      small.years[0].ltGainsRealized * 0.238,
+      0
+    );
+    // 20M × 2.4% = $480K LT gains → $210K above exemption × 7% excise
+    const large = calculate(createInputs({ ...base, stateCode: 'WA', collateralAmount: 20000000 }));
+    const y1 = large.years[0];
+    expect(y1.ltGainCost).toBeCloseTo(
+      y1.ltGainsRealized * 0.238 + (y1.ltGainsRealized - 270000) * 0.07,
       0
     );
   });

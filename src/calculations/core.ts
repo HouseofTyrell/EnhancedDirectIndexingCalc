@@ -7,7 +7,7 @@ import {
   DEFAULT_SETTINGS,
   YearOverride,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate } from '../taxData';
+import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -88,9 +88,10 @@ export function calculateWithOverrides(
   // Calculate initial sizing (will be adjusted for infusions)
   const baseSizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
 
-  // Pre-calculate base tax rates
+  // Pre-calculate base tax rates and the per-state treatment profile (D-005)
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
+  const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate);
 
   // Honor custom tax rates the same way calculate() does, so the standard
   // view and Year-by-Year Planning agree when custom rates are set.
@@ -147,7 +148,7 @@ export function calculateWithOverrides(
       ordinaryRate: useCustomRates
         ? settings.stcgRate
         : getFederalOrdinaryRate(yearIncome, inputs.filingStatus),
-      stateRate: baseStateRate,
+      state: stateProfile,
       section461Limit:
         settings.section461Limits[inputs.filingStatus] ??
         SECTION_461L_LIMITS[inputs.filingStatus],
@@ -158,7 +159,7 @@ export function calculateWithOverrides(
     const cashInfusionTaxType = override?.cashInfusionTaxType ?? 'gross';
     let cashInfusion = rawCashInfusion;
     if (rawCashInfusion !== 0 && cashInfusionTaxType === 'gross') {
-      const combinedStRate = yearTaxRates.stRate + yearTaxRates.stateRate;
+      const combinedStRate = yearTaxRates.stRate + yearTaxRates.state.stRate;
       cashInfusion = rawCashInfusion * (1 - combinedStRate);
     }
     if (cashInfusion !== 0) {
@@ -377,43 +378,61 @@ export function calculateYear(
     netStGainLoss -= usedStCarryforward;
   }
 
-  // Section 461(l) limitation on ordinary losses
-  // Cannot deduct more than: (1) losses generated, (2) statutory limit, (3) taxable income
-  // Income clamped at 0 so a negative year-income override can't produce a
-  // negative deduction. (Precise negative-income → NOL modeling is D-010.)
-  const usableOrdinaryLoss = Math.min(
-    ordinaryLossesGenerated,
-    taxRates.section461Limit,
-    Math.max(0, effectiveIncome)
-  );
-  const excessToNol = ordinaryLossesGenerated - usableOrdinaryLoss;
+  // Section 461(l) limitation on ordinary losses — precise model (D-010):
+  // the current-year deduction is capped only by the statutory limit; the
+  // excess business loss becomes NOL. If the allowed deduction exceeds the
+  // income available to shelter (wages + net capital gains − $3K usage), the
+  // shortfall ALSO flows to NOL (negative taxable income → NOL, IRC §172)
+  // rather than being lost.
+  const allowedOrdinaryLoss = Math.min(ordinaryLossesGenerated, taxRates.section461Limit);
 
   // Calculate carryforwards and NOL usage
-  const { newStCarryforward, newLtCarryforward, nolUsed, capitalLossUsedAgainstIncome } =
-    calculateCarryforwards(
-      netStGainLoss,
-      ltGainsRealized,
-      usableOrdinaryLoss,
-      stCarryforward - usedStCarryforward,
-      ltCarryforward,
-      nolCarryforward,
-      inputs,
-      settings,
-      effectiveIncome
-    );
+  const {
+    newStCarryforward,
+    newLtCarryforward,
+    nolUsed,
+    capitalLossUsedAgainstIncome,
+    taxableSt,
+    taxableLt,
+  } = calculateCarryforwards(
+    netStGainLoss,
+    ltGainsRealized,
+    allowedOrdinaryLoss,
+    stCarryforward - usedStCarryforward,
+    ltCarryforward,
+    nolCarryforward,
+    inputs,
+    settings,
+    effectiveIncome
+  );
+
+  // Income actually sheltered this year by the §461(l) deduction. Capital
+  // gain income absorbs deduction too (the cap base is full taxable income).
+  const incomeAvailable = Math.max(
+    0,
+    effectiveIncome + taxableSt + taxableLt - capitalLossUsedAgainstIncome
+  );
+  const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
+  const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
+  const excessToNol = safeNumber(
+    ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol
+  );
 
   // Update NOL carryforward: add excess, subtract used
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
 
   // Calculate tax savings directly as sum of benefits minus costs
   // This matches the Year 1 Tax Benefit breakdown in the UI
-  const { stRate, ltRate, ordinaryRate, stateRate } = taxRates;
-  const combinedStRate = stRate + stateRate;
-  const combinedLtRate = ltRate + stateRate;
+  // State rates are character-specific (D-005): PA/NJ give no state benefit
+  // for deductions against wages, MA splits ST/LT rates, WA adds an excise.
+  const { stRate, ltRate, ordinaryRate, state } = taxRates;
+  const combinedStRate = stRate + state.stRate;
+  const combinedLtRate = ltRate + state.ltRate;
   // Deductions against ordinary income (wages) don't reduce net investment
   // income, so NIIT is excluded from their value (IRC §1411). This matches
   // the treatment already used in ediOnly.ts for the $3K deduction.
-  const combinedOrdinaryRate = ordinaryRate + stateRate;
+  const stateDeductionRate = state.allowsLossOffsetAgainstIncome ? state.ordinaryRate : 0;
+  const combinedOrdinaryRate = ordinaryRate + stateDeductionRate;
 
   // Benefits:
   // 1. Ordinary loss reduces W2 income tax
@@ -426,8 +445,11 @@ export function calculateYear(
   const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
   // Costs:
-  // 1. LT gains are taxed at LT rates
-  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate);
+  // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption)
+  const ltcgExciseTax = state.ltcgExcise
+    ? Math.max(0, ltGainsRealized - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
+    : 0;
+  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate + ltcgExciseTax);
 
   // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
@@ -457,11 +479,11 @@ export function calculateYear(
   );
   const federalTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stRate / combinedStRate)
+      (combinedStRate > 0 ? stRate / combinedStRate : 1)
   );
   const stateTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *
-      (stateRate / combinedStRate)
+      (combinedStRate > 0 ? state.stRate / combinedStRate : 0)
   );
   const baselineTax = ltGainsRealized * combinedLtRate;
 

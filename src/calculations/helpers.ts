@@ -133,6 +133,9 @@ export function calculateCarryforwards(
   newLtCarryforward: number;
   nolUsed: number;
   capitalLossUsedAgainstIncome: number;
+  /** Net taxable ST/LT gains after all offsets (pre-NOL) — used by the §461(l) shelter calc */
+  taxableSt: number;
+  taxableLt: number;
 } {
   let taxableSt = netStGainLoss;
   let taxableLt = ltGains;
@@ -218,6 +221,8 @@ export function calculateCarryforwards(
     newLtCarryforward: safeNumber(ltCarryforward),
     nolUsed: safeNumber(nolUsed),
     capitalLossUsedAgainstIncome: safeNumber(capitalLossUsedAgainstIncome),
+    taxableSt: safeNumber(taxableSt),
+    taxableLt: safeNumber(taxableLt),
   };
 }
 
