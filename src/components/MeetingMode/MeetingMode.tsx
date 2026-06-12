@@ -4,9 +4,11 @@ import {
   CalculationResult,
   AdvancedSettings,
   FILING_STATUSES,
+  YearResult,
 } from '../../types';
 import { Strategy, STRATEGIES } from '../../strategyData';
 import { STATES } from '../../taxData';
+import { getQuantifiedStateWarning } from '../../utils/stateTaxWarnings';
 import { formatWithCommas, parseFormattedNumber } from '../../utils/formatters';
 import { getEffectiveView } from '../../utils/effectiveAllocation';
 import { ExitTaxAnalysis } from '../../calculations/exitTax';
@@ -46,6 +48,76 @@ const fmtCurrencyFull = (n: number): string =>
   `${n < 0 ? '-' : ''}$${Math.abs(Math.round(n)).toLocaleString()}`;
 const fmtPercent = (n: number): string => `${(n * 100).toFixed(2)}%`;
 const fmtPercent1 = (n: number): string => `${(n * 100).toFixed(1)}%`;
+
+// ─── D-022: benefit-type decomposition of the headline ───
+// Mirrors the engine's per-year identity (core.ts):
+//   taxSavings = ordinaryLossBenefit + nolUsageBenefit + capitalLossBenefit
+//                − ltGainCost − remainingStGainCost
+// summed over the visible window — the same audit-complete per-year fields
+// the ResultsTable savings reconciliation surfaces — so the components sum
+// EXACTLY to the headline (Σ taxSavings), with no NOL double-counting.
+export interface BenefitDecomposition {
+  ordinaryLossBenefit: number;
+  nolUsageBenefit: number;
+  capitalLossBenefit: number;
+  /** ltGainCost + remainingStGainCost, subtracted from the benefits */
+  gainAndOtherCosts: number;
+  /** ordinary + NOL + capital − costs = Σ taxSavings over the same years */
+  total: number;
+}
+
+export function computeBenefitDecomposition(
+  years: Pick<
+    YearResult,
+    | 'ordinaryLossBenefit'
+    | 'nolUsageBenefit'
+    | 'capitalLossBenefit'
+    | 'ltGainCost'
+    | 'remainingStGainCost'
+  >[]
+): BenefitDecomposition {
+  const ordinaryLossBenefit = years.reduce((s, y) => s + y.ordinaryLossBenefit, 0);
+  const nolUsageBenefit = years.reduce((s, y) => s + y.nolUsageBenefit, 0);
+  const capitalLossBenefit = years.reduce((s, y) => s + y.capitalLossBenefit, 0);
+  const gainAndOtherCosts = years.reduce((s, y) => s + y.ltGainCost + y.remainingStGainCost, 0);
+  return {
+    ordinaryLossBenefit,
+    nolUsageBenefit,
+    capitalLossBenefit,
+    gainAndOtherCosts,
+    total: ordinaryLossBenefit + nolUsageBenefit + capitalLossBenefit - gainAndOtherCosts,
+  };
+}
+
+// One card in the "How we get to {headline}" strip.
+interface DecompCard {
+  stepLabel: string;
+  label: string;
+  display: string;
+  color: string;
+  note: string;
+  inBar: boolean;
+  barFlex: number;
+  testId?: string;
+}
+
+// Round signed component dollar values so the DISPLAYED whole-dollar figures
+// sum exactly to the displayed total: each part is rounded, then the largest
+// part absorbs the ≤$2 float-rounding residual. Fixes the mock-meeting
+// "$2K + $14K vs $15K" class of mismatch — one unrounded source, formatted
+// once, and the cards visibly reconcile to the headline.
+export function reconcileRounded(parts: number[], total: number): number[] {
+  const rounded = parts.map(p => Math.round(p));
+  const residual = Math.round(total) - rounded.reduce((s, p) => s + p, 0);
+  if (residual !== 0 && rounded.length > 0) {
+    let biggest = 0;
+    rounded.forEach((p, i) => {
+      if (Math.abs(p) > Math.abs(rounded[biggest])) biggest = i;
+    });
+    rounded[biggest] += residual;
+  }
+  return rounded;
+}
 
 interface TaxRates {
   federalStRate: number;
@@ -757,10 +829,14 @@ function BenefitBreakdownChart({
   yearIdx,
   setYearIdx,
   data,
+  note,
 }: {
   yearIdx: number;
   setYearIdx: (i: number) => void;
   data: BreakdownPoint[];
+  /** Optional one-line story note rendered under the legend (e.g. why the
+   *  tail years show $0 new savings once the QFAF stops running). */
+  note?: string;
 }) {
   const W = 900;
   const H = 280;
@@ -769,16 +845,21 @@ function BenefitBreakdownChart({
   const plotH = H - pad.t - pad.b;
 
   // Determine the y-range. Positive max is the sum of stacked benefits;
-  // negative min is the sum of stacked costs. Default to a small symmetric
-  // range when there is no activity so the zero line stays visible.
+  // negative min is the sum of stacked costs. When there is no real negative
+  // activity, keep only a sliver below zero (room for the net-savings dots)
+  // and skip negative axis ticks entirely so an epsilon-range never renders
+  // as a "-$1" tick label.
   const stackedPos = data.map(
     d => d.ordinaryLossBenefit + d.nolUsageBenefit + d.capitalLossBenefit
   );
   const stackedNeg = data.map(d => d.ltGainCost + d.remainingStGainCost);
+  const hasNegative = stackedNeg.some(v => v > 0.5) || data.some(d => d.netSavings < -0.5);
   const posMax = Math.max(...stackedPos, ...data.map(d => d.netSavings), 1);
-  const negMax = Math.max(...stackedNeg, -Math.min(...data.map(d => d.netSavings), 0), 1);
+  const negMax = hasNegative
+    ? Math.max(...stackedNeg, -Math.min(...data.map(d => d.netSavings), 0), 1)
+    : 0;
   const yTop = posMax * 1.12;
-  const yBot = -negMax * 1.12;
+  const yBot = hasNegative ? -negMax * 1.12 : -posMax * 0.05;
   const range = yTop - yBot || 1;
 
   const ys = (v: number) => pad.t + plotH - ((v - yBot) / range) * plotH;
@@ -798,8 +879,9 @@ function BenefitBreakdownChart({
     setYearIdx(i + 1);
   };
 
-  // Axis ticks: 4 horizontal grid lines (top, midpoint above zero, zero, bottom).
-  const tickValues = [yTop, yTop / 2, 0, yBot / 2, yBot];
+  // Axis ticks: horizontal grid lines. Negative ticks only exist when there
+  // is real negative data (item 7c: no epsilon "-$1" labels).
+  const tickValues = hasNegative ? [yTop, yTop / 2, 0, yBot / 2, yBot] : [yTop, yTop / 2, 0];
 
   // Active bar (1-indexed yearIdx; 0 means "no selection").
   const activeI = yearIdx > 0 ? Math.min(yearIdx - 1, data.length - 1) : -1;
@@ -849,7 +931,7 @@ function BenefitBreakdownChart({
         viewBox={`0 0 ${W} ${H}`}
         onMouseMove={onMove}
         onClick={onMove}
-        onMouseLeave={() => setYearIdx(data.length)}
+        onMouseLeave={() => setYearIdx(Math.min(1, data.length))}
         style={{
           width: '100%',
           height: 'auto',
@@ -878,7 +960,7 @@ function BenefitBreakdownChart({
               fill={M.inkFaint}
               fontFamily={M.sans}
             >
-              {fmtCurrency(v)}
+              {fmtCurrency(Math.abs(v) < 0.5 ? 0 : v)}
             </text>
           </g>
         ))}
@@ -1005,6 +1087,22 @@ function BenefitBreakdownChart({
         <LegendSwatch color={stColor} label="Remaining ST gain cost" />
         <LegendSwatch color={netColor} label="Net savings" ring />
       </div>
+
+      {/* Story note (mock-meeting review): explain the dead tail when the
+          QFAF stops before the projection window ends. */}
+      {note && (
+        <div
+          style={{
+            marginTop: 10,
+            fontSize: 13,
+            color: M.inkSoft,
+            fontStyle: 'italic',
+            lineHeight: 1.5,
+          }}
+        >
+          {note}
+        </div>
+      )}
     </div>
   );
 }
@@ -1036,23 +1134,49 @@ function LegendSwatch({
 }
 
 // ═══ Animated count-up ═══
-function CountUp({ value, duration = 1400 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState(0);
+// Count-up discipline (mock-meeting review): animate from $0 ONCE on mount;
+// later value changes wait out a 300ms debounce, then animate from the
+// currently displayed number to the new one in ≤400ms. Never replays from
+// zero after mount, so the hero can't show a wrong number mid-keystroke.
+// Values are rendered with the shared compact formatter so sub-$1M heroes
+// read "$153K", never "$0.15M" — the same fmtCurrency the narrative uses.
+function CountUp({ value, instant = false }: { value: number; instant?: boolean }) {
+  const [display, setDisplay] = useState(instant ? value : 0);
+  const displayRef = useRef(instant ? value : 0);
+  const mountedRef = useRef(false);
   useEffect(() => {
+    if (instant) {
+      mountedRef.current = true;
+      displayRef.current = value;
+      setDisplay(value);
+      return;
+    }
     let raf = 0;
-    const start = performance.now();
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setDisplay(value * eased);
-      if (p < 1) raf = requestAnimationFrame(tick);
+    let timer: number | undefined;
+    const animate = (from: number, to: number, duration: number) => {
+      const start = performance.now();
+      const tick = (t: number) => {
+        const p = duration <= 0 ? 1 : Math.min(1, (t - start) / duration);
+        const eased = 1 - Math.pow(1 - p, 3);
+        const v = from + (to - from) * eased;
+        displayRef.current = v;
+        setDisplay(v);
+        if (p < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
-  return (
-    <span style={{ fontVariantNumeric: 'tabular-nums' }}>${(display / 1_000_000).toFixed(2)}M</span>
-  );
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      animate(0, value, 1400);
+    } else {
+      timer = window.setTimeout(() => animate(displayRef.current, value, 400), 300);
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [value, instant]);
+  return <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(display)}</span>;
 }
 
 type Level = 'high' | 'detail' | 'mechanics';
@@ -1296,6 +1420,10 @@ function DetailView({
           })}
         </tbody>
         <tfoot>
+          {/* Each td carries an explicit transparent background inline: the
+              app-global `tfoot td { background: var(--bg) }` rule otherwise
+              paints light cells over this dark row (white-on-white totals).
+              Inline style outranks the global rule without changing it. */}
           <tr style={{ background: M.ink, color: 'white' }}>
             <td
               style={{
@@ -1304,6 +1432,7 @@ function DetailView({
                 fontSize: 13.5,
                 fontFamily: M.sans,
                 color: 'white',
+                background: 'transparent',
               }}
             >
               {yearData.length}-year total
@@ -1315,6 +1444,7 @@ function DetailView({
                 fontWeight: 800,
                 fontSize: 14,
                 color: '#86efac',
+                background: 'transparent',
               }}
             >
               {fmtCurrencyFull(totalTaxSavings)}
@@ -1326,6 +1456,7 @@ function DetailView({
                 fontWeight: 800,
                 fontSize: 14,
                 color: 'white',
+                background: 'transparent',
               }}
             >
               {fmtCurrencyFull(totalTaxSavings)}
@@ -1337,6 +1468,7 @@ function DetailView({
                 fontWeight: 700,
                 fontSize: 14,
                 color: '#f1f5f9',
+                background: 'transparent',
               }}
             >
               {fmtCurrencyFull(totalNol)}
@@ -1348,6 +1480,7 @@ function DetailView({
                 fontWeight: 800,
                 fontSize: 14,
                 color: 'white',
+                background: 'transparent',
               }}
             >
               {fmtCurrencyFull(finalPortfolio)}
@@ -1360,6 +1493,7 @@ function DetailView({
                 fontWeight: 700,
                 fontFamily: M.sans,
                 letterSpacing: 0.3,
+                background: 'transparent',
               }}
             >
               Cumulative advantage
@@ -1476,55 +1610,178 @@ function PrintPageFooter() {
 }
 
 function MechanicsView({
+  ediMode,
+  inputs,
+  settings,
+  visibleYears,
   qfafValue,
   totalExposure,
   totalNol,
   totalTaxSavings,
+  cfReserveBalance,
+  lossReserve,
   taxRates,
   currentStrategy,
+  filingLabel,
 }: {
+  ediMode: boolean;
+  inputs: CalculatorInputs;
+  settings: AdvancedSettings;
+  visibleYears: YearResult[];
   qfafValue: number;
   totalExposure: number;
   totalNol: number;
   totalTaxSavings: number;
+  cfReserveBalance: number;
+  lossReserve: number;
   taxRates: TaxRates;
   currentStrategy: Strategy | undefined;
+  filingLabel: string;
 }) {
   const strategyLabel = currentStrategy?.name ?? 'Overlay strategy';
-  const steps = [
+  const totalStLossesHarvested = visibleYears.reduce((s, y) => s + y.stLossesHarvested, 0);
+  // EDI mode (QFAF off): no QFAF, no ordinary losses, no NOL — the story is
+  // harvest → carryforward reserve → shelter. Showing "Establish QFAF /
+  // QFAF VALUE $0 / NOL GENERATED $0" here was a mock-meeting credibility
+  // failure; branch like the high level already does.
+  const steps = ediMode
+    ? [
+        {
+          n: 1,
+          title: 'Harvest losses systematically',
+          tone: M.accent,
+          body: `The long/short ${strategyLabel} overlay realizes short-term losses on constituent positions while maintaining benchmark-like exposure. No QFAF is used in this mode, so there are no ordinary-loss deductions or NOL.`,
+          metric: fmtCurrency(totalStLossesHarvested),
+          metricLabel: 'ST losses harvested',
+        },
+        {
+          n: 2,
+          title: 'Losses bank as carryforwards',
+          tone: '#8b7cf6',
+          body: 'Harvested losses not used against gains in the year realized are banked, not spent — capital-loss carryforwards persist indefinitely during life and build a reserve year over year.',
+          metric: fmtCurrency(cfReserveBalance),
+          metricLabel: 'CF reserve balance',
+        },
+        {
+          n: 3,
+          title: 'The reserve shelters future gains',
+          tone: '#f59e0b',
+          body: 'The carryforward reserve offsets future capital gains — a business sale, concentrated-stock exit, or portfolio transition — plus up to $3,000 of ordinary income per year. Its shelter value is contingent on those gains being realized.',
+          metric: fmtCurrency(lossReserve),
+          metricLabel: 'Contingent shelter value',
+        },
+        {
+          n: 4,
+          title: 'Realized savings accrue',
+          tone: M.good,
+          body: 'Realized savings in this mode come from gains actually offset and the small annual ordinary-income deduction — modest by design while the reserve compounds.',
+          metric: fmtCurrency(totalTaxSavings),
+          metricLabel: 'Est. realized savings',
+        },
+      ]
+    : [
+        {
+          n: 1,
+          title: 'Establish QFAF',
+          tone: M.accent,
+          body: 'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.',
+          metric: fmtCurrency(qfafValue),
+          metricLabel: 'QFAF value',
+        },
+        {
+          n: 2,
+          title: 'Direct-indexing overlay',
+          tone: '#8b7cf6',
+          body: `A long/short ${strategyLabel} overlay harvests losses on constituent positions while maintaining benchmark-like exposure.`,
+          metric: fmtCurrency(totalExposure),
+          metricLabel: 'Total exposure',
+        },
+        {
+          n: 3,
+          title: 'Loss harvesting generates NOL',
+          tone: '#f59e0b',
+          body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedOrdinaryRate)} ordinary rate), with the balance carried forward as NOL.`,
+          metric: fmtCurrency(totalNol),
+          metricLabel: 'NOL generated',
+        },
+        {
+          n: 4,
+          title: 'Tax savings compound',
+          tone: M.good,
+          body: 'Estimated tax savings, if reinvested, can compound over time — potentially adding to after-tax results vs. standard direct indexing.',
+          metric: fmtCurrency(totalTaxSavings),
+          metricLabel: 'Est. cumulative savings',
+        },
+      ];
+
+  // ─── "For your CPA" content (mock-meeting review, 4b) ───
+  // Plain-language versions of claims the app already makes in
+  // popupContent.ts ('qfaf-treatment', 'section-461-limit') and the print
+  // disclosure — no new tax positions.
+  const limit461 = settings.section461Limits[inputs.filingStatus];
+  const year1OrdinaryGenerated = visibleYears[0]?.ordinaryLossesGenerated ?? 0;
+  const capBinds = !ediMode && year1OrdinaryGenerated > limit461 + 0.5;
+  const nolPct = `${Math.round(settings.nolOffsetLimit * 100)}%`;
+  const washRate = settings.washSaleDisallowanceRate;
+  const stateNote = getQuantifiedStateWarning(inputs.stateCode, taxRates.stateRate, visibleYears);
+
+  const cpaItems: { heading: string; body: string }[] = [
+    ediMode
+      ? {
+          heading: 'Character of losses',
+          body:
+            'Harvested losses are capital losses: they first offset realized capital gains, then up to ' +
+            '$3,000 per year of ordinary income (§1211(b)). The unused balance carries forward ' +
+            'indefinitely during life (§1212); it is lost at death — see the step-up comparison.',
+        }
+      : {
+          heading: 'Why the losses are ordinary (§475(f))',
+          body:
+            'The QFAF is modeled as a limited partnership engaged in high-turnover arbitrage trading ' +
+            'that has made a mark-to-market election under IRC §475(f). Under that election the ' +
+            "fund's trading losses are ordinary in character and generally non-passive, which is why " +
+            'they can offset W-2 and other ordinary income. This treatment is a working draft pending ' +
+            "counsel review — verify the actual fund's structure, elections, and tax opinions before " +
+            'relying on it.',
+        },
+    ...(!ediMode
+      ? [
+          {
+            heading: 'The §461(l) cap',
+            body: capBinds
+              ? `Year 1 ordinary deduction capped at ${fmtCurrencyFull(limit461)} (${filingLabel}) ` +
+                `under §461(l); the remaining ${fmtCurrencyFull(year1OrdinaryGenerated - limit461)} ` +
+                `of year-1 ordinary losses becomes an NOL usable against up to ${nolPct} of future ` +
+                'taxable income.'
+              : `The §461(l) excess-business-loss cap (${fmtCurrencyFull(limit461)} ${filingLabel}, ` +
+                '2026) does not bind in this projection — modeled ordinary losses stay within the ' +
+                `cap. Any excess would become an NOL usable against up to ${nolPct} of future ` +
+                'taxable income.',
+          },
+        ]
+      : []),
     {
-      n: 1,
-      title: 'Establish QFAF',
-      tone: M.accent,
-      body: 'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.',
-      metric: fmtCurrency(qfafValue),
-      metricLabel: 'QFAF value',
+      heading: 'Wash-sale assumption',
+      body:
+        washRate > 0
+          ? `${fmtPercent1(washRate)} of harvested losses are assumed disallowed as wash sales ` +
+            '(§1091) and excluded from the modeled benefits.'
+          : 'This projection assumes 0% of harvested losses are disallowed as wash sales (§1091) — ' +
+            'i.e., replacement positions avoid substantially identical securities. Actual ' +
+            'disallowance depends on trading.',
     },
-    {
-      n: 2,
-      title: 'Direct-indexing overlay',
-      tone: '#8b7cf6',
-      body: `A long/short ${strategyLabel} overlay harvests losses on constituent positions while maintaining benchmark-like exposure.`,
-      metric: fmtCurrency(totalExposure),
-      metricLabel: 'Total exposure',
-    },
-    {
-      n: 3,
-      title: 'Loss harvesting generates NOL',
-      tone: '#f59e0b',
-      body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedOrdinaryRate)} ordinary rate), with the balance carried forward as NOL.`,
-      metric: fmtCurrency(totalNol),
-      metricLabel: 'NOL generated',
-    },
-    {
-      n: 4,
-      title: 'Tax savings compound',
-      tone: M.good,
-      body: 'Estimated tax savings, if reinvested, can compound over time — potentially adding to after-tax results vs. standard direct indexing.',
-      metric: fmtCurrency(totalTaxSavings),
-      metricLabel: 'Est. cumulative savings',
-    },
+    ...(stateNote ? [{ heading: `State treatment (${inputs.stateCode})`, body: stateNote }] : []),
   ];
+
+  const cpaBody = (
+    <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+      {cpaItems.map(item => (
+        <div key={item.heading} style={{ fontSize: 12.5, lineHeight: 1.55, color: M.inkSoft }}>
+          <strong style={{ color: M.ink }}>{item.heading}.</strong> {item.body}
+        </div>
+      ))}
+    </div>
+  );
   return (
     <div>
       <div style={{ marginBottom: 22 }}>
@@ -1683,8 +1940,9 @@ function MechanicsView({
         </div>
         <div
           style={{
+            // 6 tiles: 3×2 so the last tile isn't an orphan (4c).
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            gridTemplateColumns: 'repeat(3, 1fr)',
             gap: 18,
           }}
         >
@@ -1724,6 +1982,49 @@ function MechanicsView({
           ))}
         </div>
       </div>
+
+      {/* ─── For your CPA (4b) ─── Collapsible on screen; the print handout
+          renders the expanded variant instead (page 3, verified to still
+          paginate at exactly 3 sheets). Visibility is swapped via the
+          .mm-cpa-details / .mm-cpa-print-expanded rules in index.css. */}
+      <details
+        className="mm-cpa-details"
+        style={{
+          marginTop: 20,
+          padding: '14px 18px',
+          background: 'white',
+          borderRadius: 12,
+          border: `1px solid ${M.line}`,
+        }}
+      >
+        <summary
+          style={{
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 700,
+            color: M.ink,
+            letterSpacing: 0.2,
+          }}
+        >
+          For your CPA — character, limits, and assumptions
+        </summary>
+        {cpaBody}
+      </details>
+      <div
+        className="mm-cpa-print-expanded"
+        style={{
+          marginTop: 20,
+          padding: '14px 18px',
+          background: 'white',
+          borderRadius: 12,
+          border: `1px solid ${M.line}`,
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 700, color: M.ink, letterSpacing: 0.2 }}>
+          For your CPA — character, limits, and assumptions
+        </div>
+        {cpaBody}
+      </div>
     </div>
   );
 }
@@ -1742,8 +2043,11 @@ export function MeetingMode({
   advancedSettings,
   currentStrategy,
   onExitMeetingMode,
-  onPinScenario,
-  canPin,
+  // Pin Scenario stays unwired until D-024 (Wave B). The dead button (with
+  // its lying "Pin limit reached" tooltip) is hidden entirely until then;
+  // props are kept so call sites don't churn when it's wired for real.
+  onPinScenario: _onPinScenario,
+  canPin: _canPin,
   onExport,
   onUpdateInput,
   onUpdateSettings,
@@ -1834,11 +2138,21 @@ export function MeetingMode({
   );
   const insights = useMemo(() => computeEdiInsights(results), [results]);
 
-  const [yearIdx, setYearIdx] = useState(breakdownData.length);
+  // Year focus defaults to Year 1 — the start of the story — not the final
+  // (often $0 wind-down) year (mock-meeting review, 7b).
+  const [yearIdx, setYearIdx] = useState(breakdownData.length > 0 ? 1 : 0);
   useEffect(() => {
     // When years change (e.g. projection years change), clamp index.
     setYearIdx(idx => Math.min(idx, breakdownData.length));
   }, [breakdownData.length]);
+
+  // Hide the app chrome (tab bar incl. the theme toggle) while Meeting Mode
+  // is mounted — on screen, not just in print (mock-meeting review, 7a).
+  // Reversible: the class is removed on unmount (Esc / Exit both unmount).
+  useEffect(() => {
+    document.body.classList.add('meeting-mode-active');
+    return () => document.body.classList.remove('meeting-mode-active');
+  }, []);
 
   // Esc exits meeting mode. Listening at document level so it works regardless
   // of which child element has focus.
@@ -1865,77 +2179,158 @@ export function MeetingMode({
     };
   }, [printMode]);
 
-  // Decomposition of hero number.
+  // ─── "How we get to {headline}" strip (D-022) ───
   //
-  // Three cards explain how we get to totalTaxSavings (Year 1 harvest +
-  // Years 2..N harvest + NOL carry-forward as an embedded sub-component),
-  // and a fourth card shows what the total looks like if every year's tax
-  // savings were reinvested at the portfolio growth rate:
+  // QFAF mode: decompose BY BENEFIT TYPE using the engine's own per-year
+  // fields — ordinary-loss benefit + NOL usage benefit + capital-loss
+  // benefit − gains & costs — which sums EXACTLY to the headline and
+  // matches the chart legend. (The old Year-1 + Years-2..N + NOL strip
+  // double-counted NOL, showing $3.42M of cards under a $2.34M headline.)
   //
-  //   FV = Σ taxSavings_n × (1 + r)^(N − n)
+  // EDI mode: realized savings split Year 1 vs Years 2..N from the SAME
+  // unrounded source (so the cards reconcile to the realized total), plus
+  // the contingent loss-reserve tile (excluded from the realized bar) and,
+  // when growth is on, an informational reinvestment tile.
   //
-  // The first three cards drive the proportional "how we get to $X" bar;
-  // the compounding card is rendered as a separate informational tile and
-  // is excluded from the bar (since it sums to a different total).
-  const decomposition = useMemo(() => {
-    const year1 = detailYearData[0]?.save ?? 0;
-    const years2plus = detailYearData.slice(1).reduce((s, y) => s + y.save, 0);
-    const nolBenefit = visibleYears.reduce((s, y) => s + (y.nolUsageBenefit ?? 0), 0);
+  // Card figures are whole-dollar and reconciled (reconcileRounded) so the
+  // displayed numbers visibly sum to the displayed total.
+  const decomp = useMemo((): {
+    cards: DecompCard[];
+    equation: string;
+    displayTotal: number;
+    totalLabel: string;
+    subLabel: string;
+  } => {
+    if (!ediMode) {
+      const d = computeBenefitDecomposition(visibleYears);
+      const hasCosts = d.gainAndOtherCosts > 0.5;
+      const [rOrd, rNol, rCap, rCostsNeg] = reconcileRounded(
+        [d.ordinaryLossBenefit, d.nolUsageBenefit, d.capitalLossBenefit, -d.gainAndOtherCosts],
+        d.total
+      );
+      const rCosts = -rCostsNeg;
+      const cards: DecompCard[] = [
+        {
+          stepLabel: 'Step 1',
+          label: 'Ordinary-loss benefit',
+          display: fmtCurrencyFull(rOrd),
+          color: M.accent,
+          note: `§461(l)-allowed ordinary deductions against income, valued at the ${fmtPercent1(
+            taxRates.combinedOrdinaryRate
+          )} combined ordinary rate`,
+          inBar: true,
+          barFlex: Math.max(0, d.ordinaryLossBenefit),
+          testId: 'decomp-benefit-value',
+        },
+        {
+          stepLabel: 'Step 2',
+          label: 'NOL usage benefit',
+          display: fmtCurrencyFull(rNol),
+          color: '#8b7cf6',
+          note: `From ${fmtCurrency(totalNol)} of NOL generated, deducted against later years' taxable income`,
+          inBar: true,
+          barFlex: Math.max(0, d.nolUsageBenefit),
+          testId: 'decomp-benefit-value',
+        },
+        {
+          stepLabel: 'Step 3',
+          label: 'Capital-loss benefit',
+          display: fmtCurrencyFull(rCap),
+          color: '#38bdf8',
+          note: 'Capital-loss carryforwards deducted against ordinary income ($3,000/yr, §1211(b))',
+          inBar: true,
+          barFlex: Math.max(0, d.capitalLossBenefit),
+          testId: 'decomp-benefit-value',
+        },
+      ];
+      if (hasCosts) {
+        cards.push({
+          stepLabel: 'Less',
+          label: 'Gains & costs',
+          display: fmtCurrencyFull(rCosts),
+          color: '#dc2626',
+          note: 'LT gains realized by the strategy plus any unoffset ST gains, taxed at statutory rates — already subtracted from the headline',
+          inBar: false,
+          barFlex: 0,
+          testId: 'decomp-cost-value',
+        });
+      }
+      const benefits = `${fmtCurrencyFull(rOrd)} + ${fmtCurrencyFull(rNol)} + ${fmtCurrencyFull(rCap)}`;
+      return {
+        cards,
+        equation: hasCosts ? `${benefits} − ${fmtCurrencyFull(rCosts)}` : benefits,
+        displayTotal: rOrd + rNol + rCap - rCosts,
+        totalLabel: 'total est. savings',
+        subLabel: '— benefit components that sum to the headline, net of costs',
+      };
+    }
+
+    // EDI mode (QFAF off)
+    const year1 = visibleYears[0]?.taxSavings ?? 0;
+    const [rY1, rRest] = reconcileRounded([year1, totalTaxSavings - year1], totalTaxSavings);
     const r = advancedSettings.growthEnabled ? advancedSettings.defaultAnnualReturn : 0;
-    const N = detailYearData.length;
-    const futureValue = detailYearData.reduce(
-      (s, y, i) => s + y.save * Math.pow(1 + r, N - (i + 1)),
+    const N = visibleYears.length;
+    const futureValue = visibleYears.reduce(
+      (s, y, i) => s + y.taxSavings * Math.pow(1 + r, N - (i + 1)),
       0
     );
     const compoundingBonus = Math.max(0, futureValue - totalTaxSavings);
-    return [
+    const cards: DecompCard[] = [
       {
+        stepLabel: 'Step 1',
         label: 'Year 1 harvest',
-        value: year1,
+        display: fmtCurrencyFull(rY1),
         color: M.accent,
-        note: `Loss harvest × ${fmtPercent1(taxRates.combinedOrdinaryRate)} combined ordinary rate`,
+        note: 'First-year net savings: harvested losses offsetting gains plus the $3,000 ordinary-income deduction',
         inBar: true,
+        barFlex: Math.max(0, year1),
+        testId: 'decomp-benefit-value',
       },
       {
-        label: `Years 2–${detailYearData.length} harvest`,
-        value: years2plus,
+        stepLabel: 'Step 2',
+        label: `Years 2–${N} harvest`,
+        display: fmtCurrencyFull(rRest),
         color: '#8b7cf6',
-        note: 'Ongoing harvesting as portfolio grows',
+        note: 'Net savings across the remaining years as harvesting continues',
         inBar: true,
+        barFlex: Math.max(0, totalTaxSavings - year1),
+        testId: 'decomp-benefit-value',
       },
-      ediMode
-        ? {
-            // EDI-only: no NOL exists — the third force is the CF reserve.
-            // Contingent value, so it stays OUT of the realized-savings bar.
-            label: 'Loss reserve built',
-            value: lossReserve,
-            color: '#f59e0b',
-            note: `${fmtCurrency(cfReserveBalance)} of loss carryforwards held in reserve — contingent shelter for future gains, not counted in the realized total`,
-            inBar: false,
-          }
-        : {
-            label: 'NOL carry-forward',
-            value: nolBenefit,
-            color: '#f59e0b',
-            note: `From ${fmtCurrency(totalNol)} of NOL generated, applied against future income`,
-            inBar: true,
-          },
       {
-        label: 'With reinvestment',
-        // Headline number is the total future value of reinvested savings.
-        value: futureValue,
-        color: M.good,
-        note:
-          r > 0
-            ? `Each year's savings reinvested at ${fmtPercent1(r)} grows to ${fmtCurrency(
-                futureValue
-              )} by ${endYear} — a ${fmtCurrency(compoundingBonus)} gain on top of the ${fmtCurrency(totalTaxSavings)} of un-invested savings.`
-            : 'Enable portfolio growth to model reinvested savings.',
+        // EDI-only: no NOL exists — the third force is the CF reserve.
+        // Contingent value, so it stays OUT of the realized-savings bar.
+        stepLabel: 'Step 3',
+        label: 'Loss reserve built',
+        display: fmtCurrency(lossReserve),
+        color: '#f59e0b',
+        note: `${fmtCurrency(cfReserveBalance)} of loss carryforwards held in reserve — contingent shelter for future gains, not counted in the realized total`,
         inBar: false,
+        barFlex: 0,
       },
     ];
+    if (r > 0) {
+      // Informational only (different total) — hidden entirely when growth
+      // is off rather than telling the client to go enable a setting.
+      cards.push({
+        stepLabel: 'Step 4',
+        label: 'With reinvestment',
+        display: fmtCurrency(futureValue),
+        color: M.good,
+        note: `Each year's savings reinvested at ${fmtPercent1(r)} grows to ${fmtCurrency(
+          futureValue
+        )} by ${endYear} — a ${fmtCurrency(compoundingBonus)} gain on top of the ${fmtCurrency(totalTaxSavings)} of un-invested savings.`,
+        inBar: false,
+        barFlex: 0,
+      });
+    }
+    return {
+      cards,
+      equation: `${fmtCurrencyFull(rY1)} + ${fmtCurrencyFull(rRest)}`,
+      displayTotal: rY1 + rRest,
+      totalLabel: 'realized savings',
+      subLabel: '— realized savings, plus the contingent reserve',
+    };
   }, [
-    detailYearData,
     totalTaxSavings,
     totalNol,
     ediMode,
@@ -1947,6 +2342,21 @@ export function MeetingMode({
     advancedSettings.defaultAnnualReturn,
     endYear,
   ]);
+
+  // Story coherence (mock-meeting review, 5): when the QFAF stops before the
+  // projection window ends and the tail years show no meaningful new
+  // savings, say why — otherwise the chart/table read as "the strategy
+  // stopped working in year 6".
+  const qfafTailNote = useMemo(() => {
+    if (ediMode) return undefined;
+    const d = inputs.qfafDuration;
+    if (!d || d <= 0 || d >= visibleYears.length) return undefined;
+    const tailSavings = visibleYears.slice(d).reduce((s, y) => s + y.taxSavings, 0);
+    if (Math.abs(tailSavings) > Math.max(1, Math.abs(totalTaxSavings) * 0.02)) return undefined;
+    return `The fund runs ${d} years, so savings concentrate in years 1–${d}; years ${
+      d + 1
+    }–${visibleYears.length} run off the remaining carryforwards and NOL rather than generating new losses, which is why they show little or no new savings.`;
+  }, [ediMode, inputs.qfafDuration, visibleYears, totalTaxSavings]);
 
   const filingLabel =
     FILING_STATUSES.find(f => f.value === inputs.filingStatus)
@@ -2050,37 +2460,9 @@ export function MeetingMode({
             >
               <span style={{ width: 6, height: 6, borderRadius: 999, background: M.good }} /> LIVE
             </div>
-            <button
-              onClick={onPinScenario}
-              disabled={!canPin}
-              title={canPin ? 'Pin this scenario' : 'Pin limit reached'}
-              style={{
-                padding: '8px 14px',
-                background: 'white',
-                border: `1px solid ${M.line}`,
-                borderRadius: 8,
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: canPin ? M.inkSoft : M.inkFaint,
-                cursor: canPin ? 'pointer' : 'not-allowed',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                opacity: canPin ? 1 : 0.6,
-              }}
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M12 17V3M5 10l7-7 7 7" />
-              </svg>
-              Pin scenario
-            </button>
+            {/* Pin Scenario button intentionally absent: it was hard-wired
+                dead with a misleading tooltip. D-024 (Wave B) wires pinning
+                for real and brings the button back. */}
             <button
               onClick={() => {
                 if (onExport) onExport();
@@ -2184,13 +2566,13 @@ export function MeetingMode({
                   {ediMode ? (
                     <>
                       <span style={{ color: M.accent }}>
-                        <CountUp key={String(totalTaxSavings)} value={totalTaxSavings} />
+                        <CountUp value={totalTaxSavings} instant={printMode} />
                       </span>{' '}
                       realized savings,
                       <br />
                       plus a{' '}
                       <span style={{ color: M.accent }}>
-                        <CountUp key={String(lossReserve)} value={lossReserve} />
+                        <CountUp value={lossReserve} instant={printMode} />
                       </span>{' '}
                       loss reserve.
                     </>
@@ -2198,7 +2580,7 @@ export function MeetingMode({
                     <>
                       An estimated{' '}
                       <span style={{ color: M.accent }}>
-                        <CountUp key={String(totalTaxSavings)} value={totalTaxSavings} />
+                        <CountUp value={totalTaxSavings} instant={printMode} />
                       </span>
                       <br />
                       in tax savings.
@@ -2231,6 +2613,13 @@ export function MeetingMode({
                       <strong style={{ color: M.good }}>{fmtCurrency(totalTaxSavings)}</strong> of
                       net tax savings through {endYear}, driven by ordinary loss deductions, NOL
                       usage, and capital loss carryforwards.
+                      {qfafTailNote && (
+                        <>
+                          {' '}
+                          Savings concentrate in the fund&rsquo;s {inputs.qfafDuration}-year run;
+                          the later years draw down carryforwards rather than generating new losses.
+                        </>
+                      )}
                     </>
                   )}
                   {!advancedSettings.financingFeesEnabled && (
@@ -2277,14 +2666,12 @@ export function MeetingMode({
                     <div style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>
                       How we get to {fmtCurrency(totalTaxSavings)}
                     </div>
-                    <span style={{ fontSize: 12, color: M.inkFaint }}>
-                      — compounding forces working together
-                    </span>
+                    <span style={{ fontSize: 12, color: M.inkFaint }}>{decomp.subLabel}</span>
                   </div>
 
                   {(() => {
-                    const positiveParts = decomposition.filter(p => p.value > 0 && p.inBar);
-                    const totalFlex = positiveParts.reduce((s, p) => s + p.value, 0) || 1;
+                    const positiveParts = decomp.cards.filter(p => p.inBar && p.barFlex > 0);
+                    const totalFlex = positiveParts.reduce((s, p) => s + p.barFlex, 0) || 1;
                     return (
                       <>
                         <div
@@ -2299,9 +2686,10 @@ export function MeetingMode({
                         >
                           {positiveParts.map((p, i) => (
                             <div
-                              key={i}
+                              key={p.label}
+                              title={`${p.label}: ${p.display}`}
                               style={{
-                                flex: p.value / totalFlex,
+                                flex: p.barFlex / totalFlex,
                                 background: p.color,
                                 display: 'flex',
                                 alignItems: 'center',
@@ -2310,24 +2698,28 @@ export function MeetingMode({
                                 fontSize: 12,
                                 fontWeight: 700,
                                 fontFamily: M.mono,
+                                overflow: 'hidden',
+                                whiteSpace: 'nowrap',
                                 borderRight:
                                   i < positiveParts.length - 1 ? '2px solid white' : 'none',
                               }}
                             >
-                              {fmtCurrency(p.value)}
+                              {/* Skip the in-segment label when the slice is
+                                  too thin to hold it. */}
+                              {p.barFlex / totalFlex > 0.12 ? p.display : ''}
                             </div>
                           ))}
                         </div>
                         <div
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gridTemplateColumns: `repeat(${decomp.cards.length}, 1fr)`,
                             gap: 14,
                           }}
                         >
-                          {decomposition.map((p, i) => (
+                          {decomp.cards.map(p => (
                             <div
-                              key={i}
+                              key={p.label}
                               style={{
                                 padding: '12px 14px',
                                 borderRadius: 10,
@@ -2346,7 +2738,7 @@ export function MeetingMode({
                                   marginBottom: 4,
                                 }}
                               >
-                                Step {i + 1}
+                                {p.stepLabel}
                               </div>
                               <div
                                 style={{
@@ -2359,6 +2751,7 @@ export function MeetingMode({
                                 {p.label}
                               </div>
                               <div
+                                data-testid={p.testId}
                                 style={{
                                   fontSize: 17,
                                   fontWeight: 800,
@@ -2369,7 +2762,7 @@ export function MeetingMode({
                                   marginBottom: 6,
                                 }}
                               >
-                                {fmtCurrency(p.value)}
+                                {p.display}
                               </div>
                               <div
                                 style={{
@@ -2382,6 +2775,23 @@ export function MeetingMode({
                               </div>
                             </div>
                           ))}
+                        </div>
+                        {/* Reconciliation line: the cards visibly sum to the
+                            headline (D-022 — the CPA check). */}
+                        <div
+                          style={{
+                            marginTop: 12,
+                            fontSize: 12.5,
+                            fontFamily: M.mono,
+                            fontVariantNumeric: 'tabular-nums',
+                            color: M.inkSoft,
+                          }}
+                        >
+                          {decomp.equation} ={' '}
+                          <strong data-testid="decomp-total-value" style={{ color: M.ink }}>
+                            {fmtCurrencyFull(decomp.displayTotal)}
+                          </strong>{' '}
+                          {decomp.totalLabel}
                         </div>
                         <div
                           style={{
@@ -2521,7 +2931,8 @@ export function MeetingMode({
                   borderRadius: 12,
                   border: `1px solid ${M.line}`,
                   marginBottom: 20,
-                  fontSize: 12.5,
+                  // ≥14px: this strip is read aloud in meetings (7e).
+                  fontSize: 14,
                   color: M.inkSoft,
                   lineHeight: 1.55,
                 }}
@@ -2559,7 +2970,7 @@ export function MeetingMode({
                     </span>
                   )}
                 </div>
-                <div style={{ marginTop: 6, fontSize: 11, color: M.inkFaint }}>
+                <div style={{ marginTop: 6, fontSize: 14, color: M.inkFaint }}>
                   &ldquo;Net if held to step-up&rdquo; is mortality-contingent and assumes basis
                   step-up under current law (IRC §1014). Unused loss carryforwards are lost at death
                   — their {fmtCurrency(stepUp.continueAndDie.carryforwardValueLost)} contingent
@@ -2585,6 +2996,7 @@ export function MeetingMode({
                   yearIdx={yearIdx}
                   setYearIdx={setYearIdx}
                   data={breakdownData}
+                  note={qfafTailNote}
                 />
                 <div
                   style={{
@@ -2750,6 +3162,7 @@ export function MeetingMode({
                   yearIdx={yearIdx}
                   setYearIdx={setYearIdx}
                   data={breakdownData}
+                  note={qfafTailNote}
                 />
               </div>
               <div
@@ -2827,12 +3240,19 @@ export function MeetingMode({
                 </button>
               </div>
               <MechanicsView
+                ediMode={ediMode}
+                inputs={inputs}
+                settings={advancedSettings}
+                visibleYears={visibleYears}
                 qfafValue={results.sizing.qfafValue}
                 totalExposure={results.sizing.totalExposure}
                 totalNol={totalNol}
                 totalTaxSavings={totalTaxSavings}
+                cfReserveBalance={cfReserveBalance}
+                lossReserve={lossReserve}
                 taxRates={taxRates}
                 currentStrategy={currentStrategy}
+                filingLabel={filingLabel}
               />
               {printMode && <PrintPageFooter />}
             </div>

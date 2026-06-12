@@ -558,6 +558,22 @@ headline, on screen and on the printed handout. Fails the CPA bar.
 **Decision (owner):** re-decompose by benefit type — ordinary-loss benefit, NOL usage,
 capital-loss/$3K benefit, less gain costs — which the engine already reports per year,
 sums exactly to the headline, and matches the chart legend.
+**Status: IMPLEMENTED (2026-06-12)** — `computeBenefitDecomposition` (exported from
+`MeetingMode.tsx`) sums the engine's own per-year fields over the visible window:
+Σ ordinaryLossBenefit + Σ nolUsageBenefit + Σ capitalLossBenefit −
+Σ (ltGainCost + remainingStGainCost) — the exact per-year identity core.ts uses for
+`taxSavings`, so the strip sums to the headline by construction. QFAF strip shows the
+three benefit cards (chart-legend labels/colors) plus a "Less: gains & costs" card only
+when costs are nonzero; the EDI strip keeps its Year-1 / Years 2–N realized split
+(computed from the one unrounded source) with the loss-reserve tile still excluded
+from the realized bar. Card figures are whole-dollar and reconciled via
+`reconcileRounded` (largest component absorbs the ≤$2 float residual) with an explicit
+"$a + $b + $c − $d = $total" line, so the displayed numbers also sum exactly — killing
+the "$2K + $14K vs $15K" rounding mismatch. Printed page-1 strip is the same component.
+Tests assert engine-level and display-level summation in both modes; browser-verified
+live (QFAF: $1,256,494 + $1,082,456 + $0 = $2,338,950 under the $2.34M hero; EDI:
+$1,509 + $13,581 = $15,090 under the $15K hero); print pagination re-verified at
+exactly 3 sheets in both modes.
 
 #### D-023 — In-meeting what-ifs: bounded meeting-rail presets
 **Date:** 2026-06-12
