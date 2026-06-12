@@ -111,7 +111,7 @@ a new per-year output, surface it in the table.
 
 ## Pending decision queue (next batches)
 
-### D-005 — State tax fidelity *(moved to Decided below)*
+### D-005 — State tax fidelity *(decided — see Decided section above)*
 
 ### D-006 — Present-value option for multi-year savings
 "Total Tax Savings" is an undiscounted nominal sum over 10–30 years. Options:
@@ -119,9 +119,9 @@ a new per-year output, surface it in the table.
 (c) leave nominal (consistent with D-002 high-level philosophy). Interacts with D-003's
 permanent-vs-deferral split. **PM recommendation: decide after D-003 ships.**
 
-### D-007 — Official QFAF name *(moved to Decided below)*
+### D-007 — Official QFAF name *(decided — see Decided section above)*
 
-### D-008 — Print handout disclosures *(moved to Decided below)*
+### D-008 — Print handout disclosures *(decided — see Decided section above)*
 
 ### D-009 — Qualified purchaser gate hardening
 Gate is localStorage-only and trivially bypassable — fine for an educational tool,
