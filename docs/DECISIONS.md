@@ -107,6 +107,24 @@ and net ST gain cost columns so components sum exactly to Savings), QFAF cash re
 and effective harvest rate. Treat this as a standing requirement: when the engine gains
 a new per-year output, surface it in the table.
 
+### Owner directive — UI review pass + Workspace (Beta) tab
+**Date:** 2026-06-12
+**Directive:** Full UI review; keep the current version as a tab, ship the redesigned UI
+as a new tab.
+**Review findings (current UI):** 7,049px single scroll mixing inputs/assumptions/
+results/advanced tools; 52 inputs and 60 buttons on one page; changing an input while
+reading results requires a full scroll round-trip (sticky header shows outputs only);
+numbered "steps" imply a wizard that isn't enforced; the headline summary renders below
+the detail table (inverted hierarchy); similar metrics repeat across sticky header,
+sizing cards, and results summary.
+**Status: IMPLEMENTED (2026-06-12)** — new "Workspace (Beta)" tab
+(`src/workspace/WorkspaceTab.tsx`): persistent left input rail (client/strategy/QFAF/
+model toggles) beside a results-first pane — headline metric strip (savings + PV,
+incremental, Y1/Y2+, net-if-liquidated) over Overview / Year-by-Year / Charts sub-views.
+Reuses the same engine, the audit-complete ResultsTable, charts, QP gate, and
+disclosures. Classic Tax Calculator tab untouched (split allocation, year-by-year
+planning, sensitivity, Meeting Mode remain there).
+
 ---
 
 ## Pending decision queue (next batches)

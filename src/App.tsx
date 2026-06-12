@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { Calculator } from './Calculator';
 import { QfafTestPage } from './pages/QfafTestPage';
 import { EdiOnlyPage } from './pages/EdiOnlyPage';
+import { WorkspaceTab } from './workspace/WorkspaceTab';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-type View = 'calculator' | 'qfaf-test' | 'edi-only';
+type View = 'calculator' | 'workspace' | 'qfaf-test' | 'edi-only';
 
 function getInitialView(): View {
   const params = new URLSearchParams(window.location.search);
   const view = params.get('view');
-  if (view === 'qfaf-test' || view === 'edi-only' || view === 'calculator') {
+  if (view === 'qfaf-test' || view === 'edi-only' || view === 'calculator' || view === 'workspace') {
     return view;
   }
   return 'calculator';
@@ -42,6 +43,12 @@ export function App() {
             Tax Calculator
           </button>
           <button
+            className={`nav-tab ${activeView === 'workspace' ? 'active' : ''}`}
+            onClick={() => setActiveView('workspace')}
+          >
+            Workspace <span className="nav-tab-badge">Beta</span>
+          </button>
+          <button
             className={`nav-tab ${activeView === 'edi-only' ? 'active' : ''}`}
             onClick={() => setActiveView('edi-only')}
           >
@@ -62,6 +69,7 @@ export function App() {
       <main className="app-content">
         <ErrorBoundary>
           {activeView === 'calculator' && <Calculator />}
+          {activeView === 'workspace' && <WorkspaceTab />}
           {activeView === 'qfaf-test' && <QfafTestPage />}
           {activeView === 'edi-only' && <EdiOnlyPage />}
         </ErrorBoundary>
