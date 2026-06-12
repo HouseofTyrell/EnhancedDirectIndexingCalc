@@ -70,6 +70,12 @@ export interface CalculatorInputs {
   // unwind proceeds) into the core/collateral at the start of the following
   // year, instead of holding them as uninvested cash. Default: false.
   redeployQfafProceeds?: boolean;
+
+  // Cost basis of the collateral at inception (optional). When set below the
+  // collateral amount — the concentrated-appreciated-stock case — the
+  // pre-existing embedded gain flows into the liquidation/exit-tax analysis.
+  // Default: undefined = basis equals initial market value.
+  collateralCostBasis?: number;
 }
 
 export interface SizingLeg {

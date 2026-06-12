@@ -126,9 +126,10 @@ export function WorkspaceTab() {
         results,
         rates.combinedLt,
         settings.growthEnabled ? settings.defaultAnnualReturn : 0,
-        rates.profile.ltcgExcise
+        rates.profile.ltcgExcise,
+        effectiveInputs.collateralCostBasis
       ),
-    [results, rates, settings.growthEnabled, settings.defaultAnnualReturn]
+    [results, rates, settings.growthEnabled, settings.defaultAnnualReturn, effectiveInputs.collateralCostBasis]
   );
 
   const stateNote = useMemo(
@@ -289,6 +290,25 @@ export function WorkspaceTab() {
               </p>
             </>
           )}
+          <label className="ws-field">
+            <span>Cost basis of collateral (optional)</span>
+            <input
+              inputMode="numeric"
+              placeholder="= collateral value"
+              value={
+                inputs.collateralCostBasis !== undefined
+                  ? formatWithCommas(inputs.collateralCostBasis)
+                  : ''
+              }
+              onChange={e => {
+                const raw = e.target.value.trim();
+                set(
+                  'collateralCostBasis',
+                  raw === '' ? undefined : parseFormattedNumber(raw)
+                );
+              }}
+            />
+          </label>
           <label className="ws-field">
             <span>Start month</span>
             <select
@@ -535,6 +555,9 @@ export function WorkspaceTab() {
                 <span className="ws-card-value">{formatCurrency(exit.embeddedGain)}</span>
                 <span className="ws-card-sub">
                   incl. {formatCurrency(exit.cumulativeBasisReduction)} basis reduction
+                  {exit.preExistingGain > 0 && (
+                    <> + {formatCurrency(exit.preExistingGain)} pre-existing gain</>
+                  )}
                 </span>
               </div>
               <div className="ws-card">
@@ -597,6 +620,15 @@ export function WorkspaceTab() {
               or donating can make the deferral permanent.
             </p>
 
+            {currentStrategy?.type === 'overlay' &&
+              effectiveInputs.collateralCostBasis === undefined && (
+                <div className="ws-note">
+                  ⚠️ <strong>Appreciated-stock collateral:</strong> the liquidation analysis
+                  assumes basis equals today's value. If this collateral carries unrealized
+                  gain, enter its <strong>cost basis</strong> in the Strategy panel so the
+                  embedded gain and deferred tax reflect the client's true exit picture.
+                </div>
+              )}
             {conformityNote && (
               <div className="ws-note">⚠️ <strong>State conformity:</strong> {conformityNote}</div>
             )}

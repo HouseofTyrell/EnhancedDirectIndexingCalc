@@ -111,6 +111,20 @@ describe('computeExitTaxAnalysis', () => {
     expect(analysis.cfShelterUsed).toBeLessThanOrEqual(analysis.remainingCapitalLossCf + 0.01);
   });
 
+  it('includes pre-existing gain from a low collateral cost basis', () => {
+    // Concentrated stock: $10M position with a $2M basis → $8M pre-existing gain
+    const result = calculate(createInputs(), DEFAULT_SETTINGS);
+    const withBasis = computeExitTaxAnalysis(result, COMBINED_LT_RATE, 0, undefined, 2000000);
+    const without = computeExitTaxAnalysis(result, COMBINED_LT_RATE, 0, undefined, undefined);
+
+    expect(withBasis.preExistingGain).toBeCloseTo(8000000, 0);
+    expect(withBasis.embeddedGain).toBeCloseTo(without.embeddedGain + 8000000, 0);
+
+    // The passive holder carries the same pre-existing gain, so the
+    // strategy-attributable deferred tax is unchanged
+    expect(withBasis.incrementalDeferredTax).toBeCloseTo(without.incrementalDeferredTax, 0);
+  });
+
   it('handles zero collateral without NaN', () => {
     const result = calculate(createInputs({ collateralAmount: 0 }), DEFAULT_SETTINGS);
     const analysis = computeExitTaxAnalysis(result, COMBINED_LT_RATE, 0);

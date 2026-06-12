@@ -195,6 +195,30 @@ combined, wash-sale %) for the CPA; and a wash-sale disallowance slider (0–15%
 Model group. If a DI comparison returns, it should credit carryforward value on both
 sides (EDI-Only-tab methodology).
 
+### Owner directive — three-archetype mock meetings (liquidity event / RSU / concentrated stock)
+**Date:** 2026-06-12
+**Findings:** (A) Liquidity-event client: per-year utilization chips + NOL balances answer
+the shelter questions, but the sale itself can't be modeled (no capital-gain event input
+anywhere in the main engine — Classic's year-by-year covers W-2 income only). (B) RSU
+client: fully served by the chips (max need $2.27M vs $4.5M income) + CA SB 167 note.
+(C) Concentrated-stock client: **no cost-basis input existed**, so the exit cards
+understated his real embedded gain by the entire pre-existing gain, and the Workspace
+lacked even the appreciated-stock caveat.
+**Status: (C) FIXED 2026-06-12** — optional "Cost basis of collateral" input (rail,
+CSV round-trip, classic pass-through); exit analysis includes pre-existing gain on BOTH
+the strategy and passive sides (so incremental deferred tax stays strategy-attributable,
+verified by test); embedded-gain card shows the split; an appreciated-stock caveat
+appears for Overlay strategies until a basis is entered.
+
+### D-012 — Liquidity-event modeling (from meeting A) — PENDING
+The main engine cannot represent a future capital-gain event (business sale, IPO lockup
+release). Options: (a) extend YearOverride with a gain event {year, amount, character}
+flowing through the netting/NIIT/excise machinery, + a simple Workspace field ("Planned
+gain event: year + amount"); (b) point users at the EDI-Only realization scenarios
+(disconnected from the QFAF program); (c) skip. **PM recommendation: (a)** — it is the
+liquidity-event archetype's core question and the engine's netting already supports
+taxable-gain inputs cleanly.
+
 ---
 
 ## Pending decision queue (next batches)
