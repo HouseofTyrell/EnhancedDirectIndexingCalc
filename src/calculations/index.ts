@@ -3,3 +3,5 @@ export { calculate, calculateWithOverrides } from './core';
 export { calculateWithSensitivity } from './sensitivity';
 export { computeExitTaxAnalysis } from './exitTax';
 export type { ExitTaxAnalysis } from './exitTax';
+export { computeEdiInsights, computeStepUpComparison } from './ediInsights';
+export type { EdiInsights, StepUpComparison } from './ediInsights';

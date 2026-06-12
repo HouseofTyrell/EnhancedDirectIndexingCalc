@@ -69,10 +69,13 @@ describe('computeExitTaxAnalysis', () => {
     );
   });
 
-  it('never reports net benefit above headline savings', () => {
+  it('reconciles net benefit with headline savings minus deferred tax', () => {
     const result = calculate(createInputs(), DEFAULT_SETTINGS);
     const analysis = computeExitTaxAnalysis(result, COMBINED_LT_RATE, 0);
 
+    // With no passive growth the baseline owes nothing, so the strategy's
+    // deferred tax is non-negative and the net benefit can't exceed headline.
+    expect(analysis.incrementalDeferredTax).toBeGreaterThanOrEqual(0);
     expect(analysis.netBenefitAfterLiquidation).toBeLessThanOrEqual(
       analysis.totalTaxSavings + 0.01
     );
@@ -92,9 +95,47 @@ describe('computeExitTaxAnalysis', () => {
     const expectedPassiveGain = 10000000 * (Math.pow(1.07, horizon) - 1);
     expect(analysis.passiveExitTax).toBeCloseTo(expectedPassiveGain * COMBINED_LT_RATE, 0);
 
-    // Incremental deferred tax compares strategy exit tax to the passive baseline
+    // Incremental deferred tax is the SIGNED difference vs the passive baseline
     expect(analysis.incrementalDeferredTax).toBeCloseTo(
-      Math.max(0, analysis.exitTax - analysis.passiveExitTax),
+      analysis.exitTax - analysis.passiveExitTax,
+      2
+    );
+  });
+
+  it('reports positive deferred tax when basis erosion outruns the carryforwards (QFAF on)', () => {
+    // QFAF gains consume the harvested losses, so no CF shelter remains and
+    // the basis reduction makes the strategy's exit gain exceed passive's.
+    const settings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.07 };
+    const result = calculate(createInputs(), settings);
+    const analysis = computeExitTaxAnalysis(result, COMBINED_LT_RATE, 0.07);
+
+    expect(analysis.incrementalDeferredTax).toBeGreaterThan(0);
+    expect(analysis.netBenefitAfterLiquidation).toBeLessThan(analysis.totalTaxSavings);
+  });
+
+  it('reports NEGATIVE deferred tax when carryforward shelter beats the passive baseline', () => {
+    // EDI-only with a large pre-existing CF: the strategy's exit gain is
+    // fully sheltered while the passive holder owes tax on appreciation, so
+    // liquidating the strategy is CHEAPER than liquidating passive. The
+    // unclamped negative value must INCREASE the net benefit (the EDI-only
+    // selling point — D-014/D-015 triage bug).
+    const settings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.07 };
+    const result = calculate(
+      createInputs({ qfafEnabled: false, existingStLossCarryforward: 20000000 }),
+      settings
+    );
+    const analysis = computeExitTaxAnalysis(result, COMBINED_LT_RATE, 0.07);
+
+    expect(analysis.exitTax).toBeLessThan(analysis.passiveExitTax);
+    expect(analysis.incrementalDeferredTax).toBeLessThan(0);
+    expect(analysis.incrementalDeferredTax).toBeCloseTo(
+      analysis.exitTax - analysis.passiveExitTax,
+      2
+    );
+    // Negative deferred tax flows through as ADDED benefit
+    expect(analysis.netBenefitAfterLiquidation).toBeGreaterThan(analysis.totalTaxSavings);
+    expect(analysis.netBenefitAfterLiquidation).toBeCloseTo(
+      analysis.totalTaxSavings - analysis.incrementalDeferredTax,
       2
     );
   });

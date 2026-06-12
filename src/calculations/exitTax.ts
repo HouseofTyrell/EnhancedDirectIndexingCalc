@@ -52,7 +52,12 @@ export interface ExitTaxAnalysis {
   exitTax: number;
   /** Exit tax a passive buy-and-hold investor would owe on the same horizon */
   passiveExitTax: number;
-  /** Exit tax attributable to the strategy: max(0, exitTax − passiveExitTax) */
+  /**
+   * Exit tax attributable to the strategy: exitTax − passiveExitTax. Signed:
+   * NEGATIVE means the strategy exits CHEAPER than passive buy-and-hold —
+   * harvested carryforwards shelter more than the strategy's added embedded
+   * gain (the EDI-only selling point) — which INCREASES the net benefit.
+   */
   incrementalDeferredTax: number;
   /** Projected total tax savings from the main calculation (gross of deferral) */
   totalTaxSavings: number;
@@ -120,7 +125,10 @@ export function computeExitTaxAnalysis(
   const passiveGain = Math.max(0, safeNumber(passiveValue - costBasis));
   const passiveExitTax = safeNumber(passiveGain * combinedLtRate + exciseOn(passiveGain));
 
-  const incrementalDeferredTax = Math.max(0, safeNumber(exitTax - passiveExitTax));
+  // Deliberately unclamped: with QFAF off, carryforward shelter can push the
+  // strategy's exit tax BELOW the passive baseline's. Clamping at 0 would
+  // structurally discard that advantage from netBenefitAfterLiquidation.
+  const incrementalDeferredTax = safeNumber(exitTax - passiveExitTax);
   const totalTaxSavings = result.summary.totalTaxSavings;
   const netBenefitAfterLiquidation = safeNumber(totalTaxSavings - incrementalDeferredTax);
 

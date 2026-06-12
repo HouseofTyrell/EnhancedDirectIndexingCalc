@@ -183,6 +183,9 @@ export interface YearResult {
   gainEventCfShelter: number; // event dollars absorbed by CFs/current losses
   // Cash returned from QFAF resizing (dynamic mode only, 0 in fixed mode)
   qfafCashReturned: number;
+  // Financing fees charged this year (QFAF + collateral, on end-of-year
+  // grown values). 0 when financing fees are disabled.
+  financingCostPaid: number;
   // Whether the strategy is actively generating new tax events this year
   strategyActive: boolean;
 }
@@ -201,6 +204,19 @@ export interface CalculationResult {
     finalTotalWealth: number;
     /** Σ taxSavings_n / (1 + discountRate)^n — present value of the nominal savings (D-006) */
     totalTaxSavingsPV: number;
+    /** ST capital loss carryforward balance at the end of the last projected year */
+    finalStCarryforward: number;
+    /** LT capital loss carryforward balance at the end of the last projected year */
+    finalLtCarryforward: number;
+    /**
+     * Contingent tax value of the final carryforward balances at the
+     * final year's statutory rates: ST CF × combined ST rate + LT CF ×
+     * combined LT rate (D-015 "loss reserve built"). CF shelter offsets
+     * future capital GAINS, so it is valued at the state's gains rates even
+     * where the state disallows ordinary-income offsets (PA/NJ). Contingent
+     * on future gains being realized — NOT included in totalTaxSavings.
+     */
+    lossReserveShelterValue: number;
   };
 }
 

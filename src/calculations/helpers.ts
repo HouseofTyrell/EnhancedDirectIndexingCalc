@@ -260,11 +260,23 @@ export function calculateCarryforwards(
   };
 }
 
+/**
+ * Combined (federal + state) rates on capital GAINS in the final projected
+ * year — used to value the ending carryforward balances as a contingent
+ * "loss reserve" (D-015). Callers with per-year TaxRates in scope (core,
+ * sensitivity) pass the last year's rates.
+ */
+export interface FinalYearGainRates {
+  combinedStRate: number;
+  combinedLtRate: number;
+}
+
 export function calculateSummary(
   years: YearResult[],
   sizing: CalculatedSizing,
   qfafDuration?: number,
-  discountRate: number = 0.05
+  discountRate: number = 0.05,
+  finalYearRates?: FinalYearGainRates
 ) {
   const totalTaxSavings = years.reduce((sum, y) => sum + y.taxSavings, 0);
   // Present value of the nominal savings stream (D-006); shown in the UI
@@ -287,6 +299,18 @@ export function calculateSummary(
   const effectiveTaxAlpha =
     sizing.totalExposure > 0 ? totalTaxSavings / sizing.totalExposure / numYears : 0;
 
+  // Loss reserve built (D-015): the ending CF balances are the EDI product's
+  // contingent shelter. Valued character-by-character at the final year's
+  // combined gains rates — CFs offset future capital gains, which PA/NJ DO
+  // tax, so the state component uses gains rates rather than the (disallowed)
+  // ordinary-deduction rate. Kept out of totalTaxSavings: contingent value.
+  const finalStCarryforward = lastYear?.stLossCarryforward ?? 0;
+  const finalLtCarryforward = lastYear?.ltLossCarryforward ?? 0;
+  const lossReserveShelterValue = safeNumber(
+    finalStCarryforward * (finalYearRates?.combinedStRate ?? 0) +
+      finalLtCarryforward * (finalYearRates?.combinedLtRate ?? 0)
+  );
+
   return {
     totalTaxSavings,
     totalTaxSavingsPV: safeNumber(totalTaxSavingsPV),
@@ -295,5 +319,8 @@ export function calculateSummary(
     totalNolGenerated,
     totalQfafCashReturned,
     finalTotalWealth,
+    finalStCarryforward: safeNumber(finalStCarryforward),
+    finalLtCarryforward: safeNumber(finalLtCarryforward),
+    lossReserveShelterValue,
   };
 }

@@ -145,6 +145,9 @@ export function calculateWithOverrides(
   // Income for extension years continues the FINAL scheduled year's income
   // (e.g., a retirement schedule persists), not the base input.
   let carryIncome = inputs.annualIncome;
+  // Final projected year's combined gains rates, for valuing the ending
+  // carryforward balances as a contingent loss reserve (D-015).
+  let finalYearRates: TaxRates | undefined;
 
   for (let year = 1; year <= hardCapYears; year++) {
     const inNolExtension = year > effectiveProjectionYears;
@@ -331,6 +334,7 @@ export function calculateWithOverrides(
       years.push({ ...result, qfafCashReturned: totalRedeemed });
     }
     carryIncome = yearIncome;
+    finalYearRates = yearTaxRates;
 
     // Update QFAF state for next year. Don't track QFAF growth after the
     // strategy's final calendar year.
@@ -361,7 +365,16 @@ export function calculateWithOverrides(
   return {
     sizing: adjustedSizing,
     years,
-    summary: calculateSummary(years, adjustedSizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined, settings.discountRate),
+    summary: calculateSummary(
+      years,
+      adjustedSizing,
+      inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined,
+      settings.discountRate,
+      finalYearRates && {
+        combinedStRate: finalYearRates.stRate + finalYearRates.state.stRate,
+        combinedLtRate: finalYearRates.ltRate + finalYearRates.state.ltRate,
+      }
+    ),
   };
 }
 
@@ -608,6 +621,13 @@ export function calculateYear(
   const newQfafValue = safeNumber(grownQfafValue * (1 - totalFinancingCost * yearFraction));
   const grownCollateralValue = safeNumber(collateralValue * (1 + baseReturn * yearFraction));
   const newCollateralValue = safeNumber(grownCollateralValue * (1 - totalFinancingCost * yearFraction));
+  // Dollar financing cost charged this year (D-014 insights input). In split
+  // mode the blended rate is weighted by start-of-year collateral and all
+  // legs grow at the same base return, so charging it on the grown total
+  // matches the per-leg fees the calling loop applies exactly.
+  const financingCostPaid = safeNumber(
+    (grownQfafValue + grownCollateralValue) * totalFinancingCost * yearFraction
+  );
 
   // Calculate total income offset for this year
   // This is the sum of all deductions that reduce taxable income
@@ -687,6 +707,7 @@ export function calculateYear(
     collateralTaxBenefit,
     stGainLeakage,
     qfafCashReturned: 0, // Set by the calling loop in dynamic mode
+    financingCostPaid,
     strategyActive,
   };
 }

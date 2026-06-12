@@ -123,6 +123,8 @@ export function calculateWithSensitivity(
   const minProjection =
     qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
+  // Final year's combined gains rates for the loss-reserve valuation (D-015).
+  let finalYearRates: TaxRates | undefined;
 
   for (let year = 1; year <= effectiveProjectionYears; year++) {
     // Redeploy last year's QFAF redemptions into the collateral
@@ -281,6 +283,7 @@ export function calculateWithSensitivity(
     } else {
       years.push({ ...result, qfafCashReturned: totalRedeemed });
     }
+    finalYearRates = yearTaxRates;
 
     // Update QFAF state for next year. Don't track QFAF growth after the
     // strategy's final calendar year.
@@ -294,7 +297,16 @@ export function calculateWithSensitivity(
   return {
     sizing,
     years,
-    summary: calculateSummary(years, sizing, inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined, settings.discountRate),
+    summary: calculateSummary(
+      years,
+      sizing,
+      inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined,
+      settings.discountRate,
+      finalYearRates && {
+        combinedStRate: finalYearRates.stRate + finalYearRates.state.stRate,
+        combinedLtRate: finalYearRates.ltRate + finalYearRates.state.ltRate,
+      }
+    ),
   };
 }
 
@@ -493,6 +505,13 @@ function calculateYearWithSensitivity(
   const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafGrowthRateWithFees : 0;
   const newQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
   const newCollateralValue = safeNumber(collateralValue * (1 + growthRate * yearFraction));
+  // Dollar financing cost this year. This engine nets fees out of the growth
+  // rate on start-of-year values (and skips QFAF fees when its growth is
+  // frozen), so the dollar figure mirrors that model.
+  const financingCostPaid = safeNumber(
+    (collateralValue + (settings.qfafGrowthEnabled ? qfafValue : 0)) *
+      totalFinancingCost * yearFraction
+  );
 
   // Calculate total income offset for this year
   const incomeOffsetAmount = safeNumber(
@@ -560,6 +579,7 @@ function calculateYearWithSensitivity(
     collateralTaxBenefit,
     stGainLeakage: Math.max(0, stGainsGenerated - stLossesHarvested),
     qfafCashReturned: 0,
+    financingCostPaid,
     strategyActive,
   };
 }
