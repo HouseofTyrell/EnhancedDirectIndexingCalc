@@ -256,6 +256,20 @@ be planned for."
   added (extension-until-exhausted, no-extension baseline, stall guard, income
   continuation, 40-year cap); suite at 363.
 
+### D-026 — Workspace feature-parity ports, slice 1: scenario pinning + split allocation
+**Date:** 2026-06-12
+**Context:** a full Classic-vs-Workspace inventory (post-#59) found the Workspace ahead
+on funding/eventing/Meeting Mode but missing: scenario pinning with side-by-side
+comparison, split allocation, the strategy rate editor, custom tax-rate overrides,
+keyboard shortcuts, year-by-year free-form planning, the sensitivity grid, and
+multi-strategy comparison.
+**Decision (owner):** port **scenario pinning + side-by-side comparison** and **split
+allocation** to the Workspace now. The other gaps stay in the queue (sensitivity and
+strategy comparison are large and need their own decision; small items batched later).
+Split allocation lands as an expandable section in the rail's Strategy group (rail is
+too tight for always-visible dual selectors); the D-016 deleverage-conflict warning
+must be surfaced in the rail when both are enabled.
+
 ---
 
 ## Pending decision queue (next batches)
