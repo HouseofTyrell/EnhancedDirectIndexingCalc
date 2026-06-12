@@ -177,7 +177,17 @@ export function WorkspaceTab() {
   };
 
   const { summary } = results;
-  const incremental = summary.totalTaxSavings - collateralOnly.summary.totalTaxSavings;
+  // Peak income required across the projection (the year that needs the most
+  // income to fully use the §461(l) deduction + prior NOL) — the advisor's
+  // planning target, surfaced from the buried table column.
+  const peakIncomeReq = results.years.reduce(
+    (best, y) =>
+      y.incomeRequiredForFullUtilization > best.amount
+        ? { amount: y.incomeRequiredForFullUtilization, year: y.year }
+        : best,
+    { amount: 0, year: 1 }
+  );
+  const incomeReqYears = results.years.filter(y => y.incomeRequiredForFullUtilization > 0.5);
   const year1 = results.years[0]?.taxSavings ?? 0;
   const year2 = results.years[1]?.taxSavings ?? 0;
   const projectionYears = settings.projectionYears ?? 10;
@@ -398,6 +408,14 @@ export function WorkspaceTab() {
             />
             <span>Show present value ({formatPercent(settings.discountRate, 0)})</span>
           </label>
+          <label className="ws-field">
+            <span>Wash-sale disallowance: {formatPercent(settings.washSaleDisallowanceRate, 0)}</span>
+            <input
+              type="range" min={0} max={15} step={1}
+              value={Math.round(settings.washSaleDisallowanceRate * 100)}
+              onChange={e => setSetting('washSaleDisallowanceRate', Number(e.target.value) / 100)}
+            />
+          </label>
         </div>
 
         <div className="ws-rail-group">
@@ -465,12 +483,15 @@ export function WorkspaceTab() {
           </div>
           <div className="ws-metric">
             <span className="ws-metric-label">
-              <InfoText contentKey="incremental-benefit" currentValue={formatCurrency(incremental)}>
-                vs. Standard DI
+              <InfoText
+                contentKey="col-income-required"
+                currentValue={formatCurrency(peakIncomeReq.amount)}
+              >
+                Income to Fully Utilize
               </InfoText>
             </span>
-            <span className="ws-metric-value">{formatCurrency(incremental)}</span>
-            <span className="ws-metric-sub">incremental</span>
+            <span className="ws-metric-value">{formatCurrency(peakIncomeReq.amount)}</span>
+            <span className="ws-metric-sub">peak need, year {peakIncomeReq.year} — per-year below</span>
           </div>
           <div className="ws-metric">
             <span className="ws-metric-label">Year 1 / Year 2+</span>
@@ -545,6 +566,26 @@ export function WorkspaceTab() {
               </div>
             </div>
 
+            {incomeReqYears.length > 0 && (
+              <div className="ws-income-req">
+                <span className="ws-income-req-label">
+                  <InfoText contentKey="col-income-required">
+                    Income needed per year to fully utilize §461(l) + NOL
+                  </InfoText>
+                </span>
+                <div className="ws-income-req-chips">
+                  {incomeReqYears.map(y => (
+                    <span
+                      key={y.year}
+                      className={`ws-income-chip ${y.year === peakIncomeReq.year ? 'ws-income-chip--peak' : ''}`}
+                    >
+                      Yr {y.year}: {formatCurrency(y.incomeRequiredForFullUtilization)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="ws-narrative">
               <strong>What this means:</strong> on a {formatCurrency(results.sizing.collateralValue)}{' '}
               portfolio with {currentStrategy?.name ?? 'the selected strategy'}, the program is
@@ -562,6 +603,17 @@ export function WorkspaceTab() {
             {stateNote && (
               <div className="ws-note">⚠️ <strong>State treatment:</strong> {stateNote}</div>
             )}
+            <div className="ws-note ws-note--muted">
+              <strong>Rates assumed:</strong> Fed ordinary {formatPercent(getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus))} ·
+              Fed ST {formatPercent(rates.full.federalStRate)} (incl. NIIT) ·
+              Fed LT {formatPercent(rates.full.federalLtRate)} (incl. NIIT) ·
+              State {formatPercent(rates.profile.ordinaryRate)}
+              {rates.profile.stRate !== rates.profile.ordinaryRate && (
+                <> (ST {formatPercent(rates.profile.stRate)})</>
+              )} →
+              combined ordinary {formatPercent(rates.combinedOrdinary)} / LT {formatPercent(rates.combinedLt)}.
+              Wash-sale disallowance {formatPercent(settings.washSaleDisallowanceRate)}.
+            </div>
             <div className="ws-note ws-note--muted">
               Estimates only — not investment, tax, or legal advice. See full disclosures below.
             </div>
