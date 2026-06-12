@@ -651,7 +651,12 @@ describe('LT gain cost uses taxable gains after offsets (CPA finding E)', () => 
   });
 
   it('still charges full LT cost in QFAF mode (ST losses consumed by QFAF gains)', () => {
-    const inputs = createInputs({ collateralAmount: 10000000, qfafSizingYears: 1 });
+    // $3M MFJ income → top LTCG bracket 20% + 3.8% NIIT
+    const inputs = createInputs({
+      annualIncome: 3000000,
+      collateralAmount: 10000000,
+      qfafSizingYears: 1,
+    });
     const result = calculate(inputs);
     const y1 = result.years[0];
     // CA: fed LT 23.8% + 13.3% state
