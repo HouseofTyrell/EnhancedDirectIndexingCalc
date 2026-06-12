@@ -231,6 +231,31 @@ review, and add NYC resident local tax.
 - **NYC resident local tax** (+3.876% on all characters) via NY-state checkbox,
   threaded through engines, classic, Workspace, CSV.
 
+### D-013 — NOL run-until-used + income schedule — OWNER-DIRECTED & IMPLEMENTED (2026-06-12)
+**Owner request:** "if there is left over NOL the plan runs until it's used" and "add
+the option to add a schedule for income so that different income amounts per year can
+be planned for."
+**Status: IMPLEMENTED (2026-06-12)** —
+- **NOL exhaustion extension** (`core.ts`, both `calculate` and overrides paths): when
+  NOL carryforward remains at the end of the standard horizon (projection years, or
+  QFAF duration + 2 wind-down years), the projection keeps running until the NOL is
+  fully used. Guard rails: hard cap at 40 years; stall guard stops immediately if an
+  extension year consumes no NOL (e.g., zero income); extension years continue the
+  FINAL scheduled year's income (so a retirement-income override persists rather than
+  snapping back to the base input). Workspace shows "(extended to use NOL)" on the
+  headline metric and an Overview note explaining the extension; the year-by-year
+  table and savings totals include extension years automatically.
+- **Income schedule builder** (Workspace → Per-Year Events editor): start income +
+  annual growth %/yr → "Apply schedule" fills the per-year income column with
+  compounded values; rows stay hand-editable afterward (e.g., drop a year to
+  retirement income); "Reset incomes" restores every row to the base input while
+  preserving cash infusions and gain events.
+- **Scope note:** `sensitivity.ts` intentionally keeps the fixed standard horizon — it
+  compares *relative* deltas across rate assumptions, and letting each cell extend a
+  different number of years would make the grid incomparable. Five regression tests
+  added (extension-until-exhausted, no-extension baseline, stall guard, income
+  continuation, 40-year cap); suite at 363.
+
 ---
 
 ## Pending decision queue (next batches)

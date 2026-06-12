@@ -138,8 +138,18 @@ export function calculateWithOverrides(
   const minProjection =
     qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
+  // NOL exhaustion extension: if NOL remains at the end of the standard
+  // horizon, keep projecting wind-down years until it is fully used (capped,
+  // and stopping early if no income is consuming it).
+  const hardCapYears = Math.max(effectiveProjectionYears, 40);
+  // Income for extension years continues the FINAL scheduled year's income
+  // (e.g., a retirement schedule persists), not the base input.
+  let carryIncome = inputs.annualIncome;
 
-  for (let year = 1; year <= effectiveProjectionYears; year++) {
+  for (let year = 1; year <= hardCapYears; year++) {
+    const inNolExtension = year > effectiveProjectionYears;
+    if (inNolExtension && nolCarryforward <= 0.5) break;
+
     const override = overrideMap.get(year);
 
     // Redeploy last year's QFAF redemptions into the core/collateral leg
@@ -149,7 +159,8 @@ export function calculateWithOverrides(
     }
 
     // Get effective income for this year
-    const yearIncome = override?.w2Income ?? inputs.annualIncome;
+    const yearIncome =
+      override?.w2Income ?? (inNolExtension ? carryIncome : inputs.annualIncome);
 
     // Calculate tax rates for this year's income (needed for cash infusion tax adjustment)
     const yearTaxRates: TaxRates = {
@@ -308,12 +319,18 @@ export function calculateWithOverrides(
     const terminalProceeds =
       strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
     const totalRedeemed = cashReturned + terminalProceeds;
+    // Stall guard: an extension year that consumed no NOL adds nothing
+    // (e.g., zero income) — stop instead of emitting empty years.
+    if (inNolExtension && result.nolUsedThisYear <= 0.5) {
+      break;
+    }
     if (redeployProceeds) {
       pendingRedeploy += totalRedeemed;
       years.push({ ...result, qfafCashReturned: 0 });
     } else {
       years.push({ ...result, qfafCashReturned: totalRedeemed });
     }
+    carryIncome = yearIncome;
 
     // Update QFAF state for next year. Don't track QFAF growth after the
     // strategy's final calendar year.

@@ -65,6 +65,10 @@ export function WorkspaceTab() {
   // keyed by year — income changes, cash infusions, and planned gain events.
   const [yearEvents, setYearEvents] = useState<Map<number, YearOverride>>(new Map());
   const [showEventsEditor, setShowEventsEditor] = useState(false);
+  // Income schedule builder: start amount + annual growth → per-year w2Income
+  // rows (which stay hand-editable afterward).
+  const [schedStart, setSchedStart] = useState<number>(DEFAULTS.annualIncome);
+  const [schedGrowth, setSchedGrowth] = useState<number>(3);
 
   const set = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) =>
     setInputs(prev => ({ ...prev, [key]: value }));
@@ -217,6 +221,33 @@ export function WorkspaceTab() {
     });
   };
 
+  const applyIncomeSchedule = () => {
+    setYearEvents(prev => {
+      const next = new Map(prev);
+      for (let yr = 1; yr <= projYears; yr++) {
+        const income = Math.round(schedStart * Math.pow(1 + schedGrowth / 100, yr - 1));
+        const existing = next.get(yr) ?? {
+          year: yr,
+          w2Income: effectiveInputs.annualIncome,
+          cashInfusion: 0,
+          cashInfusionTaxType: 'gross' as const,
+          note: '',
+        };
+        next.set(yr, { ...existing, w2Income: income });
+      }
+      return next;
+    });
+  };
+
+  const resetIncomeSchedule = () => {
+    // Restore every row's income to the base input; infusions/gain events stay.
+    setYearEvents(prev => {
+      const next = new Map(prev);
+      next.forEach((o, yr) => next.set(yr, { ...o, w2Income: effectiveInputs.annualIncome }));
+      return next;
+    });
+  };
+
   const eventYears = results.years.filter(y => y.gainEventAmount > 0);
 
   const { summary } = results;
@@ -235,6 +266,15 @@ export function WorkspaceTab() {
   const year2 = results.years[1]?.taxSavings ?? 0;
   const projectionYears = settings.projectionYears ?? 10;
   const currentStrategy = getStrategy(inputs.strategyId);
+  // The engine extends past the standard horizon when NOL remains unused
+  // (mirrors core.ts: QFAF duration + partial-year start + 2 wind-down years).
+  const baseHorizonYears = Math.max(
+    projectionYears,
+    effectiveInputs.qfafEnabled
+      ? effectiveInputs.qfafDuration + (effectiveInputs.startMonth > 1 ? 1 : 0) + 2
+      : 0
+  );
+  const nolExtensionYears = Math.max(0, results.years.length - baseHorizonYears);
 
   return (
     <div className="ws">
@@ -562,7 +602,8 @@ export function WorkspaceTab() {
             </span>
             <span className="ws-metric-value">{formatCurrency(summary.totalTaxSavings)}</span>
             <span className="ws-metric-sub">
-              {projectionYears} yrs
+              {results.years.length} yrs
+              {nolExtensionYears > 0 && ' (extended to use NOL)'}
               {!settings.financingFeesEnabled && ' · before costs & fees'}
               {settings.presentValueEnabled &&
                 ` · PV ${formatCurrency(summary.totalTaxSavingsPV)}`}
@@ -600,6 +641,37 @@ export function WorkspaceTab() {
 
         {showEventsEditor && (
           <div className="ws-events-editor">
+            <div className="ws-sched">
+              <span className="ws-sched-label">Income schedule</span>
+              <label className="ws-sched-field">
+                <span>Start income</span>
+                <input
+                  inputMode="numeric"
+                  value={formatWithCommas(schedStart)}
+                  onChange={e => setSchedStart(parseFormattedNumber(e.target.value))}
+                />
+              </label>
+              <label className="ws-sched-field">
+                <span>Growth %/yr</span>
+                <input
+                  type="number"
+                  step={0.5}
+                  value={schedGrowth}
+                  onChange={e => setSchedGrowth(Number(e.target.value))}
+                />
+              </label>
+              <button type="button" className="ws-sched-btn" onClick={applyIncomeSchedule}>
+                Apply schedule
+              </button>
+              <button type="button" className="ws-sched-btn ws-sched-btn--ghost" onClick={resetIncomeSchedule}>
+                Reset incomes
+              </button>
+            </div>
+            <p className="ws-rail-note" style={{ padding: 0, margin: '0 0 10px' }}>
+              Fills the income column for years 1–{projYears} (start ×{' '}
+              {schedGrowth >= 0 ? 'growth' : 'decline'} compounding). Rows stay editable —
+              adjust individual years after applying (e.g., drop to retirement income).
+            </p>
             <div className="ws-events-head">
               <span>Year</span>
               <span>W-2 / ordinary income</span>
@@ -759,7 +831,7 @@ export function WorkspaceTab() {
             <p className="ws-narrative">
               <strong>What this means:</strong> on a {formatCurrency(results.sizing.collateralValue)}{' '}
               portfolio with {currentStrategy?.name ?? 'the selected strategy'}, the program is
-              estimated to save {formatCurrency(summary.totalTaxSavings)} over {projectionYears} years
+              estimated to save {formatCurrency(summary.totalTaxSavings)} over {results.years.length} years
               at a combined ordinary rate of {formatPercent(rates.combinedOrdinary)}. A portion is
               timing: full liquidation in year {projectionYears} would surrender{' '}
               {formatCurrency(exit.incrementalDeferredTax)} of that, leaving{' '}
@@ -767,6 +839,15 @@ export function WorkspaceTab() {
               or donating can make the deferral permanent.
             </p>
 
+            {nolExtensionYears > 0 && (
+              <div className="ws-note ws-note--muted">
+                <strong>Projection extended to year {results.years.length}:</strong> NOL
+                carryforward remained at the end of the standard {baseHorizonYears}-year
+                horizon, so the model keeps running wind-down years until it is fully used.
+                Extension years assume income continues at the final scheduled year's level
+                (your last income-schedule row, if set).
+              </div>
+            )}
             {currentStrategy?.type === 'overlay' &&
               effectiveInputs.collateralCostBasis === undefined && (
                 <div className="ws-note">
