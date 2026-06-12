@@ -133,6 +133,13 @@ export interface StateTaxProfile {
    * projection years at or before `throughProjectionYear` (year 1 = 2026).
    */
   nolStateSuspension?: { throughProjectionYear: number; magiThreshold: number };
+  /**
+   * State NOL carryover period in years (D-020). CA: 20 years for post-2008
+   * losses (R&TC §17276), extended by SB 167 for suspension years. Undefined
+   * means indefinite (federal-conforming) — the engine's state NOL vintage
+   * ledger only runs when this is defined. Federal NOLs are always indefinite.
+   */
+  nolCarryoverYears?: number;
 }
 
 /**
@@ -172,6 +179,10 @@ export function getStateTaxProfile(
         ltRate: 0.133,
         allowsLossOffsetAgainstIncome: true,
         nolStateSuspension: { throughProjectionYear: 1, magiThreshold: 1000000 },
+        // CA NOLs expire 20 years after the loss year (R&TC §17276,
+        // post-2008 losses); SB 167 adds +1 carryover year per suspension
+        // year. Federal NOLs are indefinite (D-020).
+        nolCarryoverYears: 20,
       };
     case 'NY': {
       // NY taxes gains as ordinary (10.9% top) and RETAINED the §461(l)

@@ -76,6 +76,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     'Ordinary Losses',
     'Usable Ordinary Loss',
     'NOL Carryforward',
+    'State NOL Expired',
     'Tax Savings',
     'Income Offset',
     ...(hasDeleverage ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved'] : []),
@@ -93,6 +94,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
       y.ordinaryLossesGenerated,
       y.usableOrdinaryLoss,
       y.nolCarryforward,
+      y.stateNolExpired,
       y.taxSavings,
       y.incomeOffsetAmount,
       ...(hasDeleverage

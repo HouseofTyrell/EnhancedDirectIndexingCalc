@@ -25,6 +25,7 @@ function makeYear(overrides: Partial<YearResult> = {}): YearResult {
     nolCarryforward: 0,
     nolUsedThisYear: 0,
     capitalLossUsedAgainstIncome: 0,
+    stateNolExpired: 0,
     effectiveStLossRate: 0,
     incomeOffsetAmount: 0,
     maxIncomeOffsetCapacity: 0,

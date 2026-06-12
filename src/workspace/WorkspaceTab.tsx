@@ -1305,6 +1305,14 @@ export function WorkspaceTab() {
                 the projection — raise “Projection years” to see more of it.
               </div>
             )}
+            {summary.totalStateNolExpired > 0 && (
+              <div className="ws-note">
+                ⚠️ <strong>State NOL expiry:</strong> {formatCurrency(summary.totalStateNolExpired)}{' '}
+                of California NOL expires unused within the projection (20-year state carryover;
+                federal NOL is not affected). See the "St. NOL Expired" column in the year-by-year
+                table.
+              </div>
+            )}
             {currentStrategy?.type === 'overlay' &&
               effectiveInputs.collateralCostBasis === undefined && (
                 <div className="ws-note">

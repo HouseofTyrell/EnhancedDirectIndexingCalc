@@ -163,7 +163,7 @@ export function ResultsTable({
     // QFAF columns - Total Losses Realized (expandable)
     if (showQfaf && qfafEnabled) {
       cols += 1; // Total Losses headline
-      if (expandOrdLoss) cols += 6; // Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover, Inc. Req'd
+      if (expandOrdLoss) cols += 7; // Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover, St. NOL Expired, Inc. Req'd
     }
 
     // Capital loss carryforward group (always shown)
@@ -190,8 +190,14 @@ export function ResultsTable({
   // significant tax savings beyond the ~$1.5K/yr capital loss deduction.
   const filteredData = data.filter(y => {
     if (y.strategyActive) return true;
-    // Keep wind-down rows with NOL usage or ordinary loss benefits (significant events)
-    return y.nolUsedThisYear > 0.01 || y.ordinaryLossBenefit > 0.01 || y.nolUsageBenefit > 0.01;
+    // Keep wind-down rows with NOL usage, ordinary loss benefits, or a state
+    // NOL expiry (significant events)
+    return (
+      y.nolUsedThisYear > 0.01 ||
+      y.ordinaryLossBenefit > 0.01 ||
+      y.nolUsageBenefit > 0.01 ||
+      y.stateNolExpired > 0.01
+    );
   });
 
   // Determine if this is the first wind-down row for divider
@@ -382,6 +388,9 @@ export function ResultsTable({
                             <InfoText contentKey="col-nol-carryforward">NOL Carryover</InfoText>
                           </th>
                           <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-state-nol-expired">St. NOL Expired</InfoText>
+                          </th>
+                          <th className="col-detail qfaf-col">
                             <InfoText contentKey="col-income-required">Inc. Req&apos;d</InfoText>
                           </th>
                         </>
@@ -534,6 +543,7 @@ export function ResultsTable({
                       <td className="starting-note">—</td>
                       {expandOrdLoss && (
                         <>
+                          <td className="starting-note qfaf-col">—</td>
                           <td className="starting-note qfaf-col">—</td>
                           <td className="starting-note qfaf-col">—</td>
                           <td className="starting-note qfaf-col">—</td>
@@ -758,6 +768,16 @@ export function ResultsTable({
                                 </td>
                                 {/* NOL Carryover */}
                                 <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
+                                {/* State NOL expired unused (D-020: CA 20-year carryover) */}
+                                <td
+                                  className={
+                                    year.stateNolExpired > 0.01 ? 'negative qfaf-col' : 'qfaf-col'
+                                  }
+                                >
+                                  {year.stateNolExpired > 0.01
+                                    ? `(${formatCurrency(year.stateNolExpired)})`
+                                    : '—'}
+                                </td>
                                 {/* Income required to fully utilize §461(l) + NOL this year */}
                                 <td className="qfaf-col">
                                   {year.incomeRequiredForFullUtilization > 0
@@ -1146,6 +1166,12 @@ function TransposedTable({
           label: 'NOL Balance',
           contentKey: 'col-nol-carryforward',
           cell: y => money(y.nolCarryforward),
+        },
+        {
+          label: 'St. NOL Expired',
+          contentKey: 'col-state-nol-expired',
+          cell: y => negMoney(y.stateNolExpired),
+          className: () => 'negative',
         },
         {
           label: "Income Req'd (Full Use)",

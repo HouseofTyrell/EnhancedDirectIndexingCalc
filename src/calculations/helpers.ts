@@ -287,6 +287,10 @@ export function calculateSummary(
     0
   );
   const totalNolGenerated = years.reduce((sum, y) => sum + y.excessToNol, 0);
+  // State-side NOL dollars that expired unused (D-020, CA 20-year carryover).
+  // Reporting only — federal NOL balances and taxSavings are not reduced here;
+  // the lost state benefit is already reflected in each year's nolUsageBenefit.
+  const totalStateNolExpired = years.reduce((sum, y) => sum + y.stateNolExpired, 0);
   // Cash returned by QFAF dynamic resizing and the terminal unwind. Held
   // outside the strategy (modeled as uninvested), but part of total wealth.
   const totalQfafCashReturned = years.reduce((sum, y) => sum + y.qfafCashReturned, 0);
@@ -318,6 +322,7 @@ export function calculateSummary(
     finalPortfolioValue,
     effectiveTaxAlpha,
     totalNolGenerated,
+    totalStateNolExpired: safeNumber(totalStateNolExpired),
     totalQfafCashReturned,
     finalTotalWealth,
     finalStCarryforward: safeNumber(finalStCarryforward),

@@ -68,6 +68,26 @@ export interface CalculateYearOverrides {
   unwindLtGain?: number;
   /** Financing-fee dollars saved vs the un-delevered source book this year */
   deleverageFinancingSaved?: number;
+  /**
+   * D-020: sum of UNEXPIRED state NOL vintages at the start of the year
+   * (CA 20-year carryover). When defined, the state-rate component of the
+   * NOL usage benefit is applied to at most this many dollars; federal NOL
+   * math is untouched. Undefined = no state expiry (ledger off).
+   */
+  stateNolAvailable?: number;
+}
+
+/**
+ * State NOL vintage (D-020). CA NOLs expire 20 years after the loss year
+ * (R&TC §17276); SB 167 extends the carryover of NOLs whose deduction was
+ * suspended (+1 year per suspension year). The ledger gates ONLY the state
+ * component of NOL benefits — federal NOLs are indefinite.
+ */
+interface StateNolVintage {
+  yearCreated: number;
+  amount: number;
+  /** Last projection year in which this vintage is deductible; it expires at the END of this year. */
+  lastUsableYear: number;
 }
 
 /**
@@ -119,6 +139,25 @@ export function calculateWithOverrides(
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
   const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate, inputs.nycResident);
+
+  // D-020: state NOL vintage ledger (CA only — runs only when the profile
+  // defines a carryover period; zero behavior change for every other state).
+  // Vintages are consumed FIFO (oldest first, matching CA ordering rules and
+  // the taxpayer-favorable default) whenever NOL is used, and expire at the
+  // end of year `yearCreated + carryover`. Pre-existing NOL assumption: it is
+  // treated as a single pre-2024 loss whose deduction was suspended for all
+  // three SB 167 years (2024–2026), so it gets the full +3-year extension —
+  // carryover 20 + 3 measured from vintage year 0 (the year before the
+  // projection starts), i.e. usable through the end of projection year 23.
+  const stateNolCarryoverYears = stateProfile.nolCarryoverYears;
+  const stateNolVintages: StateNolVintage[] = [];
+  if (stateNolCarryoverYears !== undefined && inputs.existingNolCarryforward > 0) {
+    stateNolVintages.push({
+      yearCreated: 0,
+      amount: inputs.existingNolCarryforward,
+      lastUsableYear: stateNolCarryoverYears + 3,
+    });
+  }
 
   // Honor custom tax rates the same way calculate() does, so the standard
   // view and Year-by-Year Planning agree when custom rates are set.
@@ -372,6 +411,14 @@ export function calculateWithOverrides(
       yearOverrides.eventLtGain = ev.character === 'lt' ? ev.amount : 0;
     }
 
+    // D-020: unexpired state-side NOL available this year. Expired vintages
+    // are removed at the end of their last usable year, so the ledger sum is
+    // exactly the live state pool. Until something expires this equals the
+    // federal balance, so the cap never binds and results are unchanged.
+    if (stateNolCarryoverYears !== undefined) {
+      yearOverrides.stateNolAvailable = stateNolVintages.reduce((s, v) => s + v.amount, 0);
+    }
+
     const result = calculateYear(
       year,
       effectiveQfafValue,
@@ -429,6 +476,50 @@ export function calculateWithOverrides(
     if (inNolExtension && result.nolUsedThisYear <= 0.5 && cfConsumed <= 3000 + 0.5) {
       break;
     }
+
+    // D-020: advance the state NOL vintage ledger. The D-019 extension/stall
+    // guard above is deliberately untouched — it watches the FEDERAL NOL
+    // balance, which expiry never reduces.
+    if (stateNolCarryoverYears !== undefined) {
+      // 1) Consume this year's NOL usage FIFO (oldest vintage first). The
+      //    federal nolUsed never exceeds the start-of-year balance, so the
+      //    ledger covers it except where vintages have already expired.
+      let toConsume = result.nolUsedThisYear;
+      for (const vintage of stateNolVintages) {
+        if (toConsume <= 0) break;
+        const consumed = Math.min(vintage.amount, toConsume);
+        vintage.amount -= consumed;
+        toConsume -= consumed;
+      }
+      // 2) Record NOL generated this year as a new vintage. A vintage whose
+      //    state deduction was suspended this year (SB 167, MAGI ≥ $1M; year
+      //    1 = tax year 2026, the last suspension year) gets +1 carryover.
+      if (result.excessToNol > 0) {
+        const suspendedThisYear =
+          stateProfile.nolStateSuspension !== undefined &&
+          year <= stateProfile.nolStateSuspension.throughProjectionYear &&
+          yearIncome >= stateProfile.nolStateSuspension.magiThreshold;
+        stateNolVintages.push({
+          yearCreated: year,
+          amount: result.excessToNol,
+          lastUsableYear: year + stateNolCarryoverYears + (suspendedThisYear ? 1 : 0),
+        });
+      }
+      // 3) Expire vintages at the end of their last usable year; report the
+      //    unused dollars (state-side only — federal NOL is unaffected).
+      let stateNolExpiredThisYear = 0;
+      for (let i = stateNolVintages.length - 1; i >= 0; i--) {
+        const vintage = stateNolVintages[i];
+        if (vintage.lastUsableYear <= year) {
+          stateNolExpiredThisYear += Math.max(0, vintage.amount);
+          stateNolVintages.splice(i, 1);
+        } else if (vintage.amount <= 0) {
+          stateNolVintages.splice(i, 1);
+        }
+      }
+      result.stateNolExpired = safeNumber(stateNolExpiredThisYear);
+    }
+
     if (redeployProceeds) {
       pendingRedeploy += totalRedeemed;
       years.push({ ...result, qfafCashReturned: 0 });
@@ -650,10 +741,23 @@ export function calculateYear(
   );
   const nolAtOrdinary = Math.min(nolUsed, ordinaryNolBase);
   const nolAtLt = nolUsed - nolAtOrdinary;
-  const ltNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038)) + nolStateRate;
-  const nolUsageBenefit = safeNumber(
-    nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate
-  );
+  const fedLtNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038));
+  const ltNolRate = fedLtNolRate + nolStateRate;
+  // D-020: when expired CA vintages leave the state-side NOL pool smaller
+  // than the federal balance, only the unexpired portion earns the state
+  // rate (both NOL tranches share the same state rate, so the state benefit
+  // is simply stateEligibleNol × nolStateRate). The original expression is
+  // kept when nothing has expired so the no-ledger path is bit-identical.
+  const stateEligibleNol =
+    overrides?.stateNolAvailable !== undefined
+      ? Math.min(nolUsed, overrides.stateNolAvailable)
+      : nolUsed;
+  const nolUsageBenefit =
+    stateEligibleNol >= nolUsed
+      ? safeNumber(nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate)
+      : safeNumber(
+          nolAtOrdinary * ordinaryRate + nolAtLt * fedLtNolRate + stateEligibleNol * nolStateRate
+        );
 
   // Costs:
   // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption).
@@ -827,6 +931,7 @@ export function calculateYear(
     nolCarryforward: newNolCarryforward,
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
+    stateNolExpired: 0, // Set by the calling loop's vintage ledger (D-020)
     effectiveStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,

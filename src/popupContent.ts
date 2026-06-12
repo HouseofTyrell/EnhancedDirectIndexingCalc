@@ -429,6 +429,20 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     impact: 'Can offset 80% of future taxable income each year.',
   },
 
+  'col-state-nol-expired': {
+    title: 'State NOL Expired',
+    definition:
+      'State-side NOL dollars that expired unused at the end of this year. California NOLs ' +
+      'expire 20 years after the loss year (R&TC §17276, post-2008 losses); SB 167 extends the ' +
+      'carryover of NOLs whose deduction was suspended (tax years 2024–2026, MAGI ≥ $1M) by one ' +
+      'year per suspension year. NOL vintages are consumed oldest-first (FIFO).',
+    formula: 'Unused balance of each NOL vintage at the end of its 20(+) year carryover period',
+    impact:
+      'Expired dollars stop earning the state rate when NOL is deducted in later years — only ' +
+      'the unexpired state-side pool is valued at the state rate. Federal NOLs are indefinite ' +
+      'and are NOT affected.',
+  },
+
   'col-lt-carryforward': {
     title: 'LT Capital Loss Carryforward',
     definition: 'Accumulated long-term capital losses not yet used.',

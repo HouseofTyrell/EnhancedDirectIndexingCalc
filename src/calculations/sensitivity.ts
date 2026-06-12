@@ -115,6 +115,22 @@ export function calculateWithSensitivity(
 
   const years: YearResult[] = [];
 
+  // D-020: state NOL vintage ledger, mirroring core.ts exactly (CA only —
+  // runs only when the profile defines a carryover period). Vintages are
+  // consumed FIFO on NOL usage and expire at the end of year
+  // `yearCreated + carryover`. Pre-existing NOL is treated as a pre-2024
+  // loss suspended for all three SB 167 years → carryover 20 + 3 from
+  // vintage year 0 (see core.ts).
+  const stateNolCarryoverYears = adjustedProfile.nolCarryoverYears;
+  const stateNolVintages: { yearCreated: number; amount: number; lastUsableYear: number }[] = [];
+  if (stateNolCarryoverYears !== undefined && inputs.existingNolCarryforward > 0) {
+    stateNolVintages.push({
+      yearCreated: 0,
+      amount: inputs.existingNolCarryforward,
+      lastUsableYear: stateNolCarryoverYears + 3,
+    });
+  }
+
   let qfafValue = sizing.qfafValue;
   // Track per-leg collateral so split mode handles diverging financing fees correctly.
   const legCollateral = allocation.legs.map(leg => leg.collateralAmount);
@@ -256,6 +272,14 @@ export function calculateWithSensitivity(
       };
     }
 
+    // D-020: unexpired state-side NOL available this year (see core.ts).
+    if (stateNolCarryoverYears !== undefined) {
+      yearSensitivityOverrides.stateNolAvailable = stateNolVintages.reduce(
+        (s, v) => s + v.amount,
+        0
+      );
+    }
+
     const result = calculateYearWithSensitivity(
       year,
       effectiveQfafValue,
@@ -297,6 +321,42 @@ export function calculateWithSensitivity(
     const terminalProceeds =
       strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
     const totalRedeemed = cashReturned + terminalProceeds;
+
+    // D-020: advance the state NOL vintage ledger (mirrors core.ts —
+    // FIFO consumption, new vintage with SB 167 +1 if suspended, expiry
+    // at the end of the last usable year; state-side reporting only).
+    if (stateNolCarryoverYears !== undefined) {
+      let toConsume = result.nolUsedThisYear;
+      for (const vintage of stateNolVintages) {
+        if (toConsume <= 0) break;
+        const consumed = Math.min(vintage.amount, toConsume);
+        vintage.amount -= consumed;
+        toConsume -= consumed;
+      }
+      if (result.excessToNol > 0) {
+        const suspendedThisYear =
+          adjustedProfile.nolStateSuspension !== undefined &&
+          year <= adjustedProfile.nolStateSuspension.throughProjectionYear &&
+          inputs.annualIncome >= adjustedProfile.nolStateSuspension.magiThreshold;
+        stateNolVintages.push({
+          yearCreated: year,
+          amount: result.excessToNol,
+          lastUsableYear: year + stateNolCarryoverYears + (suspendedThisYear ? 1 : 0),
+        });
+      }
+      let stateNolExpiredThisYear = 0;
+      for (let i = stateNolVintages.length - 1; i >= 0; i--) {
+        const vintage = stateNolVintages[i];
+        if (vintage.lastUsableYear <= year) {
+          stateNolExpiredThisYear += Math.max(0, vintage.amount);
+          stateNolVintages.splice(i, 1);
+        } else if (vintage.amount <= 0) {
+          stateNolVintages.splice(i, 1);
+        }
+      }
+      result.stateNolExpired = safeNumber(stateNolExpiredThisYear);
+    }
+
     if (redeployProceeds) {
       pendingRedeploy += totalRedeemed;
       years.push({ ...result, qfafCashReturned: 0 });
@@ -343,6 +403,11 @@ interface SensitivityYearOverrides {
   // computation should NOT multiply ST losses by `yearFraction` again.
   stRateIsCalendarBlended?: boolean;
   financingCost?: number; // pre-blended financing; bypasses fullStrategy lookup
+  /**
+   * D-020: sum of unexpired state NOL vintages at the start of the year —
+   * caps the state-rate component of the NOL benefit (see core.ts).
+   */
+  stateNolAvailable?: number;
 }
 
 /**
@@ -476,10 +541,21 @@ function calculateYearWithSensitivity(
   );
   const nolAtOrdinary = Math.min(nolUsed, ordinaryNolBase);
   const nolAtLt = nolUsed - nolAtOrdinary;
-  const ltNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038)) + nolStateRate;
-  const nolUsageBenefit = safeNumber(
-    nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate
-  );
+  const fedLtNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038));
+  const ltNolRate = fedLtNolRate + nolStateRate;
+  // D-020: only unexpired state vintages earn the state rate — see core.ts.
+  // The original expression is kept when nothing has expired so the
+  // no-ledger path is bit-identical.
+  const stateEligibleNol =
+    overrides?.stateNolAvailable !== undefined
+      ? Math.min(nolUsed, overrides.stateNolAvailable)
+      : nolUsed;
+  const nolUsageBenefit =
+    stateEligibleNol >= nolUsed
+      ? safeNumber(nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate)
+      : safeNumber(
+          nolAtOrdinary * ordinaryRate + nolAtLt * fedLtNolRate + stateEligibleNol * nolStateRate
+        );
 
   // Costs: charged on taxable (post-offset) LT gains — see core.ts (CPA finding E)
   const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
@@ -590,6 +666,7 @@ function calculateYearWithSensitivity(
     nolCarryforward: newNolCarryforward,
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
+    stateNolExpired: 0, // Set by the calling loop's vintage ledger (D-020)
     effectiveStLossRate: adjustedStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,

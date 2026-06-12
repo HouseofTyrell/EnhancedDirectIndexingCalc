@@ -499,6 +499,21 @@ the CA state component past its carryover period, and surface expired amounts.
 **Implications:** per the audit-complete table directive, any new per-year output
 (e.g., state NOL expired) must appear in ResultsTable both orientations + popup.
 Federal NOL (indefinite, 80% limit) is unaffected.
+**Status: IMPLEMENTED (2026-06-12)** — state NOL vintage ledger in `core.ts` (mirrored
+in `sensitivity.ts`), gated on a new `nolCarryoverYears` state-profile field (CA = 20;
+undefined = indefinite, so non-CA behavior is bit-identical). Vintages are consumed
+FIFO on NOL usage and expire at the end of year `yearCreated + 20` (+1 per SB 167
+suspension year: a year-1 vintage suspended under the existing MAGI ≥ $1M check gets
+21). Pre-existing NOL is vintage year 0 with carryover 20 + 3 (modeling assumption: a
+pre-2024 loss whose use was suspended for all three SB 167 years). Only the STATE rate
+component of `nolUsageBenefit` is capped at the unexpired pool; federal NOL math,
+`nolCarryforward`, §461(l), and the 80% limit are untouched. New per-year
+`stateNolExpired` + `summary.totalStateNolExpired`, surfaced in ResultsTable (both
+orientations, NOL group, dash when 0), `col-state-nol-expired` popup, a Workspace
+Overview warning note, and the Excel year-by-year sheet. Eight regression tests added
+(`stateNolExpiry.test.ts`): non-CA bit-identical baselines (NY/PA), CA fully-used
+no-op, vintage-0 expiry at year 23, FIFO ordering, SB 167 +1 timing, D-019
+stall-guard/40-cap interaction, sensitivity mirror; suite at 360.
 
 ### D-021 — Export parity for EDI metrics: close now
 **Date:** 2026-06-12
