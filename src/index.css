@@ -327,7 +327,7 @@ body {
 
 /* Calculator container — responsive width with breathing room on wide displays */
 .calculator {
-  max-width: calc(100vw - 400px);  /* 200px margin each side on wide screens */
+  max-width: calc(100vw - 400px); /* 200px margin each side on wide screens */
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
@@ -364,7 +364,9 @@ body {
   letter-spacing: 0.01em;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .meeting-mode-toggle:hover {
@@ -1055,7 +1057,9 @@ body {
   cursor: pointer;
   padding: 0.35rem 0.75rem;
   border-radius: 6px;
-  transition: color 0.15s, background-color 0.15s;
+  transition:
+    color 0.15s,
+    background-color 0.15s;
 }
 
 .reset-defaults-btn:hover {
@@ -1856,7 +1860,9 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--bg, #f9fafb);
   color: var(--text-light, #6b7280);
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .btn-group__btn:not(:last-child) {
@@ -2628,7 +2634,9 @@ tfoot td {
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .export-btn:hover {
@@ -2762,7 +2770,11 @@ tfoot td {
   color: var(--text-light);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, width 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    width 0.15s ease;
 }
 
 .pinnable-section__tooltip {
@@ -2825,7 +2837,9 @@ tfoot td {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   transition: transform 0.25s ease;
 }
@@ -2841,7 +2855,9 @@ tfoot td {
 }
 
 [data-theme='dark'] .floating-panel {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* --- Header (drag handle) --- */
@@ -2971,8 +2987,20 @@ tfoot td {
 
 /* Scroll fade indicators (reduced zone to avoid clipping resize handles) */
 .floating-panel__body {
-  mask-image: linear-gradient(to bottom, transparent 0, black 3px, black calc(100% - 3px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 3px, black calc(100% - 3px), transparent 100%);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 3px,
+    black calc(100% - 3px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 3px,
+    black calc(100% - 3px),
+    transparent 100%
+  );
 }
 
 /* --- Items --- */
@@ -2981,7 +3009,12 @@ tfoot td {
   border-radius: 8px;
   overflow: hidden;
   border-left: 3px solid transparent;
-  transition: border-left-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.1s ease, transform 0.1s ease;
+  transition:
+    border-left-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.1s ease,
+    transform 0.1s ease;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -3023,7 +3056,9 @@ tfoot td {
   opacity: 0.5;
   border-color: var(--primary);
   transform: scale(0.97);
-  transition: opacity 0.1s ease, transform 0.1s ease;
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease;
 }
 
 .floating-panel__item--drop-target {
@@ -3146,10 +3181,34 @@ tfoot td {
 }
 
 /* Edges */
-.floating-panel__resize-zone--n { top: 0; left: 10px; right: 10px; height: 4px; cursor: ns-resize; }
-.floating-panel__resize-zone--s { bottom: 0; left: 10px; right: 10px; height: 4px; cursor: ns-resize; }
-.floating-panel__resize-zone--e { right: 0; top: 10px; bottom: 10px; width: 4px; cursor: ew-resize; }
-.floating-panel__resize-zone--w { left: 0; top: 10px; bottom: 10px; width: 4px; cursor: ew-resize; }
+.floating-panel__resize-zone--n {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.floating-panel__resize-zone--s {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.floating-panel__resize-zone--e {
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  cursor: ew-resize;
+}
+.floating-panel__resize-zone--w {
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  cursor: ew-resize;
+}
 
 /* Corners (higher z-index to take priority over edges) */
 .floating-panel__resize-zone--ne,
@@ -3159,10 +3218,34 @@ tfoot td {
   z-index: 3;
 }
 
-.floating-panel__resize-zone--ne { top: 0; right: 0; width: 10px; height: 10px; cursor: nesw-resize; }
-.floating-panel__resize-zone--nw { top: 0; left: 0; width: 10px; height: 10px; cursor: nwse-resize; }
-.floating-panel__resize-zone--se { bottom: 0; right: 0; width: 10px; height: 10px; cursor: nwse-resize; }
-.floating-panel__resize-zone--sw { bottom: 0; left: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+.floating-panel__resize-zone--ne {
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  cursor: nesw-resize;
+}
+.floating-panel__resize-zone--nw {
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  cursor: nwse-resize;
+}
+.floating-panel__resize-zone--se {
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  cursor: nwse-resize;
+}
+.floating-panel__resize-zone--sw {
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  cursor: nesw-resize;
+}
 
 /* Visual indicator on SE corner (conventional resize grip) */
 .floating-panel__resize-zone--se::before {
@@ -5867,8 +5950,12 @@ select:focus:not(:focus-visible) {
 
 /* Value change flash animation (generic — works on any element) */
 @keyframes value-flash {
-  0% { background-color: rgba(37, 99, 235, 0.15); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(37, 99, 235, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 .value-changed {
@@ -5895,10 +5982,20 @@ select:focus:not(:focus-visible) {
 }
 
 @keyframes delta-fade {
-  0% { opacity: 0; transform: translateY(2px); }
-  10% { opacity: 1; transform: translateY(0); }
-  75% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6030,7 +6127,9 @@ select:focus:not(:focus-visible) {
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .rate-editor-trigger:hover {
@@ -6633,8 +6732,12 @@ select:focus:not(:focus-visible) {
 }
 
 @keyframes value-flash-dark {
-  0% { background-color: rgba(59, 130, 246, 0.2); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(59, 130, 246, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 /* Delta badges in dark mode */

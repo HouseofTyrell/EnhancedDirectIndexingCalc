@@ -16,7 +16,8 @@ const STEPS: TourStep[] = [
   {
     targetSelector: '#strategy',
     title: 'Choose Your Strategy',
-    description: 'Select a collateral strategy type. Core strategies use cash; overlays use appreciated stock.',
+    description:
+      'Select a collateral strategy type. Core strategies use cash; overlays use appreciated stock.',
   },
   {
     targetSelector: '#collateral',
@@ -36,14 +37,17 @@ const STEPS: TourStep[] = [
   {
     targetSelector: '.headline-metrics',
     title: 'Projected Tax Savings',
-    description: 'Your estimated tax savings appear here. These update in real-time as you change inputs.',
+    description:
+      'Your estimated tax savings appear here. These update in real-time as you change inputs.',
   },
 ];
 
 export function OnboardingTour() {
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
-  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(
+    null
+  );
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Check if tour should show

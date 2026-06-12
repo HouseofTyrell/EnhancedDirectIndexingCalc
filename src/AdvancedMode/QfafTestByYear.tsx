@@ -66,20 +66,80 @@ interface RowDef {
 }
 
 const ROW_DEFINITIONS: RowDef[] = [
-  { key: 'dealsCollateralValue', label: 'Deals Collateral Value', field: 'dealsCollateralValue', format: 'currency' },
-  { key: 'qfafSubscriptionSize', label: 'QFAF Subscription Size', field: 'qfafSubscriptionSize', format: 'currency' },
-  { key: 'annualEstOrdinaryLosses', label: 'Annual Est. Ordinary Losses', field: 'annualEstOrdinaryLosses', format: 'currency' },
-  { key: 'section461Limit', label: 'Annual limitation TCJA Section 461(l)', field: 'section461Limit', format: 'currency' },
-  { key: 'carryForwardPrior', label: 'Carry Forward Prior Year', field: 'carryForwardPrior', format: 'currency' },
-  { key: 'carryForwardNext', label: 'Carry Forward to Next Year', field: 'carryForwardNext', format: 'currency' },
-  { key: 'writeOffAmount', label: 'Write Off Amount', field: 'writeOffAmount', format: 'currency-highlight' },
+  {
+    key: 'dealsCollateralValue',
+    label: 'Deals Collateral Value',
+    field: 'dealsCollateralValue',
+    format: 'currency',
+  },
+  {
+    key: 'qfafSubscriptionSize',
+    label: 'QFAF Subscription Size',
+    field: 'qfafSubscriptionSize',
+    format: 'currency',
+  },
+  {
+    key: 'annualEstOrdinaryLosses',
+    label: 'Annual Est. Ordinary Losses',
+    field: 'annualEstOrdinaryLosses',
+    format: 'currency',
+  },
+  {
+    key: 'section461Limit',
+    label: 'Annual limitation TCJA Section 461(l)',
+    field: 'section461Limit',
+    format: 'currency',
+  },
+  {
+    key: 'carryForwardPrior',
+    label: 'Carry Forward Prior Year',
+    field: 'carryForwardPrior',
+    format: 'currency',
+  },
+  {
+    key: 'carryForwardNext',
+    label: 'Carry Forward to Next Year',
+    field: 'carryForwardNext',
+    format: 'currency',
+  },
+  {
+    key: 'writeOffAmount',
+    label: 'Write Off Amount',
+    field: 'writeOffAmount',
+    format: 'currency-highlight',
+  },
   { key: 'taxSavings', label: 'Tax Savings', field: 'taxSavings', format: 'currency-positive' },
-  { key: 'advisorManagementFee', label: 'Advisor Management Fee (Quantinno Only)', field: 'advisorManagementFee', format: 'currency-negative' },
-  { key: 'quantinnoFees', label: 'Quantinno/QFAF/Financing Fees', field: 'quantinnoFees', format: 'currency-negative' },
+  {
+    key: 'advisorManagementFee',
+    label: 'Advisor Management Fee (Quantinno Only)',
+    field: 'advisorManagementFee',
+    format: 'currency-negative',
+  },
+  {
+    key: 'quantinnoFees',
+    label: 'Quantinno/QFAF/Financing Fees',
+    field: 'quantinnoFees',
+    format: 'currency-negative',
+  },
   { key: 'totalFees', label: 'Total', field: 'totalFees', format: 'currency-negative' },
-  { key: 'netTaxBenefit', label: 'Net Tax Benefit', field: 'netTaxBenefit', format: 'currency-highlight' },
-  { key: 'qfafAlpha', label: `Historical Strategy Alpha QFAF (${(QFAF_ALPHA_RATE * 100).toFixed(2)}%)`, field: 'qfafAlpha', format: 'currency-positive' },
-  { key: 'quantinnoAlpha', label: `Historical Strategy Alpha Quantinno (${(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%)`, field: 'quantinnoAlpha', format: 'currency-positive' },
+  {
+    key: 'netTaxBenefit',
+    label: 'Net Tax Benefit',
+    field: 'netTaxBenefit',
+    format: 'currency-highlight',
+  },
+  {
+    key: 'qfafAlpha',
+    label: `Historical Strategy Alpha QFAF (${(QFAF_ALPHA_RATE * 100).toFixed(2)}%)`,
+    field: 'qfafAlpha',
+    format: 'currency-positive',
+  },
+  {
+    key: 'quantinnoAlpha',
+    label: `Historical Strategy Alpha Quantinno (${(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%)`,
+    field: 'quantinnoAlpha',
+    format: 'currency-positive',
+  },
   { key: 'totalAlpha', label: 'Total', field: 'totalAlpha', format: 'currency-positive' },
 ];
 
@@ -101,9 +161,12 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
   const totals = useMemo(() => computeTotals(results), [results]);
 
   // Assumption change handler
-  const handleAssumptionChange = useCallback((field: keyof QfafTestAssumptions, value: number | string) => {
-    dispatch({ type: 'UPDATE_ASSUMPTION', field, value });
-  }, []);
+  const handleAssumptionChange = useCallback(
+    (field: keyof QfafTestAssumptions, value: number | string) => {
+      dispatch({ type: 'UPDATE_ASSUMPTION', field, value });
+    },
+    []
+  );
 
   // Reset handler
   const handleReset = useCallback(() => {
@@ -146,7 +209,10 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                 inputMode="numeric"
                 value={formatWithCommas(state.assumptions.initialQfafInvestment)}
                 onChange={e => {
-                  handleAssumptionChange('initialQfafInvestment', parseFormattedNumber(e.target.value));
+                  handleAssumptionChange(
+                    'initialQfafInvestment',
+                    parseFormattedNumber(e.target.value)
+                  );
                 }}
               />
             </div>
@@ -161,7 +227,10 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                 inputMode="numeric"
                 value={formatWithCommas(state.assumptions.initialDealsInvestment)}
                 onChange={e => {
-                  handleAssumptionChange('initialDealsInvestment', parseFormattedNumber(e.target.value));
+                  handleAssumptionChange(
+                    'initialDealsInvestment',
+                    parseFormattedNumber(e.target.value)
+                  );
                 }}
               />
             </div>
@@ -230,12 +299,16 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                 max={1.5}
                 step={0.05}
                 value={state.assumptions.qfafGenerationRate}
-                onChange={e => handleAssumptionChange('qfafGenerationRate', parseFloat(e.target.value))}
+                onChange={e =>
+                  handleAssumptionChange('qfafGenerationRate', parseFloat(e.target.value))
+                }
               />
               <div className="slider-labels">
                 <span>100%</span>
                 <span className="slider-hist-ref">
-                  Hist: min {(HIST_ORD_LOSS_MIN * 100).toFixed(0)}%, max {(HIST_ORD_LOSS_MAX * 100).toFixed(0)}%, avg {(HIST_ORD_LOSS_AVG * 100).toFixed(0)}%
+                  Hist: min {(HIST_ORD_LOSS_MIN * 100).toFixed(0)}%, max{' '}
+                  {(HIST_ORD_LOSS_MAX * 100).toFixed(0)}%, avg{' '}
+                  {(HIST_ORD_LOSS_AVG * 100).toFixed(0)}%
                 </span>
                 <span>150%</span>
               </div>
@@ -248,7 +321,8 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
             Reset to Defaults
           </button>
           <span className="filing-status-note">
-            Filing Status: {filingStatus.toUpperCase()} | §461(l) Limit: {formatCurrency(section461Limit)}
+            Filing Status: {filingStatus.toUpperCase()} | §461(l) Limit:{' '}
+            {formatCurrency(section461Limit)}
           </span>
         </div>
       </div>
@@ -262,13 +336,15 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
               <tr>
                 <th className="col-label"></th>
                 {results.map(r => (
-                  <th key={r.year} className="col-year">{r.calendarYear}</th>
+                  <th key={r.year} className="col-year">
+                    {r.calendarYear}
+                  </th>
                 ))}
                 <th className="col-total">Total</th>
               </tr>
             </thead>
             <tbody>
-              {ROW_DEFINITIONS.map((rowDef) => (
+              {ROW_DEFINITIONS.map(rowDef => (
                 <tr key={rowDef.key} className={`row-${rowDef.format}`}>
                   <td className="row-label">
                     {rowDef.key === 'dealsCollateralValue'
@@ -319,7 +395,9 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                         {(row.netReturn * 100).toFixed(2)}%
                       </td>
                       <td className="hist-positive">{(breakdown.stCapGain * 100).toFixed(2)}%</td>
-                      <td className="hist-negative">{(breakdown.ordinaryIncome * 100).toFixed(2)}%</td>
+                      <td className="hist-negative">
+                        {(breakdown.ordinaryIncome * 100).toFixed(2)}%
+                      </td>
                     </tr>
                   );
                 })}
@@ -331,7 +409,9 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                   const ordStats = computeStats(ANNUAL_BREAKDOWN.map(r => r.ordinaryIncome));
                   return (['min', 'max', 'mean', 'median'] as const).map(stat => (
                     <tr key={stat} className="hist-stat-row">
-                      <td className="hist-label hist-stat-label">{stat.charAt(0).toUpperCase() + stat.slice(1)}</td>
+                      <td className="hist-label hist-stat-label">
+                        {stat.charAt(0).toUpperCase() + stat.slice(1)}
+                      </td>
                       <td className={netStats[stat] >= 0 ? 'hist-positive' : 'hist-negative'}>
                         {(netStats[stat] * 100).toFixed(2)}%
                       </td>
@@ -366,7 +446,9 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                         {(row.netReturn * 100).toFixed(2)}%
                       </td>
                       <td className="hist-positive">{(breakdown.stCapGain * 100).toFixed(2)}%</td>
-                      <td className="hist-negative">{(breakdown.ordinaryIncome * 100).toFixed(2)}%</td>
+                      <td className="hist-negative">
+                        {(breakdown.ordinaryIncome * 100).toFixed(2)}%
+                      </td>
                     </tr>
                   );
                 })}
@@ -378,7 +460,9 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                   const ordStats = computeStats(MONTHLY_BREAKDOWN.map(r => r.ordinaryIncome));
                   return (['min', 'max', 'mean', 'median'] as const).map(stat => (
                     <tr key={stat} className="hist-stat-row">
-                      <td className="hist-label hist-stat-label">{stat.charAt(0).toUpperCase() + stat.slice(1)}</td>
+                      <td className="hist-label hist-stat-label">
+                        {stat.charAt(0).toUpperCase() + stat.slice(1)}
+                      </td>
                       <td className={netStats[stat] >= 0 ? 'hist-positive' : 'hist-negative'}>
                         {(netStats[stat] * 100).toFixed(2)}%
                       </td>
@@ -398,19 +482,26 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
         <h4>Calculation Notes</h4>
         <ul>
           <li>
-            <strong>QFAF Subscription:</strong> Sized based on initial investment with Year 1 adjustment factor (1.049×), then decays ~7.7% annually.
+            <strong>QFAF Subscription:</strong> Sized based on initial investment with Year 1
+            adjustment factor (1.049×), then decays ~7.7% annually.
           </li>
           <li>
-            <strong>Deals Collateral:</strong> Calculated so total ST losses = QFAF ST gains. Combines Overlay (growing at {(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%) + Core collateral.
+            <strong>Deals Collateral:</strong> Calculated so total ST losses = QFAF ST gains.
+            Combines Overlay (growing at {(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%) + Core
+            collateral.
           </li>
           <li>
-            <strong>Ordinary Losses:</strong> QFAF generates {(state.assumptions.qfafGenerationRate * 100).toFixed(0)}% of subscription as ordinary losses.
+            <strong>Ordinary Losses:</strong> QFAF generates{' '}
+            {(state.assumptions.qfafGenerationRate * 100).toFixed(0)}% of subscription as ordinary
+            losses.
           </li>
           <li>
-            <strong>§461(l) Limit:</strong> {formatCurrency(section461Limit)} for {filingStatus.toUpperCase()} filers. Excess carries forward as NOL.
+            <strong>§461(l) Limit:</strong> {formatCurrency(section461Limit)} for{' '}
+            {filingStatus.toUpperCase()} filers. Excess carries forward as NOL.
           </li>
           <li>
-            <strong>Carryforward Usage:</strong> Prior year carryforward is fully used in addition to the annual §461(l) limit.
+            <strong>Carryforward Usage:</strong> Prior year carryforward is fully used in addition
+            to the annual §461(l) limit.
           </li>
         </ul>
       </div>

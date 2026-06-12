@@ -114,7 +114,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         </div>
         <div className="headline-metric">
           <h3>
-            <InfoText contentKey="incremental-benefit" currentValue={formatCurrency(incrementalBenefit)}>
+            <InfoText
+              contentKey="incremental-benefit"
+              currentValue={formatCurrency(incrementalBenefit)}
+            >
               Est. Incremental Benefit
             </InfoText>
           </h3>
@@ -126,7 +129,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         </div>
         <div className="headline-metric">
           <h3>
-            <InfoText contentKey="effective-tax-alpha" currentValue={formatPercent(effectiveTaxAlpha)}>
+            <InfoText
+              contentKey="effective-tax-alpha"
+              currentValue={formatPercent(effectiveTaxAlpha)}
+            >
               Est. Annualized Tax Alpha
             </InfoText>
           </h3>
@@ -142,7 +148,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
       <div className="summary-cards">
         <div className="card">
           <h3>
-            <InfoText contentKey="final-portfolio-value" currentValue={formatCurrency(finalPortfolioValue)}>
+            <InfoText
+              contentKey="final-portfolio-value"
+              currentValue={formatCurrency(finalPortfolioValue)}
+            >
               Est. Final Portfolio Value
             </InfoText>
           </h3>
@@ -151,7 +160,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         </div>
         <div className="card">
           <h3>
-            <InfoText contentKey="total-nol-generated" currentValue={formatCurrency(totalNolGenerated)}>
+            <InfoText
+              contentKey="total-nol-generated"
+              currentValue={formatCurrency(totalNolGenerated)}
+            >
               Est. Total NOL Generated
             </InfoText>
           </h3>
@@ -171,16 +183,20 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         {collateralAmount > 0 ? (
           <>
             Based on a {formatCurrency(collateralAmount)} portfolio, this strategy is estimated to
-            generate approximately {formatCurrency(totalTaxSavings)} in cumulative tax savings
-            over {projectionYears} years, or roughly {formatCurrency(avgAnnualSavings)} per year.
+            generate approximately {formatCurrency(totalTaxSavings)} in cumulative tax savings over{' '}
+            {projectionYears} years, or roughly {formatCurrency(avgAnnualSavings)} per year.
             {incrementalBenefit > 0 && (
-              <> The enhanced strategy adds an estimated {formatCurrency(incrementalBenefit)} beyond
-              what standard direct indexing alone would achieve.</>
+              <>
+                {' '}
+                The enhanced strategy adds an estimated {formatCurrency(incrementalBenefit)} beyond
+                what standard direct indexing alone would achieve.
+              </>
             )}
           </>
         ) : (
           <>
-            Enter a collateral amount and income details above to see estimated tax savings projections.
+            Enter a collateral amount and income details above to see estimated tax savings
+            projections.
           </>
         )}
       </div>
@@ -199,8 +215,8 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             </h3>
             <p className="big-number">{formatCurrency(exitTaxAnalysis.embeddedGain)}</p>
             <p className="subtext">
-              Incl. {formatCurrency(exitTaxAnalysis.cumulativeBasisReduction)} basis reduction
-              from harvesting
+              Incl. {formatCurrency(exitTaxAnalysis.cumulativeBasisReduction)} basis reduction from
+              harvesting
             </p>
           </div>
           <div className="card">
@@ -228,8 +244,12 @@ export const ResultsSummary = React.memo(function ResultsSummary({
                 Est. Net Benefit After Liquidation
               </InfoText>
             </h3>
-            <p className="big-number">{formatCurrency(exitTaxAnalysis.netBenefitAfterLiquidation)}</p>
-            <p className="subtext">Tax savings less deferred tax if fully sold in year {projectionYears}</p>
+            <p className="big-number">
+              {formatCurrency(exitTaxAnalysis.netBenefitAfterLiquidation)}
+            </p>
+            <p className="subtext">
+              Tax savings less deferred tax if fully sold in year {projectionYears}
+            </p>
           </div>
         </div>
       )}
@@ -237,22 +257,23 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         <div className="results-disclosure">
           {exitTaxAnalysis.incrementalDeferredTax < 0 ? (
             <>
-              <strong>Permanent vs. deferred:</strong> The exit math runs in the strategy's
-              favor — liquidating in year {projectionYears} would cost{' '}
+              <strong>Permanent vs. deferred:</strong> The exit math runs in the strategy's favor —
+              liquidating in year {projectionYears} would cost{' '}
               {formatCurrency(Math.abs(exitTaxAnalysis.incrementalDeferredTax))} LESS than the
               passive baseline, because the remaining loss carryforwards more than cover the
               strategy's embedded gain. Assumes initial basis equals initial value;
-              appreciated-stock (Overlay) collateral carries additional pre-existing embedded
-              gain not shown here.
+              appreciated-stock (Overlay) collateral carries additional pre-existing embedded gain
+              not shown here.
             </>
           ) : (
             <>
-              <strong>Permanent vs. deferred:</strong> A portion of the estimated savings is a timing
-              benefit — harvesting reduces cost basis, so {formatCurrency(exitTaxAnalysis.incrementalDeferredTax)} of
-              tax would come due on full liquidation in year {projectionYears}. If the portfolio is
-              instead held until death (basis step-up) or donated, the deferred portion may become
-              permanent. Assumes initial basis equals initial value; appreciated-stock (Overlay)
-              collateral carries additional pre-existing embedded gain not shown here.
+              <strong>Permanent vs. deferred:</strong> A portion of the estimated savings is a
+              timing benefit — harvesting reduces cost basis, so{' '}
+              {formatCurrency(exitTaxAnalysis.incrementalDeferredTax)} of tax would come due on full
+              liquidation in year {projectionYears}. If the portfolio is instead held until death
+              (basis step-up) or donated, the deferred portion may become permanent. Assumes initial
+              basis equals initial value; appreciated-stock (Overlay) collateral carries additional
+              pre-existing embedded gain not shown here.
             </>
           )}
         </div>
@@ -260,8 +281,8 @@ export const ResultsSummary = React.memo(function ResultsSummary({
 
       {/* Exclusion disclosure */}
       <div className="results-disclosure">
-        <strong>Note:</strong> Estimates do not reflect advisory fees, financing costs, tracking error
-        impacts, transaction costs, or behavioral effects. Actual results will vary. See full
+        <strong>Note:</strong> Estimates do not reflect advisory fees, financing costs, tracking
+        error impacts, transaction costs, or behavioral effects. Actual results will vary. See full
         disclosures below.
       </div>
 

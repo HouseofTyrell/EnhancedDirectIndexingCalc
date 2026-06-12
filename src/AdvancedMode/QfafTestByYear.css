@@ -52,7 +52,7 @@
   gap: 0.25rem;
 }
 
-.generation-rate-slider input[type="range"] {
+.generation-rate-slider input[type='range'] {
   width: 100%;
   accent-color: #f59e0b;
   cursor: pointer;
@@ -473,6 +473,4 @@
   .summary-table .row-label {
     min-width: 160px;
   }
-
-
 }

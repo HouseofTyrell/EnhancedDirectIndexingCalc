@@ -19,10 +19,7 @@ import {
   TRAD_DI_LT_GAIN_RATE,
   LONG_ONLY_TARGET,
 } from './calculations/deleverage';
-import {
-  getFinancingCostForRatios,
-  getEffectiveFinancingCost,
-} from './calculations/financing';
+import { getFinancingCostForRatios, getEffectiveFinancingCost } from './calculations/financing';
 import { exportInputsToCsv, parseInputsFromCsv } from './utils/csvScenario';
 import { saveRateOverrides, clearRateOverrides } from './utils/strategyRates';
 import { getStrategy } from './strategyData';
@@ -110,7 +107,9 @@ describe('deleverage schedule resolution', () => {
   });
 
   it('D-017 defaults: LT character once seasoned (startYear > 2), ST before; pro-rata haircut; 0% short cover', () => {
-    const seasoned = resolveDeleveragePlan(createInputs({ deleveragePlan: plan({ startYear: 3 }) }));
+    const seasoned = resolveDeleveragePlan(
+      createInputs({ deleveragePlan: plan({ startYear: 3 }) })
+    );
     const early = resolveDeleveragePlan(createInputs({ deleveragePlan: plan({ startYear: 2 }) }));
     expect(seasoned?.unwindGainCharacter).toBe('lt');
     expect(early?.unwindGainCharacter).toBe('st');
@@ -300,14 +299,16 @@ describe('unwind tax attribution (endogenous, opposite of D-012)', () => {
   });
 
   it('same-year D-012 gain event is still sheltered event-LAST (unwind nets first)', () => {
-    const event = [{
-      year: 3,
-      w2Income: 3000000,
-      cashInfusion: 0,
-      cashInfusionTaxType: 'gross' as const,
-      note: '',
-      gainEvent: { amount: 10000000, character: 'lt' as const },
-    }];
+    const event = [
+      {
+        year: 3,
+        w2Income: 3000000,
+        cashInfusion: 0,
+        cashInfusionTaxType: 'gross' as const,
+        note: '',
+        gainEvent: { amount: 10000000, character: 'lt' as const },
+      },
+    ];
     const withPlan = calculateWithOverrides(
       createInputs({ deleveragePlan: plan({ startYear: 3, durationYears: 1 }) }),
       DEFAULT_SETTINGS,
@@ -399,9 +400,10 @@ describe('financing interpolation', () => {
     for (const id of ['core-130-30', 'core-225-125', 'overlay-45-45', 'overlay-125-125']) {
       const s = getStrategy(id)!;
       const expectShort = Number(s.name.match(/\d+\/(\d+)/)![1]) / 100;
-      const expectLong = s.type === 'core'
-        ? (Number(s.name.match(/(\d+)\//)![1]) - 100) / 100
-        : Number(s.name.match(/(\d+)\//)![1]) / 100;
+      const expectLong =
+        s.type === 'core'
+          ? (Number(s.name.match(/(\d+)\//)![1]) - 100) / 100
+          : Number(s.name.match(/(\d+)\//)![1]) / 100;
       expect(getEffectiveFinancingCost(s, feeSettingsDetailed)).toBeCloseTo(
         getFinancingCostForRatios(expectLong, expectShort, feeSettingsDetailed),
         12
@@ -419,9 +421,7 @@ describe('QFAF interaction', () => {
     );
     // Year 4 harvest rate drops 7.0% → 2.0%, so the dynamic QFAF (and its ST
     // gains) shrink with it instead of leaking ST gains.
-    expect(withPlan.years[3].stGainsGenerated).toBeLessThan(
-      noPlan.years[3].stGainsGenerated * 0.5
-    );
+    expect(withPlan.years[3].stGainsGenerated).toBeLessThan(noPlan.years[3].stGainsGenerated * 0.5);
     expect(withPlan.years[3].stGainLeakage).toBeCloseTo(0, 0);
   });
 

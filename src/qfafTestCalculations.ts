@@ -228,7 +228,12 @@ export function computeTotals(results: QfafTestYearRow[]): QfafTestTotals {
   };
 }
 
-export function computeStats(values: number[]): { min: number; max: number; mean: number; median: number } {
+export function computeStats(values: number[]): {
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+} {
   if (values.length === 0) {
     return { min: 0, max: 0, mean: 0, median: 0 };
   }

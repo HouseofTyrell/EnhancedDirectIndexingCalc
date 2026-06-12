@@ -1,13 +1,5 @@
-import {
-  CalculatorInputs,
-  YearResult,
-  CalculatedSizing,
-  AdvancedSettings,
-} from '../types';
-import {
-  CAPITAL_LOSS_LIMITS,
-  NOL_OFFSET_PERCENTAGE,
-} from '../strategyData';
+import { CalculatorInputs, YearResult, CalculatedSizing, AdvancedSettings } from '../types';
+import { CAPITAL_LOSS_LIMITS, NOL_OFFSET_PERCENTAGE } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
 import { getNetCapitalLossRate } from '../utils/strategyRates';
 
@@ -20,7 +12,11 @@ import { getNetCapitalLossRate } from '../utils/strategyRates';
  * partial-year starts, callers must convert calendar years to the
  * appropriate operating-year blend — see `getCalendarYearStLossRate`.
  */
-export function getEffectiveStLossRate(strategyId: string, ltGainRate: number, year: number): number {
+export function getEffectiveStLossRate(
+  strategyId: string,
+  ltGainRate: number,
+  year: number
+): number {
   // Get the net capital loss rate (may be custom or default with decay)
   const netCapitalLossRate = getNetCapitalLossRate(strategyId, year);
   // ST Loss Rate = Net Capital Loss Rate + LT Gain Rate
@@ -242,8 +238,13 @@ export function calculateCarryforwards(
   // NOL can offset up to nolOffsetLimit of taxable income
   const yearIncome = effectiveIncome ?? inputs.annualIncome;
   const taxableIncomeBeforeNol =
-    yearIncome + taxableSt + taxableLt + eventTaxableSt + eventTaxableLt -
-    usableOrdinaryLoss - capitalLossUsedAgainstIncome;
+    yearIncome +
+    taxableSt +
+    taxableLt +
+    eventTaxableSt +
+    eventTaxableLt -
+    usableOrdinaryLoss -
+    capitalLossUsedAgainstIncome;
   const nolOffsetLimit = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
   const maxNolUsage = Math.max(0, taxableIncomeBeforeNol) * nolOffsetLimit;
   const nolUsed = Math.min(nolCarryforward, maxNolUsage);
@@ -286,6 +287,10 @@ export function calculateSummary(
     0
   );
   const totalNolGenerated = years.reduce((sum, y) => sum + y.excessToNol, 0);
+  // State-side NOL dollars that expired unused (D-020, CA 20-year carryover).
+  // Reporting only — federal NOL balances and taxSavings are not reduced here;
+  // the lost state benefit is already reflected in each year's nolUsageBenefit.
+  const totalStateNolExpired = years.reduce((sum, y) => sum + y.stateNolExpired, 0);
   // Cash returned by QFAF dynamic resizing and the terminal unwind. Held
   // outside the strategy (modeled as uninvested), but part of total wealth.
   const totalQfafCashReturned = years.reduce((sum, y) => sum + y.qfafCashReturned, 0);
@@ -301,9 +306,9 @@ export function calculateSummary(
 
   // Loss reserve built (D-015): the ending CF balances are the EDI product's
   // contingent shelter. Valued character-by-character at the final year's
-  // combined gains rates — CFs offset future capital gains, which PA/NJ DO
-  // tax, so the state component uses gains rates rather than the (disallowed)
-  // ordinary-deduction rate. Kept out of totalTaxSavings: contingent value.
+  // combined gains rates. Callers zero the state component where individuals
+  // get no loss carryforwards (PA/NJ — losses expire each state tax year).
+  // Kept out of totalTaxSavings: contingent value.
   const finalStCarryforward = lastYear?.stLossCarryforward ?? 0;
   const finalLtCarryforward = lastYear?.ltLossCarryforward ?? 0;
   const lossReserveShelterValue = safeNumber(
@@ -317,6 +322,7 @@ export function calculateSummary(
     finalPortfolioValue,
     effectiveTaxAlpha,
     totalNolGenerated,
+    totalStateNolExpired: safeNumber(totalStateNolExpired),
     totalQfafCashReturned,
     finalTotalWealth,
     finalStCarryforward: safeNumber(finalStCarryforward),

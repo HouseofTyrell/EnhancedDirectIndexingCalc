@@ -32,7 +32,12 @@ import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
 import { exportToExcel } from '../utils/excelExport';
 import { MeetingMode } from '../components/MeetingMode/MeetingMode';
-import { formatCurrency, formatPercent, formatWithCommas, parseFormattedNumber } from '../utils/formatters';
+import {
+  formatCurrency,
+  formatPercent,
+  formatWithCommas,
+  parseFormattedNumber,
+} from '../utils/formatters';
 import { ResultsTable } from '../ResultsTable';
 import { TaxSavingsChart, PortfolioValueChart } from '../WealthChart';
 import { DisclaimerFooter } from '../components/DisclaimerFooter';
@@ -55,8 +60,8 @@ type FundingMode = 'collateral' | 'total';
  *   via Overview / Year-by-Year / Charts sub-views.
  * - One surface per number: the metric strip is the only headline; deep
  *   detail lives in the (audit-complete) table reused from the classic view.
- * - Power features (split allocation, year-by-year planning, sensitivity,
- *   meeting mode) intentionally stay in the classic tab.
+ * - Power features (split allocation, sensitivity) intentionally stay in
+ *   the classic tab; Meeting Mode and per-year planning launch from here.
  */
 export function WorkspaceTab() {
   const qualifiedPurchaser = useQualifiedPurchaser();
@@ -95,7 +100,13 @@ export function WorkspaceTab() {
       settings.washSaleDisallowanceRate
     );
     return { ...inputs, collateralAmount: solved };
-  }, [fundingMode, totalAvailable, inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate]);
+  }, [
+    fundingMode,
+    totalAvailable,
+    inputs,
+    settings.qfafMultiplier,
+    settings.washSaleDisallowanceRate,
+  ]);
 
   const projYears = settings.projectionYears ?? 10;
   const activeOverrides = useMemo(() => {
@@ -125,7 +136,8 @@ export function WorkspaceTab() {
         {
           ...effectiveInputs,
           qfafEnabled: false,
-          collateralAmount: fundingMode === 'total' ? totalAvailable : effectiveInputs.collateralAmount,
+          collateralAmount:
+            fundingMode === 'total' ? totalAvailable : effectiveInputs.collateralAmount,
         },
         settings
       ),
@@ -142,8 +154,7 @@ export function WorkspaceTab() {
     return {
       profile,
       combinedLt: fedLt + profile.ltRate,
-      combinedOrdinary:
-        fedOrd + (profile.allowsLossOffsetAgainstIncome ? profile.ordinaryRate : 0),
+      combinedOrdinary: fedOrd + (profile.allowsLossOffsetAgainstIncome ? profile.ordinaryRate : 0),
       // Full shape for Meeting Mode and Excel export (matches the classic memo)
       full: {
         federalStRate: fedSt,
@@ -156,7 +167,13 @@ export function WorkspaceTab() {
         rateDifferential: fedSt - fedLt,
       },
     };
-  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate, inputs.nycResident]);
+  }, [
+    inputs.annualIncome,
+    inputs.filingStatus,
+    inputs.stateCode,
+    inputs.stateRate,
+    inputs.nycResident,
+  ]);
 
   const exit = useMemo(
     () =>
@@ -167,7 +184,13 @@ export function WorkspaceTab() {
         rates.profile.ltcgExcise,
         effectiveInputs.collateralCostBasis
       ),
-    [results, rates, settings.growthEnabled, settings.defaultAnnualReturn, effectiveInputs.collateralCostBasis]
+    [
+      results,
+      rates,
+      settings.growthEnabled,
+      settings.defaultAnnualReturn,
+      effectiveInputs.collateralCostBasis,
+    ]
   );
 
   // EDI-only mode (D-014/D-015): with QFAF off, the product is the loss
@@ -194,6 +217,7 @@ export function WorkspaceTab() {
         results={results}
         collateralOnlyResults={collateralOnly}
         taxRates={rates.full}
+        exitAnalysis={exit}
         advancedSettings={settings}
         currentStrategy={getStrategy(effectiveInputs.strategyId)}
         onExitMeetingMode={() => setIsMeetingMode(false)}
@@ -332,7 +356,7 @@ export function WorkspaceTab() {
   const dlvTargetLabel =
     dlvPlan?.target === LONG_ONLY_TARGET || !dlvPlan
       ? 'long-only direct indexing'
-      : getStrategy(dlvPlan.target)?.name ?? dlvPlan.target;
+      : (getStrategy(dlvPlan.target)?.name ?? dlvPlan.target);
   // Active = the engine actually unwound something (false when the plan is
   // ignored, e.g. split allocation on).
   const dlvActive = results.years.some(y => y.extensionFraction < 1);
@@ -362,7 +386,9 @@ export function WorkspaceTab() {
               onChange={e => set('filingStatus', e.target.value as FilingStatus)}
             >
               {FILING_STATUSES.map(f => (
-                <option key={f.value} value={f.value}>{f.label}</option>
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
               ))}
             </select>
           </label>
@@ -370,7 +396,9 @@ export function WorkspaceTab() {
             <span>State</span>
             <select value={inputs.stateCode} onChange={e => set('stateCode', e.target.value)}>
               {STATES.map(s => (
-                <option key={s.code} value={s.code}>{s.name}</option>
+                <option key={s.code} value={s.code}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </label>
@@ -400,7 +428,9 @@ export function WorkspaceTab() {
             <span>Collateral strategy</span>
             <select value={inputs.strategyId} onChange={e => set('strategyId', e.target.value)}>
               {STRATEGIES.map(s => (
-                <option key={s.id} value={s.id}>{s.name} — {s.label}</option>
+                <option key={s.id} value={s.id}>
+                  {s.name} — {s.label}
+                </option>
               ))}
             </select>
           </label>
@@ -450,8 +480,7 @@ export function WorkspaceTab() {
                 → Collateral {formatCurrency(results.sizing.collateralValue)}
                 {inputs.qfafEnabled && (
                   <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
-                )}{' '}
-                = {formatCurrency(results.sizing.totalExposure)}
+                )} = {formatCurrency(results.sizing.totalExposure)}
               </p>
             </>
           )}
@@ -467,10 +496,7 @@ export function WorkspaceTab() {
               }
               onChange={e => {
                 const raw = e.target.value.trim();
-                set(
-                  'collateralCostBasis',
-                  raw === '' ? undefined : parseFormattedNumber(raw)
-                );
+                set('collateralCostBasis', raw === '' ? undefined : parseFormattedNumber(raw));
               }}
             />
           </label>
@@ -496,7 +522,9 @@ export function WorkspaceTab() {
             <input
               inputMode="numeric"
               value={formatWithCommas(inputs.existingStLossCarryforward)}
-              onChange={e => set('existingStLossCarryforward', parseFormattedNumber(e.target.value))}
+              onChange={e =>
+                set('existingStLossCarryforward', parseFormattedNumber(e.target.value))
+              }
             />
           </label>
           <label className="ws-field">
@@ -504,7 +532,9 @@ export function WorkspaceTab() {
             <input
               inputMode="numeric"
               value={formatWithCommas(inputs.existingLtLossCarryforward)}
-              onChange={e => set('existingLtLossCarryforward', parseFormattedNumber(e.target.value))}
+              onChange={e =>
+                set('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
+              }
             />
           </label>
           <label className="ws-field">
@@ -532,7 +562,9 @@ export function WorkspaceTab() {
               <label className="ws-field">
                 <span>Duration: {inputs.qfafDuration} yrs</span>
                 <input
-                  type="range" min={1} max={10}
+                  type="range"
+                  min={1}
+                  max={10}
                   value={inputs.qfafDuration}
                   onChange={e => set('qfafDuration', Number(e.target.value))}
                 />
@@ -593,7 +625,9 @@ export function WorkspaceTab() {
                   {dlvPlan.durationYears === 1 ? ' (all at once)' : ''}
                 </span>
                 <input
-                  type="range" min={1} max={10}
+                  type="range"
+                  min={1}
+                  max={10}
                   value={dlvPlan.durationYears}
                   onChange={e => setDlvPlan({ durationYears: Number(e.target.value) })}
                 />
@@ -606,15 +640,16 @@ export function WorkspaceTab() {
                 >
                   <option value={LONG_ONLY_TARGET}>Long-only direct indexing</option>
                   {dlvTargets.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} — {s.label}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.label}
+                    </option>
                   ))}
                 </select>
               </label>
               {/* D-017 disclosure — defaults stay visible while a plan is on */}
               <p className="ws-rail-note" style={{ padding: 0, marginTop: 6 }}>
-                Assumes short covers realize no gain — shorts are continuously
-                loss-recycled; unwound long-extension gains realized as LT once
-                seasoned. Overridable in code.
+                Assumes short covers realize no gain — shorts are continuously loss-recycled;
+                unwound long-extension gains realized as LT once seasoned. Overridable in code.
               </p>
             </>
           )}
@@ -622,6 +657,23 @@ export function WorkspaceTab() {
 
         <div className="ws-rail-group">
           <h4>Model</h4>
+          <label className="ws-field">
+            <span>
+              <InfoText contentKey="projection-years">Projection years</InfoText>
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={40}
+              value={projYears}
+              onChange={e =>
+                setSetting(
+                  'projectionYears',
+                  Math.max(1, Math.min(40, Number(e.target.value) || 10))
+                )
+              }
+            />
+          </label>
           <label className="ws-toggle">
             <input
               type="checkbox"
@@ -655,9 +707,14 @@ export function WorkspaceTab() {
             <span>Show present value ({formatPercent(settings.discountRate, 0)})</span>
           </label>
           <label className="ws-field">
-            <span>Wash-sale disallowance: {formatPercent(settings.washSaleDisallowanceRate, 0)}</span>
+            <span>
+              Wash-sale disallowance: {formatPercent(settings.washSaleDisallowanceRate, 0)}
+            </span>
             <input
-              type="range" min={0} max={15} step={1}
+              type="range"
+              min={0}
+              max={15}
+              step={1}
               value={Math.round(settings.washSaleDisallowanceRate * 100)}
               onChange={e => setSetting('washSaleDisallowanceRate', Number(e.target.value) / 100)}
             />
@@ -666,23 +723,22 @@ export function WorkspaceTab() {
 
         <div className="ws-rail-group">
           <h4>Per-Year Events</h4>
-          <button
-            className="ws-action-btn"
-            onClick={() => setShowEventsEditor(v => !v)}
-          >
+          <button className="ws-action-btn" onClick={() => setShowEventsEditor(v => !v)}>
             {showEventsEditor ? 'Hide' : 'Edit'} income &amp; events
             {activeOverrides.length > 0 && ` (${activeOverrides.length} active)`}
           </button>
           <p className="ws-rail-note" style={{ padding: 0, marginTop: 6 }}>
-            Model variable RSU/bonus years, cash infusions, and planned sale
-            events (business exit, IPO lockup). One-click scenario presets
-            inside.
+            Model variable RSU/bonus years, cash infusions, and planned sale events (business exit,
+            IPO lockup). One-click scenario presets inside.
           </p>
         </div>
 
         <div className="ws-rail-group">
           <h4>Actions</h4>
-          <button className="ws-action-btn ws-action-btn--primary" onClick={() => setIsMeetingMode(true)}>
+          <button
+            className="ws-action-btn ws-action-btn--primary"
+            onClick={() => setIsMeetingMode(true)}
+          >
             Open Meeting Mode
           </button>
           <button
@@ -693,6 +749,7 @@ export function WorkspaceTab() {
                 results,
                 settings,
                 taxRates: rates.full,
+                exitAnalysis: exit,
               })
             }
           >
@@ -721,8 +778,8 @@ export function WorkspaceTab() {
         </div>
 
         <p className="ws-rail-note">
-          Split allocation and sensitivity analysis live in the{' '}
-          <strong>Classic Calculator</strong> tab.
+          Split allocation and sensitivity analysis live in the <strong>Classic Calculator</strong>{' '}
+          tab.
         </p>
       </aside>
 
@@ -731,17 +788,19 @@ export function WorkspaceTab() {
         <div className="ws-metrics">
           <div className="ws-metric ws-metric--primary">
             <span className="ws-metric-label">
-              <InfoText contentKey="total-tax-savings" currentValue={formatCurrency(summary.totalTaxSavings)}>
+              <InfoText
+                contentKey="total-tax-savings"
+                currentValue={formatCurrency(summary.totalTaxSavings)}
+              >
                 Est. Tax Savings
               </InfoText>
             </span>
             <span className="ws-metric-value">{formatCurrency(summary.totalTaxSavings)}</span>
             <span className="ws-metric-sub">
               {results.years.length} yrs
-              {nolExtensionYears > 0 && ' (extended to use NOL)'}
+              {nolExtensionYears > 0 && ' (extended to use losses)'}
               {!settings.financingFeesEnabled && ' · before costs & fees'}
-              {settings.presentValueEnabled &&
-                ` · PV ${formatCurrency(summary.totalTaxSavingsPV)}`}
+              {settings.presentValueEnabled && ` · PV ${formatCurrency(summary.totalTaxSavingsPV)}`}
             </span>
           </div>
           {ediMode ? (
@@ -775,7 +834,9 @@ export function WorkspaceTab() {
                 </InfoText>
               </span>
               <span className="ws-metric-value">{formatCurrency(peakIncomeReq.amount)}</span>
-              <span className="ws-metric-sub">peak need, year {peakIncomeReq.year} — per-year below</span>
+              <span className="ws-metric-sub">
+                peak need, year {peakIncomeReq.year} — per-year below
+              </span>
             </div>
           )}
           <div className="ws-metric">
@@ -787,11 +848,16 @@ export function WorkspaceTab() {
           </div>
           <div className="ws-metric">
             <span className="ws-metric-label">
-              <InfoText contentKey="net-benefit-after-liquidation" currentValue={formatCurrency(exit.netBenefitAfterLiquidation)}>
+              <InfoText
+                contentKey="net-benefit-after-liquidation"
+                currentValue={formatCurrency(exit.netBenefitAfterLiquidation)}
+              >
                 Net If Liquidated
               </InfoText>
             </span>
-            <span className="ws-metric-value">{formatCurrency(exit.netBenefitAfterLiquidation)}</span>
+            <span className="ws-metric-value">
+              {formatCurrency(exit.netBenefitAfterLiquidation)}
+            </span>
             <span className="ws-metric-sub">after deferred tax</span>
           </div>
         </div>
@@ -800,17 +866,30 @@ export function WorkspaceTab() {
           <div className="ws-events-editor">
             <div className="ws-presets">
               <span className="ws-presets-label">Scenario presets</span>
-              <button type="button" className="ws-preset-btn" onClick={() => applyPreset('business-sale')}>
+              <button
+                type="button"
+                className="ws-preset-btn"
+                onClick={() => applyPreset('business-sale')}
+              >
                 Business sale
               </button>
-              <button type="button" className="ws-preset-btn" onClick={() => applyPreset('rsu-vesting')}>
+              <button
+                type="button"
+                className="ws-preset-btn"
+                onClick={() => applyPreset('rsu-vesting')}
+              >
                 RSU vesting
               </button>
-              <button type="button" className="ws-preset-btn" onClick={() => applyPreset('concentrated-stock')}>
+              <button
+                type="button"
+                className="ws-preset-btn"
+                onClick={() => applyPreset('concentrated-stock')}
+              >
                 Diversify concentrated stock
               </button>
               <span className="ws-presets-note">
-                starting points — each fills the rows below; edit amounts and years to fit the client
+                starting points — each fills the rows below; edit amounts and years to fit the
+                client
               </span>
             </div>
             <div className="ws-sched">
@@ -835,14 +914,18 @@ export function WorkspaceTab() {
               <button type="button" className="ws-sched-btn" onClick={applyIncomeSchedule}>
                 Apply schedule
               </button>
-              <button type="button" className="ws-sched-btn ws-sched-btn--ghost" onClick={resetIncomeSchedule}>
+              <button
+                type="button"
+                className="ws-sched-btn ws-sched-btn--ghost"
+                onClick={resetIncomeSchedule}
+              >
                 Reset incomes
               </button>
             </div>
             <p className="ws-rail-note" style={{ padding: 0, margin: '0 0 10px' }}>
               Fills the income column for years 1–{projYears} (start ×{' '}
-              {schedGrowth >= 0 ? 'growth' : 'decline'} compounding). Rows stay editable —
-              adjust individual years after applying (e.g., drop to retirement income).
+              {schedGrowth >= 0 ? 'growth' : 'decline'} compounding). Rows stay editable — adjust
+              individual years after applying (e.g., drop to retirement income).
             </p>
             <div className="ws-events-head">
               <span>Year</span>
@@ -864,7 +947,9 @@ export function WorkspaceTab() {
                   <input
                     inputMode="numeric"
                     value={formatWithCommas(o?.cashInfusion ?? 0)}
-                    onChange={e => setEvent(yr, { cashInfusion: parseFormattedNumber(e.target.value) })}
+                    onChange={e =>
+                      setEvent(yr, { cashInfusion: parseFormattedNumber(e.target.value) })
+                    }
                   />
                   <input
                     inputMode="numeric"
@@ -873,9 +958,10 @@ export function WorkspaceTab() {
                     onChange={e => {
                       const amount = parseFormattedNumber(e.target.value);
                       setEvent(yr, {
-                        gainEvent: amount > 0
-                          ? { amount, character: o?.gainEvent?.character ?? 'lt' }
-                          : undefined,
+                        gainEvent:
+                          amount > 0
+                            ? { amount, character: o?.gainEvent?.character ?? 'lt' }
+                            : undefined,
                       });
                     }}
                   />
@@ -896,10 +982,9 @@ export function WorkspaceTab() {
               );
             })}
             <p className="ws-rail-note" style={{ marginTop: 8 }}>
-              Gain events flow through the real netting: carryforwards shelter them
-              (after the strategy's own gains), they absorb the §461(l) deduction,
-              and they widen the NOL base. Event tax is reported separately — it is
-              never charged against the strategy's savings.
+              Gain events flow through the real netting: carryforwards shelter them (after the
+              strategy's own gains), they absorb the §461(l) deduction, and they widen the NOL base.
+              Event tax is reported separately — it is never charged against the strategy's savings.
             </p>
           </div>
         )}
@@ -912,8 +997,11 @@ export function WorkspaceTab() {
                 carryforwards shelter {formatCurrency(y.gainEventCfShelter)}, leaving{' '}
                 {formatCurrency(y.gainEventTax)} of tax due
                 {y.gainEventTaxWithoutStrategy - y.gainEventTax > 0.5 && (
-                  <> ({formatCurrency(y.gainEventTaxWithoutStrategy - y.gainEventTax)} less than
-                  without the program)</>
+                  <>
+                    {' '}
+                    ({formatCurrency(y.gainEventTaxWithoutStrategy - y.gainEventTax)} less than
+                    without the program)
+                  </>
                 )}
                 . Any NOL absorbed by the event shows in that year's savings and the
                 income-utilization chips.
@@ -924,8 +1012,8 @@ export function WorkspaceTab() {
 
         {dlvPlan?.enabled && inputs.qfafEnabled && inputs.qfafSizingMode === 'fixed' && (
           <div className="ws-note">
-            ⚠️ <strong>Fixed QFAF sizing</strong> won't shrink with deleveraging — expect ST
-            gain leakage as the harvest rate glides down (switch to Dynamic).
+            ⚠️ <strong>Fixed QFAF sizing</strong> won't shrink with deleveraging — expect ST gain
+            leakage as the harvest rate glides down (switch to Dynamic).
           </div>
         )}
         {dlvPlan?.enabled && inputs.splitAllocation?.enabled && (
@@ -951,7 +1039,10 @@ export function WorkspaceTab() {
             <div className="ws-cards">
               <div className="ws-card">
                 <span className="ws-card-label">
-                  <InfoText contentKey="embedded-gain-at-horizon" currentValue={formatCurrency(exit.embeddedGain)}>
+                  <InfoText
+                    contentKey="embedded-gain-at-horizon"
+                    currentValue={formatCurrency(exit.embeddedGain)}
+                  >
                     Embedded Gain (Yr {projectionYears})
                   </InfoText>
                 </span>
@@ -965,7 +1056,10 @@ export function WorkspaceTab() {
               </div>
               <div className="ws-card">
                 <span className="ws-card-label">
-                  <InfoText contentKey="incremental-deferred-tax" currentValue={formatCurrency(exit.incrementalDeferredTax)}>
+                  <InfoText
+                    contentKey="incremental-deferred-tax"
+                    currentValue={formatCurrency(exit.incrementalDeferredTax)}
+                  >
                     Deferred Tax If Liquidated
                   </InfoText>
                 </span>
@@ -978,7 +1072,10 @@ export function WorkspaceTab() {
               </div>
               <div className="ws-card">
                 <span className="ws-card-label">
-                  <InfoText contentKey="net-if-held-to-step-up" currentValue={formatCurrency(stepUp.netIfHeldToStepUp)}>
+                  <InfoText
+                    contentKey="net-if-held-to-step-up"
+                    currentValue={formatCurrency(stepUp.netIfHeldToStepUp)}
+                  >
                     Net If Held to Step-Up
                   </InfoText>
                 </span>
@@ -990,7 +1087,10 @@ export function WorkspaceTab() {
               {hasNol && (
                 <div className="ws-card">
                   <span className="ws-card-label">
-                    <InfoText contentKey="total-nol-generated" currentValue={formatCurrency(summary.totalNolGenerated)}>
+                    <InfoText
+                      contentKey="total-nol-generated"
+                      currentValue={formatCurrency(summary.totalNolGenerated)}
+                    >
                       NOL Generated
                     </InfoText>
                   </span>
@@ -1044,7 +1144,9 @@ export function WorkspaceTab() {
                         Break-Even Gain Event
                       </InfoText>
                     </span>
-                    <span className="ws-card-value">{formatCurrency(insights.breakEvenGainEvent)}</span>
+                    <span className="ws-card-value">
+                      {formatCurrency(insights.breakEvenGainEvent)}
+                    </span>
                     <span className="ws-card-sub">a gain this size would be fully sheltered</span>
                   </div>
                   <div className="ws-card">
@@ -1056,7 +1158,9 @@ export function WorkspaceTab() {
                         Cumulative Financing Cost
                       </InfoText>
                     </span>
-                    <span className="ws-card-value">{formatCurrency(insights.cumulativeFinancingCost)}</span>
+                    <span className="ws-card-value">
+                      {formatCurrency(insights.cumulativeFinancingCost)}
+                    </span>
                     <span className="ws-card-sub">
                       {settings.financingFeesEnabled
                         ? `over ${results.years.length} years`
@@ -1089,16 +1193,17 @@ export function WorkspaceTab() {
 
             {ediMode ? (
               <p className="ws-narrative">
-                <strong>What this means:</strong> on a {formatCurrency(results.sizing.collateralValue)}{' '}
-                portfolio with {currentStrategy?.name ?? 'the selected strategy'}, the program's main
-                output is a loss reserve: an estimated{' '}
+                <strong>What this means:</strong> on a{' '}
+                {formatCurrency(results.sizing.collateralValue)} portfolio with{' '}
+                {currentStrategy?.name ?? 'the selected strategy'}, the program's main output is a
+                loss reserve: an estimated{' '}
                 {formatCurrency(summary.finalStCarryforward + summary.finalLtCarryforward)} of loss
                 carryforwards by year {results.years.length}, worth{' '}
                 {formatCurrency(summary.lossReserveShelterValue)} of shelter against future capital
-                gains — contingent on those gains being realized (a business sale, concentrated-stock
-                exit, RSU diversification). Realized savings along the way are an estimated{' '}
-                {formatCurrency(summary.totalTaxSavings)} (the $3,000/yr deduction plus any gain
-                events the reserve shelters — model one with the presets above).{' '}
+                gains — contingent on those gains being realized (a business sale,
+                concentrated-stock exit, RSU diversification). Realized savings along the way are an
+                estimated {formatCurrency(summary.totalTaxSavings)} (the $3,000/yr deduction plus
+                any gain events the reserve shelters — model one with the presets above).{' '}
                 {exit.incrementalDeferredTax < 0 ? (
                   <>
                     And the reserve already covers the exit: full liquidation in year{' '}
@@ -1118,17 +1223,18 @@ export function WorkspaceTab() {
               </p>
             ) : (
               <p className="ws-narrative">
-                <strong>What this means:</strong> on a {formatCurrency(results.sizing.collateralValue)}{' '}
-                portfolio with {currentStrategy?.name ?? 'the selected strategy'}, the program is
-                estimated to save {formatCurrency(summary.totalTaxSavings)} over {results.years.length} years
-                at a combined ordinary rate of {formatPercent(rates.combinedOrdinary)}.{' '}
+                <strong>What this means:</strong> on a{' '}
+                {formatCurrency(results.sizing.collateralValue)} portfolio with{' '}
+                {currentStrategy?.name ?? 'the selected strategy'}, the program is estimated to save{' '}
+                {formatCurrency(summary.totalTaxSavings)} over {results.years.length} years at a
+                combined ordinary rate of {formatPercent(rates.combinedOrdinary)}.{' '}
                 {exit.incrementalDeferredTax < 0 ? (
                   <>
-                    The exit math runs in the strategy's favor: liquidating in year {projectionYears}{' '}
-                    would cost {formatCurrency(Math.abs(exit.incrementalDeferredTax))} <em>less</em>{' '}
-                    than the passive baseline — the loss reserve more than covers the strategy's
-                    embedded gain — for a net benefit of{' '}
-                    {formatCurrency(exit.netBenefitAfterLiquidation)}.
+                    The exit math runs in the strategy's favor: liquidating in year{' '}
+                    {projectionYears} would cost{' '}
+                    {formatCurrency(Math.abs(exit.incrementalDeferredTax))} <em>less</em> than the
+                    passive baseline — the loss reserve more than covers the strategy's embedded
+                    gain — for a net benefit of {formatCurrency(exit.netBenefitAfterLiquidation)}.
                   </>
                 ) : (
                   <>
@@ -1149,15 +1255,17 @@ export function WorkspaceTab() {
               is NOT counted in either figure.
               {stepUp.recommendation === 'partial_unwind' && (
                 <>
-                  {' '}With carryforwards covering only part of the embedded gain, the modeled
-                  optimum is a partial unwind of ~{Math.round(stepUp.optimalUnwindPct * 100)}%
-                  during life (sheltered by the reserve), holding the rest for step-up.
+                  {' '}
+                  With carryforwards covering only part of the embedded gain, the modeled optimum is
+                  a partial unwind of ~{Math.round(stepUp.optimalUnwindPct * 100)}% during life
+                  (sheltered by the reserve), holding the rest for step-up.
                 </>
               )}
               {stepUp.recommendation === 'unwind' && (
                 <>
-                  {' '}Here the carryforward exceeds the embedded gain, so a full unwind during
-                  life is tax-free — excess reserve would otherwise be lost at death.
+                  {' '}
+                  Here the carryforward exceeds the embedded gain, so a full unwind during life is
+                  tax-free — excess reserve would otherwise be lost at death.
                 </>
               )}
             </div>
@@ -1165,14 +1273,14 @@ export function WorkspaceTab() {
             {dlvActive && dlvPlan && (
               <div className="ws-note ws-note--muted">
                 <strong>Deleveraging:</strong> unwinding{' '}
-                {currentStrategy?.name ?? 'the current strategy'} to {dlvTargetLabel} starting
-                year {dlvPlan.startYear}
+                {currentStrategy?.name ?? 'the current strategy'} to {dlvTargetLabel} starting year{' '}
+                {dlvPlan.startYear}
                 {dlvPlan.durationYears > 1
                   ? ` over ${dlvPlan.durationYears} years`
                   : ' all at once'}{' '}
                 realizes {formatCurrency(dlvTotalGain)} of unwind gains, of which only{' '}
-                {formatCurrency(dlvTotalTax)} is taxed — the remainder is absorbed by the
-                year's harvested losses and the loss-carryforward reserve.{' '}
+                {formatCurrency(dlvTotalTax)} is taxed — the remainder is absorbed by the year's
+                harvested losses and the loss-carryforward reserve.{' '}
                 {settings.financingFeesEnabled ? (
                   <>Financing fees saved vs staying levered: {formatCurrency(dlvTotalFinSaved)}.</>
                 ) : (
@@ -1180,52 +1288,70 @@ export function WorkspaceTab() {
                 )}
                 {dlvPlan.target === LONG_ONLY_TARGET && (
                   <>
-                    {' '}Once long-only, the realistic endgame for an estate-minded client is
-                    holding through basis step-up — the "Net If Held to Step-Up" card above
-                    shows that path with the deferred exit tax never paid.
+                    {' '}
+                    Once long-only, the realistic endgame for an estate-minded client is holding
+                    through basis step-up — the "Net If Held to Step-Up" card above shows that path
+                    with the deferred exit tax never paid.
                   </>
                 )}
               </div>
             )}
             {nolExtensionYears > 0 && (
               <div className="ws-note ws-note--muted">
-                <strong>Projection extended to year {results.years.length}:</strong> NOL
-                carryforward remained at the end of the standard {baseHorizonYears}-year
-                horizon, so the model keeps running wind-down years until it is fully used.
-                Extension years assume income continues at the final scheduled year's level
-                (your last income-schedule row, if set).
+                <strong>Projection extended to year {results.years.length}:</strong> loss
+                carryforwards (NOL or capital) remained at the end of the standard{' '}
+                {baseHorizonYears}-year horizon, so the model keeps running wind-down years while
+                something is consuming them (capped at 40). Extension years assume income continues
+                at the final scheduled year's level (your last income-schedule row, if set). A
+                capital-loss reserve consumed only by the $3,000/yr ordinary offset does not extend
+                the projection — raise “Projection years” to see more of it.
+              </div>
+            )}
+            {summary.totalStateNolExpired > 0 && (
+              <div className="ws-note">
+                ⚠️ <strong>State NOL expiry:</strong> {formatCurrency(summary.totalStateNolExpired)}{' '}
+                of California NOL expires unused within the projection (20-year state carryover;
+                federal NOL is not affected). See the "St. NOL Expired" column in the year-by-year
+                table.
               </div>
             )}
             {currentStrategy?.type === 'overlay' &&
               effectiveInputs.collateralCostBasis === undefined && (
                 <div className="ws-note">
-                  ⚠️ <strong>Appreciated-stock collateral:</strong> the liquidation analysis
-                  assumes basis equals today's value. If this collateral carries unrealized
-                  gain, enter its <strong>cost basis</strong> in the Strategy panel so the
-                  embedded gain and deferred tax reflect the client's true exit picture.
+                  ⚠️ <strong>Appreciated-stock collateral:</strong> the liquidation analysis assumes
+                  basis equals today's value. If this collateral carries unrealized gain, enter its{' '}
+                  <strong>cost basis</strong> in the Strategy panel so the embedded gain and
+                  deferred tax reflect the client's true exit picture.
                 </div>
               )}
             {conformityNote && (
-              <div className="ws-note">⚠️ <strong>State conformity:</strong> {conformityNote}</div>
+              <div className="ws-note">
+                ⚠️ <strong>State conformity:</strong> {conformityNote}
+              </div>
             )}
             {stateNote && (
-              <div className="ws-note">⚠️ <strong>State treatment:</strong> {stateNote}</div>
+              <div className="ws-note">
+                ⚠️ <strong>State treatment:</strong> {stateNote}
+              </div>
             )}
             <div className="ws-note ws-note--muted">
-              <strong>Rates assumed:</strong> Fed ordinary {formatPercent(getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus))} ·
-              Fed ST {formatPercent(rates.full.federalStRate)} (incl. NIIT) ·
-              Fed LT {formatPercent(rates.full.federalLtRate)} (incl. NIIT) ·
-              State {formatPercent(rates.profile.ordinaryRate)}
+              <strong>Rates assumed:</strong> Fed ordinary{' '}
+              {formatPercent(getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus))} ·
+              Fed ST {formatPercent(rates.full.federalStRate)} (incl. NIIT) · Fed LT{' '}
+              {formatPercent(rates.full.federalLtRate)} (incl. NIIT) · State{' '}
+              {formatPercent(rates.profile.ordinaryRate)}
               {rates.profile.stRate !== rates.profile.ordinaryRate && (
                 <> (ST {formatPercent(rates.profile.stRate)})</>
-              )} →
-              combined ordinary {formatPercent(rates.combinedOrdinary)} / LT {formatPercent(rates.combinedLt)}.
-              Wash-sale disallowance {formatPercent(settings.washSaleDisallowanceRate)}.
+              )}{' '}
+              → combined ordinary {formatPercent(rates.combinedOrdinary)} / LT{' '}
+              {formatPercent(rates.combinedLt)}. Wash-sale disallowance{' '}
+              {formatPercent(settings.washSaleDisallowanceRate)}.
             </div>
             {!ediMode && (
               <details className="ws-note ws-note--muted ws-details">
                 <summary>
-                  <strong>How the QFAF's tax treatment works</strong> (draft — pending counsel review)
+                  <strong>How the QFAF's tax treatment works</strong> (draft — pending counsel
+                  review)
                 </summary>
                 <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
               </details>

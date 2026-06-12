@@ -91,10 +91,7 @@ function parseCsvLine(line: string): [string, string] | undefined {
 /**
  * Serialize inputs + the user-relevant subset of settings to CSV text.
  */
-export function exportInputsToCsv(
-  inputs: CalculatorInputs,
-  settings: AdvancedSettings
-): string {
+export function exportInputsToCsv(inputs: CalculatorInputs, settings: AdvancedSettings): string {
   const lines: string[] = [];
   lines.push('Field,Value');
   lines.push(csvRow('schema', SCHEMA_VERSION));
@@ -156,7 +153,9 @@ export function exportInputsToCsv(
     lines.push(csvRow('splitAllocation.enabled', inputs.splitAllocation.enabled));
     lines.push(csvRow('splitAllocation.coreStrategyId', inputs.splitAllocation.coreStrategyId));
     lines.push(csvRow('splitAllocation.coreAmount', inputs.splitAllocation.coreAmount));
-    lines.push(csvRow('splitAllocation.overlayStrategyId', inputs.splitAllocation.overlayStrategyId));
+    lines.push(
+      csvRow('splitAllocation.overlayStrategyId', inputs.splitAllocation.overlayStrategyId)
+    );
     lines.push(csvRow('splitAllocation.overlayAmount', inputs.splitAllocation.overlayAmount));
   }
 
@@ -272,9 +271,7 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
     throw new Error('Not a recognized scenario CSV (missing "schema" row).');
   }
   if (schema !== SCHEMA_VERSION) {
-    throw new Error(
-      `Unsupported scenario CSV schema "${schema}" (expected "${SCHEMA_VERSION}").`
-    );
+    throw new Error(`Unsupported scenario CSV schema "${schema}" (expected "${SCHEMA_VERSION}").`);
   }
 
   const inputs: Partial<CalculatorInputs> = {};
@@ -310,19 +307,45 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
       warnings.push(`filingStatus: unknown value "${s}" — ignoring.`);
     }
   });
-  strField('stateCode', s => { inputs.stateCode = s; });
-  numField('stateRate', n => { inputs.stateRate = n; });
-  numField('annualIncome', n => { inputs.annualIncome = n; });
-  strField('strategyId', s => { inputs.strategyId = s; });
-  numField('collateralAmount', n => { inputs.collateralAmount = n; });
-  numField('existingStLossCarryforward', n => { inputs.existingStLossCarryforward = n; });
-  numField('existingLtLossCarryforward', n => { inputs.existingLtLossCarryforward = n; });
-  numField('existingNolCarryforward', n => { inputs.existingNolCarryforward = n; });
-  numField('qfafOverride', n => { inputs.qfafOverride = n; });
-  boolField('qfafEnabled', b => { inputs.qfafEnabled = b; });
-  numField('qfafSizingYears', n => { inputs.qfafSizingYears = n; });
-  numField('qfafSizingCushion', n => { inputs.qfafSizingCushion = n; });
-  numField('qfafDuration', n => { inputs.qfafDuration = n; });
+  strField('stateCode', s => {
+    inputs.stateCode = s;
+  });
+  numField('stateRate', n => {
+    inputs.stateRate = n;
+  });
+  numField('annualIncome', n => {
+    inputs.annualIncome = n;
+  });
+  strField('strategyId', s => {
+    inputs.strategyId = s;
+  });
+  numField('collateralAmount', n => {
+    inputs.collateralAmount = n;
+  });
+  numField('existingStLossCarryforward', n => {
+    inputs.existingStLossCarryforward = n;
+  });
+  numField('existingLtLossCarryforward', n => {
+    inputs.existingLtLossCarryforward = n;
+  });
+  numField('existingNolCarryforward', n => {
+    inputs.existingNolCarryforward = n;
+  });
+  numField('qfafOverride', n => {
+    inputs.qfafOverride = n;
+  });
+  boolField('qfafEnabled', b => {
+    inputs.qfafEnabled = b;
+  });
+  numField('qfafSizingYears', n => {
+    inputs.qfafSizingYears = n;
+  });
+  numField('qfafSizingCushion', n => {
+    inputs.qfafSizingCushion = n;
+  });
+  numField('qfafDuration', n => {
+    inputs.qfafDuration = n;
+  });
   strField('qfafSizingMode', s => {
     if (s === 'fixed' || s === 'dynamic') {
       inputs.qfafSizingMode = s;
@@ -330,11 +353,21 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
       warnings.push(`qfafSizingMode: expected "fixed" or "dynamic", got "${s}" — ignoring.`);
     }
   });
-  numField('startMonth', n => { inputs.startMonth = n; });
-  boolField('ltGainsEnabled', b => { inputs.ltGainsEnabled = b; });
-  boolField('redeployQfafProceeds', b => { inputs.redeployQfafProceeds = b; });
-  numField('collateralCostBasis', n => { inputs.collateralCostBasis = n; });
-  boolField('nycResident', b => { inputs.nycResident = b; });
+  numField('startMonth', n => {
+    inputs.startMonth = n;
+  });
+  boolField('ltGainsEnabled', b => {
+    inputs.ltGainsEnabled = b;
+  });
+  boolField('redeployQfafProceeds', b => {
+    inputs.redeployQfafProceeds = b;
+  });
+  numField('collateralCostBasis', n => {
+    inputs.collateralCostBasis = n;
+  });
+  boolField('nycResident', b => {
+    inputs.nycResident = b;
+  });
 
   // Deleveraging plan: assemble whatever keys are present, then attach if any.
   const dlv: Partial<DeleveragePlan> = {};
@@ -344,10 +377,18 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
     if (raw !== undefined) {
       map.delete('deleveragePlan.enabled');
       const b = parseBool(raw, warnings, 'deleveragePlan.enabled');
-      if (b !== undefined) { dlv.enabled = b; dlvTouched = true; }
+      if (b !== undefined) {
+        dlv.enabled = b;
+        dlvTouched = true;
+      }
     }
   }
-  for (const key of ['deleveragePlan.startYear', 'deleveragePlan.durationYears', 'deleveragePlan.lotSelectionHaircut', 'deleveragePlan.shortCoverGainPct'] as const) {
+  for (const key of [
+    'deleveragePlan.startYear',
+    'deleveragePlan.durationYears',
+    'deleveragePlan.lotSelectionHaircut',
+    'deleveragePlan.shortCoverGainPct',
+  ] as const) {
     const raw = map.get(key);
     if (raw === undefined) continue;
     map.delete(key);
@@ -363,7 +404,10 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
     const raw = map.get('deleveragePlan.target');
     if (raw !== undefined) {
       map.delete('deleveragePlan.target');
-      if (raw) { dlv.target = raw; dlvTouched = true; }
+      if (raw) {
+        dlv.target = raw;
+        dlvTouched = true;
+      }
     }
   }
   {
@@ -374,7 +418,9 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
         dlv.unwindGainCharacter = raw;
         dlvTouched = true;
       } else if (raw) {
-        warnings.push(`deleveragePlan.unwindGainCharacter: expected "st" or "lt", got "${raw}" — ignoring.`);
+        warnings.push(
+          `deleveragePlan.unwindGainCharacter: expected "st" or "lt", got "${raw}" — ignoring.`
+        );
       }
     }
   }
@@ -384,8 +430,12 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
       startYear: dlv.startYear ?? 1,
       durationYears: dlv.durationYears ?? 1,
       target: dlv.target ?? 'long-only',
-      ...(dlv.unwindGainCharacter !== undefined && { unwindGainCharacter: dlv.unwindGainCharacter }),
-      ...(dlv.lotSelectionHaircut !== undefined && { lotSelectionHaircut: dlv.lotSelectionHaircut }),
+      ...(dlv.unwindGainCharacter !== undefined && {
+        unwindGainCharacter: dlv.unwindGainCharacter,
+      }),
+      ...(dlv.lotSelectionHaircut !== undefined && {
+        lotSelectionHaircut: dlv.lotSelectionHaircut,
+      }),
       ...(dlv.shortCoverGainPct !== undefined && { shortCoverGainPct: dlv.shortCoverGainPct }),
     };
   }
@@ -422,11 +472,21 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
       splitTouched = true;
     }
   };
-  splitBool('splitAllocation.enabled', b => { split.enabled = b; });
-  splitStr('splitAllocation.coreStrategyId', s => { split.coreStrategyId = s; });
-  splitNum('splitAllocation.coreAmount', n => { split.coreAmount = n; });
-  splitStr('splitAllocation.overlayStrategyId', s => { split.overlayStrategyId = s; });
-  splitNum('splitAllocation.overlayAmount', n => { split.overlayAmount = n; });
+  splitBool('splitAllocation.enabled', b => {
+    split.enabled = b;
+  });
+  splitStr('splitAllocation.coreStrategyId', s => {
+    split.coreStrategyId = s;
+  });
+  splitNum('splitAllocation.coreAmount', n => {
+    split.coreAmount = n;
+  });
+  splitStr('splitAllocation.overlayStrategyId', s => {
+    split.overlayStrategyId = s;
+  });
+  splitNum('splitAllocation.overlayAmount', n => {
+    split.overlayAmount = n;
+  });
   if (splitTouched) {
     inputs.splitAllocation = {
       enabled: split.enabled ?? false,
@@ -438,12 +498,24 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
   }
 
   // Settings
-  numField('settings.qfafMultiplier', n => { settings.qfafMultiplier = n; });
-  boolField('settings.qfafGrowthEnabled', b => { settings.qfafGrowthEnabled = b; });
-  numField('settings.washSaleDisallowanceRate', n => { settings.washSaleDisallowanceRate = n; });
-  numField('settings.nolOffsetLimit', n => { settings.nolOffsetLimit = n; });
-  boolField('settings.growthEnabled', b => { settings.growthEnabled = b; });
-  numField('settings.defaultAnnualReturn', n => { settings.defaultAnnualReturn = n; });
+  numField('settings.qfafMultiplier', n => {
+    settings.qfafMultiplier = n;
+  });
+  boolField('settings.qfafGrowthEnabled', b => {
+    settings.qfafGrowthEnabled = b;
+  });
+  numField('settings.washSaleDisallowanceRate', n => {
+    settings.washSaleDisallowanceRate = n;
+  });
+  numField('settings.nolOffsetLimit', n => {
+    settings.nolOffsetLimit = n;
+  });
+  boolField('settings.growthEnabled', b => {
+    settings.growthEnabled = b;
+  });
+  numField('settings.defaultAnnualReturn', n => {
+    settings.defaultAnnualReturn = n;
+  });
   // qfafAnnualReturn: empty string means "use default" (null).
   if (map.has('settings.qfafAnnualReturn')) {
     const raw = map.get('settings.qfafAnnualReturn') ?? '';
@@ -455,25 +527,51 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
       if (n !== undefined) settings.qfafAnnualReturn = n;
     }
   }
-  boolField('settings.financingFeesEnabled', b => { settings.financingFeesEnabled = b; });
+  boolField('settings.financingFeesEnabled', b => {
+    settings.financingFeesEnabled = b;
+  });
   strField('settings.financingMode', s => {
     if (s === 'simple' || s === 'detailed') {
       settings.financingMode = s;
     } else {
-      warnings.push(`settings.financingMode: expected "simple" or "detailed", got "${s}" — ignoring.`);
+      warnings.push(
+        `settings.financingMode: expected "simple" or "detailed", got "${s}" — ignoring.`
+      );
     }
   });
-  numField('settings.simpleWealthMgmtFee', n => { settings.simpleWealthMgmtFee = n; });
-  numField('settings.simpleManagerFeeBase', n => { settings.simpleManagerFeeBase = n; });
-  numField('settings.simpleManagerFeeFixed', n => { settings.simpleManagerFeeFixed = n; });
-  numField('settings.brokerMarginRate', n => { settings.brokerMarginRate = n; });
-  numField('settings.shortBorrowRate', n => { settings.shortBorrowRate = n; });
-  numField('settings.shortDividendRate', n => { settings.shortDividendRate = n; });
-  numField('settings.wealthManagementFeeRate', n => { settings.wealthManagementFeeRate = n; });
-  numField('settings.projectionYears', n => { settings.projectionYears = n; });
-  numField('settings.niitRate', n => { settings.niitRate = n; });
-  numField('settings.ltcgRate', n => { settings.ltcgRate = n; });
-  numField('settings.stcgRate', n => { settings.stcgRate = n; });
+  numField('settings.simpleWealthMgmtFee', n => {
+    settings.simpleWealthMgmtFee = n;
+  });
+  numField('settings.simpleManagerFeeBase', n => {
+    settings.simpleManagerFeeBase = n;
+  });
+  numField('settings.simpleManagerFeeFixed', n => {
+    settings.simpleManagerFeeFixed = n;
+  });
+  numField('settings.brokerMarginRate', n => {
+    settings.brokerMarginRate = n;
+  });
+  numField('settings.shortBorrowRate', n => {
+    settings.shortBorrowRate = n;
+  });
+  numField('settings.shortDividendRate', n => {
+    settings.shortDividendRate = n;
+  });
+  numField('settings.wealthManagementFeeRate', n => {
+    settings.wealthManagementFeeRate = n;
+  });
+  numField('settings.projectionYears', n => {
+    settings.projectionYears = n;
+  });
+  numField('settings.niitRate', n => {
+    settings.niitRate = n;
+  });
+  numField('settings.ltcgRate', n => {
+    settings.ltcgRate = n;
+  });
+  numField('settings.stcgRate', n => {
+    settings.stcgRate = n;
+  });
 
   // Anything left in the map is unknown.
   map.delete('schema');

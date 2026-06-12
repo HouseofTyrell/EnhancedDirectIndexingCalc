@@ -59,14 +59,8 @@ describe('computeExitTaxAnalysis', () => {
     const lastYear = result.years[result.years.length - 1];
     const expectedCf = lastYear.stLossCarryforward + lastYear.ltLossCarryforward;
     expect(analysis.remainingCapitalLossCf).toBeCloseTo(expectedCf, 2);
-    expect(analysis.cfShelterUsed).toBeCloseTo(
-      Math.min(expectedCf, analysis.embeddedGain),
-      2
-    );
-    expect(analysis.exitTax).toBeCloseTo(
-      analysis.taxableGainAfterShelter * COMBINED_LT_RATE,
-      2
-    );
+    expect(analysis.cfShelterUsed).toBeCloseTo(Math.min(expectedCf, analysis.embeddedGain), 2);
+    expect(analysis.exitTax).toBeCloseTo(analysis.taxableGainAfterShelter * COMBINED_LT_RATE, 2);
   });
 
   it('reconciles net benefit with headline savings minus deferred tax', () => {

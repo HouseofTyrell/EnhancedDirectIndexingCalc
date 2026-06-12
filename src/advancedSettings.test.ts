@@ -141,13 +141,9 @@ describe('Projection Years Setting', () => {
       const result5yr = calculate(longDurationClient, settings);
 
       // More QFAF years = more active strategy years = different total savings
-      expect(result3yr.summary.totalTaxSavings).not.toEqual(
-        result5yr.summary.totalTaxSavings
-      );
+      expect(result3yr.summary.totalTaxSavings).not.toEqual(result5yr.summary.totalTaxSavings);
       // 5-year QFAF should produce more savings than 3-year
-      expect(result5yr.summary.totalTaxSavings).toBeGreaterThan(
-        result3yr.summary.totalTaxSavings
-      );
+      expect(result5yr.summary.totalTaxSavings).toBeGreaterThan(result3yr.summary.totalTaxSavings);
     });
   });
 
@@ -185,14 +181,14 @@ describe('Custom Tax Rate Overrides', () => {
       const lowerNiit: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
         stcgRate: 0.37,
-        ltcgRate: 0.20,
+        ltcgRate: 0.2,
         niitRate: 0.038, // 3.8% standard NIIT
       };
 
       const higherNiit: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
         stcgRate: 0.37,
-        ltcgRate: 0.20,
+        ltcgRate: 0.2,
         niitRate: 0.05, // 5% increased NIIT
       };
 
@@ -210,14 +206,14 @@ describe('Custom Tax Rate Overrides', () => {
       const withNiit: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
         stcgRate: 0.37,
-        ltcgRate: 0.20,
+        ltcgRate: 0.2,
         niitRate: 0.038, // Standard NIIT
       };
 
       const noNiit: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
         stcgRate: 0.37,
-        ltcgRate: 0.20,
+        ltcgRate: 0.2,
         niitRate: 0, // No NIIT
       };
 
@@ -225,9 +221,7 @@ describe('Custom Tax Rate Overrides', () => {
       const noNiitResult = calculate(baseClient, noNiit);
 
       // No NIIT means lower combined LT rate, which can affect savings
-      expect(noNiitResult.summary.totalTaxSavings).not.toBe(
-        withNiitResult.summary.totalTaxSavings
-      );
+      expect(noNiitResult.summary.totalTaxSavings).not.toBe(withNiitResult.summary.totalTaxSavings);
     });
   });
 
@@ -236,14 +230,14 @@ describe('Custom Tax Rate Overrides', () => {
       // Use a custom stcgRate different from default to trigger custom rate mode
       const lowerLtcg: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
-        stcgRate: 0.40, // Use same custom rate
-        ltcgRate: 0.20, // 20% LTCG
+        stcgRate: 0.4, // Use same custom rate
+        ltcgRate: 0.2, // 20% LTCG
         niitRate: 0.038,
       };
 
       const higherLtcg: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
-        stcgRate: 0.40, // Use same custom rate
+        stcgRate: 0.4, // Use same custom rate
         ltcgRate: 0.25, // 25% LTCG
         niitRate: 0.038,
       };
@@ -261,14 +255,14 @@ describe('Custom Tax Rate Overrides', () => {
       // Use a custom stcgRate different from default to trigger custom rate mode
       const standardLtcg: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
-        stcgRate: 0.40, // Use same custom rate
-        ltcgRate: 0.20, // 20% LTCG
+        stcgRate: 0.4, // Use same custom rate
+        ltcgRate: 0.2, // 20% LTCG
         niitRate: 0.038,
       };
 
       const lowerLtcg: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
-        stcgRate: 0.40, // Use same custom rate
+        stcgRate: 0.4, // Use same custom rate
         ltcgRate: 0.15, // 15% LTCG
         niitRate: 0.038,
       };
@@ -313,7 +307,7 @@ describe('Custom Tax Rate Overrides', () => {
       // Use custom ltcgRate and niitRate to ensure custom rate mode
       const standardStcg: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
-        stcgRate: 0.40, // 40% base
+        stcgRate: 0.4, // 40% base
         ltcgRate: 0.18,
         niitRate: 0.04,
       };
@@ -366,7 +360,7 @@ describe('Custom Tax Rate Overrides', () => {
       // Model flat tax scenario
       const lowTax: AdvancedSettings = {
         ...DEFAULT_SETTINGS,
-        stcgRate: 0.20, // 20% flat tax
+        stcgRate: 0.2, // 20% flat tax
         ltcgRate: 0.15, // 15% LTCG
         niitRate: 0, // No NIIT
       };
@@ -384,10 +378,7 @@ describe('Custom Tax Rate Overrides', () => {
       const result1 = calculate(baseClient);
       const result2 = calculate(baseClient, DEFAULT_SETTINGS);
 
-      expect(result1.summary.totalTaxSavings).toBeCloseTo(
-        result2.summary.totalTaxSavings,
-        2
-      );
+      expect(result1.summary.totalTaxSavings).toBeCloseTo(result2.summary.totalTaxSavings, 2);
     });
   });
 });
@@ -514,7 +505,7 @@ describe('Combined Settings', () => {
     const customSettings: AdvancedSettings = {
       ...DEFAULT_SETTINGS,
       projectionYears: 15,
-      stcgRate: 0.40,
+      stcgRate: 0.4,
       ltcgRate: 0.25,
       niitRate: 0.05,
     };
@@ -533,13 +524,13 @@ describe('Combined Settings', () => {
     const shortTerm: AdvancedSettings = {
       ...DEFAULT_SETTINGS,
       projectionYears: 5,
-      stcgRate: 0.40,
+      stcgRate: 0.4,
     };
 
     const longTerm: AdvancedSettings = {
       ...DEFAULT_SETTINGS,
       projectionYears: 20,
-      stcgRate: 0.40,
+      stcgRate: 0.4,
     };
 
     const shortResult = calculate(baseClient, shortTerm);

@@ -15,7 +15,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculate, calculateSizing, calculateWithOverrides, solveCollateralForTotal } from './calculations';
+import {
+  calculate,
+  calculateSizing,
+  calculateWithOverrides,
+  solveCollateralForTotal,
+} from './calculations';
 import { CalculatorInputs, DEFAULT_SETTINGS, AdvancedSettings } from './types';
 
 // Helper to create base inputs
@@ -178,20 +183,20 @@ describe('redeployQfafProceeds', () => {
       );
     const without = mk(false);
     const withRedeploy = mk(true);
-    expect(withRedeploy.summary.totalTaxSavings).toBeGreaterThan(
-      without.summary.totalTaxSavings
-    );
+    expect(withRedeploy.summary.totalTaxSavings).toBeGreaterThan(without.summary.totalTaxSavings);
   });
 });
 
 describe('gain events (D-012)', () => {
-  const eventOverride = (
-    year: number,
-    amount: number,
-    character: 'st' | 'lt',
-    w2: number
-  ) => [
-    { year, w2Income: w2, cashInfusion: 0, cashInfusionTaxType: 'gross' as const, note: '', gainEvent: { amount, character } },
+  const eventOverride = (year: number, amount: number, character: 'st' | 'lt', w2: number) => [
+    {
+      year,
+      w2Income: w2,
+      cashInfusion: 0,
+      cashInfusionTaxType: 'gross' as const,
+      note: '',
+      gainEvent: { amount, character },
+    },
   ];
 
   it('shelters a sale event with carryforwards (event-last) and reports the delta', () => {
@@ -212,10 +217,7 @@ describe('gain events (D-012)', () => {
     expect(y3.gainEventAmount).toBe(5000000);
     expect(y3.gainEventCfShelter).toBeGreaterThan(0);
     // Tax due = unsheltered portion × combined LT (CA, \$1M income → 20%+3.8%+13.3%)
-    expect(y3.gainEventTax).toBeCloseTo(
-      (5000000 - y3.gainEventCfShelter) * 0.371,
-      0
-    );
+    expect(y3.gainEventTax).toBeCloseTo((5000000 - y3.gainEventCfShelter) * 0.371, 0);
     expect(y3.gainEventTax).toBeLessThan(y3.gainEventTaxWithoutStrategy);
     expect(y3.gainEventTaxWithoutStrategy).toBeCloseTo(5000000 * 0.371, 0);
   });
@@ -482,7 +484,7 @@ describe('calculate - loss rate decay', () => {
 
     // Check rates follow the expected pattern
     // Year 1 should be significantly higher than Year 10
-    expect(year1Rate).toBeGreaterThan(0.20); // ~23%
+    expect(year1Rate).toBeGreaterThan(0.2); // ~23%
     expect(year10Rate).toBeLessThan(0.05); // ~3%
   });
 });
@@ -771,10 +773,7 @@ describe('QFAF Duration', () => {
       qfafSizingCushion: 0,
     });
     const resultNoCushion = calculate(inputsNoCushion, settings);
-    expect(result.sizing.qfafValue).toBeCloseTo(
-      resultNoCushion.sizing.qfafValue * 0.95,
-      0
-    );
+    expect(result.sizing.qfafValue).toBeCloseTo(resultNoCushion.sizing.qfafValue * 0.95, 0);
 
     // Year 5 should have QFAF, year 6 should not
     expect(result.years[4].stGainsGenerated).toBeGreaterThan(0);
@@ -878,19 +877,13 @@ describe('Per-state tax treatment (D-005)', () => {
     // Net ST gains: fed 40.8% + MA 12.5% (8.5% + 4% surtax)
     const leakYear = result.years.find(y => y.netStGainLoss > 1000);
     expect(leakYear).toBeDefined();
-    expect(leakYear!.remainingStGainCost).toBeCloseTo(
-      leakYear!.netStGainLoss * (0.408 + 0.125),
-      0
-    );
+    expect(leakYear!.remainingStGainCost).toBeCloseTo(leakYear!.netStGainLoss * (0.408 + 0.125), 0);
   });
 
   it('applies the WA 7% LTCG excise above the annual exemption', () => {
     // 10M × 2.4% = $240K LT gains → below the $278K exemption: no excise
     const small = calculate(createInputs({ ...base, stateCode: 'WA' }));
-    expect(small.years[0].ltGainCost).toBeCloseTo(
-      small.years[0].ltGainsRealized * 0.238,
-      0
-    );
+    expect(small.years[0].ltGainCost).toBeCloseTo(small.years[0].ltGainsRealized * 0.238, 0);
     // 20M × 2.4% = $480K LT gains → $202K above the $278K exemption × 7%
     const large = calculate(createInputs({ ...base, stateCode: 'WA', collateralAmount: 20000000 }));
     const y1 = large.years[0];
@@ -903,7 +896,9 @@ describe('Per-state tax treatment (D-005)', () => {
   it('applies the WA ESSB 5813 surcharge (2.9%) on taxed gains above $1M', () => {
     // 60M × 2.4% = $1.44M LT gains → taxed = 1.44M − 278K = 1.162M:
     // 7% on all taxed + 2.9% on the 162K above $1M
-    const result = calculate(createInputs({ ...base, stateCode: 'WA', collateralAmount: 60000000 }));
+    const result = calculate(
+      createInputs({ ...base, stateCode: 'WA', collateralAmount: 60000000 })
+    );
     const y1 = result.years[0];
     const taxed = y1.ltGainsRealized - 278000;
     expect(y1.ltGainCost).toBeCloseTo(
@@ -1032,9 +1027,7 @@ describe('ST Gain Leakage', () => {
     );
     // The QFAF principal must not vanish from total wealth: with growth
     // disabled, final wealth ≈ collateral + initial QFAF value.
-    expect(result.summary.finalTotalWealth).toBeGreaterThan(
-      result.summary.finalPortfolioValue
-    );
+    expect(result.summary.finalTotalWealth).toBeGreaterThan(result.summary.finalPortfolioValue);
   });
 });
 
@@ -1174,7 +1167,7 @@ describe('Dynamic vs Fixed QFAF Comparison', () => {
     const noWash = calculate(createInputs(baseInputs));
     const withWash = calculate(createInputs(baseInputs), {
       ...DEFAULT_SETTINGS,
-      washSaleDisallowanceRate: 0.10,
+      washSaleDisallowanceRate: 0.1,
     });
 
     // With 10% wash sale, dynamic sizing should produce smaller QFAF (less ST gains)

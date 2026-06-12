@@ -14,7 +14,7 @@ that have an obvious answer.
 
 1. `docs/DECISIONS.md` — the decision log. Never re-ask anything already in the Decided
    table. Honor every recorded decision as a constraint on new recommendations.
-2. `TAX_CALCULATION_REVIEW.md` — the standing tax-accuracy review.
+2. `docs/reviews/TAX_CALCULATION_REVIEW.md` — the standing tax-accuracy review.
 3. `todos/` — completed and pending work items.
 4. Recent git log — what has shipped since the last decision batch.
 

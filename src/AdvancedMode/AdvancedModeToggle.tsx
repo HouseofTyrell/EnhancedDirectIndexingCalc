@@ -5,7 +5,10 @@ interface AdvancedModeToggleProps {
   onToggle: () => void;
 }
 
-export const AdvancedModeToggle = memo(function AdvancedModeToggle({ enabled, onToggle }: AdvancedModeToggleProps) {
+export const AdvancedModeToggle = memo(function AdvancedModeToggle({
+  enabled,
+  onToggle,
+}: AdvancedModeToggleProps) {
   return (
     <div className="advanced-mode-toggle">
       <label className="advanced-toggle-label">

@@ -143,7 +143,10 @@ describe('computeYearResults — carryforward', () => {
 
   it('prior carryforward is fully consumed in writeOff', () => {
     const results = computeYearResults(defaults, 'mfj', 2);
-    const year2NewWriteOff = Math.min(results[1].annualEstOrdinaryLosses, results[1].section461Limit);
+    const year2NewWriteOff = Math.min(
+      results[1].annualEstOrdinaryLosses,
+      results[1].section461Limit
+    );
     const expectedWriteOff = year2NewWriteOff + results[1].carryForwardPrior;
     expect(results[1].writeOffAmount).toBeCloseTo(expectedWriteOff, 2);
   });
@@ -223,21 +226,24 @@ describe('computeYearResults — fees', () => {
   it('advisor fee = deals collateral × 0.57%', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
     expect(results[0].advisorManagementFee).toBeCloseTo(
-      results[0].dealsCollateralValue * ADVISOR_MGMT_FEE_RATE, 2
+      results[0].dealsCollateralValue * ADVISOR_MGMT_FEE_RATE,
+      2
     );
   });
 
   it('Quantinno fee = deals collateral × 0.536%', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
     expect(results[0].quantinnoFees).toBeCloseTo(
-      results[0].dealsCollateralValue * QFAF_FINANCING_FEE_RATE, 2
+      results[0].dealsCollateralValue * QFAF_FINANCING_FEE_RATE,
+      2
     );
   });
 
   it('total fees = advisor + Quantinno', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
     expect(results[0].totalFees).toBeCloseTo(
-      results[0].advisorManagementFee + results[0].quantinnoFees, 2
+      results[0].advisorManagementFee + results[0].quantinnoFees,
+      2
     );
   });
 });
@@ -246,20 +252,19 @@ describe('computeYearResults — tax savings and net benefit', () => {
   it('tax savings = writeOff × marginal tax rate', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
     expect(results[0].taxSavings).toBeCloseTo(
-      results[0].writeOffAmount * defaults.marginalTaxRate, 2
+      results[0].writeOffAmount * defaults.marginalTaxRate,
+      2
     );
   });
 
   it('net tax benefit = tax savings - total fees', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
-    expect(results[0].netTaxBenefit).toBeCloseTo(
-      results[0].taxSavings - results[0].totalFees, 2
-    );
+    expect(results[0].netTaxBenefit).toBeCloseTo(results[0].taxSavings - results[0].totalFees, 2);
   });
 
   it('higher tax rate produces higher tax savings', () => {
-    const highTax: QfafTestAssumptions = { ...defaults, marginalTaxRate: 0.60 };
-    const lowTax: QfafTestAssumptions = { ...defaults, marginalTaxRate: 0.30 };
+    const highTax: QfafTestAssumptions = { ...defaults, marginalTaxRate: 0.6 };
+    const lowTax: QfafTestAssumptions = { ...defaults, marginalTaxRate: 0.3 };
     const highResults = computeYearResults(highTax, 'mfj', 1);
     const lowResults = computeYearResults(lowTax, 'mfj', 1);
     expect(highResults[0].taxSavings).toBeGreaterThan(lowResults[0].taxSavings);
@@ -269,23 +274,20 @@ describe('computeYearResults — tax savings and net benefit', () => {
 describe('computeYearResults — alpha calculations', () => {
   it('QFAF alpha = subscription × 5.57%', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
-    expect(results[0].qfafAlpha).toBeCloseTo(
-      results[0].qfafSubscriptionSize * QFAF_ALPHA_RATE, 2
-    );
+    expect(results[0].qfafAlpha).toBeCloseTo(results[0].qfafSubscriptionSize * QFAF_ALPHA_RATE, 2);
   });
 
   it('Quantinno alpha = deals collateral × 1.17%', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
     expect(results[0].quantinnoAlpha).toBeCloseTo(
-      results[0].dealsCollateralValue * QUANTINNO_ALPHA_RATE, 2
+      results[0].dealsCollateralValue * QUANTINNO_ALPHA_RATE,
+      2
     );
   });
 
   it('total alpha = QFAF + Quantinno', () => {
     const results = computeYearResults(defaults, 'mfj', 1);
-    expect(results[0].totalAlpha).toBeCloseTo(
-      results[0].qfafAlpha + results[0].quantinnoAlpha, 2
-    );
+    expect(results[0].totalAlpha).toBeCloseTo(results[0].qfafAlpha + results[0].quantinnoAlpha, 2);
   });
 });
 

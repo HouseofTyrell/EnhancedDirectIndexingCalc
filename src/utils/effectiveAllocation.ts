@@ -45,8 +45,7 @@ export function getEffectiveView(inputs: CalculatorInputs): EffectiveAllocationV
           split.overlayAmount * getLongLeverageRatio(overlay)) /
         total;
       const weightedShort =
-        (split.coreAmount * getShortRatio(core) +
-          split.overlayAmount * getShortRatio(overlay)) /
+        (split.coreAmount * getShortRatio(core) + split.overlayAmount * getShortRatio(overlay)) /
         total;
       const primary = split.coreAmount >= split.overlayAmount ? core : overlay;
       return {
@@ -72,8 +71,6 @@ export function getEffectiveView(inputs: CalculatorInputs): EffectiveAllocationV
     displayName: strategy?.name ?? inputs.strategyId,
     weightedLongLeverage: strategy ? getLongLeverageRatio(strategy) : 0,
     weightedShortRatio: strategy ? getShortRatio(strategy) : 0,
-    legs: strategy
-      ? [{ strategy, amount: inputs.collateralAmount, label: 'Strategy' }]
-      : [],
+    legs: strategy ? [{ strategy, amount: inputs.collateralAmount, label: 'Strategy' }] : [],
   };
 }

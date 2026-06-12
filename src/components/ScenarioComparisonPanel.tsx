@@ -1,10 +1,5 @@
 import { useState } from 'react';
-import {
-  PinnedScenario,
-  CalculatorInputs,
-  AdvancedSettings,
-  CalculationResult,
-} from '../types';
+import { PinnedScenario, CalculatorInputs, AdvancedSettings, CalculationResult } from '../types';
 import { formatPercent, formatCurrencyAbbreviated } from '../utils/formatters';
 import { getEffectiveView } from '../utils/effectiveAllocation';
 import './ScenarioComparisonPanel.css';
@@ -50,14 +45,54 @@ interface MetricDef {
 }
 
 const METRIC_DEFS: MetricDef[] = [
-  { label: 'Total Tax Savings', getValue: r => r.summary.totalTaxSavings, format: 'currency', higherIsBetter: true },
-  { label: 'Year 1 Savings', getValue: r => r.years[0]?.taxSavings ?? 0, format: 'currency', higherIsBetter: true },
-  { label: 'Year 2 Savings', getValue: r => r.years[1]?.taxSavings ?? 0, format: 'currency', higherIsBetter: true },
-  { label: 'Tax Alpha', getValue: r => r.summary.effectiveTaxAlpha, format: 'percent', higherIsBetter: true },
-  { label: 'QFAF Value', getValue: r => r.sizing.qfafValue, format: 'currency', higherIsBetter: false },
-  { label: 'Total Exposure', getValue: r => r.sizing.totalExposure, format: 'currency', higherIsBetter: false },
-  { label: 'Final Portfolio', getValue: r => r.summary.finalPortfolioValue, format: 'currency', higherIsBetter: true },
-  { label: 'Total NOL', getValue: r => r.summary.totalNolGenerated, format: 'currency', higherIsBetter: true },
+  {
+    label: 'Total Tax Savings',
+    getValue: r => r.summary.totalTaxSavings,
+    format: 'currency',
+    higherIsBetter: true,
+  },
+  {
+    label: 'Year 1 Savings',
+    getValue: r => r.years[0]?.taxSavings ?? 0,
+    format: 'currency',
+    higherIsBetter: true,
+  },
+  {
+    label: 'Year 2 Savings',
+    getValue: r => r.years[1]?.taxSavings ?? 0,
+    format: 'currency',
+    higherIsBetter: true,
+  },
+  {
+    label: 'Tax Alpha',
+    getValue: r => r.summary.effectiveTaxAlpha,
+    format: 'percent',
+    higherIsBetter: true,
+  },
+  {
+    label: 'QFAF Value',
+    getValue: r => r.sizing.qfafValue,
+    format: 'currency',
+    higherIsBetter: false,
+  },
+  {
+    label: 'Total Exposure',
+    getValue: r => r.sizing.totalExposure,
+    format: 'currency',
+    higherIsBetter: false,
+  },
+  {
+    label: 'Final Portfolio',
+    getValue: r => r.summary.finalPortfolioValue,
+    format: 'currency',
+    higherIsBetter: true,
+  },
+  {
+    label: 'Total NOL',
+    getValue: r => r.summary.totalNolGenerated,
+    format: 'currency',
+    higherIsBetter: true,
+  },
 ];
 
 // ============================================
@@ -144,7 +179,9 @@ function detectKeyDifferences(scenarios: PinnedScenario[]): string[] {
 // MAIN COMPONENT
 // ============================================
 
-export function ScenarioComparisonPanel(props: ScenarioComparisonPanelProps | LegacyScenarioComparisonPanelProps) {
+export function ScenarioComparisonPanel(
+  props: ScenarioComparisonPanelProps | LegacyScenarioComparisonPanelProps
+) {
   // Handle legacy single-scenario props
   if ('pinned' in props) {
     return <LegacyPanel {...props} />;
@@ -173,18 +210,24 @@ function MultiScenarioPanel({
             Scenario Comparison <strong>({scenarioCount}/4)</strong>
           </span>
           {keyDiffs.length > 0 && (
-            <span className="comparison-panel__diffs">
-              Varying: {keyDiffs.join(', ')}
-            </span>
+            <span className="comparison-panel__diffs">Varying: {keyDiffs.join(', ')}</span>
           )}
         </div>
         <div className="comparison-panel__actions">
           {canPin && (
-            <button className="comparison-btn comparison-btn--repin" onClick={onPin} title="Pin current state as a new scenario">
+            <button
+              className="comparison-btn comparison-btn--repin"
+              onClick={onPin}
+              title="Pin current state as a new scenario"
+            >
               + Pin Current
             </button>
           )}
-          <button className="comparison-btn comparison-btn--clear" onClick={onUnpinAll} title="Remove all pinned scenarios">
+          <button
+            className="comparison-btn comparison-btn--clear"
+            onClick={onUnpinAll}
+            title="Remove all pinned scenarios"
+          >
             Clear All
           </button>
           <button
@@ -214,7 +257,9 @@ function MultiScenarioPanel({
                             <div className="scenario-header__strategy">{summary.strategy}</div>
                             <div className="scenario-header__config">
                               {summary.qfafEnabled && (
-                                <span className={`scenario-tag scenario-tag--${summary.sizingMode.toLowerCase()}`}>
+                                <span
+                                  className={`scenario-tag scenario-tag--${summary.sizingMode.toLowerCase()}`}
+                                >
                                   {summary.sizingMode}
                                 </span>
                               )}
@@ -291,11 +336,12 @@ function LegacyPanel({
   });
 
   const pinnedAge = Date.now() - pinned.pinnedAt;
-  const pinnedAgo = pinnedAge < 60_000
-    ? 'just now'
-    : pinnedAge < 3_600_000
-      ? `${Math.floor(pinnedAge / 60_000)}m ago`
-      : `${Math.floor(pinnedAge / 3_600_000)}h ago`;
+  const pinnedAgo =
+    pinnedAge < 60_000
+      ? 'just now'
+      : pinnedAge < 3_600_000
+        ? `${Math.floor(pinnedAge / 60_000)}m ago`
+        : `${Math.floor(pinnedAge / 3_600_000)}h ago`;
 
   return (
     <div className="comparison-panel">
@@ -308,13 +354,25 @@ function LegacyPanel({
           <span className="comparison-panel__age">{pinnedAgo}</span>
         </div>
         <div className="comparison-panel__actions">
-          <button className="comparison-btn comparison-btn--restore" onClick={onRestore} title="Restore pinned inputs">
+          <button
+            className="comparison-btn comparison-btn--restore"
+            onClick={onRestore}
+            title="Restore pinned inputs"
+          >
             Restore
           </button>
-          <button className="comparison-btn comparison-btn--repin" onClick={onReplacePin} title="Replace pin with current state">
+          <button
+            className="comparison-btn comparison-btn--repin"
+            onClick={onReplacePin}
+            title="Replace pin with current state"
+          >
             Re-pin
           </button>
-          <button className="comparison-btn comparison-btn--clear" onClick={onUnpin} title="Remove pin">
+          <button
+            className="comparison-btn comparison-btn--clear"
+            onClick={onUnpin}
+            title="Remove pin"
+          >
             Clear
           </button>
           <button
@@ -340,18 +398,24 @@ function LegacyPanel({
             </thead>
             <tbody>
               {metrics.map(metric => {
-                const deltaClass = metric.delta === 0 ? '' :
-                  !metric.higherIsBetter ? 'comparison-delta--neutral' :
-                  metric.delta > 0 ? 'comparison-delta--positive' : 'comparison-delta--negative';
+                const deltaClass =
+                  metric.delta === 0
+                    ? ''
+                    : !metric.higherIsBetter
+                      ? 'comparison-delta--neutral'
+                      : metric.delta > 0
+                        ? 'comparison-delta--positive'
+                        : 'comparison-delta--negative';
                 const sign = metric.delta > 0 ? '+' : metric.delta < 0 ? '-' : '';
                 let deltaStr = '—';
                 if (metric.delta !== 0) {
                   if (metric.format === 'percent') {
                     deltaStr = `${sign}${Math.abs(metric.delta * 100).toFixed(2)}pp`;
                   } else {
-                    const pctStr = metric.pinnedValue !== 0
-                      ? ` (${sign}${Math.abs(metric.deltaPercent * 100).toFixed(0)}%)`
-                      : '';
+                    const pctStr =
+                      metric.pinnedValue !== 0
+                        ? ` (${sign}${Math.abs(metric.deltaPercent * 100).toFixed(0)}%)`
+                        : '';
                     deltaStr = `${sign}${formatCurrencyAbbreviated(Math.abs(metric.delta))}${pctStr}`;
                   }
                 }
@@ -359,8 +423,12 @@ function LegacyPanel({
                 return (
                   <tr key={metric.label}>
                     <td className="comparison-table__label">{metric.label}</td>
-                    <td className="comparison-table__value">{formatMetricValue(metric.pinnedValue, metric.format)}</td>
-                    <td className="comparison-table__value">{formatMetricValue(metric.currentValue, metric.format)}</td>
+                    <td className="comparison-table__value">
+                      {formatMetricValue(metric.pinnedValue, metric.format)}
+                    </td>
+                    <td className="comparison-table__value">
+                      {formatMetricValue(metric.currentValue, metric.format)}
+                    </td>
                     <td className={`comparison-table__delta ${deltaClass}`}>{deltaStr}</td>
                   </tr>
                 );

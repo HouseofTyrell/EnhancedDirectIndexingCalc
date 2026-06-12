@@ -77,16 +77,16 @@ export function getStateRate(code: string): number {
  * Some states do not conform to federal IRC Section 461(l) or have their own variations.
  */
 export const STATE_TAX_CONFORMITY_WARNINGS: Record<string, string> = {
-  'CA':
+  CA:
     'California modeling: gains and wages at 13.3% top rate with a federal-parallel excess ' +
     'business loss limit. CA NOL deductions are suspended for MAGI ≥ $1M through tax year ' +
     '2026 (SB 167) — the state portion of NOL benefits is excluded for year 1 accordingly. ' +
     "CA's excess-business-loss carryover character (business loss, not NOL) is approximated.",
-  'NY':
+  NY:
     'New York modeling: gains and wages at the 10.9% top rate with the §461(l) limitation ' +
     'applied (NY retained the limitation even when the CARES Act suspended it federally). ' +
     'NY-specific NOL recomputation rules are approximated by federal-parallel treatment.',
-  'PA':
+  PA:
     "Pennsylvania modeling: no PA state benefit for ordinary deductions or NOL (PA's " +
     'class-based system does not allow these losses to offset wages); the 3.07% flat rate ' +
     'still applies to gains.',
@@ -133,6 +133,13 @@ export interface StateTaxProfile {
    * projection years at or before `throughProjectionYear` (year 1 = 2026).
    */
   nolStateSuspension?: { throughProjectionYear: number; magiThreshold: number };
+  /**
+   * State NOL carryover period in years (D-020). CA: 20 years for post-2008
+   * losses (R&TC §17276), extended by SB 167 for suspension years. Undefined
+   * means indefinite (federal-conforming) — the engine's state NOL vintage
+   * ledger only runs when this is defined. Federal NOLs are always indefinite.
+   */
+  nolCarryoverYears?: number;
 }
 
 /**
@@ -172,6 +179,10 @@ export function getStateTaxProfile(
         ltRate: 0.133,
         allowsLossOffsetAgainstIncome: true,
         nolStateSuspension: { throughProjectionYear: 1, magiThreshold: 1000000 },
+        // CA NOLs expire 20 years after the loss year (R&TC §17276,
+        // post-2008 losses); SB 167 adds +1 carryover year per suspension
+        // year. Federal NOLs are indefinite (D-020).
+        nolCarryoverYears: 20,
       };
     case 'NY': {
       // NY taxes gains as ordinary (10.9% top) and RETAINED the §461(l)

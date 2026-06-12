@@ -1,7 +1,12 @@
 import { CalculatorInputs, AdvancedSettings, CalculationResult, SplitAllocation } from '../types';
 import { STRATEGIES, Strategy, getStrategy } from '../strategyData';
 import { StrategyRateEditor } from '../AdvancedMode/StrategyRateEditor';
-import { formatCurrency, formatWithCommas, parseFormattedNumber, formatPercent } from '../utils/formatters';
+import {
+  formatCurrency,
+  formatWithCommas,
+  parseFormattedNumber,
+  formatPercent,
+} from '../utils/formatters';
 import { getEffectiveView } from '../utils/effectiveAllocation';
 import { InfoPopup } from '../InfoPopup';
 
@@ -24,13 +29,8 @@ interface StrategySelectionInputsProps {
   currentStrategy?: Strategy;
   validationWarnings: Record<string, string>;
   isRateEditorOpen: boolean;
-  onUpdateInput: <K extends keyof CalculatorInputs>(
-    key: K,
-    value: CalculatorInputs[K]
-  ) => void;
-  onUpdateSettings: (
-    updater: (prev: AdvancedSettings) => AdvancedSettings
-  ) => void;
+  onUpdateInput: <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => void;
+  onUpdateSettings: (updater: (prev: AdvancedSettings) => AdvancedSettings) => void;
   onSetRateEditorOpen: (open: boolean) => void;
   onRateVersionIncrement: () => void;
 }
@@ -135,7 +135,9 @@ export function StrategySelectionInputs({
                   type="text"
                   inputMode="numeric"
                   value={formatWithCommas(split.overlayAmount)}
-                  onChange={e => updateSplit({ overlayAmount: parseFormattedNumber(e.target.value) })}
+                  onChange={e =>
+                    updateSplit({ overlayAmount: parseFormattedNumber(e.target.value) })
+                  }
                 />
               </div>
             </div>
@@ -145,7 +147,8 @@ export function StrategySelectionInputs({
             Total collateral: <strong>{formatCurrency(splitTotal)}</strong>
             {splitTotal > 0 && (
               <>
-                {' '}({formatPercent(split.coreAmount / splitTotal)} Core /{' '}
+                {' '}
+                ({formatPercent(split.coreAmount / splitTotal)} Core /{' '}
                 {formatPercent(split.overlayAmount / splitTotal)} Overlay)
               </>
             )}
@@ -184,7 +187,9 @@ export function StrategySelectionInputs({
 
           <div className="input-group">
             <label htmlFor="collateral">Collateral Amount</label>
-            <div className={`input-with-prefix ${validationWarnings.collateral ? 'input-warning' : ''}`}>
+            <div
+              className={`input-with-prefix ${validationWarnings.collateral ? 'input-warning' : ''}`}
+            >
               <span className="prefix">$</span>
               <input
                 id="collateral"
@@ -257,7 +262,10 @@ export function StrategySelectionInputs({
           <div className="strategy-rate">
             <span className="rate-label">Net Capital Loss (Y1):</span>
             <span className="rate-value highlight">
-              {formatPercent(results.years[0].effectiveStLossRate - (inputs.ltGainsEnabled ? currentStrategy.ltGainRate : 0))}
+              {formatPercent(
+                results.years[0].effectiveStLossRate -
+                  (inputs.ltGainsEnabled ? currentStrategy.ltGainRate : 0)
+              )}
             </span>
           </div>
           <button className="rate-editor-trigger" onClick={() => onSetRateEditorOpen(true)}>
@@ -265,34 +273,39 @@ export function StrategySelectionInputs({
           </button>
         </div>
       )}
-      {isSplitEnabled && results.years[0] && (() => {
-        const coreStrat = getStrategy(split.coreStrategyId);
-        const overlayStrat = getStrategy(split.overlayStrategyId);
-        const blendedLt = splitTotal > 0 && coreStrat && overlayStrat
-          ? (split.coreAmount * coreStrat.ltGainRate + split.overlayAmount * overlayStrat.ltGainRate) / splitTotal
-          : 0;
-        const blendedSt = results.years[0].effectiveStLossRate;
-        return (
-          <div className="strategy-rates-info">
-            <div className="strategy-rate">
-              <span className="rate-label">Blended ST Loss Rate (Y1):</span>
-              <span className="rate-value positive">{formatPercent(blendedSt)}</span>
+      {isSplitEnabled &&
+        results.years[0] &&
+        (() => {
+          const coreStrat = getStrategy(split.coreStrategyId);
+          const overlayStrat = getStrategy(split.overlayStrategyId);
+          const blendedLt =
+            splitTotal > 0 && coreStrat && overlayStrat
+              ? (split.coreAmount * coreStrat.ltGainRate +
+                  split.overlayAmount * overlayStrat.ltGainRate) /
+                splitTotal
+              : 0;
+          const blendedSt = results.years[0].effectiveStLossRate;
+          return (
+            <div className="strategy-rates-info">
+              <div className="strategy-rate">
+                <span className="rate-label">Blended ST Loss Rate (Y1):</span>
+                <span className="rate-value positive">{formatPercent(blendedSt)}</span>
+              </div>
+              <div className="strategy-rate">
+                <span className="rate-label">Blended LT Gain Rate:</span>
+                <span className="rate-value negative">
+                  {formatPercent(inputs.ltGainsEnabled ? blendedLt : 0)}
+                </span>
+              </div>
+              <div className="strategy-rate">
+                <span className="rate-label">Net Capital Loss (Y1):</span>
+                <span className="rate-value highlight">
+                  {formatPercent(blendedSt - (inputs.ltGainsEnabled ? blendedLt : 0))}
+                </span>
+              </div>
             </div>
-            <div className="strategy-rate">
-              <span className="rate-label">Blended LT Gain Rate:</span>
-              <span className="rate-value negative">
-                {formatPercent(inputs.ltGainsEnabled ? blendedLt : 0)}
-              </span>
-            </div>
-            <div className="strategy-rate">
-              <span className="rate-label">Net Capital Loss (Y1):</span>
-              <span className="rate-value highlight">
-                {formatPercent(blendedSt - (inputs.ltGainsEnabled ? blendedLt : 0))}
-              </span>
-            </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Strategy Rate Editor Modal */}
       <StrategyRateEditor
@@ -314,9 +327,7 @@ export function StrategySelectionInputs({
             QFAF Overlay
           </label>
           <span className="input-hint">
-            {inputs.qfafEnabled
-              ? 'ST gains + ordinary losses'
-              : 'Collateral-only'}
+            {inputs.qfafEnabled ? 'ST gains + ordinary losses' : 'Collateral-only'}
           </span>
         </div>
 
@@ -327,9 +338,7 @@ export function StrategySelectionInputs({
                 <input
                   type="checkbox"
                   checked={true}
-                  onChange={() =>
-                    onUpdateSettings(s => ({ ...s, growthEnabled: false }))
-                  }
+                  onChange={() => onUpdateSettings(s => ({ ...s, growthEnabled: false }))}
                 />
                 <span className="toggle-switch"></span>
                 Growth: {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%
@@ -338,8 +347,8 @@ export function StrategySelectionInputs({
                 id="annualReturnInline"
                 type="range"
                 className="inline-slider"
-                min={-0.20}
-                max={0.30}
+                min={-0.2}
+                max={0.3}
                 step={0.005}
                 value={advancedSettings.defaultAnnualReturn}
                 onChange={e => {
@@ -356,9 +365,7 @@ export function StrategySelectionInputs({
                 <input
                   type="checkbox"
                   checked={false}
-                  onChange={() =>
-                    onUpdateSettings(s => ({ ...s, growthEnabled: true }))
-                  }
+                  onChange={() => onUpdateSettings(s => ({ ...s, growthEnabled: true }))}
                 />
                 <span className="toggle-switch"></span>
                 Portfolio Growth
@@ -379,9 +386,7 @@ export function StrategySelectionInputs({
             Net Out LT Gains
           </label>
           <span className="input-hint">
-            {inputs.ltGainsEnabled
-              ? 'LT gains included in projections'
-              : 'LT gains netted out'}
+            {inputs.ltGainsEnabled ? 'LT gains included in projections' : 'LT gains netted out'}
           </span>
         </div>
 
@@ -421,14 +426,18 @@ export function StrategySelectionInputs({
                       />
                       <span className="suffix">%</span>
                     </div>
-                    <span className="input-hint">Applied to 100% of portfolio (no leverage multiplier)</span>
+                    <span className="input-hint">
+                      Applied to 100% of portfolio (no leverage multiplier)
+                    </span>
                   </div>
                   <div className="fee-input-group">
                     <label htmlFor="simpleManagerFee">Manager Fees</label>
                     {(() => {
                       const view = getEffectiveView(inputs);
                       const leveragePct = view.weightedShortRatio;
-                      const managerFee = advancedSettings.simpleManagerFeeBase * leveragePct + advancedSettings.simpleManagerFeeFixed;
+                      const managerFee =
+                        advancedSettings.simpleManagerFeeBase * leveragePct +
+                        advancedSettings.simpleManagerFeeFixed;
                       const hasStrategy = view.legs.length > 0;
                       return (
                         <>
@@ -454,7 +463,9 @@ export function StrategySelectionInputs({
                     const view = getEffectiveView(inputs);
                     if (view.legs.length === 0) return null;
                     const leveragePct = view.weightedShortRatio;
-                    const managerFee = advancedSettings.simpleManagerFeeBase * leveragePct + advancedSettings.simpleManagerFeeFixed;
+                    const managerFee =
+                      advancedSettings.simpleManagerFeeBase * leveragePct +
+                      advancedSettings.simpleManagerFeeFixed;
                     const totalEffective = advancedSettings.simpleWealthMgmtFee + managerFee;
                     const collateral = view.totalCollateral;
                     const showDollars = collateral > 0;
@@ -462,15 +473,45 @@ export function StrategySelectionInputs({
                       <div className="financing-summary">
                         <strong>Total Effective Cost for {view.displayName}:</strong>
                         <div className="financing-breakdown">
-                          <div>Wealth management: {(advancedSettings.simpleWealthMgmtFee * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((advancedSettings.simpleWealthMgmtFee * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Manager fees: {(managerFee * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((managerFee * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>
+                            Wealth management:{' '}
+                            {(advancedSettings.simpleWealthMgmtFee * 100).toFixed(2)}%
+                            {showDollars && (
+                              <span className="cost-dollars">
+                                {' '}
+                                ($
+                                {(
+                                  (advancedSettings.simpleWealthMgmtFee * collateral) /
+                                  1000
+                                ).toFixed(0)}
+                                K/year)
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            Manager fees: {(managerFee * 100).toFixed(2)}%
+                            {showDollars && (
+                              <span className="cost-dollars">
+                                {' '}
+                                (${((managerFee * collateral) / 1000).toFixed(0)}K/year)
+                              </span>
+                            )}
+                          </div>
                           <div className="financing-total">
-                            <strong>Total: {(totalEffective * 100).toFixed(2)}% of portfolio</strong>
-                            {showDollars && <strong className="cost-dollars"> (${((totalEffective * collateral) / 1000).toFixed(0)}K/year)</strong>}
+                            <strong>
+                              Total: {(totalEffective * 100).toFixed(2)}% of portfolio
+                            </strong>
+                            {showDollars && (
+                              <strong className="cost-dollars">
+                                {' '}
+                                (${((totalEffective * collateral) / 1000).toFixed(0)}K/year)
+                              </strong>
+                            )}
                           </div>
                           {view.isSplit && (
                             <div className="financing-split-note">
-                              Leverage is collateral-weighted across both legs ({view.legs.map(l => `${l.label}: ${l.strategy.name}`).join(', ')}).
+                              Leverage is collateral-weighted across both legs (
+                              {view.legs.map(l => `${l.label}: ${l.strategy.name}`).join(', ')}).
                             </div>
                           )}
                         </div>
@@ -512,67 +553,137 @@ export function StrategySelectionInputs({
                         <div className="fee-input-group">
                           <label htmlFor="brokerMargin">
                             Broker Margin Rate
-                            {hasStrategy && <span className="effective-cost"> → {(marginCost * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && (
+                              <span className="effective-cost">
+                                {' '}
+                                → {(marginCost * 100).toFixed(2)}% of portfolio
+                              </span>
+                            )}
                           </label>
                           <div className="input-with-suffix">
-                            <input id="brokerMargin" type="number" step={0.25} min={0} max={20}
+                            <input
+                              id="brokerMargin"
+                              type="number"
+                              step={0.25}
+                              min={0}
+                              max={20}
                               value={(advancedSettings.brokerMarginRate * 100).toFixed(2)}
-                              onChange={e => { const val = parseFloat(e.target.value) / 100; if (!isNaN(val)) onUpdateSettings(s => ({ ...s, brokerMarginRate: val })); }}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value) / 100;
+                                if (!isNaN(val))
+                                  onUpdateSettings(s => ({ ...s, brokerMarginRate: val }));
+                              }}
                             />
                             <span className="suffix">%</span>
                           </div>
                           <span className="input-hint">
-                            Applied to {hasStrategy ? `${(longLeverage * 100).toFixed(0)}%${blendedNote}` : '—'} long leverage
-                            {hasStrategy && ` (${(advancedSettings.brokerMarginRate * 100).toFixed(2)}% × ${(longLeverage * 100).toFixed(0)}% = ${(marginCost * 100).toFixed(2)}%)`}
+                            Applied to{' '}
+                            {hasStrategy
+                              ? `${(longLeverage * 100).toFixed(0)}%${blendedNote}`
+                              : '—'}{' '}
+                            long leverage
+                            {hasStrategy &&
+                              ` (${(advancedSettings.brokerMarginRate * 100).toFixed(2)}% × ${(longLeverage * 100).toFixed(0)}% = ${(marginCost * 100).toFixed(2)}%)`}
                           </span>
                         </div>
                         <div className="fee-input-group">
                           <label htmlFor="shortBorrow">
                             Short Borrow Fee
-                            {hasStrategy && <span className="effective-cost"> → {(borrowCost * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && (
+                              <span className="effective-cost">
+                                {' '}
+                                → {(borrowCost * 100).toFixed(2)}% of portfolio
+                              </span>
+                            )}
                           </label>
                           <div className="input-with-suffix">
-                            <input id="shortBorrow" type="number" step={0.1} min={0} max={10}
+                            <input
+                              id="shortBorrow"
+                              type="number"
+                              step={0.1}
+                              min={0}
+                              max={10}
                               value={(advancedSettings.shortBorrowRate * 100).toFixed(2)}
-                              onChange={e => { const val = parseFloat(e.target.value) / 100; if (!isNaN(val)) onUpdateSettings(s => ({ ...s, shortBorrowRate: val })); }}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value) / 100;
+                                if (!isNaN(val))
+                                  onUpdateSettings(s => ({ ...s, shortBorrowRate: val }));
+                              }}
                             />
                             <span className="suffix">%</span>
                           </div>
                           <span className="input-hint">
-                            Applied to {hasStrategy ? `${(shortRatio * 100).toFixed(0)}%${blendedNote}` : '—'} short positions
-                            {hasStrategy && ` (${(advancedSettings.shortBorrowRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(borrowCost * 100).toFixed(2)}%)`}
+                            Applied to{' '}
+                            {hasStrategy ? `${(shortRatio * 100).toFixed(0)}%${blendedNote}` : '—'}{' '}
+                            short positions
+                            {hasStrategy &&
+                              ` (${(advancedSettings.shortBorrowRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(borrowCost * 100).toFixed(2)}%)`}
                           </span>
                         </div>
                         <div className="fee-input-group">
                           <label htmlFor="shortDividend">
                             Short Dividend Cost
-                            {hasStrategy && <span className="effective-cost"> → {(dividendCost * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && (
+                              <span className="effective-cost">
+                                {' '}
+                                → {(dividendCost * 100).toFixed(2)}% of portfolio
+                              </span>
+                            )}
                           </label>
                           <div className="input-with-suffix">
-                            <input id="shortDividend" type="number" step={0.1} min={0} max={5}
+                            <input
+                              id="shortDividend"
+                              type="number"
+                              step={0.1}
+                              min={0}
+                              max={5}
                               value={(advancedSettings.shortDividendRate * 100).toFixed(2)}
-                              onChange={e => { const val = parseFloat(e.target.value) / 100; if (!isNaN(val)) onUpdateSettings(s => ({ ...s, shortDividendRate: val })); }}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value) / 100;
+                                if (!isNaN(val))
+                                  onUpdateSettings(s => ({ ...s, shortDividendRate: val }));
+                              }}
                             />
                             <span className="suffix">%</span>
                           </div>
                           <span className="input-hint">
-                            Applied to {hasStrategy ? `${(shortRatio * 100).toFixed(0)}%${blendedNote}` : '—'} short positions
-                            {hasStrategy && ` (${(advancedSettings.shortDividendRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(dividendCost * 100).toFixed(2)}%)`}
+                            Applied to{' '}
+                            {hasStrategy ? `${(shortRatio * 100).toFixed(0)}%${blendedNote}` : '—'}{' '}
+                            short positions
+                            {hasStrategy &&
+                              ` (${(advancedSettings.shortDividendRate * 100).toFixed(2)}% × ${(shortRatio * 100).toFixed(0)}% = ${(dividendCost * 100).toFixed(2)}%)`}
                           </span>
                         </div>
                         <div className="fee-input-group">
                           <label htmlFor="wealthMgmtFee">
                             Wealth Management Fee
-                            {hasStrategy && <span className="effective-cost"> → {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}% of portfolio</span>}
+                            {hasStrategy && (
+                              <span className="effective-cost">
+                                {' '}
+                                → {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}% of
+                                portfolio
+                              </span>
+                            )}
                           </label>
                           <div className="input-with-suffix">
-                            <input id="wealthMgmtFee" type="number" step={0.05} min={0} max={3}
+                            <input
+                              id="wealthMgmtFee"
+                              type="number"
+                              step={0.05}
+                              min={0}
+                              max={3}
                               value={(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}
-                              onChange={e => { const val = parseFloat(e.target.value) / 100; if (!isNaN(val)) onUpdateSettings(s => ({ ...s, wealthManagementFeeRate: val })); }}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value) / 100;
+                                if (!isNaN(val))
+                                  onUpdateSettings(s => ({ ...s, wealthManagementFeeRate: val }));
+                              }}
                             />
                             <span className="suffix">%</span>
                           </div>
-                          <span className="input-hint">Applied to 100% of portfolio (no leverage multiplier)</span>
+                          <span className="input-hint">
+                            Applied to 100% of portfolio (no leverage multiplier)
+                          </span>
                         </div>
                       </>
                     );
@@ -585,24 +696,74 @@ export function StrategySelectionInputs({
                     const marginCost = advancedSettings.brokerMarginRate * longLeverage;
                     const borrowCost = advancedSettings.shortBorrowRate * shortRatio;
                     const dividendCost = advancedSettings.shortDividendRate * shortRatio;
-                    const totalEffective = marginCost + borrowCost + dividendCost + advancedSettings.wealthManagementFeeRate;
+                    const totalEffective =
+                      marginCost +
+                      borrowCost +
+                      dividendCost +
+                      advancedSettings.wealthManagementFeeRate;
                     const collateral = view.totalCollateral;
                     const showDollars = collateral > 0;
                     return (
                       <div className="financing-summary">
                         <strong>Total Effective Cost for {view.displayName}:</strong>
                         <div className="financing-breakdown">
-                          <div>Margin interest: {(marginCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((marginCost * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Stock borrow: {(borrowCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((borrowCost * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Short dividends: {(dividendCost * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((dividendCost * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
-                          <div>Advisory fee: {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}%{showDollars && <span className="cost-dollars"> (${((advancedSettings.wealthManagementFeeRate * collateral) / 1000).toFixed(0)}K/year)</span>}</div>
+                          <div>
+                            Margin interest: {(marginCost * 100).toFixed(2)}%
+                            {showDollars && (
+                              <span className="cost-dollars">
+                                {' '}
+                                (${((marginCost * collateral) / 1000).toFixed(0)}K/year)
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            Stock borrow: {(borrowCost * 100).toFixed(2)}%
+                            {showDollars && (
+                              <span className="cost-dollars">
+                                {' '}
+                                (${((borrowCost * collateral) / 1000).toFixed(0)}K/year)
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            Short dividends: {(dividendCost * 100).toFixed(2)}%
+                            {showDollars && (
+                              <span className="cost-dollars">
+                                {' '}
+                                (${((dividendCost * collateral) / 1000).toFixed(0)}K/year)
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            Advisory fee:{' '}
+                            {(advancedSettings.wealthManagementFeeRate * 100).toFixed(2)}%
+                            {showDollars && (
+                              <span className="cost-dollars">
+                                {' '}
+                                ($
+                                {(
+                                  (advancedSettings.wealthManagementFeeRate * collateral) /
+                                  1000
+                                ).toFixed(0)}
+                                K/year)
+                              </span>
+                            )}
+                          </div>
                           <div className="financing-total">
-                            <strong>Total: {(totalEffective * 100).toFixed(2)}% of portfolio</strong>
-                            {showDollars && <strong className="cost-dollars"> (${((totalEffective * collateral) / 1000).toFixed(0)}K/year)</strong>}
+                            <strong>
+                              Total: {(totalEffective * 100).toFixed(2)}% of portfolio
+                            </strong>
+                            {showDollars && (
+                              <strong className="cost-dollars">
+                                {' '}
+                                (${((totalEffective * collateral) / 1000).toFixed(0)}K/year)
+                              </strong>
+                            )}
                           </div>
                           {view.isSplit && (
                             <div className="financing-split-note">
-                              Leverage and short ratios are collateral-weighted across both legs ({view.legs.map(l => `${l.label}: ${l.strategy.name}`).join(', ')}).
+                              Leverage and short ratios are collateral-weighted across both legs (
+                              {view.legs.map(l => `${l.label}: ${l.strategy.name}`).join(', ')}).
                             </div>
                           )}
                         </div>
@@ -627,20 +788,20 @@ export function StrategySelectionInputs({
               <InfoPopup title="QFAF Overlay Parameters">
                 <p>
                   <strong>Sizing Mode:</strong> Dynamic (default) resizes QFAF each year to match
-                  decaying EDI losses — minimizes ST gain leakage. Fixed holds QFAF constant
-                  through the full duration.
+                  decaying EDI losses — minimizes ST gain leakage. Fixed holds QFAF constant through
+                  the full duration.
                 </p>
                 <p>
-                  <strong>QFAF Multiplier:</strong> Controls the size of the QFAF overlay relative to the
-                  collateral. Historical range: 1.31x to 1.58x (avg 1.42x).
+                  <strong>QFAF Multiplier:</strong> Controls the size of the QFAF overlay relative
+                  to the collateral. Historical range: 1.31x to 1.58x (avg 1.42x).
                 </p>
                 <p>
-                  <strong>Sizing Window:</strong> Number of years averaged for QFAF sizing. Default: 5 years
-                  (conservative multi-year average). Capped by Duration.
+                  <strong>Sizing Window:</strong> Number of years averaged for QFAF sizing. Default:
+                  5 years (conservative multi-year average). Capped by Duration.
                 </p>
                 <p>
-                  <strong>Duration:</strong> Years QFAF runs before breakeven unwind. Default: 5 years.
-                  Reducing duration auto-caps the sizing window.
+                  <strong>Duration:</strong> Years QFAF runs before breakeven unwind. Default: 5
+                  years. Reducing duration auto-caps the sizing window.
                 </p>
                 <p>
                   <strong>Sizing Cushion:</strong> Reduces auto-sized QFAF for conservative sizing.
@@ -651,7 +812,11 @@ export function StrategySelectionInputs({
 
             <div className="qfaf-sizing-mode-toggle">
               <label className="qfaf-sizing-mode-label">Sizing Mode</label>
-              <div className="btn-group btn-group--compact" role="radiogroup" aria-label="QFAF sizing mode">
+              <div
+                className="btn-group btn-group--compact"
+                role="radiogroup"
+                aria-label="QFAF sizing mode"
+              >
                 <button
                   type="button"
                   role="radio"
@@ -698,7 +863,9 @@ export function StrategySelectionInputs({
                 />
                 <div className="slider-labels">
                   <span>125%</span>
-                  <span className="current-value">{(advancedSettings.qfafMultiplier * 100).toFixed(0)}%</span>
+                  <span className="current-value">
+                    {(advancedSettings.qfafMultiplier * 100).toFixed(0)}%
+                  </span>
                   <span>175%</span>
                 </div>
                 <span className="input-hint">
@@ -729,8 +896,12 @@ export function StrategySelectionInputs({
                     />
                     <div className="slider-labels">
                       <span>1 year</span>
-                      <span className="current-value">{inputs.qfafSizingYears} {inputs.qfafSizingYears === 1 ? 'year' : 'years'}</span>
-                      <span>{inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}</span>
+                      <span className="current-value">
+                        {inputs.qfafSizingYears} {inputs.qfafSizingYears === 1 ? 'year' : 'years'}
+                      </span>
+                      <span>
+                        {inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}
+                      </span>
                     </div>
                   </>
                 )}
@@ -764,7 +935,9 @@ export function StrategySelectionInputs({
                 />
                 <div className="slider-labels">
                   <span>1 year</span>
-                  <span className="current-value">{inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}</span>
+                  <span className="current-value">
+                    {inputs.qfafDuration} {inputs.qfafDuration === 1 ? 'year' : 'years'}
+                  </span>
                   <span>10 years</span>
                 </div>
                 <span className="input-hint">
@@ -778,7 +951,7 @@ export function StrategySelectionInputs({
                   id="qfafSizingCushion"
                   type="range"
                   min={0}
-                  max={0.10}
+                  max={0.1}
                   step={0.01}
                   value={inputs.qfafSizingCushion}
                   aria-valuetext={`${(inputs.qfafSizingCushion * 100).toFixed(0)} percent`}
@@ -791,12 +964,12 @@ export function StrategySelectionInputs({
                 />
                 <div className="slider-labels">
                   <span>0%</span>
-                  <span className="current-value">{(inputs.qfafSizingCushion * 100).toFixed(0)}%</span>
+                  <span className="current-value">
+                    {(inputs.qfafSizingCushion * 100).toFixed(0)}%
+                  </span>
                   <span>10%</span>
                 </div>
-                <span className="input-hint">
-                  Reduces auto-sized QFAF for conservative sizing
-                </span>
+                <span className="input-hint">Reduces auto-sized QFAF for conservative sizing</span>
               </div>
             </div>
 
@@ -806,7 +979,8 @@ export function StrategySelectionInputs({
                 <label htmlFor="qfafAnnualReturn">
                   <InfoPopup title="QFAF Return Rate">
                     <p>
-                      QFAF may have different return characteristics than index-tracking collateral due to:
+                      QFAF may have different return characteristics than index-tracking collateral
+                      due to:
                     </p>
                     <ul>
                       <li>Active management fees</li>
@@ -814,13 +988,15 @@ export function StrategySelectionInputs({
                       <li>Different asset allocation or strategy</li>
                     </ul>
                     <p>
-                      <strong>Default:</strong> Use same rate as collateral ({(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%)
+                      <strong>Default:</strong> Use same rate as collateral (
+                      {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%)
                     </p>
                     <p>
-                      <strong>Override:</strong> Set a separate return assumption for QFAF growth modeling
+                      <strong>Override:</strong> Set a separate return assumption for QFAF growth
+                      modeling
                     </p>
-                  </InfoPopup>
-                  {' '}QFAF Return Rate (%)
+                  </InfoPopup>{' '}
+                  QFAF Return Rate (%)
                 </label>
                 <div className="qfaf-return-controls">
                   <label className="use-default-checkbox">
@@ -831,11 +1007,17 @@ export function StrategySelectionInputs({
                         if (e.target.checked) {
                           onUpdateSettings(s => ({ ...s, qfafAnnualReturn: null }));
                         } else {
-                          onUpdateSettings(s => ({ ...s, qfafAnnualReturn: s.defaultAnnualReturn }));
+                          onUpdateSettings(s => ({
+                            ...s,
+                            qfafAnnualReturn: s.defaultAnnualReturn,
+                          }));
                         }
                       }}
                     />
-                    <span>Use collateral rate ({(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%)</span>
+                    <span>
+                      Use collateral rate ({(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}
+                      %)
+                    </span>
                   </label>
                   {advancedSettings.qfafAnnualReturn !== null && (
                     <>
@@ -843,8 +1025,8 @@ export function StrategySelectionInputs({
                         id="qfafAnnualReturn"
                         type="range"
                         className="inline-slider"
-                        min={-0.20}
-                        max={0.30}
+                        min={-0.2}
+                        max={0.3}
                         step={0.005}
                         value={advancedSettings.qfafAnnualReturn}
                         onChange={e => {
@@ -856,7 +1038,9 @@ export function StrategySelectionInputs({
                       />
                       <div className="slider-labels">
                         <span>-20%</span>
-                        <span className="current-value">{(advancedSettings.qfafAnnualReturn * 100).toFixed(1)}%</span>
+                        <span className="current-value">
+                          {(advancedSettings.qfafAnnualReturn * 100).toFixed(1)}%
+                        </span>
                         <span>+30%</span>
                       </div>
                     </>
@@ -865,8 +1049,7 @@ export function StrategySelectionInputs({
                 <span className="input-hint">
                   {advancedSettings.qfafAnnualReturn === null
                     ? `QFAF growing at collateral rate (${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%)`
-                    : `QFAF growing at ${(advancedSettings.qfafAnnualReturn * 100).toFixed(1)}% vs collateral ${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%`
-                  }
+                    : `QFAF growing at ${(advancedSettings.qfafAnnualReturn * 100).toFixed(1)}% vs collateral ${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%`}
                 </span>
               </div>
             )}

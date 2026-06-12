@@ -32,8 +32,18 @@ export interface LossSubPeriod {
 }
 
 const MONTH_ABBRS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 interface MonthInfo {
@@ -74,11 +84,7 @@ function groupSegments(months: MonthInfo[]): DeploymentSegment[] {
     if (!m.active) continue;
     const last = segments[segments.length - 1];
     // Extend the prior segment if same DY and contiguous within the DY.
-    if (
-      last &&
-      last.deploymentYear === m.dy &&
-      last.monthsInDY[1] === (m.dyMonth as number) - 1
-    ) {
+    if (last && last.deploymentYear === m.dy && last.monthsInDY[1] === (m.dyMonth as number) - 1) {
       last.monthsInDY = [last.monthsInDY[0], m.dyMonth as number];
       last.monthsInPeriod += 1;
     } else {
@@ -110,14 +116,7 @@ export interface BuildLossBreakdownArgs {
 }
 
 export function buildLossBreakdown(args: BuildLossBreakdownArgs): LossSubPeriod[] {
-  const {
-    year,
-    yearIndex,
-    startMonth,
-    qfafDuration,
-    granularity,
-    rateForDeploymentYear,
-  } = args;
+  const { year, yearIndex, startMonth, qfafDuration, granularity, rateForDeploymentYear } = args;
 
   const monthInfo = computeMonthInfo(yearIndex, startMonth, qfafDuration);
 
@@ -150,10 +149,7 @@ export function buildLossBreakdown(args: BuildLossBreakdownArgs): LossSubPeriod[
     const active = slice.some(m => m.active);
     const stLosses = monthStLoss.slice(start, end).reduce((s, v) => s + v, 0);
     const ordinaryLosses = monthOrdLoss.slice(start, end).reduce((s, v) => s + v, 0);
-    const label =
-      granularity === 'monthly'
-        ? MONTH_ABBRS[start]
-        : `Q${Math.floor(start / 3) + 1}`;
+    const label = granularity === 'monthly' ? MONTH_ABBRS[start] : `Q${Math.floor(start / 3) + 1}`;
     periods.push({
       label,
       monthRange: [start + 1, end],

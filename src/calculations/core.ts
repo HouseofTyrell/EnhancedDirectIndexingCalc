@@ -7,7 +7,14 @@ import {
   DEFAULT_SETTINGS,
   YearOverride,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile, computeLtcgExcise } from '../taxData';
+import {
+  getFederalStRate,
+  getFederalLtRate,
+  getFederalOrdinaryRate,
+  getStateRate,
+  getStateTaxProfile,
+  computeLtcgExcise,
+} from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -61,6 +68,26 @@ export interface CalculateYearOverrides {
   unwindLtGain?: number;
   /** Financing-fee dollars saved vs the un-delevered source book this year */
   deleverageFinancingSaved?: number;
+  /**
+   * D-020: sum of UNEXPIRED state NOL vintages at the start of the year
+   * (CA 20-year carryover). When defined, the state-rate component of the
+   * NOL usage benefit is applied to at most this many dollars; federal NOL
+   * math is untouched. Undefined = no state expiry (ledger off).
+   */
+  stateNolAvailable?: number;
+}
+
+/**
+ * State NOL vintage (D-020). CA NOLs expire 20 years after the loss year
+ * (R&TC §17276); SB 167 extends the carryover of NOLs whose deduction was
+ * suspended (+1 year per suspension year). The ledger gates ONLY the state
+ * component of NOL benefits — federal NOLs are indefinite.
+ */
+interface StateNolVintage {
+  yearCreated: number;
+  amount: number;
+  /** Last projection year in which this vintage is deductible; it expires at the END of this year. */
+  lastUsableYear: number;
 }
 
 /**
@@ -93,7 +120,6 @@ export function calculateWithOverrides(
   settings: AdvancedSettings = DEFAULT_SETTINGS,
   overrides: YearOverride[] = []
 ): CalculationResult {
-
   const allocation = resolveAllocation(inputs);
 
   // Build a map of overrides by year for quick lookup
@@ -103,12 +129,35 @@ export function calculateWithOverrides(
   }
 
   // Calculate initial sizing (will be adjusted for infusions)
-  const baseSizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
+  const baseSizing = calculateSizing(
+    inputs,
+    settings.qfafMultiplier,
+    settings.washSaleDisallowanceRate
+  );
 
   // Pre-calculate base tax rates and the per-state treatment profile (D-005)
   const baseStateRate =
     inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
   const stateProfile = getStateTaxProfile(inputs.stateCode, baseStateRate, inputs.nycResident);
+
+  // D-020: state NOL vintage ledger (CA only — runs only when the profile
+  // defines a carryover period; zero behavior change for every other state).
+  // Vintages are consumed FIFO (oldest first, matching CA ordering rules and
+  // the taxpayer-favorable default) whenever NOL is used, and expire at the
+  // end of year `yearCreated + carryover`. Pre-existing NOL assumption: it is
+  // treated as a single pre-2024 loss whose deduction was suspended for all
+  // three SB 167 years (2024–2026), so it gets the full +3-year extension —
+  // carryover 20 + 3 measured from vintage year 0 (the year before the
+  // projection starts), i.e. usable through the end of projection year 23.
+  const stateNolCarryoverYears = stateProfile.nolCarryoverYears;
+  const stateNolVintages: StateNolVintage[] = [];
+  if (stateNolCarryoverYears !== undefined && inputs.existingNolCarryforward > 0) {
+    stateNolVintages.push({
+      yearCreated: 0,
+      amount: inputs.existingNolCarryforward,
+      lastUsableYear: stateNolCarryoverYears + 3,
+    });
+  }
 
   // Honor custom tax rates the same way calculate() does, so the standard
   // view and Year-by-Year Planning agree when custom rates are set.
@@ -146,10 +195,8 @@ export function calculateWithOverrides(
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
   const yf = (13 - (inputs.startMonth ?? 1)) / 12;
   const isPartialStart = yf < 1;
-  const strategyLastCalendarYear =
-    qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
-  const minProjection =
-    qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
+  const strategyLastCalendarYear = qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
+  const minProjection = qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
   // NOL exhaustion extension: if NOL remains at the end of the standard
   // horizon, keep projecting wind-down years until it is fully used (capped,
@@ -160,9 +207,7 @@ export function calculateWithOverrides(
   // Null when the plan is disabled/invalid or split allocation is enabled
   // (split wins in v1; the UI shows a "plan ignored" warning).
   const dlvPlan = allocation.isSplit ? null : resolveDeleveragePlan(inputs);
-  const dlvSchedule = dlvPlan
-    ? resolveDeleverageSchedule(inputs, settings, hardCapYears)
-    : null;
+  const dlvSchedule = dlvPlan ? resolveDeleverageSchedule(inputs, settings, hardCapYears) : null;
   // Running embedded-gain state for unwind-gain sizing (consistent with
   // exitTax.ts: market appreciation + pre-existing gain + Σ(harvested ST
   // losses − realized LT gains) − Σ prior unwind gains realized).
@@ -183,7 +228,10 @@ export function calculateWithOverrides(
 
   for (let year = 1; year <= hardCapYears; year++) {
     const inNolExtension = year > effectiveProjectionYears;
-    if (inNolExtension && nolCarryforward <= 0.5) break;
+    // Extension runs while NOL or capital-loss carryforwards remain; the
+    // stall guard below stops it once nothing is meaningfully consuming them
+    // (the $3K/yr ordinary offset alone doesn't justify decades of rows).
+    if (inNolExtension && nolCarryforward <= 0.5 && stCarryforward + ltCarryforward <= 0.5) break;
 
     const override = overrideMap.get(year);
 
@@ -194,8 +242,7 @@ export function calculateWithOverrides(
     }
 
     // Get effective income for this year
-    const yearIncome =
-      override?.w2Income ?? (inNolExtension ? carryIncome : inputs.annualIncome);
+    const yearIncome = override?.w2Income ?? (inNolExtension ? carryIncome : inputs.annualIncome);
 
     // Calculate tax rates for this year's income (needed for cash infusion tax adjustment)
     const yearTaxRates: TaxRates = {
@@ -210,8 +257,7 @@ export function calculateWithOverrides(
         : getFederalOrdinaryRate(yearIncome, inputs.filingStatus),
       state: stateProfile,
       section461Limit:
-        settings.section461Limits[inputs.filingStatus] ??
-        SECTION_461L_LIMITS[inputs.filingStatus],
+        settings.section461Limits[inputs.filingStatus] ?? SECTION_461L_LIMITS[inputs.filingStatus],
     };
 
     // Apply cash infusion at the start of the year
@@ -268,7 +314,12 @@ export function calculateWithOverrides(
     const calStLossRate = dlvYear
       ? dlvYear.stLossRate
       : allocation.isSplit
-        ? getBlendedCalendarYearStLossRate(yearAllocation, year, inputs.startMonth ?? 1, qfafDuration)
+        ? getBlendedCalendarYearStLossRate(
+            yearAllocation,
+            year,
+            inputs.startMonth ?? 1,
+            qfafDuration
+          )
         : getCalendarYearStLossRate(
             allocation.primary.strategy.id,
             allocation.primary.strategy.ltGainRate,
@@ -285,10 +336,8 @@ export function calculateWithOverrides(
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0 && opFraction > 0) {
       const neededQfaf =
-        yearStartTotalCollateral *
-        calStLossRate *
-        (1 - settings.washSaleDisallowanceRate) /
-        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
+        ((yearStartTotalCollateral * calStLossRate * (1 - settings.washSaleDisallowanceRate)) /
+          ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction)) *
         (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -332,8 +381,11 @@ export function calculateWithOverrides(
     if (dlvYear && dlvPlan && dlvYear.fracUnwoundThisYear > 0) {
       const embeddedGain = Math.max(
         0,
-        yearStartTotalCollateral - dlvInitialCollateral +
-          dlvPreExistingGain + dlvCumNetHarvest - dlvCumUnwindRealized
+        yearStartTotalCollateral -
+          dlvInitialCollateral +
+          dlvPreExistingGain +
+          dlvCumNetHarvest -
+          dlvCumUnwindRealized
       );
       // Pro-rata: gain per dollar of the LONG book (NAV × (1 + long leverage)).
       const grossLongValue = yearStartTotalCollateral * (1 + dlvPlan.sourceLongLeverage);
@@ -350,14 +402,21 @@ export function calculateWithOverrides(
       const shortCoverGain = dlvPlan.shortCoverGainPct * shortDollarsCovered;
       yearOverrides.unwindStGain =
         (dlvPlan.unwindGainCharacter === 'st' ? dlvLongUnwindGain : 0) + shortCoverGain;
-      yearOverrides.unwindLtGain =
-        dlvPlan.unwindGainCharacter === 'lt' ? dlvLongUnwindGain : 0;
+      yearOverrides.unwindLtGain = dlvPlan.unwindGainCharacter === 'lt' ? dlvLongUnwindGain : 0;
     }
 
     const ev = override?.gainEvent;
     if (ev && ev.amount > 0) {
       yearOverrides.eventStGain = ev.character === 'st' ? ev.amount : 0;
       yearOverrides.eventLtGain = ev.character === 'lt' ? ev.amount : 0;
+    }
+
+    // D-020: unexpired state-side NOL available this year. Expired vintages
+    // are removed at the end of their last usable year, so the ledger sum is
+    // exactly the live state pool. Until something expires this equals the
+    // federal balance, so the cap never binds and results are unchanged.
+    if (stateNolCarryoverYears !== undefined) {
+      yearOverrides.stateNolAvailable = stateNolVintages.reduce((s, v) => s + v.amount, 0);
     }
 
     const result = calculateYear(
@@ -408,11 +467,59 @@ export function calculateWithOverrides(
     const terminalProceeds =
       strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
     const totalRedeemed = cashReturned + terminalProceeds;
-    // Stall guard: an extension year that consumed no NOL adds nothing
-    // (e.g., zero income) — stop instead of emitting empty years.
-    if (inNolExtension && result.nolUsedThisYear <= 0.5) {
+    // Stall guard: an extension year must consume NOL or burn capital-loss
+    // carryforward beyond the $3K ordinary-offset trickle (LT-gain
+    // realization, deleverage unwinds); otherwise stop instead of emitting
+    // empty years (a $6M CF at $3K/yr would mean ~2,000 of them).
+    const cfConsumed =
+      stCarryforward + ltCarryforward - (result.stLossCarryforward + result.ltLossCarryforward);
+    if (inNolExtension && result.nolUsedThisYear <= 0.5 && cfConsumed <= 3000 + 0.5) {
       break;
     }
+
+    // D-020: advance the state NOL vintage ledger. The D-019 extension/stall
+    // guard above is deliberately untouched — it watches the FEDERAL NOL
+    // balance, which expiry never reduces.
+    if (stateNolCarryoverYears !== undefined) {
+      // 1) Consume this year's NOL usage FIFO (oldest vintage first). The
+      //    federal nolUsed never exceeds the start-of-year balance, so the
+      //    ledger covers it except where vintages have already expired.
+      let toConsume = result.nolUsedThisYear;
+      for (const vintage of stateNolVintages) {
+        if (toConsume <= 0) break;
+        const consumed = Math.min(vintage.amount, toConsume);
+        vintage.amount -= consumed;
+        toConsume -= consumed;
+      }
+      // 2) Record NOL generated this year as a new vintage. A vintage whose
+      //    state deduction was suspended this year (SB 167, MAGI ≥ $1M; year
+      //    1 = tax year 2026, the last suspension year) gets +1 carryover.
+      if (result.excessToNol > 0) {
+        const suspendedThisYear =
+          stateProfile.nolStateSuspension !== undefined &&
+          year <= stateProfile.nolStateSuspension.throughProjectionYear &&
+          yearIncome >= stateProfile.nolStateSuspension.magiThreshold;
+        stateNolVintages.push({
+          yearCreated: year,
+          amount: result.excessToNol,
+          lastUsableYear: year + stateNolCarryoverYears + (suspendedThisYear ? 1 : 0),
+        });
+      }
+      // 3) Expire vintages at the end of their last usable year; report the
+      //    unused dollars (state-side only — federal NOL is unaffected).
+      let stateNolExpiredThisYear = 0;
+      for (let i = stateNolVintages.length - 1; i >= 0; i--) {
+        const vintage = stateNolVintages[i];
+        if (vintage.lastUsableYear <= year) {
+          stateNolExpiredThisYear += Math.max(0, vintage.amount);
+          stateNolVintages.splice(i, 1);
+        } else if (vintage.amount <= 0) {
+          stateNolVintages.splice(i, 1);
+        }
+      }
+      result.stateNolExpired = safeNumber(stateNolExpiredThisYear);
+    }
+
     if (redeployProceeds) {
       pendingRedeploy += totalRedeemed;
       years.push({ ...result, qfafCashReturned: 0 });
@@ -456,9 +563,16 @@ export function calculateWithOverrides(
       adjustedSizing,
       inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined,
       settings.discountRate,
+      // Reserve valuation rates: PA/NJ give individuals NO loss carryforwards,
+      // so the state-level shelter of an end-of-horizon CF balance is zero —
+      // those losses expire each state tax year. Federal (incl. NIIT) remains.
       finalYearRates && {
-        combinedStRate: finalYearRates.stRate + finalYearRates.state.stRate,
-        combinedLtRate: finalYearRates.ltRate + finalYearRates.state.ltRate,
+        combinedStRate:
+          finalYearRates.stRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.stRate : 0),
+        combinedLtRate:
+          finalYearRates.ltRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.ltRate : 0),
       }
     ),
   };
@@ -486,8 +600,12 @@ export function calculateYear(
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate (default 150% of MV each)
   // Use safeNumber to prevent NaN/Infinity propagation (004)
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
-  const stGainsGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
-  const ordinaryLossesGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
+  const stGainsGenerated = strategyActive
+    ? safeNumber(qfafValue * qfafMultiplier * yearFraction)
+    : 0;
+  const ordinaryLossesGenerated = strategyActive
+    ? safeNumber(qfafValue * qfafMultiplier * yearFraction)
+    : 0;
 
   // Collateral generates ST losses and LT gains per strategy rates
   // Uses custom rates if set, otherwise applies 7% annual decay
@@ -509,7 +627,10 @@ export function calculateYear(
     grossStLosses = strategyActive ? collateralValue * effectiveStLossRate * yearFraction : 0;
   }
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * ltGainRate * yearFraction) : 0;
+  const ltGainsRealized =
+    strategyActive && inputs.ltGainsEnabled !== false
+      ? safeNumber(collateralValue * ltGainRate * yearFraction)
+      : 0;
 
   // Deleverage unwind gains (D-016/D-017): ENDOGENOUS strategy costs, the
   // opposite of D-012 gain events — they net WITH the strategy's own flows
@@ -569,14 +690,16 @@ export function calculateYear(
   // gain income absorbs deduction too (the cap base is full taxable income).
   const incomeAvailable = Math.max(
     0,
-    effectiveIncome + taxableSt + taxableLt + eventTaxableSt + eventTaxableLt -
+    effectiveIncome +
+      taxableSt +
+      taxableLt +
+      eventTaxableSt +
+      eventTaxableLt -
       capitalLossUsedAgainstIncome
   );
   const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
   const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
-  const excessToNol = safeNumber(
-    ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol
-  );
+  const excessToNol = safeNumber(ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol);
 
   // Update NOL carryforward: add excess, subtract used
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
@@ -618,10 +741,23 @@ export function calculateYear(
   );
   const nolAtOrdinary = Math.min(nolUsed, ordinaryNolBase);
   const nolAtLt = nolUsed - nolAtOrdinary;
-  const ltNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038)) + nolStateRate;
-  const nolUsageBenefit = safeNumber(
-    nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate
-  );
+  const fedLtNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038));
+  const ltNolRate = fedLtNolRate + nolStateRate;
+  // D-020: when expired CA vintages leave the state-side NOL pool smaller
+  // than the federal balance, only the unexpired portion earns the state
+  // rate (both NOL tranches share the same state rate, so the state benefit
+  // is simply stateEligibleNol × nolStateRate). The original expression is
+  // kept when nothing has expired so the no-ledger path is bit-identical.
+  const stateEligibleNol =
+    overrides?.stateNolAvailable !== undefined
+      ? Math.min(nolUsed, overrides.stateNolAvailable)
+      : nolUsed;
+  const nolUsageBenefit =
+    stateEligibleNol >= nolUsed
+      ? safeNumber(nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate)
+      : safeNumber(
+          nolAtOrdinary * ordinaryRate + nolAtLt * fedLtNolRate + stateEligibleNol * nolStateRate
+        );
 
   // Costs:
   // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption).
@@ -671,11 +807,7 @@ export function calculateYear(
   // Net tax savings: ordinary deductions minus capital gains costs
   // ST gains and ST losses wash (by design) — no phantom "conversion benefit"
   const taxSavings = safeNumber(
-    ordinaryLossBenefit +
-      capitalLossBenefit +
-      nolUsageBenefit -
-      ltGainCost -
-      remainingStGainCost
+    ordinaryLossBenefit + capitalLossBenefit + nolUsageBenefit - ltGainCost - remainingStGainCost
   );
 
   // ST gain leakage: excess QFAF ST gains not offset by collateral losses
@@ -719,14 +851,18 @@ export function calculateYear(
   // QFAF growth can be disabled (e.g., to model fees/hedging costs eating returns)
   // QFAF can also use a separate return rate if specified (defaults to collateral growth rate)
   const qfafBaseReturn = settings.growthEnabled
-    ? (settings.qfafAnnualReturn !== null ? settings.qfafAnnualReturn : settings.defaultAnnualReturn)
+    ? settings.qfafAnnualReturn !== null
+      ? settings.qfafAnnualReturn
+      : settings.defaultAnnualReturn
     : 0;
   const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafBaseReturn : 0;
   // Grow at full return rate, then deduct fees at end of year on the grown value
   const grownQfafValue = safeNumber(qfafValue * (1 + qfafGrowthRate * yearFraction));
   const newQfafValue = safeNumber(grownQfafValue * (1 - totalFinancingCost * yearFraction));
   const grownCollateralValue = safeNumber(collateralValue * (1 + baseReturn * yearFraction));
-  const newCollateralValue = safeNumber(grownCollateralValue * (1 - totalFinancingCost * yearFraction));
+  const newCollateralValue = safeNumber(
+    grownCollateralValue * (1 - totalFinancingCost * yearFraction)
+  );
   // Dollar financing cost charged this year (D-014 insights input). In split
   // mode the blended rate is weighted by start-of-year collateral and all
   // legs grow at the same base return, so charging it on the grown total
@@ -795,6 +931,7 @@ export function calculateYear(
     nolCarryforward: newNolCarryforward,
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
+    stateNolExpired: 0, // Set by the calling loop's vintage ledger (D-020)
     effectiveStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,

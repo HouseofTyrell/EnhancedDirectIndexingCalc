@@ -47,11 +47,7 @@ describe('Advanced Features - Cash Infusion', () => {
       overrides[2].cashInfusion = 2000000;
       overrides[2].cashInfusionTaxType = 'net';
 
-      const resultWithInfusion = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithInfusion = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
       const resultWithoutInfusion = calculate(baseClient, DEFAULT_SETTINGS);
 
       // Year 3 collateral should be higher with infusion
@@ -78,11 +74,7 @@ describe('Advanced Features - Cash Infusion', () => {
       overrides[2].cashInfusion = 2000000;
       overrides[2].cashInfusionTaxType = 'net';
 
-      const resultWithInfusion = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithInfusion = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
       const resultWithoutInfusion = calculate(baseClient, DEFAULT_SETTINGS);
 
       // Year 4 ST losses should be higher (year 3 infusion affects year 4 calcs)
@@ -100,34 +92,28 @@ describe('Advanced Features - Cash Infusion', () => {
       overrides[2].cashInfusion = 2000000;
       overrides[2].cashInfusionTaxType = 'net';
 
-      const resultWithInfusion = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithInfusion = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
       const resultWithoutInfusion = calculate(baseClient, DEFAULT_SETTINGS);
 
       // QFAF should be resized to match new collateral ST loss capacity
       const year4WithInfusion = resultWithInfusion.years[3];
       const year4WithoutInfusion = resultWithoutInfusion.years[3];
 
-      expect(year4WithInfusion.qfafValue).toBeGreaterThan(
-        year4WithoutInfusion.qfafValue
-      );
+      expect(year4WithInfusion.qfafValue).toBeGreaterThan(year4WithoutInfusion.qfafValue);
     });
 
     it('should compound growth on infused capital', () => {
-      const growthSettings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.07 };
+      const growthSettings = {
+        ...DEFAULT_SETTINGS,
+        growthEnabled: true,
+        defaultAnnualReturn: 0.07,
+      };
       const overrides = generateDefaultOverrides(baseClient.annualIncome);
       // Add $1M in year 1
       overrides[0].cashInfusion = 1000000;
       overrides[0].cashInfusionTaxType = 'net';
 
-      const resultWithInfusion = calculateWithOverrides(
-        baseClient,
-        growthSettings,
-        overrides
-      );
+      const resultWithInfusion = calculateWithOverrides(baseClient, growthSettings, overrides);
 
       // By year 10, the $1M should have grown at 7% for 9 years
       // This affects total portfolio value
@@ -151,11 +137,7 @@ describe('Advanced Features - Cash Infusion', () => {
       overrides[4].cashInfusion = 500000;
       overrides[4].cashInfusionTaxType = 'net';
 
-      const resultWithInfusions = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithInfusions = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
 
       // Total exposure should increase after each infusion
       const year1 = resultWithInfusions.years[0];
@@ -174,11 +156,7 @@ describe('Advanced Features - Cash Infusion', () => {
       overrides[0].cashInfusion = 5000000;
       overrides[0].cashInfusionTaxType = 'net';
 
-      const resultWithInfusion = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithInfusion = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
       const resultWithoutInfusion = calculate(baseClient, DEFAULT_SETTINGS);
 
       // Total 10-year tax savings should be significantly higher
@@ -197,11 +175,7 @@ describe('Advanced Features - Income Overrides', () => {
       overrides[4].w2Income = 300000;
       overrides[4].note = 'Sabbatical year';
 
-      const resultWithOverride = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithOverride = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
 
       // Year 5 usable ordinary loss should be capped by available income
       const year5 = resultWithOverride.years[4];
@@ -232,11 +206,7 @@ describe('Advanced Features - Income Overrides', () => {
       // Drop income to $0 in year 3 so the shelter limit truly binds
       overrides[2].w2Income = 0;
 
-      const resultWithOverride = calculateWithOverrides(
-        client,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithOverride = calculateWithOverrides(client, DEFAULT_SETTINGS, overrides);
       const resultWithoutOverride = calculate(client, DEFAULT_SETTINGS);
 
       // Year 3 should generate more excess to NOL (since less can be used)
@@ -294,11 +264,7 @@ describe('Advanced Features - Income Overrides', () => {
       overrides[5].w2Income = 0;
       overrides[5].note = 'Full retirement';
 
-      const resultWithOverride = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const resultWithOverride = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
 
       const year6 = resultWithOverride.years[5];
 
@@ -327,11 +293,7 @@ describe('Advanced Features - Income Overrides', () => {
       overrides[5].w2Income = 100000;
       overrides[5].note = 'Retirement';
 
-      const result = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const result = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
 
       // Year 5 should show larger portfolio from infusion
       // Base is $5M collateral + QFAF, plus $3M infusion
@@ -367,11 +329,7 @@ describe('Advanced Features - Income Overrides', () => {
       overrides[8].w2Income = 450000;
       overrides[9].w2Income = 450000;
 
-      const result = calculateWithOverrides(
-        youngProfessional,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const result = calculateWithOverrides(youngProfessional, DEFAULT_SETTINGS, overrides);
 
       // Should complete 10-year projection
       expect(result.years.length).toBe(12);
@@ -381,9 +339,7 @@ describe('Advanced Features - Income Overrides', () => {
       const year5 = result.years[4];
 
       // Both should be limited by income (< $512K MFJ limit)
-      expect(year1.usableOrdinaryLoss).toBeLessThanOrEqual(
-        youngProfessional.annualIncome
-      );
+      expect(year1.usableOrdinaryLoss).toBeLessThanOrEqual(youngProfessional.annualIncome);
       expect(year5.usableOrdinaryLoss).toBeLessThanOrEqual(overrides[4].w2Income);
     });
 
@@ -399,11 +355,7 @@ describe('Advanced Features - Income Overrides', () => {
         overrides[i].w2Income = 200000;
       }
 
-      const result = calculateWithOverrides(
-        baseClient,
-        DEFAULT_SETTINGS,
-        overrides
-      );
+      const result = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
 
       // Year 3 should show massive increase (base $5M + $10M infusion = $15M)
       const year3 = result.years[2];
@@ -425,11 +377,7 @@ describe('Advanced Features - Edge Cases', () => {
   it('should handle all default overrides (no changes)', () => {
     const overrides = generateDefaultOverrides(baseClient.annualIncome);
 
-    const resultWithOverrides = calculateWithOverrides(
-      baseClient,
-      DEFAULT_SETTINGS,
-      overrides
-    );
+    const resultWithOverrides = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
     const resultWithoutOverrides = calculate(baseClient, DEFAULT_SETTINGS);
 
     // Results should be identical when no overrides are active
@@ -457,11 +405,7 @@ describe('Advanced Features - Edge Cases', () => {
       note: '',
     }));
 
-    const result = calculateWithOverrides(
-      baseClient,
-      DEFAULT_SETTINGS,
-      partialOverrides
-    );
+    const result = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, partialOverrides);
 
     // Should still calculate all 10 years
     expect(result.years.length).toBe(12);
@@ -479,11 +423,7 @@ describe('Advanced Features - Edge Cases', () => {
     overrides[4].cashInfusionTaxType = 'net';
     overrides[4].note = 'Capital withdrawal';
 
-    const resultWithWithdrawal = calculateWithOverrides(
-      baseClient,
-      DEFAULT_SETTINGS,
-      overrides
-    );
+    const resultWithWithdrawal = calculateWithOverrides(baseClient, DEFAULT_SETTINGS, overrides);
     const resultWithoutWithdrawal = calculate(baseClient, DEFAULT_SETTINGS);
 
     // Year 5 collateral should be lower

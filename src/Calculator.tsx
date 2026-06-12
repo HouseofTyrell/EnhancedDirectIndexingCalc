@@ -1,6 +1,18 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { calculate, calculateWithOverrides, calculateWithSensitivity, computeExitTaxAnalysis } from './calculations';
-import { DEFAULTS, getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile } from './taxData';
+import {
+  calculate,
+  calculateWithOverrides,
+  calculateWithSensitivity,
+  computeExitTaxAnalysis,
+} from './calculations';
+import {
+  DEFAULTS,
+  getFederalStRate,
+  getFederalLtRate,
+  getFederalOrdinaryRate,
+  getStateRate,
+  getStateTaxProfile,
+} from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
 import { getQuantifiedStateWarning } from './utils/stateTaxWarnings';
 import {
@@ -11,11 +23,7 @@ import {
   SensitivityParams,
   DEFAULT_SENSITIVITY,
 } from './types';
-import {
-  InfoPopup,
-  StrategyRatesFormula,
-  ProjectionFormula,
-} from './InfoPopup';
+import { InfoPopup, StrategyRatesFormula, ProjectionFormula } from './InfoPopup';
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useScrollHeader } from './hooks/useScrollHeader';
 import { useQualifiedPurchaser } from './hooks/useQualifiedPurchaser';
@@ -101,10 +109,7 @@ export function Calculator() {
 
   // Check if any year overrides differ from defaults
   const hasActiveOverrides = useMemo(
-    () =>
-      yearOverrides.some(
-        o => o.w2Income !== inputs.annualIncome || o.cashInfusion !== 0
-      ),
+    () => yearOverrides.some(o => o.w2Income !== inputs.annualIncome || o.cashInfusion !== 0),
     [yearOverrides, inputs.annualIncome]
   );
 
@@ -162,7 +167,13 @@ export function Calculator() {
         (stateProfile.allowsLossOffsetAgainstIncome ? stateProfile.ordinaryRate : 0),
       rateDifferential: federalStRate - federalLtRate,
     };
-  }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate, inputs.nycResident]);
+  }, [
+    inputs.annualIncome,
+    inputs.filingStatus,
+    inputs.stateCode,
+    inputs.stateRate,
+    inputs.nycResident,
+  ]);
 
   const {
     federalStRate,
@@ -192,7 +203,13 @@ export function Calculator() {
         taxRates.stateProfile.ltcgExcise,
         inputs.collateralCostBasis
       ),
-    [results, combinedLtRate, taxRates.stateProfile, advancedSettings.growthEnabled, advancedSettings.defaultAnnualReturn]
+    [
+      results,
+      combinedLtRate,
+      taxRates.stateProfile,
+      advancedSettings.growthEnabled,
+      advancedSettings.defaultAnnualReturn,
+    ]
   );
 
   const updateInput = useCallback(
@@ -305,6 +322,7 @@ export function Calculator() {
         results={results}
         collateralOnlyResults={collateralOnlyResults}
         taxRates={taxRates}
+        exitAnalysis={exitTaxAnalysis}
         advancedSettings={advancedSettings}
         currentStrategy={currentStrategy}
         onExitMeetingMode={() => setIsMeetingMode(false)}
@@ -344,19 +362,25 @@ export function Calculator() {
         pinnedCount={pinnedScenario.scenarios.length}
         onPinScenario={() => pinnedScenario.pin(inputs, advancedSettings, results)}
         onUnpinScenario={handleUnpinAll}
-        pinnedValues={pinnedScenario.pinned ? {
-          collateral:
-            pinnedScenario.pinned.inputs.splitAllocation?.enabled === true
-              ? pinnedScenario.pinned.inputs.splitAllocation.coreAmount +
-                pinnedScenario.pinned.inputs.splitAllocation.overlayAmount
-              : pinnedScenario.pinned.inputs.collateralAmount,
-          qfafValue: pinnedScenario.pinned.results.sizing.qfafValue,
-          annualTaxSavings: pinnedScenario.pinned.results.years[0]?.taxSavings ?? 0,
-          year2TaxSavings: pinnedScenario.pinned.inputs.qfafEnabled && pinnedScenario.pinned.results.years.length > 1
-            ? pinnedScenario.pinned.results.years[1]?.taxSavings
-            : undefined,
-          totalTaxSavings: pinnedScenario.pinned.results.summary.totalTaxSavings,
-        } : undefined}
+        pinnedValues={
+          pinnedScenario.pinned
+            ? {
+                collateral:
+                  pinnedScenario.pinned.inputs.splitAllocation?.enabled === true
+                    ? pinnedScenario.pinned.inputs.splitAllocation.coreAmount +
+                      pinnedScenario.pinned.inputs.splitAllocation.overlayAmount
+                    : pinnedScenario.pinned.inputs.collateralAmount,
+                qfafValue: pinnedScenario.pinned.results.sizing.qfafValue,
+                annualTaxSavings: pinnedScenario.pinned.results.years[0]?.taxSavings ?? 0,
+                year2TaxSavings:
+                  pinnedScenario.pinned.inputs.qfafEnabled &&
+                  pinnedScenario.pinned.results.years.length > 1
+                    ? pinnedScenario.pinned.results.years[1]?.taxSavings
+                    : undefined,
+                totalTaxSavings: pinnedScenario.pinned.results.summary.totalTaxSavings,
+              }
+            : undefined
+        }
       />
 
       <header className="header">
@@ -405,77 +429,87 @@ export function Calculator() {
       <div className="section-group section-group--inputs">
         <div className="section-group__label">Inputs</div>
 
-      {/* Input Form - Step 1: Your Situation */}
-      <CollapsibleSection
-        sectionKey="inputs"
-        step="1"
-        stepLabel="Your Situation"
-        title="Client Profile"
-        headerAction={
-          <InfoPopup title="Strategy Selection">
-            <StrategyRatesFormula />
-          </InfoPopup>
-        }
-        guidance="Tell us about your client's investment and tax profile. These inputs determine the strategy sizing and tax impact."
-        className="inputs-section"
-      >
-        <div className="input-grid">
-          {/* Sub-card: Strategy Selection */}
-          <PinnableSection id="strategy" label="Strategy Selection" isPinned={pinnedElements.isPinned('strategy')} onTogglePin={() => pinnedElements.togglePin('strategy')}>
-          <StrategySelectionInputs
+        {/* Input Form - Step 1: Your Situation */}
+        <CollapsibleSection
+          sectionKey="inputs"
+          step="1"
+          stepLabel="Your Situation"
+          title="Client Profile"
+          headerAction={
+            <InfoPopup title="Strategy Selection">
+              <StrategyRatesFormula />
+            </InfoPopup>
+          }
+          guidance="Tell us about your client's investment and tax profile. These inputs determine the strategy sizing and tax impact."
+          className="inputs-section"
+        >
+          <div className="input-grid">
+            {/* Sub-card: Strategy Selection */}
+            <PinnableSection
+              id="strategy"
+              label="Strategy Selection"
+              isPinned={pinnedElements.isPinned('strategy')}
+              onTogglePin={() => pinnedElements.togglePin('strategy')}
+            >
+              <StrategySelectionInputs
+                inputs={inputs}
+                advancedSettings={advancedSettings}
+                results={results}
+                currentStrategy={currentStrategy}
+                validationWarnings={validationWarnings}
+                isRateEditorOpen={isRateEditorOpen}
+                onUpdateInput={updateInput}
+                onUpdateSettings={setAdvancedSettings}
+                onSetRateEditorOpen={setIsRateEditorOpen}
+                onRateVersionIncrement={() => setRateVersion(v => v + 1)}
+              />
+            </PinnableSection>
+
+            {/* Sub-card: Tax & Financial Profile */}
+            <PinnableSection
+              id="tax-profile"
+              label="Tax & Financial Profile"
+              isPinned={pinnedElements.isPinned('tax-profile')}
+              onTogglePin={() => pinnedElements.togglePin('tax-profile')}
+            >
+              <TaxFinancialProfileInputs
+                inputs={inputs}
+                validationWarnings={validationWarnings}
+                onUpdateInput={updateInput}
+              />
+            </PinnableSection>
+          </div>
+
+          {/* Advanced Options */}
+          <AdvancedOptionsPanel
             inputs={inputs}
             advancedSettings={advancedSettings}
-            results={results}
-            currentStrategy={currentStrategy}
-            validationWarnings={validationWarnings}
-            isRateEditorOpen={isRateEditorOpen}
             onUpdateInput={updateInput}
             onUpdateSettings={setAdvancedSettings}
-            onSetRateEditorOpen={setIsRateEditorOpen}
-            onRateVersionIncrement={() => setRateVersion(v => v + 1)}
+            onResetSettings={resetAdvancedSettings}
           />
-          </PinnableSection>
 
-          {/* Sub-card: Tax & Financial Profile */}
-          <PinnableSection id="tax-profile" label="Tax & Financial Profile" isPinned={pinnedElements.isPinned('tax-profile')} onTogglePin={() => pinnedElements.togglePin('tax-profile')}>
-          <TaxFinancialProfileInputs
-            inputs={inputs}
-            validationWarnings={validationWarnings}
-            onUpdateInput={updateInput}
-          />
-          </PinnableSection>
-        </div>
-
-        {/* Advanced Options */}
-        <AdvancedOptionsPanel
-          inputs={inputs}
-          advancedSettings={advancedSettings}
-          onUpdateInput={updateInput}
-          onUpdateSettings={setAdvancedSettings}
-          onResetSettings={resetAdvancedSettings}
-        />
-
-        {/* Reset to Defaults */}
-        <div className="reset-defaults-row">
-          <button
-            type="button"
-            className="reset-defaults-btn"
-            onClick={() => {
-              if (window.confirm('Reset all inputs to defaults? This cannot be undone.')) {
-                setInputs(DEFAULTS);
-                setYearOverrides(generateDefaultOverrides(DEFAULTS.annualIncome));
-                setAdvancedSettings(DEFAULT_SETTINGS);
-                setSensitivityParams(DEFAULT_SENSITIVITY);
-                setComparisonStrategies([STRATEGIES[1].id, STRATEGIES[0].id]);
-              }
-            }}
-          >
-            Reset to Defaults
-          </button>
-        </div>
-      </CollapsibleSection>
-
-      </div>{/* end section-group--inputs */}
+          {/* Reset to Defaults */}
+          <div className="reset-defaults-row">
+            <button
+              type="button"
+              className="reset-defaults-btn"
+              onClick={() => {
+                if (window.confirm('Reset all inputs to defaults? This cannot be undone.')) {
+                  setInputs(DEFAULTS);
+                  setYearOverrides(generateDefaultOverrides(DEFAULTS.annualIncome));
+                  setAdvancedSettings(DEFAULT_SETTINGS);
+                  setSensitivityParams(DEFAULT_SENSITIVITY);
+                  setComparisonStrategies([STRATEGIES[1].id, STRATEGIES[0].id]);
+                }
+              }}
+            >
+              Reset to Defaults
+            </button>
+          </div>
+        </CollapsibleSection>
+      </div>
+      {/* end section-group--inputs */}
 
       {/* ========================================
           SECTION GROUP 2: KEY ASSUMPTIONS
@@ -483,31 +517,41 @@ export function Calculator() {
       <div className="section-group section-group--assumptions">
         <div className="section-group__label">Key Assumptions</div>
 
-      {/* Marginal Tax Rates - Step 2: Tax Rate Analysis */}
-      <PinnableSection id="tax-rates" label="Tax Rates" isPinned={pinnedElements.isPinned('tax-rates')} onTogglePin={() => pinnedElements.togglePin('tax-rates')}>
-      <TaxRatesDisplay
-        federalStRate={federalStRate}
-        federalLtRate={federalLtRate}
-        stateRate={stateRate}
-        combinedStRate={combinedStRate}
-        combinedLtRate={combinedLtRate}
-      />
-      </PinnableSection>
+        {/* Marginal Tax Rates - Step 2: Tax Rate Analysis */}
+        <PinnableSection
+          id="tax-rates"
+          label="Tax Rates"
+          isPinned={pinnedElements.isPinned('tax-rates')}
+          onTogglePin={() => pinnedElements.togglePin('tax-rates')}
+        >
+          <TaxRatesDisplay
+            federalStRate={federalStRate}
+            federalLtRate={federalLtRate}
+            stateRate={stateRate}
+            combinedStRate={combinedStRate}
+            combinedLtRate={combinedLtRate}
+          />
+        </PinnableSection>
 
-      {/* Strategy Sizing - Step 3: Optimized Strategy */}
-      <PinnableSection id="sizing" label="Strategy Sizing" isPinned={pinnedElements.isPinned('sizing')} onTogglePin={() => pinnedElements.togglePin('sizing')}>
-      <SizingSummary
-        results={results}
-        filingStatus={inputs.filingStatus}
-        qfafEnabled={inputs.qfafEnabled}
-        combinedLtRate={combinedLtRate}
-        combinedOrdinaryRate={combinedOrdinaryRate}
-        qfafMultiplier={advancedSettings.qfafMultiplier}
-        startMonth={inputs.startMonth}
-      />
-      </PinnableSection>
-
-      </div>{/* end section-group--assumptions */}
+        {/* Strategy Sizing - Step 3: Optimized Strategy */}
+        <PinnableSection
+          id="sizing"
+          label="Strategy Sizing"
+          isPinned={pinnedElements.isPinned('sizing')}
+          onTogglePin={() => pinnedElements.togglePin('sizing')}
+        >
+          <SizingSummary
+            results={results}
+            filingStatus={inputs.filingStatus}
+            qfafEnabled={inputs.qfafEnabled}
+            combinedLtRate={combinedLtRate}
+            combinedOrdinaryRate={combinedOrdinaryRate}
+            qfafMultiplier={advancedSettings.qfafMultiplier}
+            startMonth={inputs.startMonth}
+          />
+        </PinnableSection>
+      </div>
+      {/* end section-group--assumptions */}
 
       {/* ========================================
           SECTION GROUP 3: RESULTS
@@ -515,75 +559,89 @@ export function Calculator() {
       <div className="section-group section-group--results">
         <div className="section-group__label">Results</div>
 
-      {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
-      <PinnableSection id="charts" label="Charts & Table" isPinned={pinnedElements.isPinned('charts')} onTogglePin={() => pinnedElements.togglePin('charts')}>
-      <CollapsibleSection
-        sectionKey="yearByYear"
-        step="4"
-        stepLabel="Year-by-Year Breakdown"
-        title="Estimated Detailed Projections"
-        headerAction={
-          <InfoPopup title="Projection Methodology">
-            <ProjectionFormula qfafMultiplier={advancedSettings.qfafMultiplier} projectionYears={advancedSettings.projectionYears} />
-          </InfoPopup>
-        }
-        guidance={`Estimated year-by-year breakdown showing how tax benefits compound over the ${advancedSettings.projectionYears}-year projection period.`}
-        className="results-section"
-      >
-        {/* Charts and Export Actions */}
-        <ResultsChartsSection
-          results={results}
-          inputs={inputs}
-          advancedSettings={advancedSettings}
-          currentStrategy={currentStrategy}
-          taxRates={taxRates}
-          projectionYears={advancedSettings.projectionYears}
-          startMonth={inputs.startMonth}
-          onPrintRef={(handler) => setPrintHandler(() => handler)}
-          onExportRef={(handler) => setExportHandler(() => handler)}
-          onImportCsv={(parsedInputs, parsedSettings) => {
-            setInputs(prev => ({ ...prev, ...parsedInputs }));
-            setAdvancedSettings(prev => ({ ...prev, ...parsedSettings }));
-          }}
-        />
-      </CollapsibleSection>
-      </PinnableSection>
+        {/* Detailed Results - Step 4: Year-by-Year Breakdown */}
+        <PinnableSection
+          id="charts"
+          label="Charts & Table"
+          isPinned={pinnedElements.isPinned('charts')}
+          onTogglePin={() => pinnedElements.togglePin('charts')}
+        >
+          <CollapsibleSection
+            sectionKey="yearByYear"
+            step="4"
+            stepLabel="Year-by-Year Breakdown"
+            title="Estimated Detailed Projections"
+            headerAction={
+              <InfoPopup title="Projection Methodology">
+                <ProjectionFormula
+                  qfafMultiplier={advancedSettings.qfafMultiplier}
+                  projectionYears={advancedSettings.projectionYears}
+                />
+              </InfoPopup>
+            }
+            guidance={`Estimated year-by-year breakdown showing how tax benefits compound over the ${advancedSettings.projectionYears}-year projection period.`}
+            className="results-section"
+          >
+            {/* Charts and Export Actions */}
+            <ResultsChartsSection
+              results={results}
+              inputs={inputs}
+              advancedSettings={advancedSettings}
+              currentStrategy={currentStrategy}
+              taxRates={taxRates}
+              exitTaxAnalysis={exitTaxAnalysis}
+              projectionYears={advancedSettings.projectionYears}
+              startMonth={inputs.startMonth}
+              onPrintRef={handler => setPrintHandler(() => handler)}
+              onExportRef={handler => setExportHandler(() => handler)}
+              onImportCsv={(parsedInputs, parsedSettings) => {
+                setInputs(prev => ({ ...prev, ...parsedInputs }));
+                setAdvancedSettings(prev => ({ ...prev, ...parsedSettings }));
+              }}
+            />
+          </CollapsibleSection>
+        </PinnableSection>
 
-      {/* Results Summary - headline metrics (Step 5) */}
-      <PinnableSection id="results" label="Results Summary" isPinned={pinnedElements.isPinned('results')} onTogglePin={() => pinnedElements.togglePin('results')}>
-      <ResultsSummary
-        totalTaxSavings={results.summary.totalTaxSavings}
-        finalPortfolioValue={results.summary.finalPortfolioValue}
-        effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
-        totalNolGenerated={results.summary.totalNolGenerated}
-        projectionYears={advancedSettings.projectionYears}
-        collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
-        collateralAmount={effectiveCollateral}
-        exitTaxAnalysis={exitTaxAnalysis}
-        stateMathWarning={stateMathWarning}
-        totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
-        presentValueEnabled={advancedSettings.presentValueEnabled}
-        discountRate={advancedSettings.discountRate}
-        grossOfCosts={!advancedSettings.financingFeesEnabled}
-        stateCode={inputs.stateCode}
-      />
-      </PinnableSection>
+        {/* Results Summary - headline metrics (Step 5) */}
+        <PinnableSection
+          id="results"
+          label="Results Summary"
+          isPinned={pinnedElements.isPinned('results')}
+          onTogglePin={() => pinnedElements.togglePin('results')}
+        >
+          <ResultsSummary
+            totalTaxSavings={results.summary.totalTaxSavings}
+            finalPortfolioValue={results.summary.finalPortfolioValue}
+            effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
+            totalNolGenerated={results.summary.totalNolGenerated}
+            projectionYears={advancedSettings.projectionYears}
+            collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
+            collateralAmount={effectiveCollateral}
+            exitTaxAnalysis={exitTaxAnalysis}
+            stateMathWarning={stateMathWarning}
+            totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
+            presentValueEnabled={advancedSettings.presentValueEnabled}
+            discountRate={advancedSettings.discountRate}
+            grossOfCosts={!advancedSettings.financingFeesEnabled}
+            stateCode={inputs.stateCode}
+          />
+        </PinnableSection>
 
-      {/* Scenario comparison panel (shown when scenarios are pinned) */}
-      {pinnedScenario.hasPinned && (
-        <ScenarioComparisonPanel
-          scenarios={pinnedScenario.scenarios}
-          currentInputs={inputs}
-          currentSettings={advancedSettings}
-          currentResults={results}
-          canPin={pinnedScenario.canPin}
-          onPin={handlePinScenario}
-          onUnpin={(id: string) => pinnedScenario.unpin(id)}
-          onUnpinAll={handleUnpinAll}
-        />
-      )}
-
-      </div>{/* end section-group--results */}
+        {/* Scenario comparison panel (shown when scenarios are pinned) */}
+        {pinnedScenario.hasPinned && (
+          <ScenarioComparisonPanel
+            scenarios={pinnedScenario.scenarios}
+            currentInputs={inputs}
+            currentSettings={advancedSettings}
+            currentResults={results}
+            canPin={pinnedScenario.canPin}
+            onPin={handlePinScenario}
+            onUnpin={(id: string) => pinnedScenario.unpin(id)}
+            onUnpinAll={handleUnpinAll}
+          />
+        )}
+      </div>
+      {/* end section-group--results */}
 
       {/* ========================================
           SECTION GROUP: ADVANCED TOOLS (collapsed)
@@ -598,7 +656,23 @@ export function Calculator() {
               expanded={advancedMode.state.sections.yearByYear}
               onToggle={() => advancedMode.toggleSection('yearByYear')}
               hint="Model income changes and cash infusions"
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
+              icon={
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+              }
             >
               <YearByYearPlanning
                 baseIncome={inputs.annualIncome}
@@ -617,7 +691,28 @@ export function Calculator() {
               expanded={advancedMode.state.sections.sensitivity}
               onToggle={() => advancedMode.toggleSection('sensitivity')}
               hint="Stress-test assumptions"
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>}
+              icon={
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="4" y1="21" x2="4" y2="14" />
+                  <line x1="4" y1="10" x2="4" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12" y2="3" />
+                  <line x1="20" y1="21" x2="20" y2="16" />
+                  <line x1="20" y1="12" x2="20" y2="3" />
+                  <line x1="1" y1="14" x2="7" y2="14" />
+                  <line x1="9" y1="8" x2="15" y2="8" />
+                  <line x1="17" y1="16" x2="23" y2="16" />
+                </svg>
+              }
             >
               <SensitivityAnalysis
                 params={sensitivityParams}
@@ -631,7 +726,22 @@ export function Calculator() {
               expanded={advancedMode.state.sections.scenarios}
               onToggle={() => advancedMode.toggleSection('scenarios')}
               hint="Bull/Base/Bear outcomes"
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>}
+              icon={
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                  <polyline points="2 17 12 22 22 17" />
+                  <polyline points="2 12 12 17 22 12" />
+                </svg>
+              }
             >
               <ScenarioAnalysis inputs={inputs} settings={advancedSettings} />
             </CollapsibleSection>
@@ -641,7 +751,22 @@ export function Calculator() {
               expanded={advancedMode.state.sections.comparison}
               onToggle={() => advancedMode.toggleSection('comparison')}
               hint="Compare 2-3 strategies"
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 8 4 12 8 16"/><polyline points="16 8 20 12 16 16"/></svg>}
+              icon={
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="3" x2="12" y2="21" />
+                  <polyline points="8 8 4 12 8 16" />
+                  <polyline points="16 8 20 12 16 16" />
+                </svg>
+              }
             >
               <StrategyComparison
                 baseInputs={inputs}
@@ -652,7 +777,8 @@ export function Calculator() {
             </CollapsibleSection>
           </div>
         </section>
-      </div>{/* end section-group--tools */}
+      </div>
+      {/* end section-group--tools */}
 
       {/* ========================================
           SECTION GROUP 4: METHODOLOGY / NOTES
@@ -660,128 +786,154 @@ export function Calculator() {
       <div className="section-group section-group--methodology">
         <div className="section-group__label">Methodology &amp; Notes</div>
 
-      <DisclaimerFooter />
-
-      </div>{/* end section-group--methodology */}
+        <DisclaimerFooter />
+      </div>
+      {/* end section-group--methodology */}
 
       {/* Keyboard Shortcuts Help Modal */}
-      <KeyboardShortcutsHelp
-        isOpen={showKeyboardHelp}
-        onClose={() => setShowKeyboardHelp(false)}
-      />
+      <KeyboardShortcutsHelp isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
       {/* Floating panel for pinned UI elements */}
       <FloatingPinnedPanel
         elements={[
-          ...(pinnedElements.isPinned('strategy') ? [{
-            id: 'strategy',
-            label: 'Strategy Selection',
-            content: (
-              <StrategySelectionInputs
-                inputs={inputs}
-                advancedSettings={advancedSettings}
-                results={results}
-                currentStrategy={currentStrategy}
-                validationWarnings={validationWarnings}
-                isRateEditorOpen={false}
-                onUpdateInput={updateInput}
-                onUpdateSettings={setAdvancedSettings}
-                onSetRateEditorOpen={setIsRateEditorOpen}
-                onRateVersionIncrement={() => setRateVersion(v => v + 1)}
-              />
-            ),
-          }] : []),
-          ...(pinnedElements.isPinned('tax-profile') ? [{
-            id: 'tax-profile',
-            label: 'Tax & Financial Profile',
-            content: (
-              <TaxFinancialProfileInputs
-                inputs={inputs}
-                validationWarnings={validationWarnings}
-                onUpdateInput={updateInput}
-              />
-            ),
-          }] : []),
-          ...(pinnedElements.isPinned('tax-rates') ? [{
-            id: 'tax-rates',
-            label: 'Tax Rates',
-            content: (
-              <TaxRatesDisplay
-                federalStRate={federalStRate}
-                federalLtRate={federalLtRate}
-                stateRate={stateRate}
-                combinedStRate={combinedStRate}
-                combinedLtRate={combinedLtRate}
-              />
-            ),
-          }] : []),
-          ...(pinnedElements.isPinned('results') ? [{
-            id: 'results',
-            label: 'Results Summary',
-            content: (
-              <ResultsSummary
-                totalTaxSavings={results.summary.totalTaxSavings}
-                finalPortfolioValue={results.summary.finalPortfolioValue}
-                effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
-                totalNolGenerated={results.summary.totalNolGenerated}
-                projectionYears={advancedSettings.projectionYears}
-                collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
-                collateralAmount={effectiveCollateral}
-                exitTaxAnalysis={exitTaxAnalysis}
-                stateMathWarning={stateMathWarning}
-        totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
-        presentValueEnabled={advancedSettings.presentValueEnabled}
-        discountRate={advancedSettings.discountRate}
-        grossOfCosts={!advancedSettings.financingFeesEnabled}
-                stateCode={inputs.stateCode}
-              />
-            ),
-          }] : []),
-          ...(pinnedElements.isPinned('comparison') && pinnedScenario.hasPinned ? [{
-            id: 'comparison',
-            label: 'Scenario Comparison',
-            content: (
-              <ScenarioComparisonPanel
-                scenarios={pinnedScenario.scenarios}
-                currentInputs={inputs}
-                currentSettings={advancedSettings}
-                currentResults={results}
-                canPin={pinnedScenario.canPin}
-                onPin={handlePinScenario}
-                onUnpin={(id: string) => pinnedScenario.unpin(id)}
-                onUnpinAll={handleUnpinAll}
-              />
-            ),
-          }] : []),
-          ...(pinnedElements.isPinned('sizing') ? [{
-            id: 'sizing',
-            label: 'Strategy Sizing',
-            content: (
-              <SizingSummary
-                results={results}
-                filingStatus={inputs.filingStatus}
-                qfafEnabled={inputs.qfafEnabled}
-                combinedLtRate={combinedLtRate}
-                combinedOrdinaryRate={combinedOrdinaryRate}
-                qfafMultiplier={advancedSettings.qfafMultiplier}
-              />
-            ),
-          }] : []),
-          ...(pinnedElements.isPinned('charts') ? [{
-            id: 'charts',
-            label: 'Charts & Table',
-            content: (
-              <ResultsChartsSection
-                results={results}
-                inputs={inputs}
-                advancedSettings={advancedSettings}
-                currentStrategy={currentStrategy}
-                taxRates={taxRates}
-                projectionYears={advancedSettings.projectionYears}
-                startMonth={inputs.startMonth}
-              />
-            ),
-          }] : []),
+          ...(pinnedElements.isPinned('strategy')
+            ? [
+                {
+                  id: 'strategy',
+                  label: 'Strategy Selection',
+                  content: (
+                    <StrategySelectionInputs
+                      inputs={inputs}
+                      advancedSettings={advancedSettings}
+                      results={results}
+                      currentStrategy={currentStrategy}
+                      validationWarnings={validationWarnings}
+                      isRateEditorOpen={false}
+                      onUpdateInput={updateInput}
+                      onUpdateSettings={setAdvancedSettings}
+                      onSetRateEditorOpen={setIsRateEditorOpen}
+                      onRateVersionIncrement={() => setRateVersion(v => v + 1)}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(pinnedElements.isPinned('tax-profile')
+            ? [
+                {
+                  id: 'tax-profile',
+                  label: 'Tax & Financial Profile',
+                  content: (
+                    <TaxFinancialProfileInputs
+                      inputs={inputs}
+                      validationWarnings={validationWarnings}
+                      onUpdateInput={updateInput}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(pinnedElements.isPinned('tax-rates')
+            ? [
+                {
+                  id: 'tax-rates',
+                  label: 'Tax Rates',
+                  content: (
+                    <TaxRatesDisplay
+                      federalStRate={federalStRate}
+                      federalLtRate={federalLtRate}
+                      stateRate={stateRate}
+                      combinedStRate={combinedStRate}
+                      combinedLtRate={combinedLtRate}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(pinnedElements.isPinned('results')
+            ? [
+                {
+                  id: 'results',
+                  label: 'Results Summary',
+                  content: (
+                    <ResultsSummary
+                      totalTaxSavings={results.summary.totalTaxSavings}
+                      finalPortfolioValue={results.summary.finalPortfolioValue}
+                      effectiveTaxAlpha={results.summary.effectiveTaxAlpha}
+                      totalNolGenerated={results.summary.totalNolGenerated}
+                      projectionYears={advancedSettings.projectionYears}
+                      collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
+                      collateralAmount={effectiveCollateral}
+                      exitTaxAnalysis={exitTaxAnalysis}
+                      stateMathWarning={stateMathWarning}
+                      totalTaxSavingsPV={results.summary.totalTaxSavingsPV}
+                      presentValueEnabled={advancedSettings.presentValueEnabled}
+                      discountRate={advancedSettings.discountRate}
+                      grossOfCosts={!advancedSettings.financingFeesEnabled}
+                      stateCode={inputs.stateCode}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(pinnedElements.isPinned('comparison') && pinnedScenario.hasPinned
+            ? [
+                {
+                  id: 'comparison',
+                  label: 'Scenario Comparison',
+                  content: (
+                    <ScenarioComparisonPanel
+                      scenarios={pinnedScenario.scenarios}
+                      currentInputs={inputs}
+                      currentSettings={advancedSettings}
+                      currentResults={results}
+                      canPin={pinnedScenario.canPin}
+                      onPin={handlePinScenario}
+                      onUnpin={(id: string) => pinnedScenario.unpin(id)}
+                      onUnpinAll={handleUnpinAll}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(pinnedElements.isPinned('sizing')
+            ? [
+                {
+                  id: 'sizing',
+                  label: 'Strategy Sizing',
+                  content: (
+                    <SizingSummary
+                      results={results}
+                      filingStatus={inputs.filingStatus}
+                      qfafEnabled={inputs.qfafEnabled}
+                      combinedLtRate={combinedLtRate}
+                      combinedOrdinaryRate={combinedOrdinaryRate}
+                      qfafMultiplier={advancedSettings.qfafMultiplier}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          ...(pinnedElements.isPinned('charts')
+            ? [
+                {
+                  id: 'charts',
+                  label: 'Charts & Table',
+                  content: (
+                    <ResultsChartsSection
+                      results={results}
+                      inputs={inputs}
+                      advancedSettings={advancedSettings}
+                      currentStrategy={currentStrategy}
+                      taxRates={taxRates}
+                      exitTaxAnalysis={exitTaxAnalysis}
+                      projectionYears={advancedSettings.projectionYears}
+                      startMonth={inputs.startMonth}
+                    />
+                  ),
+                },
+              ]
+            : []),
         ]}
         onUnpin={(id: string) => {
           pinnedElements.unpin(id);

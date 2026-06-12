@@ -1,5 +1,7 @@
 import type { CalculationResult, CalculatorInputs } from '../types';
 import type { AdvancedSettings } from '../types';
+import type { ExitTaxAnalysis } from '../calculations/exitTax';
+import { computeEdiInsights, computeStepUpComparison } from '../calculations/ediInsights';
 import { getEffectiveView } from './effectiveAllocation';
 
 interface ExportData {
@@ -14,20 +16,34 @@ interface ExportData {
     combinedLtRate: number;
     rateDifferential: number;
   };
+  /**
+   * Exit-tax / deferred-gain analysis already computed from `results` by the
+   * caller (D-003). Needed for the step-up comparison block (D-018/D-021).
+   */
+  exitAnalysis: ExitTaxAnalysis;
 }
 
+type Workbook = import('xlsx').WorkBook;
+
 /**
- * Lazily loads SheetJS and exports calculator data to an .xlsx file.
+ * Builds the export workbook. Separated from `exportToExcel` so tests can
+ * parse the sheets back without triggering a browser download.
  * All 4 sheets: Summary, Year-by-Year, Assumptions, Disclaimer.
  */
-export async function exportToExcel(data: ExportData): Promise<void> {
+export async function buildWorkbook(data: ExportData): Promise<Workbook> {
   const XLSX = await import('xlsx');
 
   const wb = XLSX.utils.book_new();
 
+  // EDI metrics (D-021 export parity): derived INSIDE the export from the
+  // same CalculationResult + ExitTaxAnalysis the screen uses — one engine,
+  // one set of numbers. Labels mirror the on-screen names.
+  const insights = computeEdiInsights(data.results);
+  const stepUp = computeStepUpComparison(data.results, data.exitAnalysis);
+
   // Sheet 1: Summary
   const view = getEffectiveView(data.inputs);
-  const summaryRows = [
+  const summaryRows: (string | number)[][] = [
     ['Tax Optimization Calculator — Summary'],
     [],
     ['Strategy', view.displayName],
@@ -41,23 +57,53 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     ['Year 1 Tax Savings', data.results.years[0]?.taxSavings ?? 0],
     [
       'Year 2+ Tax Savings',
-      data.results.years.length > 1 ? data.results.years[1]?.taxSavings ?? 0 : 'N/A',
+      data.results.years.length > 1 ? (data.results.years[1]?.taxSavings ?? 0) : 'N/A',
     ],
     ['Total Tax Savings (All Years)', data.results.summary.totalTaxSavings],
     ['Effective Tax Alpha', data.results.summary.effectiveTaxAlpha],
     ['Final Portfolio Value', data.results.summary.finalPortfolioValue],
     ['Total NOL Generated', data.results.summary.totalNolGenerated],
+    [],
+    // Loss reserve (D-015): CONTINGENT shelter value — reported alongside,
+    // and never summed into, Total Tax Savings.
+    ['Loss Reserve Built — contingent on future gains, NOT added to savings'],
+    ['Final ST Loss Carryforward', insights.finalStCarryforward],
+    ['Final LT Loss Carryforward', insights.finalLtCarryforward],
+    ['Loss Reserve Shelter Value (contingent on future gains)', insights.lossReserveShelterValue],
+    [],
+    ['EDI Economics'],
+    // Ratio over zero financing cost is meaningless — print "—", not Infinity.
+    [
+      'Protection Ratio (shelter value ÷ financing cost)',
+      insights.protectionRatio !== null ? insights.protectionRatio : '—',
+    ],
+    ['Break-Even Gain Event', insights.breakEvenGainEvent],
+    ['Cumulative Financing Cost', insights.cumulativeFinancingCost],
+    [],
+    ['Step-Up Comparison (IRC §1014, mortality-contingent)'],
+    ['Net If Held to Step-Up', stepUp.netIfHeldToStepUp],
+    ['Net If Liquidated', stepUp.netIfLiquidated],
+    // Signed (D-018): negative means the strategy exits cheaper than passive.
+    ['Step-Up Advantage (signed)', stepUp.stepUpAdvantage],
+    [
+      'Carryforward Value Lost at Death (contingent; not counted in either figure)',
+      stepUp.continueAndDie.carryforwardValueLost,
+    ],
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
-  // Format currency columns. Identify the "Effective Tax Alpha" row by label
-  // since split-allocation breakdown can shift later rows down.
+  // Format currency columns. Identify special rows by label since
+  // split-allocation breakdown can shift later rows down.
   const currencyFmt = '$#,##0';
   const pctFmt = '0.00%';
+  const ratioFmt = '0.0"×"';
   const alphaRow = summaryRows.findIndex(row => row[0] === 'Effective Tax Alpha');
+  const ratioRow = summaryRows.findIndex(
+    row => typeof row[0] === 'string' && row[0].startsWith('Protection Ratio')
+  );
   for (let r = 2; r < summaryRows.length; r++) {
     const cell = summarySheet[XLSX.utils.encode_cell({ r, c: 1 })];
     if (cell && typeof cell.v === 'number') {
-      cell.z = r === alphaRow ? pctFmt : currencyFmt;
+      cell.z = r === alphaRow ? pctFmt : r === ratioRow ? ratioFmt : currencyFmt;
     }
   }
   XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
@@ -76,11 +122,10 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     'Ordinary Losses',
     'Usable Ordinary Loss',
     'NOL Carryforward',
+    'State NOL Expired',
     'Tax Savings',
     'Income Offset',
-    ...(hasDeleverage
-      ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved']
-      : []),
+    ...(hasDeleverage ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved'] : []),
   ];
   const yearRows: (string | number)[][] = [yearHeaders];
   for (const y of data.results.years) {
@@ -95,6 +140,7 @@ export async function exportToExcel(data: ExportData): Promise<void> {
       y.ordinaryLossesGenerated,
       y.usableOrdinaryLoss,
       y.nolCarryforward,
+      y.stateNolExpired,
       y.taxSavings,
       y.incomeOffsetAmount,
       ...(hasDeleverage
@@ -189,6 +235,14 @@ export async function exportToExcel(data: ExportData): Promise<void> {
   disclaimerSheet['!cols'] = [{ wch: 100 }];
   XLSX.utils.book_append_sheet(wb, disclaimerSheet, 'Disclaimer');
 
-  // Trigger download
+  return wb;
+}
+
+/**
+ * Lazily loads SheetJS, builds the workbook, and triggers an .xlsx download.
+ */
+export async function exportToExcel(data: ExportData): Promise<void> {
+  const XLSX = await import('xlsx');
+  const wb = await buildWorkbook(data);
   XLSX.writeFile(wb, 'TaxOptimizationCalculator.xlsx');
 }

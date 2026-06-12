@@ -178,6 +178,13 @@ export interface YearResult {
   nolCarryforward: number; // Cumulative NOL
   nolUsedThisYear: number; // NOL applied this year
   capitalLossUsedAgainstIncome: number; // Up to $3,000 per §1211(b)
+  /**
+   * State-side NOL dollars that expired unused at the END of this year
+   * (D-020: CA 20-year carryover per R&TC §17276, +1 year per SB 167
+   * suspension year). Federal NOLs are indefinite — `nolCarryforward` is
+   * NOT reduced by this. 0 for states without a carryover limit.
+   */
+  stateNolExpired: number;
 
   // Effective rates (for debugging/display)
   effectiveStLossRate: number; // Actual ST loss rate used (may be custom)
@@ -241,6 +248,8 @@ export interface CalculationResult {
     finalPortfolioValue: number;
     effectiveTaxAlpha: number;
     totalNolGenerated: number;
+    /** Σ stateNolExpired — state-side NOL dollars expiring unused within the projection (D-020) */
+    totalStateNolExpired: number;
     /** Cumulative cash returned by QFAF resizing + terminal unwind (held outside the portfolio) */
     totalQfafCashReturned: number;
     /** finalPortfolioValue + totalQfafCashReturned: total wealth including returned cash */

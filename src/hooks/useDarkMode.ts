@@ -79,10 +79,10 @@ export function useDarkMode() {
   }, []);
 
   return {
-    theme,           // The stored preference ('light', 'dark', or 'system')
-    resolvedTheme,   // The actual theme being displayed ('light' or 'dark')
+    theme, // The stored preference ('light', 'dark', or 'system')
+    resolvedTheme, // The actual theme being displayed ('light' or 'dark')
     isDark: resolvedTheme === 'dark',
-    toggle,          // Toggle between light and dark
-    setTheme,        // Set a specific theme
+    toggle, // Toggle between light and dark
+    setTheme, // Set a specific theme
   };
 }

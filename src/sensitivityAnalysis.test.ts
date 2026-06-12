@@ -70,9 +70,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, higherRates);
 
       // Higher tax rates = more value from tax savings
-      expect(result.summary.totalTaxSavings).toBeGreaterThan(
-        baseResult.summary.totalTaxSavings
-      );
+      expect(result.summary.totalTaxSavings).toBeGreaterThan(baseResult.summary.totalTaxSavings);
     });
 
     it('should decrease tax savings when federal rates decrease', () => {
@@ -87,9 +85,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, lowerRates);
 
       // Lower tax rates = less value from tax savings
-      expect(result.summary.totalTaxSavings).toBeLessThan(
-        baseResult.summary.totalTaxSavings
-      );
+      expect(result.summary.totalTaxSavings).toBeLessThan(baseResult.summary.totalTaxSavings);
     });
   });
 
@@ -106,9 +102,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, higherStateRate);
 
       // Higher state rates = more combined tax savings
-      expect(result.summary.totalTaxSavings).toBeGreaterThan(
-        baseResult.summary.totalTaxSavings
-      );
+      expect(result.summary.totalTaxSavings).toBeGreaterThan(baseResult.summary.totalTaxSavings);
     });
 
     it('should model moving to a no-tax state (negative change)', () => {
@@ -124,9 +118,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, noStateTax);
 
       // Lower combined rate = less tax savings (but still positive)
-      expect(result.summary.totalTaxSavings).toBeLessThan(
-        baseResult.summary.totalTaxSavings
-      );
+      expect(result.summary.totalTaxSavings).toBeLessThan(baseResult.summary.totalTaxSavings);
       expect(result.summary.totalTaxSavings).toBeGreaterThan(0);
     });
   });
@@ -170,15 +162,13 @@ describe('Sensitivity Analysis', () => {
       // Model severe recession (-10% annual return)
       const recession: SensitivityParams = {
         ...DEFAULT_SENSITIVITY,
-        annualReturn: -0.10, // -10% return
+        annualReturn: -0.1, // -10% return
       };
 
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, recession);
 
       // Portfolio should shrink but strategy still generates tax benefits
-      expect(result.summary.finalPortfolioValue).toBeLessThan(
-        baseClient.collateralAmount
-      );
+      expect(result.summary.finalPortfolioValue).toBeLessThan(baseClient.collateralAmount);
       expect(result.summary.totalTaxSavings).toBeGreaterThan(0);
     });
   });
@@ -196,9 +186,7 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, moreLosses);
 
       // More ST losses = more tax benefits
-      expect(result.summary.totalTaxSavings).toBeGreaterThan(
-        baseResult.summary.totalTaxSavings
-      );
+      expect(result.summary.totalTaxSavings).toBeGreaterThan(baseResult.summary.totalTaxSavings);
     });
 
     it('should decrease tax savings with lower ST loss rates', () => {
@@ -207,15 +195,13 @@ describe('Sensitivity Analysis', () => {
       // Model worse tax-loss harvesting (-30% fewer losses)
       const fewerLosses: SensitivityParams = {
         ...DEFAULT_SENSITIVITY,
-        stLossRateVariance: -0.30, // -30%
+        stLossRateVariance: -0.3, // -30%
       };
 
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, fewerLosses);
 
       // Fewer ST losses = less tax benefits
-      expect(result.summary.totalTaxSavings).toBeLessThan(
-        baseResult.summary.totalTaxSavings
-      );
+      expect(result.summary.totalTaxSavings).toBeLessThan(baseResult.summary.totalTaxSavings);
     });
   });
 
@@ -226,15 +212,13 @@ describe('Sensitivity Analysis', () => {
       // Model higher LT gain realization (+30%)
       const moreGains: SensitivityParams = {
         ...DEFAULT_SENSITIVITY,
-        ltGainRateVariance: 0.30, // +30%
+        ltGainRateVariance: 0.3, // +30%
       };
 
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, moreGains);
 
       // More LT gains = higher tax cost = less net benefit
-      expect(result.summary.totalTaxSavings).toBeLessThan(
-        baseResult.summary.totalTaxSavings
-      );
+      expect(result.summary.totalTaxSavings).toBeLessThan(baseResult.summary.totalTaxSavings);
     });
 
     it('should maintain similar tax savings with lower LT gains', () => {
@@ -243,7 +227,7 @@ describe('Sensitivity Analysis', () => {
       // Model lower LT gain realization (-30%)
       const fewerGains: SensitivityParams = {
         ...DEFAULT_SENSITIVITY,
-        ltGainRateVariance: -0.30, // -30%
+        ltGainRateVariance: -0.3, // -30%
       };
 
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, fewerGains);
@@ -270,8 +254,8 @@ describe('Sensitivity Analysis', () => {
         federalRateChange: -0.05, // Lower tax rates
         stateRateChange: -0.05, // Move to lower-tax state
         annualReturn: 0.02, // Bear market
-        stLossRateVariance: -0.30, // Fewer losses harvested
-        ltGainRateVariance: 0.30, // More gains realized
+        stLossRateVariance: -0.3, // Fewer losses harvested
+        ltGainRateVariance: 0.3, // More gains realized
         trackingErrorMultiplier: 2.0, // High variance
       };
 
@@ -333,16 +317,13 @@ describe('Sensitivity Analysis', () => {
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
       const baseResult = calculate(baseClient, DEFAULT_SETTINGS);
 
-      expect(result.summary.totalTaxSavings).toBeCloseTo(
-        baseResult.summary.totalTaxSavings,
-        2
-      );
+      expect(result.summary.totalTaxSavings).toBeCloseTo(baseResult.summary.totalTaxSavings, 2);
     });
 
     it('should handle extreme negative return (-20%)', () => {
       const params: SensitivityParams = {
         ...DEFAULT_SENSITIVITY,
-        annualReturn: -0.20,
+        annualReturn: -0.2,
       };
 
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
@@ -355,8 +336,8 @@ describe('Sensitivity Analysis', () => {
     it('should handle maximum rate variance (+50%)', () => {
       const params: SensitivityParams = {
         ...DEFAULT_SENSITIVITY,
-        stLossRateVariance: 0.50,
-        ltGainRateVariance: 0.50,
+        stLossRateVariance: 0.5,
+        ltGainRateVariance: 0.5,
       };
 
       const result = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
@@ -381,7 +362,11 @@ describe('Sensitivity Analysis', () => {
       };
 
       const baseResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, baseParams);
-      const amplifiedResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, amplifiedParams);
+      const amplifiedResult = calculateWithSensitivity(
+        baseClient,
+        DEFAULT_SETTINGS,
+        amplifiedParams
+      );
 
       // With tracking error amplification, results should differ
       // Core 145/45 has 1.9% tracking error, so with 2x multiplier:
@@ -427,8 +412,16 @@ describe('Sensitivity Analysis', () => {
         stLossRateVariance: 0.1,
       };
 
-      const zeroResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, zeroMultiplierParams);
-      const noVarianceResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, noVarianceParams);
+      const zeroResult = calculateWithSensitivity(
+        baseClient,
+        DEFAULT_SETTINGS,
+        zeroMultiplierParams
+      );
+      const noVarianceResult = calculateWithSensitivity(
+        baseClient,
+        DEFAULT_SETTINGS,
+        noVarianceParams
+      );
 
       // With multiplier = 0, tracking error has no effect
       // effectiveVariance = 0.1 * (1 + 0) = 0.1 exactly
@@ -457,7 +450,11 @@ describe('Sensitivity Analysis', () => {
       };
 
       const baselineResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, baselineParams);
-      const highMultiplierResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, highMultiplierParams);
+      const highMultiplierResult = calculateWithSensitivity(
+        baseClient,
+        DEFAULT_SETTINGS,
+        highMultiplierParams
+      );
 
       // When variance = 0, amplification has no effect (0 * anything = 0)
       // Results should be very similar (may differ slightly due to floating point)
@@ -481,7 +478,11 @@ describe('Sensitivity Analysis', () => {
       };
 
       const lowTrackingResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, params);
-      const highTrackingResult = calculateWithSensitivity(highTrackingClient, DEFAULT_SETTINGS, params);
+      const highTrackingResult = calculateWithSensitivity(
+        highTrackingClient,
+        DEFAULT_SETTINGS,
+        params
+      );
 
       // Higher tracking error strategy should show different variance amplification
       // Core 145/45: effectiveVariance = 0.1 * (1 + 0.019 * 2.0) = 0.1038
@@ -506,8 +507,16 @@ describe('Sensitivity Analysis', () => {
         ltGainRateVariance: 0.2, // +20% more gains (detrimental)
       };
 
-      const positiveResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, positiveVarianceParams);
-      const negativeResult = calculateWithSensitivity(baseClient, DEFAULT_SETTINGS, negativeVarianceParams);
+      const positiveResult = calculateWithSensitivity(
+        baseClient,
+        DEFAULT_SETTINGS,
+        positiveVarianceParams
+      );
+      const negativeResult = calculateWithSensitivity(
+        baseClient,
+        DEFAULT_SETTINGS,
+        negativeVarianceParams
+      );
 
       // Both should calculate successfully
       expect(positiveResult.years.length).toBe(12);

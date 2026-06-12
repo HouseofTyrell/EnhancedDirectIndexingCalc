@@ -6,10 +6,7 @@ import { formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 interface AdvancedOptionsPanelProps {
   inputs: CalculatorInputs;
   advancedSettings: AdvancedSettings;
-  onUpdateInput: <K extends keyof CalculatorInputs>(
-    key: K,
-    value: CalculatorInputs[K]
-  ) => void;
+  onUpdateInput: <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) => void;
   onUpdateSettings: (settings: AdvancedSettings) => void;
   onResetSettings: () => void;
 }
@@ -57,7 +54,10 @@ export function AdvancedOptionsPanel({
                     inputMode="numeric"
                     value={formatWithCommas(inputs.existingStLossCarryforward)}
                     onChange={e =>
-                      onUpdateInput('existingStLossCarryforward', parseFormattedNumber(e.target.value))
+                      onUpdateInput(
+                        'existingStLossCarryforward',
+                        parseFormattedNumber(e.target.value)
+                      )
                     }
                   />
                 </div>
@@ -73,7 +73,10 @@ export function AdvancedOptionsPanel({
                     inputMode="numeric"
                     value={formatWithCommas(inputs.existingLtLossCarryforward)}
                     onChange={e =>
-                      onUpdateInput('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
+                      onUpdateInput(
+                        'existingLtLossCarryforward',
+                        parseFormattedNumber(e.target.value)
+                      )
                     }
                   />
                 </div>

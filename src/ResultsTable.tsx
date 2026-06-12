@@ -163,7 +163,7 @@ export function ResultsTable({
     // QFAF columns - Total Losses Realized (expandable)
     if (showQfaf && qfafEnabled) {
       cols += 1; // Total Losses headline
-      if (expandOrdLoss) cols += 6; // Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover, Inc. Req'd
+      if (expandOrdLoss) cols += 7; // Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover, St. NOL Expired, Inc. Req'd
     }
 
     // Capital loss carryforward group (always shown)
@@ -190,11 +190,13 @@ export function ResultsTable({
   // significant tax savings beyond the ~$1.5K/yr capital loss deduction.
   const filteredData = data.filter(y => {
     if (y.strategyActive) return true;
-    // Keep wind-down rows with NOL usage or ordinary loss benefits (significant events)
+    // Keep wind-down rows with NOL usage, ordinary loss benefits, or a state
+    // NOL expiry (significant events)
     return (
       y.nolUsedThisYear > 0.01 ||
       y.ordinaryLossBenefit > 0.01 ||
-      y.nolUsageBenefit > 0.01
+      y.nolUsageBenefit > 0.01 ||
+      y.stateNolExpired > 0.01
     );
   });
 
@@ -238,7 +240,11 @@ export function ResultsTable({
           <button
             className="toggle-details-btn"
             onClick={() => setTransposed(t => !t)}
-            title={transposed ? 'Years as rows (default)' : 'Years as columns (financial-statement layout)'}
+            title={
+              transposed
+                ? 'Years as rows (default)'
+                : 'Years as columns (financial-statement layout)'
+            }
           >
             ⇄ {transposed ? 'Years as Rows' : 'Years as Columns'}
           </button>
@@ -256,676 +262,713 @@ export function ResultsTable({
       )}
 
       {!transposed && (
-      <>
+        <>
+          <div className="table-scroll">
+            <table className="year-breakdown-table year-breakdown-table--compact">
+              <thead>
+                <tr>
+                  <th className="col-year">Year</th>
 
-      <div className="table-scroll">
-        <table className="year-breakdown-table year-breakdown-table--compact">
-          <thead>
-            <tr>
-              <th className="col-year">Year</th>
+                  {/* Portfolio Value - show based on view mode */}
+                  {viewMode === 'combined' && qfafEnabled ? (
+                    <th
+                      className="col-expandable col-portfolio"
+                      onClick={() => setExpandPortfolio(!expandPortfolio)}
+                    >
+                      <span className="expandable-header">
+                        <span className="expand-icon">
+                          {expandPortfolio ? <ChevronDown /> : <ChevronRight />}
+                        </span>
+                        <InfoText contentKey="col-portfolio-value">Portfolio</InfoText>
+                      </span>
+                    </th>
+                  ) : viewMode === 'qfaf-only' ? (
+                    <th className="col-portfolio qfaf-col">
+                      <InfoText contentKey="col-qfaf-value">QFAF Value</InfoText>
+                    </th>
+                  ) : viewMode === 'collateral-only' ? (
+                    <th className="col-portfolio collateral-col">
+                      <InfoText contentKey="col-collateral-value">Collateral Value</InfoText>
+                    </th>
+                  ) : (
+                    <th className="col-portfolio">
+                      <InfoText contentKey="col-portfolio-value">Portfolio</InfoText>
+                    </th>
+                  )}
 
-              {/* Portfolio Value - show based on view mode */}
-              {viewMode === 'combined' && qfafEnabled ? (
-                <th
-                  className="col-expandable col-portfolio"
-                  onClick={() => setExpandPortfolio(!expandPortfolio)}
-                >
-                  <span className="expandable-header">
-                    <span className="expand-icon">
-                      {expandPortfolio ? <ChevronDown /> : <ChevronRight />}
-                    </span>
-                    <InfoText contentKey="col-portfolio-value">Portfolio</InfoText>
-                  </span>
-                </th>
-              ) : viewMode === 'qfaf-only' ? (
-                <th className="col-portfolio qfaf-col">
-                  <InfoText contentKey="col-qfaf-value">QFAF Value</InfoText>
-                </th>
-              ) : viewMode === 'collateral-only' ? (
-                <th className="col-portfolio collateral-col">
-                  <InfoText contentKey="col-collateral-value">Collateral Value</InfoText>
-                </th>
-              ) : (
-                <th className="col-portfolio">
-                  <InfoText contentKey="col-portfolio-value">Portfolio</InfoText>
-                </th>
-              )}
+                  {/* Expanded Portfolio Details - only in combined mode */}
+                  {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
+                    <>
+                      <th className="col-detail collateral-col">
+                        <InfoText contentKey="col-collateral-value">Collateral</InfoText>
+                      </th>
+                      <th className="col-detail qfaf-col">
+                        <InfoText contentKey="col-qfaf-value">QFAF</InfoText>
+                      </th>
+                      <th className="col-detail qfaf-col">
+                        <InfoText contentKey="col-cash-returned">Cash Out</InfoText>
+                      </th>
+                    </>
+                  )}
 
-              {/* Expanded Portfolio Details - only in combined mode */}
-              {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
-                <>
-                  <th className="col-detail collateral-col">
-                    <InfoText contentKey="col-collateral-value">Collateral</InfoText>
-                  </th>
-                  <th className="col-detail qfaf-col">
-                    <InfoText contentKey="col-qfaf-value">QFAF</InfoText>
-                  </th>
-                  <th className="col-detail qfaf-col">
-                    <InfoText contentKey="col-cash-returned">Cash Out</InfoText>
-                  </th>
-                </>
-              )}
+                  {/* Net Capital - Collapsible (show in combined and collateral-only) */}
+                  {showCollateral && (
+                    <th
+                      className={`col-expandable col-net-capital ${viewMode === 'collateral-only' ? 'collateral-col' : ''}`}
+                      onClick={() => setExpandCapital(!expandCapital)}
+                    >
+                      <span className="expandable-header">
+                        <span className="expand-icon">
+                          {expandCapital ? <ChevronDown /> : <ChevronRight />}
+                        </span>
+                        <InfoText contentKey="col-net-capital">Net Cap GL</InfoText>
+                      </span>
+                    </th>
+                  )}
 
-              {/* Net Capital - Collapsible (show in combined and collateral-only) */}
-              {showCollateral && (
-                <th
-                  className={`col-expandable col-net-capital ${viewMode === 'collateral-only' ? 'collateral-col' : ''}`}
-                  onClick={() => setExpandCapital(!expandCapital)}
-                >
-                  <span className="expandable-header">
-                    <span className="expand-icon">
-                      {expandCapital ? <ChevronDown /> : <ChevronRight />}
-                    </span>
-                    <InfoText contentKey="col-net-capital">Net Cap GL</InfoText>
-                  </span>
-                </th>
-              )}
+                  {/* Expanded Capital Details - Collateral items */}
+                  {expandCapital && showCollateral && (
+                    <>
+                      <th className="col-detail collateral-col">
+                        <InfoText contentKey="col-st-losses">ST Loss</InfoText>
+                      </th>
+                      <th className="col-detail collateral-col">
+                        <InfoText contentKey="col-lt-gains">LT Gain</InfoText>
+                      </th>
+                      <th className="col-detail collateral-col">
+                        <InfoText contentKey="col-eff-rate">Harvest %</InfoText>
+                      </th>
+                    </>
+                  )}
 
-              {/* Expanded Capital Details - Collateral items */}
-              {expandCapital && showCollateral && (
-                <>
-                  <th className="col-detail collateral-col">
-                    <InfoText contentKey="col-st-losses">ST Loss</InfoText>
-                  </th>
-                  <th className="col-detail collateral-col">
-                    <InfoText contentKey="col-lt-gains">LT Gain</InfoText>
-                  </th>
-                  <th className="col-detail collateral-col">
-                    <InfoText contentKey="col-eff-rate">Harvest %</InfoText>
-                  </th>
-                </>
-              )}
+                  {/* QFAF ST Gains - show in combined (expanded) and qfaf-only */}
+                  {viewMode === 'qfaf-only' && (
+                    <th className="col-detail qfaf-col">
+                      <InfoText contentKey="col-st-gains">ST Gain</InfoText>
+                    </th>
+                  )}
+                  {expandCapital && viewMode === 'combined' && qfafEnabled && (
+                    <th className="col-detail qfaf-col">
+                      <InfoText contentKey="col-st-gains">ST Gain</InfoText>
+                    </th>
+                  )}
 
-              {/* QFAF ST Gains - show in combined (expanded) and qfaf-only */}
-              {viewMode === 'qfaf-only' && (
-                <th className="col-detail qfaf-col">
-                  <InfoText contentKey="col-st-gains">ST Gain</InfoText>
-                </th>
-              )}
-              {expandCapital && viewMode === 'combined' && qfafEnabled && (
-                <th className="col-detail qfaf-col">
-                  <InfoText contentKey="col-st-gains">ST Gain</InfoText>
-                </th>
-              )}
+                  {/* QFAF columns - show in combined and qfaf-only */}
+                  {showQfaf && qfafEnabled && (
+                    <>
+                      {/* Total Losses Realized - expandable to show Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover */}
+                      <th
+                        className={`col-expandable col-ordinary-loss ${viewMode === 'qfaf-only' ? 'qfaf-col' : ''}`}
+                        onClick={() => setExpandOrdLoss(!expandOrdLoss)}
+                      >
+                        <span className="expandable-header">
+                          <span className="expand-icon">
+                            {expandOrdLoss ? <ChevronDown /> : <ChevronRight />}
+                          </span>
+                          <InfoText contentKey="col-max-offset">Total Losses</InfoText>
+                        </span>
+                      </th>
 
-              {/* QFAF columns - show in combined and qfaf-only */}
-              {showQfaf && qfafEnabled && (
-                <>
-                  {/* Total Losses Realized - expandable to show Ord. Loss, Gross, → NOL, NOL Applied, NOL Carryover */}
+                      {/* Expanded Loss & NOL Details */}
+                      {expandOrdLoss && (
+                        <>
+                          <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-usable-loss">Ord. Loss</InfoText>
+                          </th>
+                          <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-ordinary-loss">Gross</InfoText>
+                          </th>
+                          <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-excess-nol">→ NOL</InfoText>
+                          </th>
+                          <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-nol-used">NOL Applied</InfoText>
+                          </th>
+                          <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-nol-carryforward">NOL Carryover</InfoText>
+                          </th>
+                          <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-state-nol-expired">St. NOL Expired</InfoText>
+                          </th>
+                          <th className="col-detail qfaf-col">
+                            <InfoText contentKey="col-income-required">Inc. Req&apos;d</InfoText>
+                          </th>
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {/* Capital loss carryforward balances - Collapsible */}
                   <th
-                    className={`col-expandable col-ordinary-loss ${viewMode === 'qfaf-only' ? 'qfaf-col' : ''}`}
-                    onClick={() => setExpandOrdLoss(!expandOrdLoss)}
+                    className="col-expandable col-capital-cf"
+                    onClick={() => setExpandCf(!expandCf)}
                   >
                     <span className="expandable-header">
                       <span className="expand-icon">
-                        {expandOrdLoss ? <ChevronDown /> : <ChevronRight />}
+                        {expandCf ? <ChevronDown /> : <ChevronRight />}
                       </span>
-                      <InfoText contentKey="col-max-offset">Total Losses</InfoText>
+                      <InfoText contentKey="col-capital-cf">Cap. CF</InfoText>
                     </span>
                   </th>
 
-                  {/* Expanded Loss & NOL Details */}
-                  {expandOrdLoss && (
+                  {/* Expanded Carryforward Details */}
+                  {expandCf && (
                     <>
-                      <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-usable-loss">Ord. Loss</InfoText>
+                      <th className="col-detail">
+                        <InfoText contentKey="col-st-carryforward">ST CF</InfoText>
                       </th>
-                      <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-ordinary-loss">Gross</InfoText>
+                      <th className="col-detail">
+                        <InfoText contentKey="col-lt-carryforward">LT CF</InfoText>
                       </th>
-                      <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-excess-nol">→ NOL</InfoText>
-                      </th>
-                      <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-nol-used">NOL Applied</InfoText>
-                      </th>
-                      <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-nol-carryforward">NOL Carryover</InfoText>
-                      </th>
-                      <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-income-required">Inc. Req&apos;d</InfoText>
+                      <th className="col-detail">
+                        <InfoText contentKey="col-cap-loss-income">$3K Used</InfoText>
                       </th>
                     </>
                   )}
-                </>
-              )}
 
-              {/* Capital loss carryforward balances - Collapsible */}
-              <th
-                className="col-expandable col-capital-cf"
-                onClick={() => setExpandCf(!expandCf)}
-              >
-                <span className="expandable-header">
-                  <span className="expand-icon">
-                    {expandCf ? <ChevronDown /> : <ChevronRight />}
-                  </span>
-                  <InfoText contentKey="col-capital-cf">Cap. CF</InfoText>
-                </span>
-              </th>
-
-              {/* Expanded Carryforward Details */}
-              {expandCf && (
-                <>
-                  <th className="col-detail">
-                    <InfoText contentKey="col-st-carryforward">ST CF</InfoText>
-                  </th>
-                  <th className="col-detail">
-                    <InfoText contentKey="col-lt-carryforward">LT CF</InfoText>
-                  </th>
-                  <th className="col-detail">
-                    <InfoText contentKey="col-cap-loss-income">$3K Used</InfoText>
-                  </th>
-                </>
-              )}
-
-              {/* Deleverage group (D-016) — only when a plan is active */}
-              {hasDeleverage && (
-                <th
-                  className="col-expandable col-deleverage"
-                  onClick={() => setExpandDeleverage(!expandDeleverage)}
-                >
-                  <span className="expandable-header">
-                    <span className="expand-icon">
-                      {expandDeleverage ? <ChevronDown /> : <ChevronRight />}
-                    </span>
-                    <InfoText contentKey="col-extension-fraction">Extension %</InfoText>
-                  </span>
-                </th>
-              )}
-              {hasDeleverage && expandDeleverage && (
-                <>
-                  <th className="col-detail">
-                    <InfoText contentKey="col-deleverage-gain">Unwind Gain</InfoText>
-                  </th>
-                  <th className="col-detail">
-                    <InfoText contentKey="col-deleverage-tax">Unwind Tax</InfoText>
-                  </th>
-                  <th className="col-detail">
-                    <InfoText contentKey="col-financing-saved">Fin. Saved</InfoText>
-                  </th>
-                </>
-              )}
-
-              {/* Tax Savings - Collapsible to show benefit breakdown */}
-              <th
-                className="col-expandable col-savings"
-                onClick={() => setExpandSavings(!expandSavings)}
-              >
-                <span className="expandable-header">
-                  <span className="expand-icon">
-                    {expandSavings ? <ChevronDown /> : <ChevronRight />}
-                  </span>
-                  <InfoText contentKey="col-tax-savings">
-                    {viewMode === 'qfaf-only' ? 'QFAF Benefit' : viewMode === 'collateral-only' ? 'Coll. Benefit' : 'Savings'}
-                  </InfoText>
-                </span>
-              </th>
-
-              {/* Expanded Savings Breakdown — components sum exactly to Savings */}
-              {expandSavings && (
-                <>
-                  <th className="col-detail benefit-col">
-                    <InfoText contentKey="col-ord-loss-benefit">Ord. Ded.</InfoText>
-                  </th>
-                  <th className="col-detail benefit-col">
-                    <InfoText contentKey="col-nol-benefit">NOL Ben.</InfoText>
-                  </th>
-                  <th className="col-detail benefit-col">
-                    <InfoText contentKey="col-capital-loss-benefit">$3K Ben.</InfoText>
-                  </th>
-                  <th className="col-detail cost-col">
-                    <InfoText contentKey="col-lt-gain-cost">LT Cost</InfoText>
-                  </th>
-                  <th className="col-detail cost-col">
-                    <InfoText contentKey="col-st-leak-cost">ST Cost</InfoText>
-                  </th>
-                  <th className="col-detail cost-col">
-                    <InfoText contentKey="col-financing-cost">Fin. Cost</InfoText>
-                  </th>
-                </>
-              )}
-
-              {/* Cumulative Savings - always visible */}
-              <th className="col-cumulative">
-                <InfoText contentKey="col-cumulative-savings">Cumul.</InfoText>
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {/* Starting values row */}
-            <tr className="starting-row">
-              <td>Start</td>
-              <td>
-                {viewMode === 'qfaf-only'
-                  ? formatCurrency(sizing.qfafValue)
-                  : viewMode === 'collateral-only'
-                    ? formatCurrency(sizing.collateralValue)
-                    : formatCurrency(sizing.collateralValue + (qfafEnabled ? sizing.qfafValue : 0))}
-              </td>
-              {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
-                <>
-                  <td className="starting-note collateral-col">
-                    {formatCurrency(sizing.collateralValue)}
-                  </td>
-                  <td className="starting-note qfaf-col">{formatCurrency(sizing.qfafValue)}</td>
-                  <td className="starting-note qfaf-col">—</td>
-                </>
-              )}
-              {showCollateral && <td className="starting-note">—</td>}
-              {expandCapital && showCollateral && (
-                <>
-                  <td className="starting-note collateral-col">—</td>
-                  <td className="starting-note collateral-col">—</td>
-                  <td className="starting-note collateral-col">—</td>
-                </>
-              )}
-              {viewMode === 'qfaf-only' && <td className="starting-note qfaf-col">—</td>}
-              {expandCapital && viewMode === 'combined' && qfafEnabled && (
-                <td className="starting-note qfaf-col">—</td>
-              )}
-              {showQfaf && qfafEnabled && (
-                <>
-                  <td className="starting-note">—</td>
-                  {expandOrdLoss && (
-                    <>
-                      <td className="starting-note qfaf-col">—</td>
-                      <td className="starting-note qfaf-col">—</td>
-                      <td className="starting-note qfaf-col">—</td>
-                      <td className="starting-note qfaf-col">—</td>
-                      <td className="starting-note qfaf-col">—</td>
-                      <td className="starting-note qfaf-col">—</td>
-                    </>
-                  )}
-                </>
-              )}
-              <td className="starting-note">—</td>
-              {expandCf && (
-                <>
-                  <td className="starting-note">—</td>
-                  <td className="starting-note">—</td>
-                  <td className="starting-note">—</td>
-                </>
-              )}
-              {hasDeleverage && <td className="starting-note">100%</td>}
-              {hasDeleverage && expandDeleverage && (
-                <>
-                  <td className="starting-note">—</td>
-                  <td className="starting-note">—</td>
-                  <td className="starting-note">—</td>
-                </>
-              )}
-              <td className="starting-note">—</td>
-              {expandSavings && (
-                <>
-                  {Array.from({ length: savingsDetailCols }).map((_, i) => (
-                    <td key={i} className="starting-note">—</td>
-                  ))}
-                </>
-              )}
-              <td className="starting-note">—</td>
-            </tr>
-
-            {filteredData.map((year, index) => {
-              // Get the appropriate benefit based on view mode
-              const displayedBenefit =
-                viewMode === 'qfaf-only'
-                  ? year.qfafTaxBenefit
-                  : viewMode === 'collateral-only'
-                    ? year.collateralTaxBenefit
-                    : year.taxSavings;
-
-              cumulativeSavings += displayedBenefit;
-              const netCapital = getNetCapital(year);
-
-              // Get portfolio value based on view mode
-              const portfolioValue =
-                viewMode === 'qfaf-only'
-                  ? year.qfafValue
-                  : viewMode === 'collateral-only'
-                    ? year.collateralValue
-                    : year.totalValue;
-
-              // Post-strategy wind-down: dim rows where strategy is no longer active
-              const isWindDown = !year.strategyActive;
-              const isFirstWindDown = index === firstWindDownIndex;
-
-              return (
-                <Fragment key={year.year}>
-                  {/* Wind-down divider row */}
-                  {isFirstWindDown && (
-                    <tr className="wind-down-divider-row">
-                      <td colSpan={getColSpan()}>
-                        <span className="wind-down-divider-text">Strategy Ended — Wind-Down (Carryforward Usage Only)</span>
-                      </td>
-                    </tr>
-                  )}
-                  <tr className={isWindDown ? 'wind-down-row' : ''}>
-                    <td className="year-cell">
-                      {!isWindDown && (
-                        <button
-                          type="button"
-                          className="breakdown-toggle"
-                          onClick={() => toggleBreakdownYear(year.year)}
-                          aria-expanded={expandedBreakdownYears.has(year.year)}
-                          title={
-                            expandedBreakdownYears.has(year.year)
-                              ? 'Hide month/quarter breakdown'
-                              : 'Show month/quarter breakdown'
-                          }
-                        >
-                          <span className="expand-icon">
-                            {expandedBreakdownYears.has(year.year) ? (
-                              <ChevronDown />
-                            ) : (
-                              <ChevronRight />
-                            )}
-                          </span>
-                        </button>
-                      )}
-                      {year.year}
-                      {year.year === 1 && partialFirstYearMonths !== null && (
-                        <span
-                          className="partial-year-badge partial-year-badge--compact"
-                          title={`Year 1 pro-rated to ${partialFirstYearMonths} months`}
-                        >
-                          {partialFirstYearMonths} mo
+                  {/* Deleverage group (D-016) — only when a plan is active */}
+                  {hasDeleverage && (
+                    <th
+                      className="col-expandable col-deleverage"
+                      onClick={() => setExpandDeleverage(!expandDeleverage)}
+                    >
+                      <span className="expandable-header">
+                        <span className="expand-icon">
+                          {expandDeleverage ? <ChevronDown /> : <ChevronRight />}
                         </span>
+                        <InfoText contentKey="col-extension-fraction">Extension %</InfoText>
+                      </span>
+                    </th>
+                  )}
+                  {hasDeleverage && expandDeleverage && (
+                    <>
+                      <th className="col-detail">
+                        <InfoText contentKey="col-deleverage-gain">Unwind Gain</InfoText>
+                      </th>
+                      <th className="col-detail">
+                        <InfoText contentKey="col-deleverage-tax">Unwind Tax</InfoText>
+                      </th>
+                      <th className="col-detail">
+                        <InfoText contentKey="col-financing-saved">Fin. Saved</InfoText>
+                      </th>
+                    </>
+                  )}
+
+                  {/* Tax Savings - Collapsible to show benefit breakdown */}
+                  <th
+                    className="col-expandable col-savings"
+                    onClick={() => setExpandSavings(!expandSavings)}
+                  >
+                    <span className="expandable-header">
+                      <span className="expand-icon">
+                        {expandSavings ? <ChevronDown /> : <ChevronRight />}
+                      </span>
+                      <InfoText contentKey="col-tax-savings">
+                        {viewMode === 'qfaf-only'
+                          ? 'QFAF Benefit'
+                          : viewMode === 'collateral-only'
+                            ? 'Coll. Benefit'
+                            : 'Savings'}
+                      </InfoText>
+                    </span>
+                  </th>
+
+                  {/* Expanded Savings Breakdown — components sum exactly to Savings */}
+                  {expandSavings && (
+                    <>
+                      <th className="col-detail benefit-col">
+                        <InfoText contentKey="col-ord-loss-benefit">Ord. Ded.</InfoText>
+                      </th>
+                      <th className="col-detail benefit-col">
+                        <InfoText contentKey="col-nol-benefit">NOL Ben.</InfoText>
+                      </th>
+                      <th className="col-detail benefit-col">
+                        <InfoText contentKey="col-capital-loss-benefit">$3K Ben.</InfoText>
+                      </th>
+                      <th className="col-detail cost-col">
+                        <InfoText contentKey="col-lt-gain-cost">LT Cost</InfoText>
+                      </th>
+                      <th className="col-detail cost-col">
+                        <InfoText contentKey="col-st-leak-cost">ST Cost</InfoText>
+                      </th>
+                      <th className="col-detail cost-col">
+                        <InfoText contentKey="col-financing-cost">Fin. Cost</InfoText>
+                      </th>
+                    </>
+                  )}
+
+                  {/* Cumulative Savings - always visible */}
+                  <th className="col-cumulative">
+                    <InfoText contentKey="col-cumulative-savings">Cumul.</InfoText>
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {/* Starting values row */}
+                <tr className="starting-row">
+                  <td>Start</td>
+                  <td>
+                    {viewMode === 'qfaf-only'
+                      ? formatCurrency(sizing.qfafValue)
+                      : viewMode === 'collateral-only'
+                        ? formatCurrency(sizing.collateralValue)
+                        : formatCurrency(
+                            sizing.collateralValue + (qfafEnabled ? sizing.qfafValue : 0)
+                          )}
+                  </td>
+                  {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
+                    <>
+                      <td className="starting-note collateral-col">
+                        {formatCurrency(sizing.collateralValue)}
+                      </td>
+                      <td className="starting-note qfaf-col">{formatCurrency(sizing.qfafValue)}</td>
+                      <td className="starting-note qfaf-col">—</td>
+                    </>
+                  )}
+                  {showCollateral && <td className="starting-note">—</td>}
+                  {expandCapital && showCollateral && (
+                    <>
+                      <td className="starting-note collateral-col">—</td>
+                      <td className="starting-note collateral-col">—</td>
+                      <td className="starting-note collateral-col">—</td>
+                    </>
+                  )}
+                  {viewMode === 'qfaf-only' && <td className="starting-note qfaf-col">—</td>}
+                  {expandCapital && viewMode === 'combined' && qfafEnabled && (
+                    <td className="starting-note qfaf-col">—</td>
+                  )}
+                  {showQfaf && qfafEnabled && (
+                    <>
+                      <td className="starting-note">—</td>
+                      {expandOrdLoss && (
+                        <>
+                          <td className="starting-note qfaf-col">—</td>
+                          <td className="starting-note qfaf-col">—</td>
+                          <td className="starting-note qfaf-col">—</td>
+                          <td className="starting-note qfaf-col">—</td>
+                          <td className="starting-note qfaf-col">—</td>
+                          <td className="starting-note qfaf-col">—</td>
+                          <td className="starting-note qfaf-col">—</td>
+                        </>
                       )}
-                      {isWindDown && <span className="wind-down-badge" title="Wind-down: strategy ended, carryforward usage only">W/D</span>}
-                    </td>
-                    <td>{formatCurrency(portfolioValue)}</td>
-
-                    {/* Expanded Portfolio Details - only in combined mode */}
-                    {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
-                      <>
-                        <td className="collateral-col">{formatCurrency(year.collateralValue)}</td>
-                        <td className="qfaf-col">{formatCurrency(year.qfafValue)}</td>
-                        <td className="qfaf-col">
-                          {year.qfafCashReturned > 0.01
-                            ? formatCurrency(year.qfafCashReturned)
-                            : '—'}
+                    </>
+                  )}
+                  <td className="starting-note">—</td>
+                  {expandCf && (
+                    <>
+                      <td className="starting-note">—</td>
+                      <td className="starting-note">—</td>
+                      <td className="starting-note">—</td>
+                    </>
+                  )}
+                  {hasDeleverage && <td className="starting-note">100%</td>}
+                  {hasDeleverage && expandDeleverage && (
+                    <>
+                      <td className="starting-note">—</td>
+                      <td className="starting-note">—</td>
+                      <td className="starting-note">—</td>
+                    </>
+                  )}
+                  <td className="starting-note">—</td>
+                  {expandSavings && (
+                    <>
+                      {Array.from({ length: savingsDetailCols }).map((_, i) => (
+                        <td key={i} className="starting-note">
+                          —
                         </td>
-                      </>
-                    )}
+                      ))}
+                    </>
+                  )}
+                  <td className="starting-note">—</td>
+                </tr>
 
-                    {/* Net Capital - show in combined and collateral-only */}
-                    {showCollateral && (
-                      <td className={netCapital >= 0 ? 'positive' : 'negative'}>
-                        {isWindDown
-                          ? '—'
-                          : netCapital >= 0
-                            ? formatCurrency(netCapital)
-                            : `(${formatCurrency(Math.abs(netCapital))})`}
-                      </td>
-                    )}
+                {filteredData.map((year, index) => {
+                  // Get the appropriate benefit based on view mode
+                  const displayedBenefit =
+                    viewMode === 'qfaf-only'
+                      ? year.qfafTaxBenefit
+                      : viewMode === 'collateral-only'
+                        ? year.collateralTaxBenefit
+                        : year.taxSavings;
 
-                    {/* Expanded Capital Details - Collateral items */}
-                    {expandCapital && showCollateral && (
-                      <>
-                        <td className="negative collateral-col">
-                          {isWindDown ? '—' : `(${formatCurrency(year.stLossesHarvested)})`}
+                  cumulativeSavings += displayedBenefit;
+                  const netCapital = getNetCapital(year);
+
+                  // Get portfolio value based on view mode
+                  const portfolioValue =
+                    viewMode === 'qfaf-only'
+                      ? year.qfafValue
+                      : viewMode === 'collateral-only'
+                        ? year.collateralValue
+                        : year.totalValue;
+
+                  // Post-strategy wind-down: dim rows where strategy is no longer active
+                  const isWindDown = !year.strategyActive;
+                  const isFirstWindDown = index === firstWindDownIndex;
+
+                  return (
+                    <Fragment key={year.year}>
+                      {/* Wind-down divider row */}
+                      {isFirstWindDown && (
+                        <tr className="wind-down-divider-row">
+                          <td colSpan={getColSpan()}>
+                            <span className="wind-down-divider-text">
+                              Strategy Ended — Wind-Down (Carryforward Usage Only)
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                      <tr className={isWindDown ? 'wind-down-row' : ''}>
+                        <td className="year-cell">
+                          {!isWindDown && (
+                            <button
+                              type="button"
+                              className="breakdown-toggle"
+                              onClick={() => toggleBreakdownYear(year.year)}
+                              aria-expanded={expandedBreakdownYears.has(year.year)}
+                              title={
+                                expandedBreakdownYears.has(year.year)
+                                  ? 'Hide month/quarter breakdown'
+                                  : 'Show month/quarter breakdown'
+                              }
+                            >
+                              <span className="expand-icon">
+                                {expandedBreakdownYears.has(year.year) ? (
+                                  <ChevronDown />
+                                ) : (
+                                  <ChevronRight />
+                                )}
+                              </span>
+                            </button>
+                          )}
+                          {year.year}
+                          {year.year === 1 && partialFirstYearMonths !== null && (
+                            <span
+                              className="partial-year-badge partial-year-badge--compact"
+                              title={`Year 1 pro-rated to ${partialFirstYearMonths} months`}
+                            >
+                              {partialFirstYearMonths} mo
+                            </span>
+                          )}
+                          {isWindDown && (
+                            <span
+                              className="wind-down-badge"
+                              title="Wind-down: strategy ended, carryforward usage only"
+                            >
+                              W/D
+                            </span>
+                          )}
                         </td>
-                        <td className="collateral-col">
-                          {isWindDown ? '—' : formatCurrency(year.ltGainsRealized)}
-                        </td>
-                        <td className="collateral-col">
-                          {isWindDown ? '—' : formatPercent(year.effectiveStLossRate)}
-                        </td>
-                      </>
-                    )}
+                        <td>{formatCurrency(portfolioValue)}</td>
 
-                    {/* QFAF ST Gains - show in qfaf-only OR expanded in combined */}
-                    {viewMode === 'qfaf-only' && (
-                      <td className="positive qfaf-col">
-                        {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
-                      </td>
-                    )}
-                    {expandCapital && viewMode === 'combined' && qfafEnabled && (
-                      <td className="positive qfaf-col">
-                        {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
-                      </td>
-                    )}
-
-                    {/* QFAF columns - show in combined and qfaf-only */}
-                    {showQfaf && qfafEnabled && (
-                      <>
-                        {/* Total Losses Realized (headline: max income offset capacity) */}
-                        <td className={`${isWindDown ? 'wind-down-shelter' : ''}`}>
-                          {isWindDown && year.maxIncomeOffsetCapacity > 0
-                            ? <span title="Available capacity from carryforwards (no new losses generated)">{formatCurrency(year.maxIncomeOffsetCapacity)}*</span>
-                            : formatCurrency(year.maxIncomeOffsetCapacity)}
-                        </td>
-
-                        {/* Expanded Loss & NOL Details */}
-                        {expandOrdLoss && (
+                        {/* Expanded Portfolio Details - only in combined mode */}
+                        {expandPortfolio && qfafEnabled && viewMode === 'combined' && (
                           <>
-                            {/* Usable Ordinary Loss (capped by §461(l)) */}
-                            <td className="negative qfaf-col">
-                              {isWindDown ? '—' : `(${formatCurrency(year.usableOrdinaryLoss)})`}
+                            <td className="collateral-col">
+                              {formatCurrency(year.collateralValue)}
                             </td>
-                            {/* Gross Ordinary Loss (before §461(l) cap) */}
-                            <td className="negative qfaf-col">
-                              {isWindDown ? '—' : `(${formatCurrency(year.ordinaryLossesGenerated)})`}
-                            </td>
-                            {/* Excess → NOL */}
-                            <td className={year.excessToNol > 0 ? 'nol-generated qfaf-col' : 'qfaf-col'}>
-                              {isWindDown
-                                ? '—'
-                                : year.excessToNol > 0
-                                  ? formatCurrency(year.excessToNol)
-                                  : '—'}
-                            </td>
-                            {/* NOL Applied */}
-                            <td className={year.nolUsedThisYear > 0 ? 'positive qfaf-col' : 'qfaf-col'}>
-                              {year.nolUsedThisYear > 0 ? formatCurrency(year.nolUsedThisYear) : '—'}
-                            </td>
-                            {/* NOL Carryover */}
-                            <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
-                            {/* Income required to fully utilize §461(l) + NOL this year */}
+                            <td className="qfaf-col">{formatCurrency(year.qfafValue)}</td>
                             <td className="qfaf-col">
-                              {year.incomeRequiredForFullUtilization > 0
-                                ? formatCurrency(year.incomeRequiredForFullUtilization)
+                              {year.qfafCashReturned > 0.01
+                                ? formatCurrency(year.qfafCashReturned)
                                 : '—'}
                             </td>
                           </>
                         )}
-                      </>
-                    )}
 
-                    {/* Capital loss carryforward balances (real data through wind-down) */}
-                    <td>
-                      {formatCurrency(year.stLossCarryforward + year.ltLossCarryforward)}
-                    </td>
+                        {/* Net Capital - show in combined and collateral-only */}
+                        {showCollateral && (
+                          <td className={netCapital >= 0 ? 'positive' : 'negative'}>
+                            {isWindDown
+                              ? '—'
+                              : netCapital >= 0
+                                ? formatCurrency(netCapital)
+                                : `(${formatCurrency(Math.abs(netCapital))})`}
+                          </td>
+                        )}
 
-                    {/* Expanded Carryforward Details */}
-                    {expandCf && (
-                      <>
-                        <td>{formatCurrency(year.stLossCarryforward)}</td>
-                        <td>{formatCurrency(year.ltLossCarryforward)}</td>
-                        <td className="positive">
-                          {year.capitalLossUsedAgainstIncome > 0
-                            ? formatCurrency(year.capitalLossUsedAgainstIncome)
-                            : '—'}
-                        </td>
-                      </>
-                    )}
+                        {/* Expanded Capital Details - Collateral items */}
+                        {expandCapital && showCollateral && (
+                          <>
+                            <td className="negative collateral-col">
+                              {isWindDown ? '—' : `(${formatCurrency(year.stLossesHarvested)})`}
+                            </td>
+                            <td className="collateral-col">
+                              {isWindDown ? '—' : formatCurrency(year.ltGainsRealized)}
+                            </td>
+                            <td className="collateral-col">
+                              {isWindDown ? '—' : formatPercent(year.effectiveStLossRate)}
+                            </td>
+                          </>
+                        )}
 
-                    {/* Deleverage group (D-016) */}
-                    {hasDeleverage && (
-                      <td>{formatPercent(year.extensionFraction, 0)}</td>
-                    )}
-                    {hasDeleverage && expandDeleverage && (
-                      <>
-                        <td className="positive">
-                          {year.deleverageGainRealized > 0.01
-                            ? formatCurrency(year.deleverageGainRealized)
-                            : '—'}
-                        </td>
-                        <td className="negative">
-                          {year.deleverageTax > 0.01
-                            ? `(${formatCurrency(year.deleverageTax)})`
-                            : '—'}
-                        </td>
-                        <td className="positive">
-                          {year.financingSaved > 0.01
-                            ? formatCurrency(year.financingSaved)
-                            : '—'}
-                        </td>
-                      </>
-                    )}
+                        {/* QFAF ST Gains - show in qfaf-only OR expanded in combined */}
+                        {viewMode === 'qfaf-only' && (
+                          <td className="positive qfaf-col">
+                            {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
+                          </td>
+                        )}
+                        {expandCapital && viewMode === 'combined' && qfafEnabled && (
+                          <td className="positive qfaf-col">
+                            {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
+                          </td>
+                        )}
 
-                    {/* Tax Savings (collapsed: net number) */}
-                    <td className={`highlight ${displayedBenefit < 0 ? 'negative' : ''}`}>
-                      {displayedBenefit < 0
-                        ? `(${formatCurrency(Math.abs(displayedBenefit))})`
-                        : formatCurrency(displayedBenefit)}
-                    </td>
+                        {/* QFAF columns - show in combined and qfaf-only */}
+                        {showQfaf && qfafEnabled && (
+                          <>
+                            {/* Total Losses Realized (headline: max income offset capacity) */}
+                            <td className={`${isWindDown ? 'wind-down-shelter' : ''}`}>
+                              {isWindDown && year.maxIncomeOffsetCapacity > 0 ? (
+                                <span title="Available capacity from carryforwards (no new losses generated)">
+                                  {formatCurrency(year.maxIncomeOffsetCapacity)}*
+                                </span>
+                              ) : (
+                                formatCurrency(year.maxIncomeOffsetCapacity)
+                              )}
+                            </td>
 
-                    {/* Expanded Savings Breakdown — sums exactly to Savings */}
-                    {expandSavings && (
-                      <>
-                        {/* Ordinary Deduction Benefit */}
-                        <td className="positive benefit-col">
-                          {year.ordinaryLossBenefit > 0
-                            ? formatCurrency(year.ordinaryLossBenefit)
-                            : '—'}
-                        </td>
-                        {/* NOL Usage Benefit */}
-                        <td className="positive benefit-col">
-                          {year.nolUsageBenefit > 0
-                            ? formatCurrency(year.nolUsageBenefit)
-                            : '—'}
-                        </td>
-                        {/* $3K Capital Loss Deduction Benefit */}
-                        <td className="positive benefit-col">
-                          {year.capitalLossBenefit > 0
-                            ? formatCurrency(year.capitalLossBenefit)
-                            : '—'}
-                        </td>
-                        {/* LT Gain Cost */}
-                        <td className="negative cost-col">
-                          {year.ltGainCost > 0
-                            ? `(${formatCurrency(year.ltGainCost)})`
-                            : '—'}
-                        </td>
-                        {/* Net ST Gain Cost (leakage) */}
-                        <td className="negative cost-col">
-                          {year.remainingStGainCost > 0
-                            ? `(${formatCurrency(year.remainingStGainCost)})`
-                            : '—'}
-                        </td>
-                        {/* Financing cost paid (reference: netted from portfolio
-                            growth, NOT part of the Savings component sum) */}
-                        <td className="negative cost-col">
-                          {year.financingCostPaid > 0
-                            ? `(${formatCurrency(year.financingCostPaid)})`
-                            : '—'}
-                        </td>
-                      </>
-                    )}
-
-                    {/* Cumulative Savings */}
-                    <td className="highlight cumulative-cell">
-                      {formatCurrency(cumulativeSavings)}
-                    </td>
-                  </tr>
-                  {expandedBreakdownYears.has(year.year) && !isWindDown && (
-                    <tr className="breakdown-sub-row">
-                      <td colSpan={getColSpan()}>
-                        <div className="loss-breakdown">
-                          <div className="loss-breakdown-controls">
-                            <span className="loss-breakdown-title">
-                              Year {year.year} loss generation
-                            </span>
-                            <div className="loss-breakdown-granularity">
-                              <button
-                                type="button"
-                                className={`view-mode-btn ${breakdownGranularity === 'quarterly' ? 'active' : ''}`}
-                                onClick={() => setBreakdownGranularity('quarterly')}
-                              >
-                                Quarterly
-                              </button>
-                              <button
-                                type="button"
-                                className={`view-mode-btn ${breakdownGranularity === 'monthly' ? 'active' : ''}`}
-                                onClick={() => setBreakdownGranularity('monthly')}
-                              >
-                                Monthly
-                              </button>
-                            </div>
-                          </div>
-                          <table className="loss-breakdown-table">
-                            <thead>
-                              <tr>
-                                <th>Period</th>
-                                <th>Deployment Year</th>
-                                <th className="num">ST Losses (Collateral)</th>
-                                {qfafEnabled && (
-                                  <th className="num">Ord. Losses (QFAF)</th>
-                                )}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {buildLossBreakdown({
-                                year,
-                                yearIndex: year.year,
-                                startMonth,
-                                qfafDuration,
-                                granularity: breakdownGranularity,
-                                rateForDeploymentYear,
-                              }).map(p => (
-                                <tr
-                                  key={p.label}
-                                  className={p.active ? '' : 'loss-breakdown-inactive'}
+                            {/* Expanded Loss & NOL Details */}
+                            {expandOrdLoss && (
+                              <>
+                                {/* Usable Ordinary Loss (capped by §461(l)) */}
+                                <td className="negative qfaf-col">
+                                  {isWindDown
+                                    ? '—'
+                                    : `(${formatCurrency(year.usableOrdinaryLoss)})`}
+                                </td>
+                                {/* Gross Ordinary Loss (before §461(l) cap) */}
+                                <td className="negative qfaf-col">
+                                  {isWindDown
+                                    ? '—'
+                                    : `(${formatCurrency(year.ordinaryLossesGenerated)})`}
+                                </td>
+                                {/* Excess → NOL */}
+                                <td
+                                  className={
+                                    year.excessToNol > 0 ? 'nol-generated qfaf-col' : 'qfaf-col'
+                                  }
                                 >
-                                  <td>{p.label}</td>
-                                  <td>{describeSegments(p.segments)}</td>
-                                  <td className="num negative">
-                                    {p.active
-                                      ? `(${formatCurrency(p.stLosses)})`
+                                  {isWindDown
+                                    ? '—'
+                                    : year.excessToNol > 0
+                                      ? formatCurrency(year.excessToNol)
                                       : '—'}
-                                  </td>
-                                  {qfafEnabled && (
-                                    <td className="num negative">
-                                      {p.active
-                                        ? `(${formatCurrency(p.ordinaryLosses)})`
-                                        : '—'}
-                                    </td>
-                                  )}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          {!rateForDeploymentYear && (
-                            <p className="loss-breakdown-note">
-                              Split allocation: losses spread uniformly across active
-                              months (deployment-year rates aren't a single curve).
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
+                                </td>
+                                {/* NOL Applied */}
+                                <td
+                                  className={
+                                    year.nolUsedThisYear > 0 ? 'positive qfaf-col' : 'qfaf-col'
+                                  }
+                                >
+                                  {year.nolUsedThisYear > 0
+                                    ? formatCurrency(year.nolUsedThisYear)
+                                    : '—'}
+                                </td>
+                                {/* NOL Carryover */}
+                                <td className="qfaf-col">{formatCurrency(year.nolCarryforward)}</td>
+                                {/* State NOL expired unused (D-020: CA 20-year carryover) */}
+                                <td
+                                  className={
+                                    year.stateNolExpired > 0.01 ? 'negative qfaf-col' : 'qfaf-col'
+                                  }
+                                >
+                                  {year.stateNolExpired > 0.01
+                                    ? `(${formatCurrency(year.stateNolExpired)})`
+                                    : '—'}
+                                </td>
+                                {/* Income required to fully utilize §461(l) + NOL this year */}
+                                <td className="qfaf-col">
+                                  {year.incomeRequiredForFullUtilization > 0
+                                    ? formatCurrency(year.incomeRequiredForFullUtilization)
+                                    : '—'}
+                                </td>
+                              </>
+                            )}
+                          </>
+                        )}
 
-          <tfoot>
-            <tr>
-              <td colSpan={getColSpan() - 1}>
-                <strong>Total {data.length}-Year Projection</strong>
-              </td>
-              <td className="highlight">
-                <strong>{formatCurrency(totalSavingsAllYears)}</strong>
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+                        {/* Capital loss carryforward balances (real data through wind-down) */}
+                        <td>{formatCurrency(year.stLossCarryforward + year.ltLossCarryforward)}</td>
 
-      </>
+                        {/* Expanded Carryforward Details */}
+                        {expandCf && (
+                          <>
+                            <td>{formatCurrency(year.stLossCarryforward)}</td>
+                            <td>{formatCurrency(year.ltLossCarryforward)}</td>
+                            <td className="positive">
+                              {year.capitalLossUsedAgainstIncome > 0
+                                ? formatCurrency(year.capitalLossUsedAgainstIncome)
+                                : '—'}
+                            </td>
+                          </>
+                        )}
+
+                        {/* Deleverage group (D-016) */}
+                        {hasDeleverage && <td>{formatPercent(year.extensionFraction, 0)}</td>}
+                        {hasDeleverage && expandDeleverage && (
+                          <>
+                            <td className="positive">
+                              {year.deleverageGainRealized > 0.01
+                                ? formatCurrency(year.deleverageGainRealized)
+                                : '—'}
+                            </td>
+                            <td className="negative">
+                              {year.deleverageTax > 0.01
+                                ? `(${formatCurrency(year.deleverageTax)})`
+                                : '—'}
+                            </td>
+                            <td className="positive">
+                              {year.financingSaved > 0.01
+                                ? formatCurrency(year.financingSaved)
+                                : '—'}
+                            </td>
+                          </>
+                        )}
+
+                        {/* Tax Savings (collapsed: net number) */}
+                        <td className={`highlight ${displayedBenefit < 0 ? 'negative' : ''}`}>
+                          {displayedBenefit < 0
+                            ? `(${formatCurrency(Math.abs(displayedBenefit))})`
+                            : formatCurrency(displayedBenefit)}
+                        </td>
+
+                        {/* Expanded Savings Breakdown — sums exactly to Savings */}
+                        {expandSavings && (
+                          <>
+                            {/* Ordinary Deduction Benefit */}
+                            <td className="positive benefit-col">
+                              {year.ordinaryLossBenefit > 0
+                                ? formatCurrency(year.ordinaryLossBenefit)
+                                : '—'}
+                            </td>
+                            {/* NOL Usage Benefit */}
+                            <td className="positive benefit-col">
+                              {year.nolUsageBenefit > 0
+                                ? formatCurrency(year.nolUsageBenefit)
+                                : '—'}
+                            </td>
+                            {/* $3K Capital Loss Deduction Benefit */}
+                            <td className="positive benefit-col">
+                              {year.capitalLossBenefit > 0
+                                ? formatCurrency(year.capitalLossBenefit)
+                                : '—'}
+                            </td>
+                            {/* LT Gain Cost */}
+                            <td className="negative cost-col">
+                              {year.ltGainCost > 0 ? `(${formatCurrency(year.ltGainCost)})` : '—'}
+                            </td>
+                            {/* Net ST Gain Cost (leakage) */}
+                            <td className="negative cost-col">
+                              {year.remainingStGainCost > 0
+                                ? `(${formatCurrency(year.remainingStGainCost)})`
+                                : '—'}
+                            </td>
+                            {/* Financing cost paid (reference: netted from portfolio
+                            growth, NOT part of the Savings component sum) */}
+                            <td className="negative cost-col">
+                              {year.financingCostPaid > 0
+                                ? `(${formatCurrency(year.financingCostPaid)})`
+                                : '—'}
+                            </td>
+                          </>
+                        )}
+
+                        {/* Cumulative Savings */}
+                        <td className="highlight cumulative-cell">
+                          {formatCurrency(cumulativeSavings)}
+                        </td>
+                      </tr>
+                      {expandedBreakdownYears.has(year.year) && !isWindDown && (
+                        <tr className="breakdown-sub-row">
+                          <td colSpan={getColSpan()}>
+                            <div className="loss-breakdown">
+                              <div className="loss-breakdown-controls">
+                                <span className="loss-breakdown-title">
+                                  Year {year.year} loss generation
+                                </span>
+                                <div className="loss-breakdown-granularity">
+                                  <button
+                                    type="button"
+                                    className={`view-mode-btn ${breakdownGranularity === 'quarterly' ? 'active' : ''}`}
+                                    onClick={() => setBreakdownGranularity('quarterly')}
+                                  >
+                                    Quarterly
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`view-mode-btn ${breakdownGranularity === 'monthly' ? 'active' : ''}`}
+                                    onClick={() => setBreakdownGranularity('monthly')}
+                                  >
+                                    Monthly
+                                  </button>
+                                </div>
+                              </div>
+                              <table className="loss-breakdown-table">
+                                <thead>
+                                  <tr>
+                                    <th>Period</th>
+                                    <th>Deployment Year</th>
+                                    <th className="num">ST Losses (Collateral)</th>
+                                    {qfafEnabled && <th className="num">Ord. Losses (QFAF)</th>}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {buildLossBreakdown({
+                                    year,
+                                    yearIndex: year.year,
+                                    startMonth,
+                                    qfafDuration,
+                                    granularity: breakdownGranularity,
+                                    rateForDeploymentYear,
+                                  }).map(p => (
+                                    <tr
+                                      key={p.label}
+                                      className={p.active ? '' : 'loss-breakdown-inactive'}
+                                    >
+                                      <td>{p.label}</td>
+                                      <td>{describeSegments(p.segments)}</td>
+                                      <td className="num negative">
+                                        {p.active ? `(${formatCurrency(p.stLosses)})` : '—'}
+                                      </td>
+                                      {qfafEnabled && (
+                                        <td className="num negative">
+                                          {p.active ? `(${formatCurrency(p.ordinaryLosses)})` : '—'}
+                                        </td>
+                                      )}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              {!rateForDeploymentYear && (
+                                <p className="loss-breakdown-note">
+                                  Split allocation: losses spread uniformly across active months
+                                  (deployment-year rates aren't a single curve).
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+
+              <tfoot>
+                <tr>
+                  <td colSpan={getColSpan() - 1}>
+                    <strong>Total {data.length}-Year Projection</strong>
+                  </td>
+                  <td className="highlight">
+                    <strong>{formatCurrency(totalSavingsAllYears)}</strong>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Carryforward Summary */}
@@ -947,10 +990,10 @@ export function ResultsTable({
         {qfafEnabled && (
           <p className="carryforward-explanation">
             <em>
-              Expand "Total Losses" for usable ordinary loss, gross losses, §461(l) cap overflow to NOL,
-              and NOL usage; "Cap. CF" for ST/LT carryforward balances and the $3K deduction; and
-              "Savings" for the full benefit/cost components, which sum exactly to the Savings column
-              (Ord. Ded. + NOL Ben. + $3K Ben. − LT Cost − ST Cost). Fin. Cost is shown for
+              Expand "Total Losses" for usable ordinary loss, gross losses, §461(l) cap overflow to
+              NOL, and NOL usage; "Cap. CF" for ST/LT carryforward balances and the $3K deduction;
+              and "Savings" for the full benefit/cost components, which sum exactly to the Savings
+              column (Ord. Ded. + NOL Ben. + $3K Ben. − LT Cost − ST Cost). Fin. Cost is shown for
               reference only — financing fees are netted out of portfolio growth, not the Savings
               column. Rows marked "W/D" are post-strategy wind-down years where only carryforward
               usage continues.
@@ -1025,15 +1068,35 @@ function TransposedTable({
     title: 'Portfolio',
     rows: [
       ...(viewMode === 'combined' && qfafEnabled
-        ? [{ label: 'Total Value', contentKey: 'col-portfolio-value', cell: (y: YearResult) => money(y.totalValue) }]
+        ? [
+            {
+              label: 'Total Value',
+              contentKey: 'col-portfolio-value',
+              cell: (y: YearResult) => money(y.totalValue),
+            },
+          ]
         : []),
       ...(showCollateral
-        ? [{ label: 'Collateral', contentKey: 'col-collateral-value', cell: (y: YearResult) => money(y.collateralValue) }]
+        ? [
+            {
+              label: 'Collateral',
+              contentKey: 'col-collateral-value',
+              cell: (y: YearResult) => money(y.collateralValue),
+            },
+          ]
         : []),
       ...(showQfaf && qfafEnabled
         ? [
-            { label: 'QFAF', contentKey: 'col-qfaf-value', cell: (y: YearResult) => money(y.qfafValue) },
-            { label: 'Cash Out', contentKey: 'col-cash-returned', cell: (y: YearResult) => moneyOrDash(y.qfafCashReturned) },
+            {
+              label: 'QFAF',
+              contentKey: 'col-qfaf-value',
+              cell: (y: YearResult) => money(y.qfafValue),
+            },
+            {
+              label: 'Cash Out',
+              contentKey: 'col-cash-returned',
+              cell: (y: YearResult) => moneyOrDash(y.qfafCashReturned),
+            },
           ]
         : []),
     ],
@@ -1076,7 +1139,11 @@ function TransposedTable({
     sections.push({
       title: 'Ordinary Losses & NOL',
       rows: [
-        { label: 'Max Shelter', contentKey: 'col-max-offset', cell: y => money(y.maxIncomeOffsetCapacity) },
+        {
+          label: 'Max Shelter',
+          contentKey: 'col-max-offset',
+          cell: y => money(y.maxIncomeOffsetCapacity),
+        },
         {
           label: 'Usable Ordinary Loss',
           contentKey: 'col-usable-loss',
@@ -1090,8 +1157,22 @@ function TransposedTable({
           className: () => 'negative',
         },
         { label: '→ NOL', contentKey: 'col-excess-nol', cell: y => moneyOrDash(y.excessToNol) },
-        { label: 'NOL Applied', contentKey: 'col-nol-used', cell: y => moneyOrDash(y.nolUsedThisYear) },
-        { label: 'NOL Balance', contentKey: 'col-nol-carryforward', cell: y => money(y.nolCarryforward) },
+        {
+          label: 'NOL Applied',
+          contentKey: 'col-nol-used',
+          cell: y => moneyOrDash(y.nolUsedThisYear),
+        },
+        {
+          label: 'NOL Balance',
+          contentKey: 'col-nol-carryforward',
+          cell: y => money(y.nolCarryforward),
+        },
+        {
+          label: 'St. NOL Expired',
+          contentKey: 'col-state-nol-expired',
+          cell: y => negMoney(y.stateNolExpired),
+          className: () => 'negative',
+        },
         {
           label: "Income Req'd (Full Use)",
           contentKey: 'col-income-required',
@@ -1152,18 +1233,42 @@ function TransposedTable({
   sections.push({
     title: 'Capital Loss Carryforwards',
     rows: [
-      { label: 'ST Carryforward', contentKey: 'col-st-carryforward', cell: y => money(y.stLossCarryforward) },
-      { label: 'LT Carryforward', contentKey: 'col-lt-carryforward', cell: y => money(y.ltLossCarryforward) },
-      { label: '$3K Used vs Income', contentKey: 'col-cap-loss-income', cell: y => moneyOrDash(y.capitalLossUsedAgainstIncome) },
+      {
+        label: 'ST Carryforward',
+        contentKey: 'col-st-carryforward',
+        cell: y => money(y.stLossCarryforward),
+      },
+      {
+        label: 'LT Carryforward',
+        contentKey: 'col-lt-carryforward',
+        cell: y => money(y.ltLossCarryforward),
+      },
+      {
+        label: '$3K Used vs Income',
+        contentKey: 'col-cap-loss-income',
+        cell: y => moneyOrDash(y.capitalLossUsedAgainstIncome),
+      },
     ],
   });
 
   sections.push({
     title: 'Tax Savings',
     rows: [
-      { label: 'Ordinary Deduction', contentKey: 'col-ord-loss-benefit', cell: y => moneyOrDash(y.ordinaryLossBenefit) },
-      { label: 'NOL Benefit', contentKey: 'col-nol-benefit', cell: y => moneyOrDash(y.nolUsageBenefit) },
-      { label: '$3K Benefit', contentKey: 'col-capital-loss-benefit', cell: y => moneyOrDash(y.capitalLossBenefit) },
+      {
+        label: 'Ordinary Deduction',
+        contentKey: 'col-ord-loss-benefit',
+        cell: y => moneyOrDash(y.ordinaryLossBenefit),
+      },
+      {
+        label: 'NOL Benefit',
+        contentKey: 'col-nol-benefit',
+        cell: y => moneyOrDash(y.nolUsageBenefit),
+      },
+      {
+        label: '$3K Benefit',
+        contentKey: 'col-capital-loss-benefit',
+        cell: y => moneyOrDash(y.capitalLossBenefit),
+      },
       {
         label: 'LT Gain Cost',
         contentKey: 'col-lt-gain-cost',
@@ -1185,7 +1290,12 @@ function TransposedTable({
         className: () => 'negative',
       },
       {
-        label: viewMode === 'qfaf-only' ? 'QFAF Benefit' : viewMode === 'collateral-only' ? 'Coll. Benefit' : 'Net Savings',
+        label:
+          viewMode === 'qfaf-only'
+            ? 'QFAF Benefit'
+            : viewMode === 'collateral-only'
+              ? 'Coll. Benefit'
+              : 'Net Savings',
         contentKey: 'col-tax-savings',
         cell: y => formatCurrency(benefitFor(y)),
         highlight: true,
@@ -1211,12 +1321,18 @@ function TransposedTable({
               <th key={y.year} className={`num ${!y.strategyActive ? 'wind-down-row' : ''}`}>
                 Yr {y.year}
                 {y.year === 1 && partialMonths !== null && (
-                  <span className="partial-year-badge partial-year-badge--compact" title={`Year 1 pro-rated to ${partialMonths} months`}>
+                  <span
+                    className="partial-year-badge partial-year-badge--compact"
+                    title={`Year 1 pro-rated to ${partialMonths} months`}
+                  >
                     {partialMonths} mo
                   </span>
                 )}
                 {!y.strategyActive && (
-                  <span className="wind-down-badge" title="Wind-down: strategy ended, carryforward usage only">
+                  <span
+                    className="wind-down-badge"
+                    title="Wind-down: strategy ended, carryforward usage only"
+                  >
                     W/D
                   </span>
                 )}

@@ -64,7 +64,11 @@ const getValueClass = (key: keyof SensitivityParams, value: number): string => {
   }
 };
 
-export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, onChange, onReset }: SensitivityAnalysisProps) {
+export const SensitivityAnalysis = memo(function SensitivityAnalysis({
+  params,
+  onChange,
+  onReset,
+}: SensitivityAnalysisProps) {
   const handleChange = (key: keyof SensitivityParams, value: number) => {
     onChange({ ...params, [key]: value });
   };
@@ -87,9 +91,7 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              <InfoText contentKey="sens-federal-rate">
-                Federal Rate Change
-              </InfoText>
+              <InfoText contentKey="sens-federal-rate">Federal Rate Change</InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('federalRateChange', params.federalRateChange)}`}
@@ -112,9 +114,7 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              <InfoText contentKey="sens-state-rate">
-                State Rate Change
-              </InfoText>
+              <InfoText contentKey="sens-state-rate">State Rate Change</InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('stateRateChange', params.stateRateChange)}`}
@@ -138,9 +138,7 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              <InfoText contentKey="sens-annual-return">
-                Annual Return
-              </InfoText>
+              <InfoText contentKey="sens-annual-return">Annual Return</InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('annualReturn', params.annualReturn)}`}
@@ -163,9 +161,7 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              <InfoText contentKey="sens-tracking-error">
-                Tracking Error Impact
-              </InfoText>
+              <InfoText contentKey="sens-tracking-error">Tracking Error Impact</InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('trackingErrorMultiplier', params.trackingErrorMultiplier)}`}
@@ -183,7 +179,8 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
             onChange={e => handleChange('trackingErrorMultiplier', parseFloat(e.target.value))}
           />
           <span className="sensitivity-help">
-            Scales strategy tracking error to model implementation risk (0x = perfect, 1x = baseline, 2x = high variance)
+            Scales strategy tracking error to model implementation risk (0x = perfect, 1x =
+            baseline, 2x = high variance)
           </span>
         </div>
 
@@ -191,9 +188,7 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              <InfoText contentKey="sens-st-loss-variance">
-                ST Loss Rate Variance
-              </InfoText>
+              <InfoText contentKey="sens-st-loss-variance">ST Loss Rate Variance</InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('stLossRateVariance', params.stLossRateVariance)}`}
@@ -216,9 +211,7 @@ export const SensitivityAnalysis = memo(function SensitivityAnalysis({ params, o
         <div className="sensitivity-group">
           <div className="sensitivity-label">
             <span>
-              <InfoText contentKey="sens-lt-gain-variance">
-                LT Gain Rate Variance
-              </InfoText>
+              <InfoText contentKey="sens-lt-gain-variance">LT Gain Rate Variance</InfoText>
             </span>
             <span
               className={`sensitivity-value ${getValueClass('ltGainRateVariance', params.ltGainRateVariance)}`}

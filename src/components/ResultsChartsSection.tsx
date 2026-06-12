@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ResultsTable } from '../ResultsTable';
 import { CalculatorInputs, AdvancedSettings, CalculationResult } from '../types';
+import { ExitTaxAnalysis } from '../calculations/exitTax';
 import { Strategy } from '../strategyData';
 import { formatShortcut } from '../hooks/useKeyboardShortcuts';
 import { downloadInputsCsv, parseInputsFromCsv } from '../utils/csvScenario';
@@ -28,6 +29,8 @@ interface ResultsChartsSectionProps {
   advancedSettings: AdvancedSettings;
   currentStrategy?: Strategy;
   taxRates: TaxRates;
+  /** Exit-tax analysis for the EDI metric blocks in the Excel export (D-021) */
+  exitTaxAnalysis: ExitTaxAnalysis;
   projectionYears: number;
   startMonth?: number;
   onPrintRef?: (handler: () => void) => void;
@@ -36,10 +39,7 @@ interface ResultsChartsSectionProps {
    * Apply a parsed CSV scenario back into Calculator state. When omitted, the
    * Import Scenario button is hidden.
    */
-  onImportCsv?: (
-    inputs: Partial<CalculatorInputs>,
-    settings: Partial<AdvancedSettings>
-  ) => void;
+  onImportCsv?: (inputs: Partial<CalculatorInputs>, settings: Partial<AdvancedSettings>) => void;
 }
 
 export function ResultsChartsSection({
@@ -48,6 +48,7 @@ export function ResultsChartsSection({
   advancedSettings,
   currentStrategy,
   taxRates,
+  exitTaxAnalysis,
   projectionYears,
   startMonth,
   onPrintRef,
@@ -55,10 +56,7 @@ export function ResultsChartsSection({
   onImportCsv,
 }: ResultsChartsSectionProps) {
   // Filter chart data to only show strategy-active years (no wind-down)
-  const activeYears = useMemo(
-    () => results.years.filter(y => y.strategyActive),
-    [results.years]
-  );
+  const activeYears = useMemo(() => results.years.filter(y => y.strategyActive), [results.years]);
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -71,8 +69,9 @@ export function ResultsChartsSection({
       results,
       settings: advancedSettings,
       taxRates,
+      exitAnalysis: exitTaxAnalysis,
     });
-  }, [inputs, results, advancedSettings, taxRates]);
+  }, [inputs, results, advancedSettings, taxRates, exitTaxAnalysis]);
 
   const handleExportCsv = useCallback(() => {
     downloadInputsCsv(inputs, advancedSettings);
@@ -91,13 +90,14 @@ export function ResultsChartsSection({
       if (!file || !onImportCsv) return;
       try {
         const text = await file.text();
-        const { inputs: parsedInputs, settings: parsedSettings, warnings } =
-          parseInputsFromCsv(text);
+        const {
+          inputs: parsedInputs,
+          settings: parsedSettings,
+          warnings,
+        } = parseInputsFromCsv(text);
         onImportCsv(parsedInputs, parsedSettings);
         if (warnings.length > 0) {
-          window.alert(
-            `Scenario imported with warnings:\n\n${warnings.join('\n')}`
-          );
+          window.alert(`Scenario imported with warnings:\n\n${warnings.join('\n')}`);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -128,12 +128,8 @@ export function ResultsChartsSection({
         projectionYears={projectionYears}
         startMonth={startMonth}
         qfafDuration={inputs.qfafDuration}
-        strategyId={
-          inputs.splitAllocation?.enabled ? undefined : currentStrategy?.id
-        }
-        ltGainRate={
-          inputs.splitAllocation?.enabled ? undefined : currentStrategy?.ltGainRate
-        }
+        strategyId={inputs.splitAllocation?.enabled ? undefined : currentStrategy?.id}
+        ltGainRate={inputs.splitAllocation?.enabled ? undefined : currentStrategy?.ltGainRate}
       />
 
       {/* Portfolio Value Chart — only active strategy years */}
@@ -147,7 +143,11 @@ export function ResultsChartsSection({
 
       {/* Actions */}
       <section className="actions">
-        <button className="print-btn" onClick={handlePrint} title={`Print or save as PDF (${formatShortcut('P')})`}>
+        <button
+          className="print-btn"
+          onClick={handlePrint}
+          title={`Print or save as PDF (${formatShortcut('P')})`}
+        >
           Print / Save as PDF
         </button>
         <button

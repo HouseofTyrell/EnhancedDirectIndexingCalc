@@ -7,7 +7,14 @@ import {
   SensitivityParams,
   DEFAULT_SENSITIVITY,
 } from '../types';
-import { getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate, getStateTaxProfile, computeLtcgExcise } from '../taxData';
+import {
+  getFederalStRate,
+  getFederalLtRate,
+  getFederalOrdinaryRate,
+  getStateRate,
+  getStateTaxProfile,
+  computeLtcgExcise,
+} from '../taxData';
 import {
   getStrategy,
   QFAF_ST_GAIN_RATE,
@@ -62,7 +69,11 @@ export function calculateWithSensitivity(
   const allocation = resolveAllocation(inputs);
 
   // Calculate initial sizing
-  const sizing = calculateSizing(inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate);
+  const sizing = calculateSizing(
+    inputs,
+    settings.qfafMultiplier,
+    settings.washSaleDisallowanceRate
+  );
 
   // Get base state rate
   const baseStateRate =
@@ -79,12 +90,13 @@ export function calculateWithSensitivity(
   };
 
   // Tracking error: in split mode, blend by collateral weight.
-  const blendedTrackingError = allocation.isSplit && allocation.totalCollateral > 0
-    ? allocation.legs.reduce(
-        (sum, leg) => sum + (leg.collateralAmount * leg.strategy.trackingError),
-        0
-      ) / allocation.totalCollateral
-    : allocation.primary.strategy.trackingError;
+  const blendedTrackingError =
+    allocation.isSplit && allocation.totalCollateral > 0
+      ? allocation.legs.reduce(
+          (sum, leg) => sum + leg.collateralAmount * leg.strategy.trackingError,
+          0
+        ) / allocation.totalCollateral
+      : allocation.primary.strategy.trackingError;
   const scaledTrackingError = blendedTrackingError * sensitivity.trackingErrorMultiplier;
 
   // Use sensitivity annual return if different from default
@@ -102,6 +114,22 @@ export function calculateWithSensitivity(
   };
 
   const years: YearResult[] = [];
+
+  // D-020: state NOL vintage ledger, mirroring core.ts exactly (CA only —
+  // runs only when the profile defines a carryover period). Vintages are
+  // consumed FIFO on NOL usage and expire at the end of year
+  // `yearCreated + carryover`. Pre-existing NOL is treated as a pre-2024
+  // loss suspended for all three SB 167 years → carryover 20 + 3 from
+  // vintage year 0 (see core.ts).
+  const stateNolCarryoverYears = adjustedProfile.nolCarryoverYears;
+  const stateNolVintages: { yearCreated: number; amount: number; lastUsableYear: number }[] = [];
+  if (stateNolCarryoverYears !== undefined && inputs.existingNolCarryforward > 0) {
+    stateNolVintages.push({
+      yearCreated: 0,
+      amount: inputs.existingNolCarryforward,
+      lastUsableYear: stateNolCarryoverYears + 3,
+    });
+  }
 
   let qfafValue = sizing.qfafValue;
   // Track per-leg collateral so split mode handles diverging financing fees correctly.
@@ -123,10 +151,8 @@ export function calculateWithSensitivity(
   const qfafDuration = inputs.qfafEnabled !== false ? (inputs.qfafDuration ?? 10) : 0;
   const yf = (13 - (inputs.startMonth ?? 1)) / 12;
   const isPartialStart = yf < 1;
-  const strategyLastCalendarYear =
-    qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
-  const minProjection =
-    qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
+  const strategyLastCalendarYear = qfafDuration > 0 ? qfafDuration + (isPartialStart ? 1 : 0) : 0;
+  const minProjection = qfafDuration > 0 ? strategyLastCalendarYear + 2 : projectionYears;
   const effectiveProjectionYears = Math.max(projectionYears, minProjection);
   // Final year's combined gains rates for the loss-reserve valuation (D-015).
   let finalYearRates: TaxRates | undefined;
@@ -181,10 +207,8 @@ export function calculateWithSensitivity(
     let cashReturned = 0;
     if (isDynamic && effectiveQfafValue > 0 && opFraction > 0) {
       const neededQfaf =
-        yearStartTotalCollateral *
-        calStLossRate *
-        (1 - settings.washSaleDisallowanceRate) /
-        ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction) *
+        ((yearStartTotalCollateral * calStLossRate * (1 - settings.washSaleDisallowanceRate)) /
+          ((settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE) * opFraction)) *
         (1 - (inputs.qfafSizingCushion ?? 0));
       const cappedQfaf = Math.min(effectiveQfafValue, neededQfaf, initialQfafValue);
       cashReturned = Math.max(0, effectiveQfafValue - cappedQfaf);
@@ -194,12 +218,18 @@ export function calculateWithSensitivity(
     // Calculate tax rates with sensitivity adjustments
     const baseFederalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const baseFederalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
-    const baseFederalOrdinaryRate = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
+    const baseFederalOrdinaryRate = getFederalOrdinaryRate(
+      inputs.annualIncome,
+      inputs.filingStatus
+    );
 
     // Apply federal rate change (affects both ST and LT rates proportionally)
     const adjustedFederalStRate = Math.max(0, baseFederalStRate + sensitivity.federalRateChange);
     const adjustedFederalLtRate = Math.max(0, baseFederalLtRate + sensitivity.federalRateChange);
-    const adjustedFederalOrdinaryRate = Math.max(0, baseFederalOrdinaryRate + sensitivity.federalRateChange);
+    const adjustedFederalOrdinaryRate = Math.max(
+      0,
+      baseFederalOrdinaryRate + sensitivity.federalRateChange
+    );
 
     // Use settings section461Limits if provided
     const section461Limit =
@@ -231,7 +261,8 @@ export function calculateWithSensitivity(
         financingCost: getBlendedFinancingCost(yearAllocation, adjustedSettings),
       };
     } else {
-      const adjustedStLossRate = allocation.primary.strategy.stLossRate * (1 + sensitivity.stLossRateVariance);
+      const adjustedStLossRate =
+        allocation.primary.strategy.stLossRate * (1 + sensitivity.stLossRateVariance);
       const adjustedLtGainRate = baseLtGainRate * (1 + sensitivity.ltGainRateVariance);
       strategyForYear = { stLossRate: adjustedStLossRate, ltGainRate: adjustedLtGainRate };
       // Calendar-year blended rate already accounts for partial-year start.
@@ -239,6 +270,14 @@ export function calculateWithSensitivity(
         baseStLossRate: calStLossRate,
         stRateIsCalendarBlended: true,
       };
+    }
+
+    // D-020: unexpired state-side NOL available this year (see core.ts).
+    if (stateNolCarryoverYears !== undefined) {
+      yearSensitivityOverrides.stateNolAvailable = stateNolVintages.reduce(
+        (s, v) => s + v.amount,
+        0
+      );
     }
 
     const result = calculateYearWithSensitivity(
@@ -282,6 +321,42 @@ export function calculateWithSensitivity(
     const terminalProceeds =
       strategyLastCalendarYear > 0 && year === strategyLastCalendarYear ? result.qfafValue : 0;
     const totalRedeemed = cashReturned + terminalProceeds;
+
+    // D-020: advance the state NOL vintage ledger (mirrors core.ts —
+    // FIFO consumption, new vintage with SB 167 +1 if suspended, expiry
+    // at the end of the last usable year; state-side reporting only).
+    if (stateNolCarryoverYears !== undefined) {
+      let toConsume = result.nolUsedThisYear;
+      for (const vintage of stateNolVintages) {
+        if (toConsume <= 0) break;
+        const consumed = Math.min(vintage.amount, toConsume);
+        vintage.amount -= consumed;
+        toConsume -= consumed;
+      }
+      if (result.excessToNol > 0) {
+        const suspendedThisYear =
+          adjustedProfile.nolStateSuspension !== undefined &&
+          year <= adjustedProfile.nolStateSuspension.throughProjectionYear &&
+          inputs.annualIncome >= adjustedProfile.nolStateSuspension.magiThreshold;
+        stateNolVintages.push({
+          yearCreated: year,
+          amount: result.excessToNol,
+          lastUsableYear: year + stateNolCarryoverYears + (suspendedThisYear ? 1 : 0),
+        });
+      }
+      let stateNolExpiredThisYear = 0;
+      for (let i = stateNolVintages.length - 1; i >= 0; i--) {
+        const vintage = stateNolVintages[i];
+        if (vintage.lastUsableYear <= year) {
+          stateNolExpiredThisYear += Math.max(0, vintage.amount);
+          stateNolVintages.splice(i, 1);
+        } else if (vintage.amount <= 0) {
+          stateNolVintages.splice(i, 1);
+        }
+      }
+      result.stateNolExpired = safeNumber(stateNolExpiredThisYear);
+    }
+
     if (redeployProceeds) {
       pendingRedeploy += totalRedeemed;
       years.push({ ...result, qfafCashReturned: 0 });
@@ -307,9 +382,15 @@ export function calculateWithSensitivity(
       sizing,
       inputs.qfafEnabled !== false ? inputs.qfafDuration : undefined,
       settings.discountRate,
+      // Mirrors core.ts: no state component where individuals get no loss
+      // carryforwards (PA/NJ) — those losses expire each state tax year.
       finalYearRates && {
-        combinedStRate: finalYearRates.stRate + finalYearRates.state.stRate,
-        combinedLtRate: finalYearRates.ltRate + finalYearRates.state.ltRate,
+        combinedStRate:
+          finalYearRates.stRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.stRate : 0),
+        combinedLtRate:
+          finalYearRates.ltRate +
+          (finalYearRates.state.allowsLossOffsetAgainstIncome ? finalYearRates.state.ltRate : 0),
       }
     ),
   };
@@ -321,7 +402,12 @@ interface SensitivityYearOverrides {
   // already includes the partial-year fractional weighting. The inner
   // computation should NOT multiply ST losses by `yearFraction` again.
   stRateIsCalendarBlended?: boolean;
-  financingCost?: number;  // pre-blended financing; bypasses fullStrategy lookup
+  financingCost?: number; // pre-blended financing; bypasses fullStrategy lookup
+  /**
+   * D-020: sum of unexpired state NOL vintages at the start of the year —
+   * caps the state-rate component of the NOL benefit (see core.ts).
+   */
+  stateNolAvailable?: number;
 }
 
 /**
@@ -350,8 +436,12 @@ function calculateYearWithSensitivity(
 ): YearResult {
   // QFAF generates ST gains and ordinary losses at qfafMultiplier rate
   const qfafMultiplier = settings.qfafMultiplier ?? QFAF_ST_GAIN_RATE;
-  const stGainsGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
-  const ordinaryLossesGenerated = strategyActive ? safeNumber(qfafValue * qfafMultiplier * yearFraction) : 0;
+  const stGainsGenerated = strategyActive
+    ? safeNumber(qfafValue * qfafMultiplier * yearFraction)
+    : 0;
+  const ordinaryLossesGenerated = strategyActive
+    ? safeNumber(qfafValue * qfafMultiplier * yearFraction)
+    : 0;
 
   // Get base rates with decay (same as normal calculation), or use blended override.
   const baseStLossRate =
@@ -377,7 +467,10 @@ function calculateYearWithSensitivity(
     ? collateralValue * adjustedStLossRate * (stRateIsCalendarBlended ? 1 : yearFraction)
     : 0;
   const stLossesHarvested = safeNumber(grossStLosses * (1 - settings.washSaleDisallowanceRate));
-  const ltGainsRealized = strategyActive && inputs.ltGainsEnabled !== false ? safeNumber(collateralValue * adjustedLtGainRate * yearFraction) : 0;
+  const ltGainsRealized =
+    strategyActive && inputs.ltGainsEnabled !== false
+      ? safeNumber(collateralValue * adjustedLtGainRate * yearFraction)
+      : 0;
 
   // Net ST position
   const grossNetSt = stGainsGenerated - stLossesHarvested;
@@ -401,17 +494,16 @@ function calculateYearWithSensitivity(
     capitalLossUsedAgainstIncome,
     taxableSt,
     taxableLt,
-  } =
-    calculateCarryforwards(
-      netStGainLoss,
-      ltGainsRealized,
-      allowedOrdinaryLoss,
-      stCarryforward - usedStCarryforward,
-      ltCarryforward,
-      nolCarryforward,
-      inputs,
-      settings
-    );
+  } = calculateCarryforwards(
+    netStGainLoss,
+    ltGainsRealized,
+    allowedOrdinaryLoss,
+    stCarryforward - usedStCarryforward,
+    ltCarryforward,
+    nolCarryforward,
+    inputs,
+    settings
+  );
 
   // Income actually sheltered this year (capital gains absorb deduction too)
   const incomeAvailable = Math.max(
@@ -420,9 +512,7 @@ function calculateYearWithSensitivity(
   );
   const usableOrdinaryLoss = Math.min(allowedOrdinaryLoss, incomeAvailable);
   const shortfallToNol = allowedOrdinaryLoss - usableOrdinaryLoss;
-  const excessToNol = safeNumber(
-    ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol
-  );
+  const excessToNol = safeNumber(ordinaryLossesGenerated - allowedOrdinaryLoss + shortfallToNol);
 
   // Update NOL carryforward
   const newNolCarryforward = safeNumber(nolCarryforward + excessToNol - nolUsed);
@@ -451,10 +541,21 @@ function calculateYearWithSensitivity(
   );
   const nolAtOrdinary = Math.min(nolUsed, ordinaryNolBase);
   const nolAtLt = nolUsed - nolAtOrdinary;
-  const ltNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038)) + nolStateRate;
-  const nolUsageBenefit = safeNumber(
-    nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate
-  );
+  const fedLtNolRate = Math.max(0, ltRate - (settings.niitRate ?? 0.038));
+  const ltNolRate = fedLtNolRate + nolStateRate;
+  // D-020: only unexpired state vintages earn the state rate — see core.ts.
+  // The original expression is kept when nothing has expired so the
+  // no-ledger path is bit-identical.
+  const stateEligibleNol =
+    overrides?.stateNolAvailable !== undefined
+      ? Math.min(nolUsed, overrides.stateNolAvailable)
+      : nolUsed;
+  const nolUsageBenefit =
+    stateEligibleNol >= nolUsed
+      ? safeNumber(nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate)
+      : safeNumber(
+          nolAtOrdinary * ordinaryRate + nolAtLt * fedLtNolRate + stateEligibleNol * nolStateRate
+        );
 
   // Costs: charged on taxable (post-offset) LT gains — see core.ts (CPA finding E)
   const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
@@ -464,11 +565,7 @@ function calculateYearWithSensitivity(
   // Net tax savings: ordinary deductions minus capital gains costs
   // ST gains and ST losses wash (by design) — no phantom "conversion benefit"
   const taxSavings = safeNumber(
-    ordinaryLossBenefit +
-      capitalLossBenefit +
-      nolUsageBenefit -
-      ltGainCost -
-      remainingStGainCost
+    ordinaryLossBenefit + capitalLossBenefit + nolUsageBenefit - ltGainCost - remainingStGainCost
   );
 
   // Component-specific benefits for view mode breakdown
@@ -504,7 +601,9 @@ function calculateYearWithSensitivity(
   const growthRate = baseReturn - totalFinancingCost;
   // QFAF can use a separate return rate if specified (defaults to collateral growth rate)
   const qfafBaseReturn = settings.growthEnabled
-    ? (settings.qfafAnnualReturn !== null ? settings.qfafAnnualReturn : settings.defaultAnnualReturn)
+    ? settings.qfafAnnualReturn !== null
+      ? settings.qfafAnnualReturn
+      : settings.defaultAnnualReturn
     : 0;
   const qfafGrowthRateWithFees = qfafBaseReturn - totalFinancingCost;
   const qfafGrowthRate = settings.qfafGrowthEnabled ? qfafGrowthRateWithFees : 0;
@@ -515,7 +614,8 @@ function calculateYearWithSensitivity(
   // frozen), so the dollar figure mirrors that model.
   const financingCostPaid = safeNumber(
     (collateralValue + (settings.qfafGrowthEnabled ? qfafValue : 0)) *
-      totalFinancingCost * yearFraction
+      totalFinancingCost *
+      yearFraction
   );
 
   // Calculate total income offset for this year
@@ -566,6 +666,7 @@ function calculateYearWithSensitivity(
     nolCarryforward: newNolCarryforward,
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
+    stateNolExpired: 0, // Set by the calling loop's vintage ledger (D-020)
     effectiveStLossRate: adjustedStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,

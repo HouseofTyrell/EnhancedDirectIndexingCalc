@@ -38,7 +38,6 @@ Example ($3M MFJ):
   + NIIT: 3.8%
   = 23.8% Federal LT Rate`}
       </pre>
-
     </div>
   );
 }
