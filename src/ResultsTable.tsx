@@ -70,6 +70,7 @@ export function ResultsTable({
   const [expandCapital, setExpandCapital] = useState(false);
   const [expandOrdLoss, setExpandOrdLoss] = useState(false);
   const [expandCf, setExpandCf] = useState(false);
+  const [expandDeleverage, setExpandDeleverage] = useState(false);
   const [expandSavings, setExpandSavings] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
   // Transposed orientation: years as columns, metrics as rows — the
@@ -116,6 +117,9 @@ export function ResultsTable({
     return sum + benefit;
   }, 0);
 
+  // Deleverage column group (D-016): only when a plan actually unwound something.
+  const hasDeleverage = data.some(y => y.extensionFraction < 1);
+
   // Toggle all details
   const handleToggleAll = () => {
     const newState = !showAllDetails;
@@ -124,6 +128,7 @@ export function ResultsTable({
     setExpandCapital(newState);
     setExpandOrdLoss(newState);
     setExpandCf(newState);
+    setExpandDeleverage(newState);
     setExpandSavings(newState);
   };
 
@@ -165,14 +170,20 @@ export function ResultsTable({
     cols += 1; // Cap. CF headline
     if (expandCf) cols += 3; // ST CF, LT CF, $3K Used
 
+    // Deleverage group (only when a plan is active)
+    if (hasDeleverage) {
+      cols += 1; // Extension % headline
+      if (expandDeleverage) cols += 3; // Unwind Gain, Unwind Tax, Fin. Saved
+    }
+
     cols += 1; // Tax Savings column
     cols += 1; // Cumulative column
-    if (expandSavings) cols += 5; // Ord Ded., NOL Ben., $3K Ben., LT Cost, ST Cost
+    if (expandSavings) cols += 6; // Ord Ded., NOL Ben., $3K Ben., LT Cost, ST Cost, Fin. Cost
     return cols;
   };
 
   // Savings breakdown columns count for starting row
-  const savingsDetailCols = expandSavings ? 5 : 0;
+  const savingsDetailCols = expandSavings ? 6 : 0;
 
   // Filter out quiet wind-down rows where only the routine $3K capital loss deduction is running.
   // Keep wind-down rows that have meaningful activity: NOL usage, ordinary loss benefits, or
@@ -407,6 +418,34 @@ export function ResultsTable({
                 </>
               )}
 
+              {/* Deleverage group (D-016) — only when a plan is active */}
+              {hasDeleverage && (
+                <th
+                  className="col-expandable col-deleverage"
+                  onClick={() => setExpandDeleverage(!expandDeleverage)}
+                >
+                  <span className="expandable-header">
+                    <span className="expand-icon">
+                      {expandDeleverage ? <ChevronDown /> : <ChevronRight />}
+                    </span>
+                    <InfoText contentKey="col-extension-fraction">Extension %</InfoText>
+                  </span>
+                </th>
+              )}
+              {hasDeleverage && expandDeleverage && (
+                <>
+                  <th className="col-detail">
+                    <InfoText contentKey="col-deleverage-gain">Unwind Gain</InfoText>
+                  </th>
+                  <th className="col-detail">
+                    <InfoText contentKey="col-deleverage-tax">Unwind Tax</InfoText>
+                  </th>
+                  <th className="col-detail">
+                    <InfoText contentKey="col-financing-saved">Fin. Saved</InfoText>
+                  </th>
+                </>
+              )}
+
               {/* Tax Savings - Collapsible to show benefit breakdown */}
               <th
                 className="col-expandable col-savings"
@@ -439,6 +478,9 @@ export function ResultsTable({
                   </th>
                   <th className="col-detail cost-col">
                     <InfoText contentKey="col-st-leak-cost">ST Cost</InfoText>
+                  </th>
+                  <th className="col-detail cost-col">
+                    <InfoText contentKey="col-financing-cost">Fin. Cost</InfoText>
                   </th>
                 </>
               )}
@@ -499,6 +541,14 @@ export function ResultsTable({
               )}
               <td className="starting-note">—</td>
               {expandCf && (
+                <>
+                  <td className="starting-note">—</td>
+                  <td className="starting-note">—</td>
+                  <td className="starting-note">—</td>
+                </>
+              )}
+              {hasDeleverage && <td className="starting-note">100%</td>}
+              {hasDeleverage && expandDeleverage && (
                 <>
                   <td className="starting-note">—</td>
                   <td className="starting-note">—</td>
@@ -701,6 +751,30 @@ export function ResultsTable({
                       </>
                     )}
 
+                    {/* Deleverage group (D-016) */}
+                    {hasDeleverage && (
+                      <td>{formatPercent(year.extensionFraction, 0)}</td>
+                    )}
+                    {hasDeleverage && expandDeleverage && (
+                      <>
+                        <td className="positive">
+                          {year.deleverageGainRealized > 0.01
+                            ? formatCurrency(year.deleverageGainRealized)
+                            : '—'}
+                        </td>
+                        <td className="negative">
+                          {year.deleverageTax > 0.01
+                            ? `(${formatCurrency(year.deleverageTax)})`
+                            : '—'}
+                        </td>
+                        <td className="positive">
+                          {year.financingSaved > 0.01
+                            ? formatCurrency(year.financingSaved)
+                            : '—'}
+                        </td>
+                      </>
+                    )}
+
                     {/* Tax Savings (collapsed: net number) */}
                     <td className={`highlight ${displayedBenefit < 0 ? 'negative' : ''}`}>
                       {displayedBenefit < 0
@@ -739,6 +813,13 @@ export function ResultsTable({
                         <td className="negative cost-col">
                           {year.remainingStGainCost > 0
                             ? `(${formatCurrency(year.remainingStGainCost)})`
+                            : '—'}
+                        </td>
+                        {/* Financing cost paid (reference: netted from portfolio
+                            growth, NOT part of the Savings component sum) */}
+                        <td className="negative cost-col">
+                          {year.financingCostPaid > 0
+                            ? `(${formatCurrency(year.financingCostPaid)})`
                             : '—'}
                         </td>
                       </>
@@ -869,8 +950,10 @@ export function ResultsTable({
               Expand "Total Losses" for usable ordinary loss, gross losses, §461(l) cap overflow to NOL,
               and NOL usage; "Cap. CF" for ST/LT carryforward balances and the $3K deduction; and
               "Savings" for the full benefit/cost components, which sum exactly to the Savings column
-              (Ord. Ded. + NOL Ben. + $3K Ben. − LT Cost − ST Cost). Rows marked "W/D" are
-              post-strategy wind-down years where only carryforward usage continues.
+              (Ord. Ded. + NOL Ben. + $3K Ben. − LT Cost − ST Cost). Fin. Cost is shown for
+              reference only — financing fees are netted out of portfolio growth, not the Savings
+              column. Rows marked "W/D" are post-strategy wind-down years where only carryforward
+              usage continues.
             </em>
           </p>
         )}
@@ -1037,6 +1120,35 @@ function TransposedTable({
     });
   }
 
+  if (data.some(y => y.extensionFraction < 1)) {
+    sections.push({
+      title: 'Deleverage',
+      rows: [
+        {
+          label: 'Extension %',
+          contentKey: 'col-extension-fraction',
+          cell: y => formatPercent(y.extensionFraction, 0),
+        },
+        {
+          label: 'Unwind Gain',
+          contentKey: 'col-deleverage-gain',
+          cell: y => moneyOrDash(y.deleverageGainRealized),
+        },
+        {
+          label: 'Tax on Unwind',
+          contentKey: 'col-deleverage-tax',
+          cell: y => negMoney(y.deleverageTax),
+          className: () => 'negative',
+        },
+        {
+          label: 'Financing Saved',
+          contentKey: 'col-financing-saved',
+          cell: y => moneyOrDash(y.financingSaved),
+        },
+      ],
+    });
+  }
+
   sections.push({
     title: 'Capital Loss Carryforwards',
     rows: [
@@ -1062,6 +1174,14 @@ function TransposedTable({
         label: 'ST Gain Cost',
         contentKey: 'col-st-leak-cost',
         cell: y => negMoney(y.remainingStGainCost),
+        className: () => 'negative',
+      },
+      {
+        // Reference row: financing fees are netted from portfolio growth,
+        // not subtracted from the Savings column.
+        label: 'Financing Cost',
+        contentKey: 'col-financing-cost',
+        cell: y => negMoney(y.financingCostPaid),
         className: () => 'negative',
       },
       {

@@ -373,12 +373,120 @@
   line-height: 1.5;
 }
 
+/* Card-row section label (EDI Economics) */
+.ws-cards-title {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  margin: 2px 0 -8px;
+}
+
+/* Scenario presets (one-click starting points in the events editor) */
+.ws-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border-color, #e2e8f0);
+}
+
+.ws-presets-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-preset-btn {
+  padding: 5px 11px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid #2563eb;
+  border-radius: 999px;
+  background: var(--input-bg, #fff);
+  color: #2563eb;
+  cursor: pointer;
+}
+
+.ws-preset-btn:hover {
+  background: #2563eb;
+  color: #fff;
+}
+
+.ws-presets-note {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
 /* Per-year events editor */
 .ws-events-editor {
   background: var(--card-bg, #fff);
   border: 1px solid var(--border-color, #e2e8f0);
   border-radius: 10px;
   padding: 14px 16px;
+}
+
+/* Income schedule builder (start income × growth → per-year rows) */
+.ws-sched {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ws-sched-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  align-self: center;
+}
+
+.ws-sched-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ws-sched-field > span {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-sched-field input {
+  width: 120px;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  background: var(--input-bg, #fff);
+  color: var(--text-primary, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-sched-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ws-sched-btn--ghost {
+  background: var(--input-bg, #fff);
+  color: #2563eb;
 }
 
 .ws-events-head,

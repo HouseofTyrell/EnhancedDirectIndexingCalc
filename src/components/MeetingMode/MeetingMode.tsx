@@ -1813,6 +1813,13 @@ export function MeetingMode({
   // Total NOL generated over the program (the final-year *balance* is often $0
   // once the NOL has been consumed, which made these labels read "$0 of NOL").
   const totalNol = results.summary.totalNolGenerated;
+  // EDI-only mode (D-015): with QFAF off the story is the carryforward
+  // shield, not ordinary-loss deductions/NOL — realized savings and the loss
+  // reserve are presented co-equally, with the reserve labeled contingent.
+  const ediMode = !inputs.qfafEnabled;
+  const lossReserve = results.summary.lossReserveShelterValue;
+  const cfReserveBalance =
+    results.summary.finalStCarryforward + results.summary.finalLtCarryforward;
 
   const [yearIdx, setYearIdx] = useState(breakdownData.length);
   useEffect(() => {
@@ -1883,13 +1890,23 @@ export function MeetingMode({
         note: 'Ongoing harvesting as portfolio grows',
         inBar: true,
       },
-      {
-        label: 'NOL carry-forward',
-        value: nolBenefit,
-        color: '#f59e0b',
-        note: `From ${fmtCurrency(totalNol)} of NOL generated, applied against future income`,
-        inBar: true,
-      },
+      ediMode
+        ? {
+            // EDI-only: no NOL exists — the third force is the CF reserve.
+            // Contingent value, so it stays OUT of the realized-savings bar.
+            label: 'Loss reserve built',
+            value: lossReserve,
+            color: '#f59e0b',
+            note: `${fmtCurrency(cfReserveBalance)} of loss carryforwards held in reserve — contingent shelter for future gains, not counted in the realized total`,
+            inBar: false,
+          }
+        : {
+            label: 'NOL carry-forward',
+            value: nolBenefit,
+            color: '#f59e0b',
+            note: `From ${fmtCurrency(totalNol)} of NOL generated, applied against future income`,
+            inBar: true,
+          },
       {
         label: 'With reinvestment',
         // Headline number is the total future value of reinvested savings.
@@ -1908,6 +1925,9 @@ export function MeetingMode({
     detailYearData,
     totalTaxSavings,
     totalNol,
+    ediMode,
+    lossReserve,
+    cfReserveBalance,
     visibleYears,
     taxRates.combinedOrdinaryRate,
     advancedSettings.growthEnabled,
@@ -2152,12 +2172,29 @@ export function MeetingMode({
                     lineHeight: 1.05,
                   }}
                 >
-                  An estimated{' '}
-                  <span style={{ color: M.accent }}>
-                    <CountUp key={String(totalTaxSavings)} value={totalTaxSavings} />
-                  </span>
-                  <br />
-                  in tax savings.
+                  {ediMode ? (
+                    <>
+                      <span style={{ color: M.accent }}>
+                        <CountUp key={String(totalTaxSavings)} value={totalTaxSavings} />
+                      </span>{' '}
+                      realized savings,
+                      <br />
+                      plus a{' '}
+                      <span style={{ color: M.accent }}>
+                        <CountUp key={String(lossReserve)} value={lossReserve} />
+                      </span>{' '}
+                      loss reserve.
+                    </>
+                  ) : (
+                    <>
+                      An estimated{' '}
+                      <span style={{ color: M.accent }}>
+                        <CountUp key={String(totalTaxSavings)} value={totalTaxSavings} />
+                      </span>
+                      <br />
+                      in tax savings.
+                    </>
+                  )}
                 </h1>
                 <p
                   style={{
@@ -2168,13 +2205,29 @@ export function MeetingMode({
                     lineHeight: 1.55,
                   }}
                 >
-                  {inputs.qfafEnabled ? 'Enhanced direct indexing with the QFAF overlay' : 'Direct indexing'}{' '}
-                  generates an estimated{' '}
-                  <strong style={{ color: M.good }}>
-                    {fmtCurrency(totalTaxSavings)}
-                  </strong>{' '}
-                  of net tax savings through {endYear},
-                  driven by ordinary loss deductions, NOL usage, and capital loss carryforwards.
+                  {ediMode ? (
+                    <>
+                      Enhanced direct indexing generates an estimated{' '}
+                      <strong style={{ color: M.good }}>
+                        {fmtCurrency(totalTaxSavings)}
+                      </strong>{' '}
+                      of realized tax savings through {endYear} — and builds{' '}
+                      <strong>{fmtCurrency(cfReserveBalance)}</strong> of loss carryforwards, a
+                      reserve worth an estimated{' '}
+                      <strong style={{ color: M.accent }}>{fmtCurrency(lossReserve)}</strong> of
+                      shelter against future capital gains (contingent on those gains being
+                      realized — a business sale, concentrated-stock exit, or RSU diversification).
+                    </>
+                  ) : (
+                    <>
+                      Enhanced direct indexing with the QFAF overlay generates an estimated{' '}
+                      <strong style={{ color: M.good }}>
+                        {fmtCurrency(totalTaxSavings)}
+                      </strong>{' '}
+                      of net tax savings through {endYear},
+                      driven by ordinary loss deductions, NOL usage, and capital loss carryforwards.
+                    </>
+                  )}
                   {!advancedSettings.financingFeesEnabled && (
                     <> Estimates are before financing costs and fees.</>
                   )}
@@ -2336,12 +2389,25 @@ export function MeetingMode({
                             lineHeight: 1.5,
                           }}
                         >
-                          <strong>The key insight:</strong> year 1 saves roughly{' '}
-                          {fmtCurrency(detailYearData[0]?.save ?? 0)}. Because harvesting
-                          continues and NOL credits roll forward, the advantage compounds —
-                          so by {endYear} you reach{' '}
-                          {fmtCurrency(totalTaxSavings)}. It's the compounding, not the rate,
-                          that does the heavy lifting.
+                          <strong>The key insight:</strong>{' '}
+                          {ediMode ? (
+                            <>
+                              realized savings are modest by design — the harvested losses are
+                              banked, not spent. Year over year the carryforward reserve
+                              compounds, reaching {fmtCurrency(lossReserve)} of contingent
+                              shelter by {endYear}. It pays off when a gain event lands: a sale
+                              up to {fmtCurrency(cfReserveBalance)} would be fully sheltered.
+                            </>
+                          ) : (
+                            <>
+                              year 1 saves roughly{' '}
+                              {fmtCurrency(detailYearData[0]?.save ?? 0)}. Because harvesting
+                              continues and NOL credits roll forward, the advantage compounds —
+                              so by {endYear} you reach{' '}
+                              {fmtCurrency(totalTaxSavings)}. It's the compounding, not the rate,
+                              that does the heavy lifting.
+                            </>
+                          )}
                         </div>
                       </>
                     );
@@ -2357,21 +2423,37 @@ export function MeetingMode({
                   marginBottom: 20,
                 }}
               >
-                {(
-                  [
-                    {
-                      label: 'Cumulative tax savings',
-                      value: fmtCurrency(totalTaxSavings),
-                      sub: `through ${endYear}`,
-                      primary: true,
-                    },
-                    {
-                      label: 'Year 1 tax savings',
-                      value: fmtCurrency(detailYearData[0]?.save ?? 0),
-                      sub: 'first-year benefit',
-                      primary: false,
-                    },
-                  ] as const
+                {(ediMode
+                  ? ([
+                      {
+                        label: 'Realized tax savings',
+                        value: fmtCurrency(totalTaxSavings),
+                        sub: `through ${endYear}`,
+                        primary: true,
+                      },
+                      {
+                        // Co-equal with realized savings (D-015) — but honest:
+                        // the reserve only pays when future gains are realized.
+                        label: 'Loss reserve built',
+                        value: fmtCurrency(lossReserve),
+                        sub: `from ${fmtCurrency(cfReserveBalance)} of carryforwards · contingent on future gains`,
+                        primary: true,
+                      },
+                    ] as const)
+                  : ([
+                      {
+                        label: 'Cumulative tax savings',
+                        value: fmtCurrency(totalTaxSavings),
+                        sub: `through ${endYear}`,
+                        primary: true,
+                      },
+                      {
+                        label: 'Year 1 tax savings',
+                        value: fmtCurrency(detailYearData[0]?.save ?? 0),
+                        sub: 'first-year benefit',
+                        primary: false,
+                      },
+                    ] as const)
                 ).map(m => (
                   <div
                     key={m.label}

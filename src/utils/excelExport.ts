@@ -62,7 +62,9 @@ export async function exportToExcel(data: ExportData): Promise<void> {
   }
   XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
 
-  // Sheet 2: Year-by-Year
+  // Sheet 2: Year-by-Year. Deleverage columns (D-016) appear only when a
+  // plan actually unwound something — keeps the default export uncluttered.
+  const hasDeleverage = data.results.years.some(y => y.extensionFraction < 1);
   const yearHeaders: (string | number)[] = [
     'Year',
     'Collateral Value',
@@ -76,6 +78,9 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     'NOL Carryforward',
     'Tax Savings',
     'Income Offset',
+    ...(hasDeleverage
+      ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved']
+      : []),
   ];
   const yearRows: (string | number)[][] = [yearHeaders];
   for (const y of data.results.years) {
@@ -92,15 +97,20 @@ export async function exportToExcel(data: ExportData): Promise<void> {
       y.nolCarryforward,
       y.taxSavings,
       y.incomeOffsetAmount,
+      ...(hasDeleverage
+        ? [y.extensionFraction, y.deleverageGainRealized, y.deleverageTax, y.financingSaved]
+        : []),
     ]);
   }
   const yearSheet = XLSX.utils.aoa_to_sheet(yearRows);
-  // Apply currency format to data cells (skip header row, skip year column)
+  // Apply currency format to data cells (skip header row, skip year column,
+  // and format the Extension % column as a percentage)
+  const extensionCol = hasDeleverage ? yearHeaders.indexOf('Extension %') : -1;
   for (let r = 1; r < yearRows.length; r++) {
     for (let c = 1; c < yearHeaders.length; c++) {
       const cell = yearSheet[XLSX.utils.encode_cell({ r, c })];
       if (cell && typeof cell.v === 'number') {
-        cell.z = currencyFmt;
+        cell.z = c === extensionCol ? pctFmt : currencyFmt;
       }
     }
   }

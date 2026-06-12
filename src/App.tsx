@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Calculator } from './Calculator';
 import { QfafTestPage } from './pages/QfafTestPage';
-import { EdiOnlyPage } from './pages/EdiOnlyPage';
 import { WorkspaceTab } from './workspace/WorkspaceTab';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-type View = 'calculator' | 'workspace' | 'qfaf-test' | 'edi-only';
+type View = 'calculator' | 'workspace' | 'qfaf-test';
 
 function getInitialView(): View {
   const params = new URLSearchParams(window.location.search);
   const view = params.get('view');
-  if (view === 'qfaf-test' || view === 'edi-only' || view === 'calculator' || view === 'workspace') {
+  if (view === 'qfaf-test' || view === 'calculator' || view === 'workspace') {
     return view;
   }
+  // Includes legacy ?view=edi-only links: the EDI-Only tab was retired
+  // (D-014) — its analytics now live in the Workspace's EDI-only mode.
   return 'workspace';
 }
 
@@ -48,12 +49,6 @@ export function App() {
           >
             Classic Calculator
           </button>
-          <button
-            className={`nav-tab ${activeView === 'edi-only' ? 'active' : ''}`}
-            onClick={() => setActiveView('edi-only')}
-          >
-            EDI-Only
-          </button>
           {activeView === 'qfaf-test' && (
             <button
               className={`nav-tab active`}
@@ -71,7 +66,6 @@ export function App() {
           {activeView === 'calculator' && <Calculator />}
           {activeView === 'workspace' && <WorkspaceTab />}
           {activeView === 'qfaf-test' && <QfafTestPage />}
-          {activeView === 'edi-only' && <EdiOnlyPage />}
         </ErrorBoundary>
       </main>
     </div>

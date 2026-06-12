@@ -1230,3 +1230,85 @@ describe('Dynamic vs Fixed QFAF Comparison', () => {
     expect(yearsDifferent.length).toBeGreaterThan(0);
   });
 });
+
+describe('NOL exhaustion extension (run until used)', () => {
+  it('extends the projection past the standard horizon until the NOL is exhausted', () => {
+    // 10-year horizon (QFAF off), $6M existing NOL, $500K income.
+    // ~80% × ($500K − $3K cap-loss offset) ≈ $397.6K of NOL used per year,
+    // so ~$2M remains at year 10 — the plan must keep running until it's gone.
+    const result = calculate(
+      createInputs({
+        qfafEnabled: false,
+        existingNolCarryforward: 6000000,
+        annualIncome: 500000,
+      })
+    );
+    expect(result.years.length).toBeGreaterThan(10);
+    const last = result.years[result.years.length - 1];
+    expect(last.nolCarryforward).toBeLessThan(1);
+    // Every extension year actually consumed NOL
+    for (const y of result.years.slice(10)) {
+      expect(y.nolUsedThisYear).toBeGreaterThan(0);
+    }
+  });
+
+  it('does not extend when the NOL is already exhausted within the horizon', () => {
+    const result = calculate(createInputs({ qfafEnabled: false }));
+    expect(result.years.length).toBe(10);
+  });
+
+  it('stops at the standard horizon when no income can consume the NOL (stall guard)', () => {
+    // Zero income and no LT gains → taxable income is $0 every year, so the
+    // NOL can never be used. Extension years would be empty — don't emit them.
+    const result = calculate(
+      createInputs({
+        qfafEnabled: false,
+        existingNolCarryforward: 5000000,
+        annualIncome: 0,
+        ltGainsEnabled: false,
+      })
+    );
+    expect(result.years.length).toBe(10);
+    expect(result.years[9].nolCarryforward).toBeGreaterThan(4000000);
+  });
+
+  it('continues extension years at the final scheduled year income (retirement persists)', () => {
+    // Income drops to $250K in scheduled year 10 (retirement). Extension
+    // years must carry $250K forward, not snap back to the $500K base input:
+    // NOL used ≈ 80% × ($250K − $3K cap-loss offset) = $197.6K per year.
+    const overrides = [
+      {
+        year: 10,
+        w2Income: 250000,
+        cashInfusion: 0,
+        cashInfusionTaxType: 'gross' as const,
+        note: 'Retirement',
+      },
+    ];
+    const result = calculateWithOverrides(
+      createInputs({
+        qfafEnabled: false,
+        existingNolCarryforward: 6000000,
+        annualIncome: 500000,
+      }),
+      DEFAULT_SETTINGS,
+      overrides
+    );
+    expect(result.years.length).toBeGreaterThan(10);
+    const y11 = result.years[10];
+    expect(y11.nolUsedThisYear).toBeCloseTo(0.8 * (250000 - 3000), -3);
+  });
+
+  it('caps the extension at 40 years even if NOL remains', () => {
+    // Tiny income consumes NOL too slowly to ever finish — hard cap applies.
+    const result = calculate(
+      createInputs({
+        qfafEnabled: false,
+        existingNolCarryforward: 50000000,
+        annualIncome: 100000,
+      })
+    );
+    expect(result.years.length).toBe(40);
+    expect(result.years[39].nolCarryforward).toBeGreaterThan(0);
+  });
+});

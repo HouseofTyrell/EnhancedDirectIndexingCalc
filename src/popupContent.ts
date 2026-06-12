@@ -231,8 +231,10 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
       'Estimated additional tax due on full liquidation at the end of the projection, beyond what ' +
       'a passive buy-and-hold investor would owe, after applying remaining capital loss ' +
       'carryforwards. This is the portion of projected tax savings that is timing (deferral) ' +
-      'rather than permanent benefit.',
-    formula: 'max(0, (Embedded Gain − Remaining Carryforwards) × LT Rate − Passive Exit Tax)',
+      'rather than permanent benefit. The value is SIGNED: a negative number means the strategy ' +
+      'exits CHEAPER than passive buy-and-hold — the harvested loss reserve shelters more than ' +
+      'the strategy\'s added embedded gain, which adds to the net benefit instead of reducing it.',
+    formula: 'max(0, Embedded Gain − Remaining Carryforwards) × LT Rate − Passive Exit Tax',
     impact:
       'If the portfolio is never fully liquidated — held until death (basis step-up) or donated — ' +
       'the deferred portion may become permanent. Remaining NOL carryforward is not applied here ' +
@@ -658,636 +660,154 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 
   // ============================================
-  // EDI TAB — SUMMARY CARDS
+  // WORKSPACE — EDI-ONLY MODE & STEP-UP (D-014/D-015/D-018)
   // ============================================
 
-  'edi-potential-tax-protection': {
-    title: 'Potential Tax Protection',
+  'loss-reserve-built': {
+    title: 'Loss Reserve Built',
     definition:
-      'The dollar value of accumulated carryforward if used to shelter a capital gain. This is contingent — it only materializes when a qualifying gain event occurs (stock sale, business exit, etc.).',
-    formula: 'Final Carryforward × Combined LT Capital Gains Rate',
+      'The contingent tax value of the loss carryforwards (ST + LT) remaining at the end of ' +
+      'the projection, valued at the final year\'s state-aware combined capital gains rates by ' +
+      'character. This is the EDI product: a reserve that shelters future capital gains — a ' +
+      'business sale, concentrated-stock exit, or portfolio transition.',
+    formula: 'Final ST CF × Combined ST Rate + Final LT CF × Combined LT Rate',
     impact:
-      'This is the headline number, but remember it requires a gain event. Without one, CF sits unused. The "Realized Benefit" card shows certain value.',
+      'Contingent on future gains being realized — it is NEVER added to the realized Est. Tax ' +
+      'Savings headline. When you model a gain event, the sheltered portion moves into realized ' +
+      'savings and the reserve shrinks.',
   },
 
-  'edi-realized-benefit': {
-    title: 'Realized Benefit',
-    definition:
-      'Cumulative tax savings from the $3,000/year capital loss deduction against ordinary income (§1211(b)). This benefit is certain — it occurs every year regardless of whether a gain event happens.',
-    formula: 'Sum of ($3K × (Combined ST Rate - NIIT Rate)) for each year',
-    impact:
-      'Small but certain. At ~50% combined rate, this generates roughly $1,500/year in guaranteed savings. It compounds when considered alongside the contingent CF protection.',
-  },
-
-  'edi-break-even-gain': {
-    title: 'Break-Even Gain Event',
-    definition:
-      'The minimum capital gain that must be realized for the strategy to "pay for itself" — i.e., for CF tax savings to exceed cumulative financing costs net of realized benefits already banked.',
-    formula: 'max(0, Cumulative Financing Cost - Cumulative Realized Benefit) ÷ Combined LT Rate',
-    impact:
-      'If a client expects a gain event larger than this amount, the strategy has positive expected value. Smaller gain events mean only partial cost recovery.',
-  },
-
-  'edi-tax-free-exit-year': {
-    title: 'Tax-Free Exit Year',
-    definition:
-      'The earliest year at which accumulated carryforward exceeds the estimated embedded gain in the portfolio. After this point, the strategy can be fully unwound with zero exit tax.',
-    formula: 'First year where Total CF ≥ Embedded Gain Estimate',
-    impact:
-      'A key milestone. Before this year, unwinding triggers some tax. After it, the client has optionality — they can exit tax-free or keep building CF for external events.',
-  },
-
-  'edi-protection-ratio': {
+  'protection-ratio': {
     title: 'Protection Ratio',
     definition:
-      'How much tax protection (CF × LT rate) has been built per dollar of incremental financing cost. A ratio above 1.0× means the strategy has generated more protection value than it cost.',
-    formula: '(Cumulative CF × Combined LT Rate) ÷ Cumulative Financing Cost',
+      'Loss-reserve shelter value generated per dollar of cumulative financing cost — what the ' +
+      'protection cost to build. Shown as "—" when financing costs are disabled (no cost to ' +
+      'compare against).',
+    formula: 'Loss Reserve Shelter Value ÷ Cumulative Financing Cost',
     impact:
-      'Higher is better. Ratios of 2-4× are typical for overlay strategies. This only has value if a gain event occurs — without one, the ratio is theoretical.',
+      'Above 1.0× means more protection value than cost; 2–4× is typical for overlay ' +
+      'strategies. The protection only materializes when a gain event uses the reserve.',
   },
 
-  // ============================================
-  // EDI TAB — ASSUMPTIONS / INPUTS
-  // ============================================
-
-  'edi-collateral-value': {
-    title: 'Collateral Value',
+  'break-even-gain-event': {
+    title: 'Break-Even Gain Event',
     definition:
-      'The amount of securities pledged as collateral for the overlay strategy. The overlay creates long and short positions against this collateral without requiring additional cash.',
+      'The largest single capital gain that the ending carryforward balances could fully ' +
+      'shelter. Capital-vs-capital netting has no annual dollar limit, and ST/LT carryforwards ' +
+      'cross-apply under §1211.',
+    formula: 'Final ST Carryforward + Final LT Carryforward',
     impact:
-      'Larger collateral generates more ST losses and builds CF faster, but also incurs proportionally more financing cost. $5-50M is the typical range for this strategy.',
+      'A gain event up to this size — stock sale, business exit — would be fully sheltered by ' +
+      'the reserve. Larger events are sheltered up to this amount, with the excess taxed normally.',
   },
 
-  'edi-annual-return': {
-    title: 'Annual Portfolio Return',
-    definition:
-      'The assumed compound annual growth rate of the underlying portfolio. Applied to both gross portfolio value and the passive benchmark.',
-    formula: 'Portfolio grows at (Annual Return - Financing Cost) per year for EDI; Annual Return for passive',
-    impact:
-      'Higher returns increase both the portfolio value and the embedded gain. The EDI strategy grows slower than passive due to financing drag.',
-  },
-
-  'edi-wash-sale-rate': {
-    title: 'Wash Sale Rate',
-    definition:
-      'Percentage of harvested ST losses disallowed under IRC §1091 when the strategy repurchases substantially identical securities within 30 days. Default is 0% (ideal scenario).',
-    formula: 'Effective ST Losses = Gross ST Losses × (1 - Wash Sale Rate)',
-    impact:
-      'Typical wash sale disallowance is 5-15%. Higher rates reduce CF accumulation and increase embedded gain. 0% represents the ideal — an upper bound on strategy performance.',
-  },
-
-  'edi-advisory-fee': {
-    title: 'Advisory Fee Rate',
-    definition:
-      'The wealth management/RIA advisory fee charged on NAV (not gross exposure). This fee is common to all strategies (passive, trad DI, EDI) and is therefore excluded from incremental cost comparisons.',
-    formula: 'Annual Fee = NAV × Advisory Fee Rate',
-    impact:
-      'Since this fee is paid regardless of strategy choice, it does not affect the relative comparison. It is tracked separately in the Strategy Cost section.',
-  },
-
-  'edi-broker-margin-rate': {
-    title: 'Broker Margin Rate',
-    definition:
-      'The interest rate charged on margin borrowing. For overlay strategies, this applies only to the long leverage amount (margin debit), NOT the full account value.',
-    formula: 'Margin Cost = Collateral × Long Leverage Ratio × Broker Margin Rate',
-    impact:
-      'The largest component of incremental financing cost. A 1% reduction in margin rate can save $45K/year on $10M collateral with 45% leverage.',
-  },
-
-  'edi-short-borrow-rate': {
-    title: 'Short Borrow Rate',
-    definition:
-      'The fee paid to borrow shares for short positions. Also called the "hard-to-borrow" or "stock loan" fee. Applied to the short position notional.',
-    formula: 'Borrow Cost = Collateral × Short Ratio × Short Borrow Rate',
-    impact:
-      'Usually 0.25-1.0% for liquid, easy-to-borrow names. Can spike for hard-to-borrow stocks. Lower rates directly reduce financing drag.',
-  },
-
-  'edi-short-dividend-cost': {
-    title: 'Short Dividend Cost',
-    definition:
-      'When you short a stock, you owe dividends to the lender. This is the estimated annual dividend yield on short positions that must be paid out.',
-    formula: 'Dividend Cost = Collateral × Short Ratio × Short Dividend Rate',
-    impact:
-      'Typically 1.0-2.0% for broad equity shorts. This is a real cost that reduces net returns. Partially offset by dividends received on long positions.',
-  },
-
-  'edi-incremental-financing': {
-    title: 'Incremental Financing Cost',
-    definition:
-      'The total annual cost of running the overlay, computed from margin interest, stock borrow fees, and short dividend costs. This is the key cost that must be recovered through tax savings.',
-    formula: '(Margin Rate × Long Leverage) + ((Borrow Rate + Dividend Rate) × Short Ratio)',
-    impact:
-      'This rate compounds against the portfolio annually, reducing EDI value vs. passive. The Protection Ratio measures how efficiently this cost translates into tax protection.',
-  },
-
-  // ============================================
-  // EDI TAB — YEAR-BY-YEAR TABLE ROWS
-  // ============================================
-
-  'edi-collateral-value-row': {
-    title: 'Collateral Value',
-    definition:
-      'The portfolio value at the start of this year, after growth from prior year. Grows at the annual return minus financing drag (net growth rate).',
-    formula: 'Prior Year Value × (1 + Annual Return - Financing Cost Rate)',
-    impact:
-      'The base on which all ST loss and LT gain rates are applied. Higher values generate more absolute losses and gains.',
-  },
-
-  'edi-st-losses-harvested': {
-    title: 'ST Losses Harvested',
-    definition:
-      'Short-term capital losses generated by actively rebalancing the overlay strategy. As individual positions decline, they are sold to realize losses before they become long-term.',
-    formula: 'Collateral Value × Strategy ST Loss Rate × (1 - Wash Sale Rate)',
-    impact:
-      'The primary driver of carryforward accumulation. Rates decline over time as the portfolio matures and "easy" harvesting opportunities diminish.',
-  },
-
-  'edi-lt-gains-realized': {
-    title: 'LT Gains Realized',
-    definition:
-      'Long-term capital gains from positions that appreciated and crossed the 1-year holding period threshold. An unavoidable cost of active rebalancing.',
-    formula: 'Collateral Value × Strategy LT Gain Rate',
-    impact:
-      'These gains must be paid for at LT rates, but are first sheltered by ST losses via IRC netting. A low LT gain rate relative to ST loss rate indicates an efficient strategy.',
-  },
-
-  'edi-st-offset-lt': {
-    title: 'ST Losses Offsetting LT Gains',
-    definition:
-      'Under IRC netting rules, short-term losses are applied to long-term gains first, before any excess flows to carryforward. This is mandatory — you cannot choose to skip this step.',
-    formula: 'min(ST Losses Harvested, LT Gains Realized)',
-    impact:
-      'This shelters LT gains from tax. The more ST losses exceed LT gains (high harvesting efficiency), the more excess flows to carryforward.',
-  },
-
-  'edi-prior-cf-used': {
-    title: 'Prior CF Used vs LT Gains',
-    definition:
-      'Carryforward from prior years applied to remaining LT gains (after current-year ST losses have been applied). LT carryforward offsets LT gains first, then ST carryforward cross-applies.',
-    formula: 'min(Prior CF, LT Gains after ST offset)',
-    impact:
-      'In early years this is usually zero (ST losses exceed LT gains). In later years as harvesting slows, prior CF may be needed to shelter LT gains.',
-  },
-
-  'edi-tax-remaining-lt': {
-    title: 'Tax on Remaining LT Gains',
-    definition:
-      'Tax owed on LT gains that could not be sheltered by either current-year ST losses or prior carryforward. This is the strategy\'s annual tax cost.',
-    formula: 'Remaining LT Gain × Combined LT Rate',
-    impact:
-      'Ideally zero or near-zero in early years when ST losses greatly exceed LT gains. May become positive in later years as harvesting efficiency declines.',
-  },
-
-  'edi-excess-st-to-cf': {
-    title: 'Excess ST Loss to CF',
-    definition:
-      'After offsetting LT gains, remaining ST losses flow to carryforward. This is the net new addition to your accumulated tax asset each year.',
-    formula: 'ST Losses Harvested - ST Losses Used to Offset LT Gains',
-    impact:
-      'The key driver of CF accumulation. Larger excess means faster CF growth. This amount retains its ST character in carryforward per IRC §1212(b).',
-  },
-
-  'edi-capital-loss-deduction': {
-    title: '$3K Capital Loss Deduction',
-    definition:
-      'IRC §1211(b) allows up to $3,000/year ($1,500 for MFS) of net capital losses to offset ordinary income. Consumed from ST carryforward first, then LT.',
-    formula: 'min(Available CF, $3,000 or $1,500 for MFS)',
-    impact:
-      'A small but certain annual benefit. At a ~50% combined rate, this saves ~$1,500/year. The deduction is consumed from CF, slightly reducing future gain-sheltering capacity.',
-  },
-
-  'edi-tax-saved-deduction': {
-    title: 'Tax Saved (Deduction)',
-    definition:
-      'Tax savings from the $3K capital loss deduction. Calculated at the combined ST rate MINUS NIIT, because this deduction offsets ordinary income, not net investment income.',
-    formula: '$3K Deduction × (Combined ST Rate - 3.8% NIIT)',
-    impact:
-      'The NIIT exclusion matters: using the full combined rate would overstate savings by $114/year. This is the only "realized" (certain) benefit each year.',
-  },
-
-  'edi-net-annual-benefit': {
-    title: 'Net Annual Realized Benefit',
-    definition:
-      'The net cash-in-pocket from the strategy this year: tax saved from the $3K deduction minus tax paid on any remaining LT gains. Positive means net savings.',
-    formula: 'Tax Saved by $3K Deduction - Tax on Remaining LT Gains',
-    impact:
-      'Usually positive in early years (ST losses far exceed LT gains, so LT gain tax is zero). This is the "realized" benefit — it occurs whether or not a gain event happens.',
-  },
-
-  'edi-st-carryforward': {
-    title: 'ST Carryforward',
-    definition:
-      'Accumulated short-term capital loss carryforward. Retains ST character per IRC §1212(b), meaning it offsets ST gains first, then cross-applies to LT gains.',
-    formula: 'Prior ST CF + Excess ST Loss - ST CF Used vs LT Gains - ST CF Used for $3K Deduction',
-    impact:
-      'The bulk of accumulated CF is ST character. When applied against future LT gains, the tax savings rate is the LT rate (not the higher ST rate).',
-  },
-
-  'edi-lt-carryforward': {
-    title: 'LT Carryforward',
-    definition:
-      'Accumulated long-term capital loss carryforward. Usually small or zero for this strategy since LT losses are rare — the strategy harvests ST losses.',
-    impact:
-      'LT carryforward offsets LT gains first (same character). In practice, nearly all accumulated CF from this strategy is ST character.',
-  },
-
-  'edi-total-carryforward': {
-    title: 'Total Carryforward',
-    definition:
-      'Sum of ST and LT carryforward — the total tax asset accumulated. This amount can shelter future capital gains dollar-for-dollar with no annual limit.',
-    formula: 'ST Carryforward + LT Carryforward',
-    impact:
-      'The core asset built by this strategy. A $5M carryforward can shelter a $5M gain in a single year, saving ~$1.86M in tax at a 37.1% combined LT rate. There is no annual limit on using CF against gains.',
-  },
-
-  'edi-harvesting-efficiency': {
-    title: 'Harvesting Efficiency (ST/LT)',
-    definition:
-      'Ratio of ST losses harvested per dollar of LT gains realized. Higher ratios mean the strategy is generating more losses relative to its gain cost.',
-    formula: 'ST Losses Harvested ÷ LT Gains Realized',
-    impact:
-      'Ratios above 3× are excellent. Declining efficiency over time is expected as "easy" losses are exhausted. Year 1 typically shows the highest ratio.',
-  },
-
-  // ============================================
-  // EDI TAB — PROTECTION VALUE TABLE
-  // ============================================
-
-  'edi-cumulative-financing': {
+  'cumulative-financing-cost': {
     title: 'Cumulative Financing Cost',
     definition:
-      'Running total of incremental financing costs (margin interest + stock borrow + short dividends) paid since inception. This is the cost that must be recovered through tax savings.',
-    formula: 'Sum of (Collateral Value × Financing Rate) for each year',
+      'Total dollar financing fees charged across the projection: margin interest on the long ' +
+      'extension plus borrow and dividend costs on the shorts. $0 when financing costs & fees ' +
+      'are disabled in the Model panel.',
+    formula: 'Σ Financing Cost Paid per year',
     impact:
-      'Grows as portfolio compounds. This is the denominator of the Protection Ratio and the cost that the Break-Even Gain Event must recover.',
+      'The carrying cost of building the loss reserve. Compare against the reserve\'s shelter ' +
+      'value (the Protection Ratio) to judge strategy efficiency.',
   },
 
-  'edi-cf-protection-built': {
-    title: 'CF Protection Built',
+  'net-if-held-to-step-up': {
+    title: 'Net If Held to Step-Up',
     definition:
-      'New carryforward added this year (net change in total CF). In early years, large CF additions; later years, smaller additions as harvesting efficiency declines.',
-    formula: 'Current Year Ending CF - Prior Year Ending CF',
+      'Estimated net benefit if the portfolio is never liquidated and is instead held until ' +
+      'death: basis steps up under IRC §1014, the deferred exit tax is never paid, and the ' +
+      'strategy keeps its full projected savings. Unused capital loss carryforwards die with ' +
+      'the taxpayer (§1212) — their contingent shelter value is lost, and is disclosed rather ' +
+      'than netted (it was never counted in savings).',
+    formula: 'Total Tax Savings (no deferred-tax surrender; CFs lapse unused)',
     impact:
-      'Multiplied by the combined LT rate, this gives the "protection value" built this year. Year 1 typically builds the most protection.',
+      'Mortality-contingent and based on current law — the conservative anchor remains Net If ' +
+      'Liquidated. If the carryforward exceeds the embedded gain, a partial unwind during life ' +
+      'can use the reserve before it is lost.',
   },
 
-  'edi-protection-ratio-row': {
-    title: 'Protection Ratio',
+  'col-financing-cost': {
+    title: 'Financing Cost',
     definition:
-      'Cumulative CF tax shield value divided by cumulative financing cost. Shows how much potential tax protection has been built per dollar of cost incurred.',
-    formula: '(Cumulative CF × Combined LT Rate) ÷ Cumulative Financing Cost',
+      'Dollar financing fees charged this year (margin interest on long leverage, borrow fees ' +
+      'and dividend costs on shorts, across QFAF and collateral legs). $0 when financing costs ' +
+      '& fees are disabled.',
+    formula: 'Year-End Portfolio Value × Financing Rate',
     impact:
-      'Values above 1.0× mean the strategy has built more potential value than it cost. Note this protection is contingent — it requires a gain event to be realized.',
-  },
-
-  'edi-break-even-row': {
-    title: 'Break-Even Gain Event',
-    definition:
-      'The capital gain amount needed to recover net unrecovered financing cost (after crediting $3K deduction savings already banked).',
-    formula: 'max(0, Cumulative Cost - Cumulative Realized Benefit) ÷ Combined LT Rate',
-    impact:
-      'Decreases over time as realized benefits accumulate. If a client expects a gain event larger than this, the strategy has positive expected value.',
-  },
-
-  // ============================================
-  // EDI TAB — REALIZATION SCENARIOS
-  // ============================================
-
-  'edi-tax-without-cf': {
-    title: 'Tax Without Carryforward',
-    definition:
-      'What you would pay in capital gains tax on this gain if you had no carryforward. This is the "do nothing" baseline.',
-    formula: 'Gain Amount × Applicable Tax Rate (LT or ST)',
-    impact:
-      'The comparison point. The difference between this and "Tax With CF" is your strategy\'s dollar value for this specific gain event.',
-  },
-
-  'edi-cf-used': {
-    title: 'Carryforward Used',
-    definition:
-      'How much of your accumulated carryforward would be applied to shelter this gain. Same-character CF applies first, then cross-character.',
-    formula: 'min(Available CF, Gain Amount)',
-    impact:
-      'If CF exceeds the gain, it shelters 100% of the gain. Any unused CF remains available for future events.',
-  },
-
-  'edi-tax-with-cf': {
-    title: 'Tax With Carryforward',
-    definition:
-      'The actual tax owed after applying your carryforward to shelter the gain. Zero if CF exceeds the gain.',
-    formula: 'max(0, Gain - CF Used) × Applicable Rate',
-    impact:
-      'This is what you actually pay. Compare to "Tax Without CF" to see your savings.',
-  },
-
-  'edi-tax-saved': {
-    title: 'Tax Saved',
-    definition:
-      'The dollar value of your carryforward for this specific gain event. This is the concrete, realized benefit of the EDI strategy.',
-    formula: 'Tax Without CF - Tax With CF',
-    impact:
-      'This is the number that answers "what is my CF worth?" For a $10M LT gain at 37.1% rate with full CF shelter, savings can exceed $3.7M.',
+      'Shown for reference: financing fees are netted out of portfolio growth, not subtracted ' +
+      'from the Savings column, so this column is NOT part of the Savings component sum.',
   },
 
   // ============================================
-  // EDI TAB — REALIZATION SIZE SENSITIVITY
+  // DELEVERAGING (D-016/D-017)
   // ============================================
 
-  'edi-effective-rate': {
-    title: 'Effective Tax Rate',
+  'deleverage-plan': {
+    title: 'Deleveraging Plan',
     definition:
-      'Your actual tax rate on this gain after CF shelter. Zero means fully sheltered; the statutory rate means no CF was available or insufficient.',
-    formula: 'Tax With CF ÷ Gain Amount × 100%',
+      'Models unwinding the extension strategy to a lower-leverage target — all at once ' +
+      '(duration 1) or linearly over a glide path. Harvest and LT gain rates blend from the ' +
+      'current strategy to the target (sampled at the current year, never restarted — the ' +
+      'book is already seasoned), financing reprices at the interpolated leverage ratios, and ' +
+      'unwinding realizes a pro-rata share of the embedded gain. Net portfolio value is ' +
+      'unchanged: gross exposure falls, the collateral stays invested.',
     impact:
-      'Shows how much protection you have at different gain sizes. Smaller gains may be fully sheltered (0%); larger gains exhaust CF and approach the statutory rate.',
+      'Unwind gains are strategy costs: they net against the year\'s harvested losses and ' +
+      'carryforwards first, and any residual tax is charged against the savings column — ' +
+      'unlike planned gain events, which are reported separately.',
   },
 
-  // ============================================
-  // EDI TAB — UNWIND ANALYSIS
-  // ============================================
-
-  'edi-portfolio-value-unwind': {
-    title: 'Portfolio Value',
+  'col-extension-fraction': {
+    title: 'Extension %',
     definition:
-      'Projected portfolio value at the end of the selected unwind year, after compounding at the net growth rate (annual return minus financing drag).',
-    formula: 'Initial Collateral × (1 + Annual Return - Financing Rate)^Year',
+      'End-of-year extension weight: 100% = fully levered at the current strategy, 0% = fully ' +
+      'delevered to the plan target. Glides linearly from the plan\'s start year over its ' +
+      'duration (1 year = all at once).',
+    formula: '1 − (years elapsed since start ÷ duration), floored at 0',
     impact:
-      'The base from which embedded gain and exit tax are calculated. Higher growth increases both value and embedded gain.',
+      'All blended quantities — harvest rate, LT gain rate, financing — move with this ' +
+      'weight, so the year-by-year economics transition smoothly to the target book.',
   },
 
-  'edi-embedded-gain': {
-    title: 'Embedded Gain',
+  'col-deleverage-gain': {
+    title: 'Unwind Gain',
     definition:
-      'The unrealized gain in the portfolio, consisting of market appreciation PLUS basis reduction from tax-loss harvesting. Harvesting lowers your cost basis, increasing the eventual exit tax.',
-    formula: '(Portfolio Value × Market Appreciation%) + Cumulative Basis Reduction from Harvesting',
+      'Capital gain realized this year by selling down the long extension (plus any modeled ' +
+      'short-cover gain). Sized as the unwound extension dollars × the portfolio\'s pro-rata ' +
+      'embedded gain percentage. Character defaults to long-term once the position is ' +
+      'seasoned (plan starts after year 2), short-term before.',
+    formula: 'Lot Haircut × Embedded Gain % × Extension Dollars Unwound',
     impact:
-      'Higher than a passive portfolio\'s embedded gain because harvesting reduces basis. This is why CF matters — it shelters this enlarged exit gain.',
+      'Nets WITH the strategy\'s own flows: current-year harvested losses absorb it first, ' +
+      'then carryforwards (§1211 ordering). Only the unsheltered residue is taxed. Gains ' +
+      'realized here step up basis, so they are NOT taxed again at the horizon exit.',
   },
 
-  'edi-cf-available': {
-    title: 'CF Available',
+  'col-deleverage-tax': {
+    title: 'Tax on Unwind',
     definition:
-      'Total carryforward (ST + LT) accumulated through this year. This is the amount available to shelter the embedded gain on exit.',
-    formula: 'Ending ST Carryforward + Ending LT Carryforward',
+      'Incremental tax attributable to this year\'s unwind gains after netting and ' +
+      'carryforward shelter, at the year\'s combined rates. Already included in the LT/ST ' +
+      'cost columns (and therefore charged against Savings) — shown here as a decomposition, ' +
+      'not an additional charge.',
+    formula: 'Taxable Unwind ST × Combined ST Rate + Taxable Unwind LT × Combined LT Rate',
     impact:
-      'When CF ≥ Embedded Gain, you can exit tax-free. The year this happens is the "Tax-Free Exit Year" shown in the summary cards.',
+      '$0 means the harvested losses and carryforwards fully absorbed the unwind — the ' +
+      'deleveraging was executed tax-free out of the loss reserve.',
   },
 
-  'edi-net-unwind-tax': {
-    title: 'Net Unwind Tax',
+  'col-financing-saved': {
+    title: 'Financing Saved',
     definition:
-      'Tax owed on full liquidation after applying carryforward to shelter the embedded gain. Zero if CF exceeds embedded gain.',
-    formula: 'max(0, Embedded Gain - CF Available) × Combined LT Rate',
+      'Financing fees avoided this year versus staying fully levered: (source strategy\'s ' +
+      'financing rate − the blended rate at this year\'s interpolated leverage) × collateral. ' +
+      '$0 when financing costs & fees are disabled in the Model panel.',
+    formula: '(Source Financing Rate − Blended Rate) × Collateral Value',
     impact:
-      'This is the "worst case" exit cost. In early years, CF may not fully cover the embedded gain. After the tax-free exit year, this is zero.',
-  },
-
-  'edi-gross-unwind-tax': {
-    title: 'Gross Unwind Tax',
-    definition:
-      'What the exit tax would be with NO carryforward — the full embedded gain taxed at the LT rate.',
-    formula: 'Embedded Gain × Combined LT Rate',
-    impact:
-      'The reference point. The difference between Gross and Net Unwind Tax is the value of your carryforward at this exit point.',
-  },
-
-  'edi-tax-saved-cf': {
-    title: 'Tax Saved by CF',
-    definition:
-      'Dollar amount of exit tax eliminated by applying carryforward. The concrete value of accumulated CF at this exit point.',
-    formula: 'Gross Unwind Tax - Net Unwind Tax',
-    impact:
-      'Shows the increasing value of CF over time. After the tax-free exit year, this equals the full Gross Unwind Tax (100% shelter).',
-  },
-
-  // ============================================
-  // EDI TAB — ESTATE PLANNING
-  // ============================================
-
-  'edi-step-up-value': {
-    title: 'Step-Up Value',
-    definition:
-      'Tax savings from IRC §1014 basis step-up at death. All unrealized gains are eliminated when positions receive a new cost basis equal to fair market value.',
-    formula: 'Embedded Gains × Combined LT Rate',
-    impact:
-      'The argument for holding: at death, all embedded gains disappear. But carryforwards are also lost (§1212(b)), so the optimal strategy may be partial unwind.',
-  },
-
-  'edi-cf-lost-death': {
-    title: 'CF Lost at Death',
-    definition:
-      'The tax value of carryforward that would be permanently lost at death. Per IRC §1212(b), capital loss carryforwards are non-transferable and expire upon death.',
-    formula: 'Total Carryforward × Combined LT Rate',
-    impact:
-      'This is the cost of not using your CF before death. If CF is large, a partial unwind to use it (tax-free via CF shelter) may be optimal.',
-  },
-
-  'edi-optimal-unwind': {
-    title: 'Optimal Unwind %',
-    definition:
-      'The fraction of the portfolio that can be liquidated tax-free using available CF. The remaining portion benefits from step-up at death.',
-    formula: 'min(Total CF ÷ Embedded Gain per share, 100%)',
-    impact:
-      'The recommended estate strategy: unwind this percentage (sheltered by CF) and hold the rest for step-up. Maximizes total tax benefit.',
-  },
-
-  // ============================================
-  // EDI TAB — STRATEGY COST & PROTECTION
-  // ============================================
-
-  'edi-annual-financing-cost': {
-    title: 'Annual Financing Cost (Incremental)',
-    definition:
-      'This year\'s cost of maintaining the overlay: margin interest on long leverage, stock borrow fees on short positions, and short dividend payments.',
-    formula: 'Collateral Value × Incremental Financing Rate',
-    impact:
-      'Grows as the portfolio compounds. This is the incremental cost of EDI vs. passive — the cost that CF must recover to justify the strategy.',
-  },
-
-  'edi-advisory-fee-row': {
-    title: 'Advisory Fee (Paid Regardless)',
-    definition:
-      'The wealth management fee charged on NAV. Shown for context but NOT included in incremental cost — it is paid whether the client chooses passive, traditional DI, or EDI.',
-    formula: 'Collateral Value × Advisory Fee Rate',
-    impact:
-      'Not part of the EDI cost/benefit analysis. Common to all strategies, so excluded from Protection Ratio and Break-Even calculations.',
-  },
-
-  'edi-cumulative-cf': {
-    title: 'Cumulative CF Protection',
-    definition:
-      'Running total of carryforward built from inception. Represents the total tax asset accumulated by the strategy.',
-    formula: 'Sum of (CF Protection Built) for each year',
-    impact:
-      'This is the numerator (times LT rate) of the Protection Ratio. The higher this goes relative to cumulative cost, the better the strategy economics.',
-  },
-
-  'edi-protection-cost-ratio': {
-    title: 'Protection-to-Cost Ratio',
-    definition:
-      'How much tax protection value (CF × LT rate) has been generated per dollar of incremental financing cost. The key efficiency metric.',
-    formula: '(Cumulative CF × Combined LT Rate) ÷ Cumulative Financing Cost',
-    impact:
-      'Above 1.0× means more protection than cost. Typically 2-4× for well-structured overlay strategies. The protection only materializes with a gain event.',
-  },
-
-  // ============================================
-  // EDI TAB — LIQUIDATION COMPARISON
-  // ============================================
-
-  'edi-passive-after-tax': {
-    title: 'Passive After-Tax',
-    definition:
-      'Terminal portfolio value of a buy-and-hold approach after paying exit tax on all unrealized gains. No tax-loss harvesting, no financing costs.',
-    formula: '(Initial × (1 + Return)^Years) - (Market Gain × Combined LT Rate)',
-    impact:
-      'The simplest baseline. No strategy costs, but also no CF protection. All embedded gains are fully taxed at liquidation.',
-  },
-
-  'edi-trad-di-after-tax': {
-    title: 'Traditional DI After-Tax',
-    definition:
-      'Terminal value of a long-only tax-loss harvesting strategy (like Parametric, Aperio, Wealthfront). Same gross return as passive, no financing costs, but builds modest CF through TLH.',
-    formula: 'Gross Value - max(0, Embedded Gain - TLH Carryforward) × LT Rate',
-    impact:
-      'Shows what basic, low-cost TLH achieves. Industry TLH rates are much lower than EDI overlay rates, so CF accumulation is slower.',
-  },
-
-  'edi-edi-after-tax': {
-    title: 'EDI After-Tax',
-    definition:
-      'Terminal value of the EDI overlay strategy after exit tax. Gross value is reduced by financing drag, but exit tax is reduced by the much larger CF shelter.',
-    formula: 'EDI Value (with drag) - max(0, Embedded Gain - EDI Carryforward) × LT Rate',
-    impact:
-      'In a forced liquidation, EDI may show lower terminal wealth than passive (financing drag). The real EDI value is in CF for external events, not terminal liquidation.',
-  },
-
-  'edi-tlh-benefit': {
-    title: 'TLH Benefit (Trad DI vs Passive)',
-    definition:
-      'The after-tax wealth improvement from basic tax-loss harvesting compared to doing nothing. This is the value of TLH alone, without the overlay.',
-    formula: 'Traditional DI After-Tax - Passive After-Tax',
-    impact:
-      'In a forced liquidation, TLH provides modest benefit since basis reduction partially offsets CF shelter. The real TLH value is in CF for external gain events.',
-  },
-
-  'edi-upgrade-value': {
-    title: 'EDI Upgrade Value (EDI vs Trad DI)',
-    definition:
-      'The incremental value of the EDI overlay versus traditional long-only DI at full liquidation. Answers: "why pay for the overlay?"',
-    formula: 'EDI After-Tax - Traditional DI After-Tax',
-    impact:
-      'In forced liquidation, this may be negative (financing drag). But EDI builds 5-10× more CF, so for external events (stock sales, business exits), EDI provides dramatically more protection.',
-  },
-
-  'edi-trad-di-cf-built': {
-    title: 'Traditional DI CF Built',
-    definition:
-      'Carryforward accumulated by traditional long-only TLH using industry-benchmark loss rates (5% Year 1, declining to 1.5% steady-state). No overlay, no leverage.',
-    formula: 'Cumulative net ST losses from TLH, minus $3K/year deduction and LT gain offsets',
-    impact:
-      'Compare to EDI CF to see the overlay\'s incremental CF generation. Traditional DI typically builds $300-500K CF at year 10 vs. EDI\'s $5-8M+.',
-  },
-
-  'edi-edi-vs-trad-di': {
-    title: 'EDI vs Trad DI (Per-Year)',
-    definition:
-      'Year-by-year after-tax advantage of EDI over traditional DI at liquidation. Shows how the comparison evolves as CF builds and financing drag compounds.',
-    formula: 'EDI After-Tax - Traditional DI After-Tax (for each year)',
-    impact:
-      'May start negative (financing drag) and improve over time as EDI CF grows. This is the forced-liquidation view — for external events, EDI\'s larger CF is the differentiator.',
-  },
-
-  // ============================================
-  // EDI TAB — NIIT BREAKOUT
-  // ============================================
-
-  'edi-niit-combined-st': {
-    title: 'Combined ST Rate (incl. NIIT)',
-    definition:
-      'Your total tax rate on ordinary income and short-term capital gains, including the 3.8% Net Investment Income Tax for high earners (AGI > $250K MFJ).',
-    formula: 'Federal Ordinary Rate + NIIT (3.8%) + State Rate',
-    impact:
-      'This rate applies to short-term gains. The differential between this and the LT rate drives the value of ST→LT conversion strategies.',
-  },
-
-  'edi-niit-combined-lt': {
-    title: 'Combined LT Rate (incl. NIIT)',
-    definition:
-      'Your total tax rate on long-term capital gains, including the 3.8% NIIT.',
-    formula: 'Federal LT Rate + NIIT (3.8%) + State Rate',
-    impact:
-      'Applied to LT gains realized by the strategy and to exit gains on liquidation. This is the rate at which carryforward saves money.',
-  },
-
-  'edi-niit-deduction-rate': {
-    title: '$3K Deduction Effective Rate',
-    definition:
-      'The tax rate applied to the $3K capital loss deduction. Excludes the 3.8% NIIT because this deduction offsets ordinary income, not net investment income.',
-    formula: 'Combined ST Rate - 3.8% NIIT',
-    impact:
-      'Using the full combined rate (including NIIT) would overstate savings by $114/year. The correct treatment excludes NIIT from this specific deduction.',
-  },
-
-  'edi-niit-exclusion-benefit': {
-    title: 'Annual NIIT Exclusion Benefit',
-    definition:
-      'Per-year savings from correctly excluding NIIT from the $3K deduction calculation. This is the amount you would overstate if you incorrectly included NIIT.',
-    formula: '$3,000 × 3.8% NIIT Rate = $114/year',
-    impact:
-      'Small but important for accuracy. This is $114/year of avoided overstatement. Shows the calculator\'s precision in NIIT handling.',
-  },
-
-  // ============================================
-  // EDI TAB — STRATEGY COMPARISON TABLE
-  // ============================================
-
-  'edi-strategy-financing': {
-    title: 'Financing Rate',
-    definition:
-      'The incremental financing cost rate for this strategy, based on its specific long leverage ratio and short ratio.',
-    formula: '(Margin Rate × Long Leverage) + ((Borrow + Dividend) × Short Ratio)',
-    impact:
-      'Higher-leverage strategies have higher financing but also generate more ST losses. The Protection Ratio shows which strategies are most efficient.',
-  },
-
-  'edi-strategy-tax-savings': {
-    title: 'Total Tax Savings',
-    definition:
-      'The sum of realized benefits ($3K deductions) and contingent CF tax shield over the projection period for this strategy.',
-    formula: 'Cumulative Realized Benefit + (Final CF × Combined LT Rate)',
-    impact:
-      'Combines certain and contingent value. Higher numbers are better, but compare against financing cost to assess true value.',
-  },
-
-  'edi-strategy-tax-free-exit': {
-    title: 'Tax-Free Exit Year',
-    definition:
-      'The first year at which this strategy\'s CF exceeds its embedded gain, allowing tax-free liquidation.',
-    impact:
-      'Strategies with higher harvesting rates reach this milestone sooner. Core strategies (no financing drag) may reach it faster despite lower loss rates.',
-  },
-
-  // ============================================
-  // EDI TAB — STRATEGY × SCENARIO MATRIX
-  // ============================================
-
-  'edi-scenario-net-value': {
-    title: 'Net Value',
-    definition:
-      'Tax saved by carryforward minus cumulative financing cost through the event year. Shows the true economic benefit after paying for the strategy.',
-    formula: 'Tax Saved by CF − Cumulative Financing Cost (through event year)',
-    impact:
-      'Higher is better. Core strategies always have $0 financing cost, so their net value equals tax saved. Overlay strategies may save more tax but must overcome financing drag.',
-  },
-
-  'edi-best-strategy': {
-    title: 'Best Strategy',
-    definition:
-      'The strategy producing the highest net value for this specific life-event scenario. Accounts for both tax savings and financing cost.',
-    impact:
-      'The best strategy varies by scenario — large/late events favor aggressive overlay strategies (more CF), while small/early events may favor core strategies (no financing drag). Use this to match strategy selection to likely exit events.',
+      'The recurring economic benefit of deleveraging — it offsets the one-time unwind tax. ' +
+      'Like financing costs, it is informational: fees are netted out of portfolio growth.',
   },
 };
 

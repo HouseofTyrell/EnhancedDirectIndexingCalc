@@ -231,6 +231,31 @@ review, and add NYC resident local tax.
 - **NYC resident local tax** (+3.876% on all characters) via NY-state checkbox,
   threaded through engines, classic, Workspace, CSV.
 
+### D-013 — NOL run-until-used + income schedule — OWNER-DIRECTED & IMPLEMENTED (2026-06-12)
+**Owner request:** "if there is left over NOL the plan runs until it's used" and "add
+the option to add a schedule for income so that different income amounts per year can
+be planned for."
+**Status: IMPLEMENTED (2026-06-12)** —
+- **NOL exhaustion extension** (`core.ts`, both `calculate` and overrides paths): when
+  NOL carryforward remains at the end of the standard horizon (projection years, or
+  QFAF duration + 2 wind-down years), the projection keeps running until the NOL is
+  fully used. Guard rails: hard cap at 40 years; stall guard stops immediately if an
+  extension year consumes no NOL (e.g., zero income); extension years continue the
+  FINAL scheduled year's income (so a retirement-income override persists rather than
+  snapping back to the base input). Workspace shows "(extended to use NOL)" on the
+  headline metric and an Overview note explaining the extension; the year-by-year
+  table and savings totals include extension years automatically.
+- **Income schedule builder** (Workspace → Per-Year Events editor): start income +
+  annual growth %/yr → "Apply schedule" fills the per-year income column with
+  compounded values; rows stay hand-editable afterward (e.g., drop a year to
+  retirement income); "Reset incomes" restores every row to the base input while
+  preserving cash infusions and gain events.
+- **Scope note:** `sensitivity.ts` intentionally keeps the fixed standard horizon — it
+  compares *relative* deltas across rate assumptions, and letting each cell extend a
+  different number of years would make the grid incomparable. Five regression tests
+  added (extension-until-exhausted, no-extension baseline, stall guard, income
+  continuation, 40-year cap); suite at 363.
+
 ---
 
 ## Pending decision queue (next batches)
@@ -265,6 +290,190 @@ to NOL (negative taxable income → NOL, IRC §172) instead of being lost. Close
 **Status: IMPLEMENTED (2026-06-12)** — "before financing costs & fees (enable in
 Advanced Settings)" under the Estimated Tax Savings headline and in the Meeting Mode
 hero, shown only while financing fees are disabled.
+
+### Pending decision queue — EDI-only & deleveraging (2026-06-12)
+
+**ALL FIVE DECIDED 2026-06-12** (owner batch) — outcomes recorded under each item.
+Implementation in two waves: Wave 1 = D-014/D-015/D-018 + exit-tax clamp fix;
+Wave 2 = D-016/D-017 deleveraging.
+
+Owner request: "Can we work more on the EDI-only part? … helpful to be able to run just
+EDI. I think we have the pieces but don't have a good display or output for it. I'd also
+like to model deleveraging, all at once or over time." Two reviews (EDI-only persona
+review; deleveraging design analysis) triaged below. Sub-parameters are folded under
+their parent decision as overridable defaults.
+
+#### D-014 — EDI-only architecture: first-class Workspace mode vs. separate tab
+**Context:** Two EDI surfaces disagree by ~150x on the same client ($2.3M "potential
+savings" on the EDI-Only tab vs $15,090 in Workspace with QFAF off). The EDI-Only tab
+(`src/components/EdiOnlyTab.tsx`, engine `src/calculations/ediOnly.ts`) has the richest
+analytics (protection ratio, break-even, realization scenarios, unwind/estate, trad-DI
+benchmark) but carries a "not for client presentations" banner, hardcodes $3M income,
+ignores state profiles, and runs a third duplicate netting/projection loop. Workspace
+with `qfafEnabled:false` already computes correct mechanics via `core.ts` — only
+summary/display composition is QFAF-shaped.
+**Options:**
+(a) **(Recommended)** Make EDI-only a first-class Workspace mode on `core.ts`; refactor
+`ediOnly.ts`'s unique analytics to consume `core.ts` outputs; retire
+`computeEdiYear`/`computeEdiProjection`. EDI-Only tab survives as a deep-dive surface
+fed by the same engine. Largest effort, but "one engine, one source of truth."
+(b) Polish the separate EDI-Only tab into the client-grade surface (fix state math,
+income input, banner). Faster, but permanently two engines and two answers.
+(c) Workspace mode for the basics; freeze EDI-Only tab as internal-only. Loses the
+unwind/estate/scenario analytics from any client surface.
+**Recommendation:** (a) — the dual-engine divergence is a CPA-credibility killer, and
+(a) is the only option where it can't recur. Defaults folded under this decision (owner
+can override): scenario presets (business sale / RSU / concentrated stock) graduate to
+the Workspace per-year-events editor; EDI-only mode inherits Workspace defaults (growth
+off, fees off), not the tab's (7% growth, financing on); the "Under Development" banner
+comes off only the surfaces that pass this refactor.
+**DECIDED (owner's words):** "I want to get rid of the edi only tab and have everything
+in the workspace tab. If there is too much information to fold into that we should see
+if we can add it to the classic tab. Open to other ideas." → Stronger than (a): the
+EDI-Only tab is REMOVED entirely (not kept as a deep-dive); its unique analytics fold
+into the Workspace, with the Classic tab as overflow if the Workspace gets crowded.
+Single engine (`core.ts`); duplicate projection loop retired. Folded defaults above
+apply.
+
+#### D-015 — EDI-only headline metric & Meeting Mode framing
+**Context:** With QFAF off, `calculateSummary` credits carryforward *building* at $0, so
+$10M/10yrs shows "Est. Tax Savings $15,090" and Meeting Mode opens "$0.02M in tax
+savings" with QFAF copy ("ordinary loss deductions, NOL usage"). But the CF shield IS
+the EDI product (~$6.9M CF ≈ ~$2.5M contingent shelter at statutory rates). The
+question is what number leads.
+**Options:**
+(a) **(Recommended)** Two-part headline: realized savings PLUS a co-equal "loss reserve
+built" metric — CF balance and its shelter value at statutory rates, explicitly labeled
+contingent on future gains; when a gain event is entered, realized shelter moves into
+the savings figure (engine already does this per D-012). EDI-specific Meeting Mode copy.
+(b) Value the CF at full statutory rates *inside* the headline (matches EDI-Only tab's
+$2.3M today). Bigger number, but presents contingent value as realized — fails the
+CPA bar.
+(c) Keep realized-only headline; rely on the gain-event editor to tell the story.
+Zero engine work, but the default view kills the conversation.
+**Recommendation:** (a) — defensible and it teaches the product: protection, not
+deductions. Consistent with D-002 (high-level default, honest attribution).
+**DECIDED:** (a) — realized + co-equal loss-reserve headline; EDI-specific Meeting
+Mode copy.
+
+#### D-016 — Deleveraging v1: scope, plan shape, and defaults
+**Context:** Owner wants deleveraging "all at once or over time." Design review
+recommends a glide path as a top-level input — `CalculatorInputs.deleveragePlan
+{enabled, startYear, durationYears, target}` — implemented as a derived per-year
+schedule feeding the existing per-year override hooks (`effectiveStLossRate`,
+`ltGainRate`, `financingCost`), blending source→target like `splitAllocation.ts`;
+all-at-once is simply `durationYears: 1`. NAV unchanged (gross falls, net stays 100%).
+**Options:**
+(a) **(Recommended)** Build the glide-path plan as designed; default when enabled =
+all-at-once (duration 1), duration editable 1–N; targets = long-only or any
+lower-leverage strategy; Workspace-only UI (rail group + conditional ResultsTable
+column group + Overview note + CSV/Excel); Classic/EDI-Only-tab and sensitivity-grid
+support deferred (D-013 precedent: grid keeps no-deleverage for comparability).
+(b) All-at-once only in v1; glide path later. Saves little — the schedule machinery is
+the same code.
+(c) Full coverage now (Classic, sensitivity, split allocation). Highest effort, delays
+the owner's ask.
+**Recommendation:** (a) — one build delivers both of the owner's cases; deferred
+surfaces are folded defaults the owner can override. QFAF interaction default: dynamic
+sizing self-corrects (QFAF shrinks); fixed mode shows an oversized-QFAF warning.
+**DECIDED:** (a) — glide-path plan, Workspace-only v1, all-at-once = duration 1.
+**Status: IMPLEMENTED (2026-06-12)** — `CalculatorInputs.deleveragePlan` +
+`src/calculations/deleverage.ts` (schedule resolution mirroring splitAllocation.ts);
+per-year blended rates/financing feed the existing `CalculateYearOverrides` hook;
+`financing.ts` refactored to a ratio-based core (`getFinancingCostForRatios`) so glide
+years price interpolated leverage. New per-year outputs (extensionFraction, unwind
+gain/character split, tax on unwind, financing saved) in the audit-complete table
+(conditional "Deleverage" group, both orientations), Workspace rail group, Overview
+note, CSV round-trip, and Excel export. Split allocation wins when both are enabled
+(plan ignored + warning chip); sensitivity grid stays un-delevered (D-013 precedent).
+Dynamic QFAF sizing self-corrects (consumes the blended rate); fixed sizing shows the
+oversized-QFAF leakage warning. Exit tax subtracts realized unwind gains from the
+basis reduction (no double taxation). 29 regression tests; suite at 352.
+
+#### D-017 — Tax character and rate assumptions for unwind (deleveraging defaults)
+**Context:** Deleveraging realizes gains on the long extension and covers shorts; the
+assumptions swing the modeled cost by ~17 points of rate and decide whether
+deleveraging looks "nearly free." These are modeling-philosophy defaults, all
+overridable via plan sub-parameters (`unwindGainCharacter`, `shortCoverGainPct`,
+`lotSelectionHaircut`).
+**Options:**
+(a) **(Recommended)** Defensible-default bundle: long-extension unwind gains 100% LT
+once the position is seasoned (after year 2; ST character before that); short-cover
+gain 0% (shorts continuously recycled by harvesting, so covering realizes ~no gain) —
+with the assumption disclosed on-screen; lot selection pro-rata (no HIFO discount);
+loss-rate transition uses the *seasoned* target schedule sampled at the current year
+index (a restart would phantom-inflate harvesting).
+(b) Aggressive bundle: HIFO lot discount + 0% short cover. Bigger headline, weakest
+CPA defense.
+(c) Conservative bundle: blended ST/LT character + positive ST short-cover gain.
+Most cautious, likely overstates the unwind cost and undersells a real feature.
+**Recommendation:** (a) — each piece is the mechanically-accurate middle, and every
+knob stays exposed for a skeptical CPA to stress.
+**DECIDED:** (a) — defensible-middle bundle, all knobs overridable per plan.
+**Status: IMPLEMENTED (2026-06-12)** — with D-016. Long-extension unwind gains are LT
+once seasoned (startYear > 2; ST before), short covers realize 0% gain (disclosed in
+the rail while a plan is on), lot selection pro-rata (haircut 1.0), and the target
+loss-rate schedule is sampled at the CURRENT year index (seasoned — never restarted;
+long-only uses the canonical trad-DI rates from the retired ediOnly.ts). All three
+knobs (`unwindGainCharacter`, `lotSelectionHaircut`, `shortCoverGainPct`) live on the
+plan and round-trip through CSV. Unwind gains are endogenous: netted WITH strategy
+flows (harvest first, then CFs per §1211) and charged against taxSavings — proven by
+test against a same-year D-012 event, which still shelters event-LAST.
+
+#### D-018 — Exit framing when the end state is long-only (hold-to-step-up)
+**Context:** After deleveraging to long-only, the realistic UHNW endgame is often hold
+until basis step-up, not liquidate at horizon — the EDI-Only tab already models estate
+step-up vs unwind vs optimal-partial-unwind, but nothing in the Workspace does. Today's
+headline trio (D-003) assumes liquidation.
+**Options:**
+(a) **(Recommended)** Keep "Net If Liquidated" as the headline discipline; add a
+co-equal "Net If Held to Step-Up" metric (with estate-assumption disclosure) whenever
+cost basis / embedded gain is in play — migrating the EDI-Only tab's estate analysis
+onto `core.ts` outputs (pairs with D-014a).
+(b) Liquidation framing only. Simplest, but systematically understates the strategy
+for exactly the clients who'd use it (concentrated/estate-minded).
+(c) Make step-up the headline. Bigger number, but presents a mortality-contingent
+outcome as the base case — fails the CPA bar.
+**Recommendation:** (a) — both numbers shown, liquidation stays the conservative
+anchor, step-up is disclosed upside.
+**DECIDED:** (a) — co-equal "Net If Held to Step-Up" with estate disclosure.
+
+#### Bugs / work items from this triage — no decision required
+
+**Fix regardless (engine correctness):**
+- `exitTax.ts:123` clamps `incrementalDeferredTax = max(0, exitTax − passiveExitTax)`,
+  structurally discarding the CF-shelter advantage vs passive from "Net If Liquidated" —
+  the EDI selling point. Remove the clamp; test both signs.
+- With deleveraging: subtract Σ deleverage gains realized from `cumulativeBasisReduction`
+  (`exitTax.ts:83`) so exited gains aren't taxed twice.
+
+**Bundled with D-014 (architecture):**
+- Netting/$3K/CF logic now exists THREE times (`helpers.calculateCarryforwards`,
+  `computeEdiYear`, inline copy in `computeBaselineComparison`) plus two financing
+  models and two embedded-gain methods — consolidate to one (extends decided bug #8).
+- EDI-Only tab math gaps (hardcoded $3M income; PA rate in `combinedStRate`; WA excise
+  not computed; NYC missing; no LT-CF input) — resolved by consuming `core.ts`, or
+  patched if the tab is kept standalone.
+- Align EDI-Only tab defaults with Workspace defaults.
+
+**Bundled with D-015 (EDI-only display):**
+- Meeting Mode shows QFAF copy ("ordinary loss deductions, NOL usage") with QFAF off —
+  swap to mode-appropriate copy.
+- Hide/repurpose noise metrics when `qfafEnabled:false`: "Income to Fully Utilize
+  $3,000" chips, dead "NOL Generated $0" card.
+- Excel / Meeting Mode export parity for EDI-only outputs.
+
+**Bundled with D-016/D-017 (deleveraging build):**
+- New `src/calculations/deleverage.ts`; unwind gains are endogenous strategy costs —
+  net WITH strategy flows (current-year harvest first, then CFs per §1211) and charge
+  against `taxSavings` (unlike D-012 gain events, which are event-LAST and never
+  charged). No changes inside `calculateCarryforwards`; pass through existing args.
+- Refactor `getEffectiveFinancingCost` → ratio-based
+  `getFinancingCostForRatios(longLev, shortRatio)` with interpolation.
+- ResultsTable conditional column group (Extension %, Deleverage Gain Realized, Tax on
+  Unwind, Financing Saved) + Overview note + CSV/Excel — per the audit-complete table
+  directive.
+- Fixed-QFAF-mode oversized-QFAF warning during deleverage.
 
 ---
 
