@@ -9,7 +9,6 @@ import {
 import {
   DEFAULTS,
   STATES,
-  getFederalStRate,
   getFederalLtRate,
   getFederalOrdinaryRate,
   getStateRate,
@@ -96,7 +95,6 @@ export function WorkspaceTab() {
     const fedOrd = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
     return {
       profile,
-      combinedSt: getFederalStRate(inputs.annualIncome, inputs.filingStatus) + profile.stRate,
       combinedLt: getFederalLtRate(inputs.annualIncome, inputs.filingStatus) + profile.ltRate,
       combinedOrdinary:
         fedOrd + (profile.allowsLossOffsetAgainstIncome ? profile.ordinaryRate : 0),
