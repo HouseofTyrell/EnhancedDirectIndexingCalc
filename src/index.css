@@ -7085,6 +7085,16 @@ select:focus:not(:focus-visible) {
     zoom: 0.62;
   }
 
+  /* Long projections (set in MeetingMode.tsx by visible year count): the
+     page-2 table grows a row per year, so tighten its zoom to keep one
+     sheet per logical page. */
+  .meeting-mode-print .meeting-mode-print-page.mm-print-dense {
+    zoom: 0.5;
+  }
+  .meeting-mode-print .meeting-mode-print-page.mm-print-densest {
+    zoom: 0.34;
+  }
+
   /* Break BETWEEN pages (not after the last one): a trailing sibling div
      defeats :last-of-type and used to emit a blank final sheet. */
   .meeting-mode-print .meeting-mode-print-page + .meeting-mode-print-page {

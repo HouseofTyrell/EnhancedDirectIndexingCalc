@@ -718,11 +718,18 @@ function Rail({
               }}
               style={railFieldStyle}
             >
-              {[5, 7, 10, 15, 20].map(y => (
-                <option key={y} value={y} style={{ background: M.sidebar }}>
-                  {y} years
-                </option>
-              ))}
+              {[5, 7, 10, 15, 20, 25, 30, 40]
+                .concat(
+                  [5, 7, 10, 15, 20, 25, 30, 40].includes(advancedSettings.projectionYears)
+                    ? []
+                    : [advancedSettings.projectionYears]
+                )
+                .sort((a, b) => a - b)
+                .map(y => (
+                  <option key={y} value={y} style={{ background: M.sidebar }}>
+                    {y} years
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -2371,24 +2378,23 @@ export function MeetingMode({
   // editing rail and on-screen controls, and triggers window.print().
   const [printMode, setPrintMode] = useState(false);
 
-  // core.ts may return more years than projectionYears (wind-down continues until
-  // carryforwards exhausted). Cap the view to what the user actually asked for.
+  // Show every year the engine produced, including D-019 extension years
+  // (the projection runs past projectionYears while NOL/carryforwards are
+  // being consumed). Cutting them here would make MM disagree with the
+  // Workspace headline whenever an extension exists.
   const projectionYears = advancedSettings.projectionYears;
+  const visibleYears = results.years;
+  const extensionYearCount = Math.max(0, visibleYears.length - projectionYears);
 
   // Calendar dates for prospect-facing copy. Strategy starts at startMonth of
-  // the current calendar year and runs `projectionYears` operating years;
-  // the year shown in copy is the last calendar year that contains strategy
-  // activity (= startYear + projectionYears − 1 for January starts; one
-  // higher for partial-year starts since the trailing partial calendar year
-  // still has activity).
+  // the current calendar year; the year shown in copy is the last calendar
+  // year that contains activity — including extension years (one higher for
+  // partial-year starts since the trailing partial calendar year still has
+  // activity).
   const startYear = new Date().getFullYear();
   const isPartialStart = (inputs.startMonth ?? 1) > 1;
-  const endYear = startYear + projectionYears - 1 + (isPartialStart ? 1 : 0);
+  const endYear = startYear + visibleYears.length - 1 + (isPartialStart ? 1 : 0);
   const projectionRangeLabel = `${startYear}–${endYear}`;
-  const visibleYears = useMemo(
-    () => results.years.slice(0, projectionYears),
-    [results.years, projectionYears]
-  );
 
   // Build year-by-year chart data from real results, bounded to projectionYears
   const detailYearData = useMemo(
@@ -2420,9 +2426,8 @@ export function MeetingMode({
     [visibleYears]
   );
 
-  // Bound summary figures to the user's projection window so labels ("over N
-  // years") agree with the numbers shown — core.ts keeps running the sim past
-  // projectionYears during QFAF wind-down, which we don't want to surface here.
+  // All engine years are shown, so the hero equals summary.totalTaxSavings —
+  // the same number the Workspace headline reports (one surface per number).
   const totalTaxSavings = useMemo(
     () => visibleYears.reduce((s, y) => s + y.taxSavings, 0),
     [visibleYears]
@@ -2891,6 +2896,7 @@ export function MeetingMode({
                     }}
                   >
                     Your projection · {projectionRangeLabel}
+                    {extensionYearCount > 0 && ' · extended to use carryforwards'}
                   </span>
                   <span style={{ width: 40, height: 1, background: M.accent }} />
                   <span style={{ fontSize: 12, color: M.inkFaint }}>
@@ -3578,7 +3584,19 @@ export function MeetingMode({
 
           {(level === 'detail' || printMode) && (
             <div
-              className={printMode ? 'meeting-mode-print-page' : undefined}
+              className={
+                printMode
+                  ? // Long projections need a tighter print zoom or the
+                    // year-by-year table spills page 2 onto a 4th sheet.
+                    `meeting-mode-print-page${
+                      visibleYears.length > 24
+                        ? ' mm-print-densest'
+                        : visibleYears.length > 12
+                          ? ' mm-print-dense'
+                          : ''
+                    }`
+                  : undefined
+              }
               data-print-page="2"
               style={printMode ? { paddingTop: 20 } : undefined}
             >
