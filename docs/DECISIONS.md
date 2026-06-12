@@ -475,6 +475,40 @@ anchor, step-up is disclosed upside.
   directive.
 - Fixed-QFAF-mode oversized-QFAF warning during deleverage.
 
+### D-019 — Projection extension semantics (carryforward-aware)
+**Date:** 2026-06-12
+**Context:** Owner asked why data stopped at 10 years with carryforward remaining.
+D-013's extension watched only NOL; capital-loss CFs never extended, and
+`projectionYears` had no UI control.
+**Decision (ratified as built):** the projection auto-extends past the horizon while
+losses are being *meaningfully consumed* — NOL usage, realized LT gains, or deleverage
+unwinds burning capital CFs — capped at 40 years. Consumption of only the $3,000/yr
+ordinary offset does NOT extend (a multi-million reserve would take centuries); the
+reserve framing plus the new "Projection years" rail control (1–40, default 10 per
+D-002) covers that case.
+**Status: IMPLEMENTED (2026-06-12).**
+
+### D-020 — CA NOL 20-year expiration: model fully
+**Date:** 2026-06-12
+**Context:** California NOLs expire 20 years after the loss year (extended by SB 167
+suspension years when the NOL was unusable). With D-019 projections reaching year 40,
+a CA client's state NOL tail can now outlive its usability — the one real state-level
+expiry in scope. Options were warning-chip-only, full modeling, or document-and-skip.
+**Decision (owner):** model it fully — track state NOL vintages in the engine, expire
+the CA state component past its carryover period, and surface expired amounts.
+**Implications:** per the audit-complete table directive, any new per-year output
+(e.g., state NOL expired) must appear in ResultsTable both orientations + popup.
+Federal NOL (indefinite, 80% limit) is unaffected.
+
+### D-021 — Export parity for EDI metrics: close now
+**Date:** 2026-06-12
+**Context:** Loss Reserve, Protection Ratio, Break-Even Gain Event, and Net If Held to
+Step-Up exist in Workspace + Meeting Mode but not in the Excel export or the printed
+one-pager (flagged during the D-015 build).
+**Decision (owner):** close the gap now — advisors should not hand clients a sheet
+missing the headline EDI numbers. Contingent values stay labeled contingent in every
+export surface.
+
 ---
 
 ## Bugs — no decision required
