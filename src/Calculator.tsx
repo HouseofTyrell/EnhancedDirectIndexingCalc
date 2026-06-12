@@ -189,7 +189,8 @@ export function Calculator() {
         results,
         combinedLtRate,
         advancedSettings.growthEnabled ? advancedSettings.defaultAnnualReturn : 0,
-        taxRates.stateProfile.ltcgExcise
+        taxRates.stateProfile.ltcgExcise,
+        inputs.collateralCostBasis
       ),
     [results, combinedLtRate, taxRates.stateProfile, advancedSettings.growthEnabled, advancedSettings.defaultAnnualReturn]
   );

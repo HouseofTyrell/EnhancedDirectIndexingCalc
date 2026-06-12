@@ -15,9 +15,11 @@ import { safeNumber } from '../utils/formatters';
  * from deferral.
  *
  * Assumptions (disclosed in UI):
- * - Initial basis equals initial market value. Overlay strategies funded with
- *   already-appreciated stock have ADDITIONAL pre-existing embedded gain that
- *   is not attributable to the strategy and is not modeled here.
+ * - Initial basis equals initial market value UNLESS a collateral cost basis
+ *   is supplied (the concentrated-appreciated-stock case), in which case the
+ *   pre-existing embedded gain is included in the liquidation analysis — on
+ *   both the strategy and the passive baseline, so the incremental deferred
+ *   tax remains strategy-attributable.
  * - Liquidation gain is taxed entirely at the LT rate (positions held through
  *   a multi-year program are predominantly long-term at exit).
  * - Remaining capital loss carryforwards shelter the exit gain dollar-for-
@@ -34,6 +36,8 @@ export interface ExitTaxAnalysis {
   finalCollateralValue: number;
   /** Σ (ST losses harvested − LT gains realized): how far basis fell below cost */
   cumulativeBasisReduction: number;
+  /** Embedded gain carried into the strategy (collateral value − cost basis at inception) */
+  preExistingGain: number;
   /** Market appreciation net of modeled fees (final value − initial value) */
   marketAppreciation: number;
   /** Unrealized gain if fully liquidated: appreciation + basis reduction */
@@ -65,7 +69,9 @@ export function computeExitTaxAnalysis(
   combinedLtRate: number,
   passiveAnnualReturn: number = 0,
   /** WA-style LTCG excise applied to a single-year full liquidation (D-005) */
-  ltcgExcise?: StateTaxProfile['ltcgExcise']
+  ltcgExcise?: StateTaxProfile['ltcgExcise'],
+  /** Cost basis of the collateral at inception (default: equals initial value) */
+  collateralCostBasis?: number
 ): ExitTaxAnalysis {
   const years = result.years;
   const initialCollateral = result.sizing.collateralValue;
@@ -78,10 +84,20 @@ export function computeExitTaxAnalysis(
     years.reduce((sum, y) => sum + y.stLossesHarvested - y.ltGainsRealized, 0)
   );
 
+  // Pre-existing gain: collateral contributed above its cost basis (the
+  // concentrated-stock case). Included on both sides of the comparison.
+  const costBasis = collateralCostBasis !== undefined
+    ? Math.min(collateralCostBasis, initialCollateral)
+    : initialCollateral;
+  const preExistingGain = Math.max(0, safeNumber(initialCollateral - costBasis));
+
   // Embedded gain = market value − basis
-  //               = (finalValue − initialCollateral) + cumulativeBasisReduction
+  //               = (finalValue − initialCollateral) + preExistingGain + cumulativeBasisReduction
   const marketAppreciation = safeNumber(finalCollateralValue - initialCollateral);
-  const embeddedGain = Math.max(0, safeNumber(marketAppreciation + cumulativeBasisReduction));
+  const embeddedGain = Math.max(
+    0,
+    safeNumber(marketAppreciation + preExistingGain + cumulativeBasisReduction)
+  );
 
   // Capital loss carryforwards shelter the exit gain (no 80% limit applies to
   // capital-vs-capital netting).
@@ -99,7 +115,9 @@ export function computeExitTaxAnalysis(
   // return with no financing drag and no basis change.
   const horizonYears = years.length;
   const passiveValue = initialCollateral * Math.pow(1 + passiveAnnualReturn, horizonYears);
-  const passiveGain = Math.max(0, safeNumber(passiveValue - initialCollateral));
+  // The passive holder carries the same pre-existing gain, so it cancels out
+  // of the incremental deferred tax (which stays strategy-attributable).
+  const passiveGain = Math.max(0, safeNumber(passiveValue - costBasis));
   const passiveExitTax = safeNumber(passiveGain * combinedLtRate + exciseOn(passiveGain));
 
   const incrementalDeferredTax = Math.max(0, safeNumber(exitTax - passiveExitTax));
@@ -110,6 +128,7 @@ export function computeExitTaxAnalysis(
     initialCollateral,
     finalCollateralValue,
     cumulativeBasisReduction,
+    preExistingGain,
     marketAppreciation,
     embeddedGain,
     remainingCapitalLossCf,
