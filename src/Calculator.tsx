@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { calculate, calculateWithOverrides, calculateWithSensitivity, computeExitTaxAnalysis } from './calculations';
-import { DEFAULTS, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
+import { DEFAULTS, getFederalStRate, getFederalLtRate, getFederalOrdinaryRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
 import { getQuantifiedStateWarning } from './utils/stateTaxWarnings';
 import {
@@ -143,14 +143,18 @@ export function Calculator() {
   const taxRates = useMemo(() => {
     const federalStRate = getFederalStRate(inputs.annualIncome, inputs.filingStatus);
     const federalLtRate = getFederalLtRate(inputs.annualIncome, inputs.filingStatus);
+    // Ordinary rate excludes NIIT: deductions against wages don't reduce NII (§1411)
+    const federalOrdinaryRate = getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus);
     const stateRate =
       inputs.stateCode === 'OTHER' ? inputs.stateRate : getStateRate(inputs.stateCode);
     return {
       federalStRate,
       federalLtRate,
+      federalOrdinaryRate,
       stateRate,
       combinedStRate: federalStRate + stateRate,
       combinedLtRate: federalLtRate + stateRate,
+      combinedOrdinaryRate: federalOrdinaryRate + stateRate,
       rateDifferential: federalStRate - federalLtRate,
     };
   }, [inputs.annualIncome, inputs.filingStatus, inputs.stateCode, inputs.stateRate]);
@@ -161,6 +165,7 @@ export function Calculator() {
     stateRate,
     combinedStRate,
     combinedLtRate,
+    combinedOrdinaryRate,
   } = taxRates;
 
   // Quantified state-math warning (D-005 phase 1): PA/NJ/MA/WA dollar-impact
@@ -488,8 +493,8 @@ export function Calculator() {
         results={results}
         filingStatus={inputs.filingStatus}
         qfafEnabled={inputs.qfafEnabled}
-        combinedStRate={combinedStRate}
         combinedLtRate={combinedLtRate}
+        combinedOrdinaryRate={combinedOrdinaryRate}
         qfafMultiplier={advancedSettings.qfafMultiplier}
         startMonth={inputs.startMonth}
       />
@@ -741,8 +746,8 @@ export function Calculator() {
                 results={results}
                 filingStatus={inputs.filingStatus}
                 qfafEnabled={inputs.qfafEnabled}
-                combinedStRate={combinedStRate}
                 combinedLtRate={combinedLtRate}
+                combinedOrdinaryRate={combinedOrdinaryRate}
                 qfafMultiplier={advancedSettings.qfafMultiplier}
               />
             ),

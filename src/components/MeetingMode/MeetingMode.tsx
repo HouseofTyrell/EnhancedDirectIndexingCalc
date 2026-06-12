@@ -51,6 +51,8 @@ interface TaxRates {
   stateRate: number;
   combinedStRate: number;
   combinedLtRate: number;
+  /** Combined ordinary rate WITHOUT NIIT — what deductions against wages actually save */
+  combinedOrdinaryRate: number;
 }
 
 type UpdateInput = <K extends keyof CalculatorInputs>(
@@ -644,6 +646,7 @@ function Rail({
               ['QFAF value', fmtCurrency(results.sizing.qfafValue), '#38bdf8'],
               ['Total exposure', fmtCurrency(results.sizing.totalExposure), '#60a5fa'],
               ['Combined ST', fmtPercent(taxRates.combinedStRate), '#fb7185'],
+              ['Ordinary (deductions)', fmtPercent(taxRates.combinedOrdinaryRate), '#34d399'],
             ] as const
           ).map(([k, v, dot]) => (
             <div
@@ -1439,12 +1442,12 @@ function PrintPageFooter() {
   return (
     <div
       style={{
-        marginTop: 32,
-        paddingTop: 12,
+        marginTop: 14,
+        paddingTop: 8,
         borderTop: `1px solid ${M.line}`,
-        fontSize: 8.5,
+        fontSize: 7,
         color: M.inkFaint,
-        lineHeight: 1.45,
+        lineHeight: 1.35,
         fontFamily: M.sans,
       }}
     >
@@ -1503,7 +1506,7 @@ function MechanicsView({
       n: 3,
       title: 'Loss harvesting generates NOL',
       tone: '#f59e0b',
-      body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedStRate)}), with the balance carried forward as NOL.`,
+      body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedOrdinaryRate)} ordinary rate), with the balance carried forward as NOL.`,
       metric: fmtCurrency(totalNol),
       metricLabel: 'NOL generated',
     },
@@ -1686,6 +1689,7 @@ function MechanicsView({
               ['Fed LT', fmtPercent(taxRates.federalLtRate), false],
               ['State', fmtPercent(taxRates.stateRate), false],
               ['Combined ST', fmtPercent(taxRates.combinedStRate), true],
+              ['Ordinary (deductions)', fmtPercent(taxRates.combinedOrdinaryRate), true],
               ['Combined LT', fmtPercent(taxRates.combinedLtRate), true],
             ] as const
           ).map(([k, v, h]) => (
@@ -1806,9 +1810,9 @@ export function MeetingMode({
   const effectiveCollateral = useMemo(() => getEffectiveView(inputs).totalCollateral, [inputs]);
   const finalPortfolio =
     visibleYears[visibleYears.length - 1]?.totalValue ?? effectiveCollateral;
-  const totalNol =
-    visibleYears[visibleYears.length - 1]?.nolCarryforward ??
-    results.summary.totalNolGenerated;
+  // Total NOL generated over the program (the final-year *balance* is often $0
+  // once the NOL has been consumed, which made these labels read "$0 of NOL").
+  const totalNol = results.summary.totalNolGenerated;
 
   const [yearIdx, setYearIdx] = useState(breakdownData.length);
   useEffect(() => {
@@ -1869,7 +1873,7 @@ export function MeetingMode({
         label: 'Year 1 harvest',
         value: year1,
         color: M.accent,
-        note: `Loss harvest × ${fmtPercent1(taxRates.combinedStRate)} combined rate`,
+        note: `Loss harvest × ${fmtPercent1(taxRates.combinedOrdinaryRate)} combined ordinary rate`,
         inBar: true,
       },
       {
@@ -1883,7 +1887,7 @@ export function MeetingMode({
         label: 'NOL carry-forward',
         value: nolBenefit,
         color: '#f59e0b',
-        note: `${fmtCurrency(totalNol)} of NOL offsetting future income`,
+        note: `From ${fmtCurrency(totalNol)} of NOL generated, applied against future income`,
         inBar: true,
       },
       {
@@ -1905,7 +1909,7 @@ export function MeetingMode({
     totalTaxSavings,
     totalNol,
     visibleYears,
-    taxRates.combinedStRate,
+    taxRates.combinedOrdinaryRate,
     advancedSettings.growthEnabled,
     advancedSettings.defaultAnnualReturn,
     endYear,

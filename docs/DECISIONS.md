@@ -164,3 +164,27 @@ enable Advanced Settings to include them").
    3–5.
 9. **Pre-existing broken type-check build** — **FIXED 2026-06-11** (`ltGainsEnabled` made
    optional to match all consumers; dead props removed from ScenarioComparisonPanel).
+
+### Found in CFP/CFA usability test session (2026-06-12)
+
+10. ~~**SizingSummary/MeetingMode benefit math used NIIT-inclusive rate**~~ **FIXED
+    2026-06-12** — Year-1/Year-2 benefit cards showed "$512K × 51.70%" while net values
+    used the corrected 47.9% ordinary rate, so components didn't sum to the total. Both
+    now use engine values + a `combinedOrdinaryRate` passed from Calculator; the
+    Meeting Mode tax-math panel gained an "Ordinary (deductions)" row.
+11. ~~**Meeting Mode showed "$0 of NOL" / "NOL GENERATED $0"**~~ **FIXED 2026-06-12** —
+    cards read the final-year NOL *balance* (zero once consumed) instead of
+    `summary.totalNolGenerated`.
+12. ~~**Print handout paginated to 7–9 sheets with orphaned disclosure pages and a
+    blank app-chrome lead page**~~ **FIXED 2026-06-12** — print zoom on handout pages,
+    break-between (not after) pagination, app-nav hidden in print, compact footer.
+    Verified: exactly 3 sheets, disclosures on every page.
+
+**UX polish queue (no decision required, not yet fixed):**
+- Onboarding tour step 1 targets the results section, so first-time users land
+  mid-page under a dimmed overlay; should start at Step 1 (Client Profile).
+- Year-by-year table has no sticky Year column; auditing the right-hand columns at
+  2,500px width loses row identity.
+- Wind-down divider label is centered across the full table width and lands
+  off-screen at either horizontal scroll extreme.
+- Sticky-header delta badges overlap the metric values right after an input change.
