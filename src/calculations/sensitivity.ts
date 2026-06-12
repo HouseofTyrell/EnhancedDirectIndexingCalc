@@ -407,11 +407,11 @@ function calculateYearWithSensitivity(
   const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
   const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
-  // Costs (+ WA-style LTCG excise above the annual exemption)
+  // Costs: charged on taxable (post-offset) LT gains — see core.ts (CPA finding E)
   const ltcgExciseTax = state.ltcgExcise
-    ? Math.max(0, ltGainsRealized - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
+    ? Math.max(0, taxableLt - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
     : 0;
-  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate + ltcgExciseTax);
+  const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
 
   // Net tax savings: ordinary deductions minus capital gains costs
@@ -430,7 +430,7 @@ function calculateYearWithSensitivity(
 
   // Tax breakdown for display
   const grossInvestmentTax = safeNumber(
-    Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
+    Math.max(0, netStGainLoss) * combinedStRate + taxableLt * combinedLtRate
   );
   const federalTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *

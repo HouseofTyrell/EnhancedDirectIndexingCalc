@@ -188,6 +188,19 @@ hero, shown only while financing fees are disabled.
 - ~~Wind-down divider label off-screen~~ → label sticks to the visible viewport.
 - ~~Sticky-header delta badge overlap~~ → badges suppressed in the sticky header only.
 
+### CPA agent review (2026-06-12)
+A CPA-persona technical review of the full engine confirmed the §1212/§1211
+netting order, the precise §461(l) model and its NOL 80% interaction, the NIIT
+placement (excluded from ordinary deductions, correctly included on LT gain
+costs and ST leakage — LT gains ARE net investment income under §1411), the
+state profiles, and the exit-tax assumptions. One High finding, fixed same day:
+**ltGainCost charged on gross LT gains instead of taxable LT gains after
+offsets** — in collateral-only mode harvested ST losses offset the LT gains, so
+the old math overstated the baseline's cost and inflated the headline
+"Incremental Benefit" of adding the QFAF. Now charged on `taxableLt` (identical
+in QFAF mode; WA excise base updated to match). Owner's NIIT question resolved:
+keep NIIT in the displayed Fed LT rate.
+
 **Also closed 2026-06-12 (cleanup slice):** engine consolidation (one projection loop;
 `financing.ts` shared), AMT-not-modeled disclosure, §1092/§469 disclosure, and a
 "tax parameters as of June 2026" line in the footer.

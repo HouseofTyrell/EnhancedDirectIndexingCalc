@@ -445,11 +445,16 @@ export function calculateYear(
   const nolUsageBenefit = safeNumber(nolUsed * combinedOrdinaryRate);
 
   // Costs:
-  // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption)
+  // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption).
+  // Charged on TAXABLE LT gains (after carryforward and current-year ST loss
+  // offsets), not gross realization — in QFAF mode these are identical (ST
+  // losses are consumed by QFAF gains), but in collateral-only mode harvested
+  // ST losses offset the LT gains and the cost would otherwise be overstated,
+  // inflating the incremental benefit of adding the QFAF. (CPA review finding E.)
   const ltcgExciseTax = state.ltcgExcise
-    ? Math.max(0, ltGainsRealized - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
+    ? Math.max(0, taxableLt - state.ltcgExcise.exemptionPerYear) * state.ltcgExcise.rate
     : 0;
-  const ltGainCost = safeNumber(ltGainsRealized * combinedLtRate + ltcgExciseTax);
+  const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
 
   // 2. Any remaining net ST gains (if ST gains > ST losses) taxed at ST rates
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
@@ -475,7 +480,7 @@ export function calculateYear(
 
   // For display/debugging: calculate what taxes would be without benefits
   const grossInvestmentTax = safeNumber(
-    Math.max(0, netStGainLoss) * combinedStRate + ltGainsRealized * combinedLtRate
+    Math.max(0, netStGainLoss) * combinedStRate + taxableLt * combinedLtRate
   );
   const federalTax = safeNumber(
     Math.max(0, grossInvestmentTax - ordinaryLossBenefit - capitalLossBenefit - nolUsageBenefit) *

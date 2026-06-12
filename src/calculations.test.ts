@@ -639,6 +639,26 @@ describe('calculateWithOverrides custom-rate parity', () => {
   });
 });
 
+describe('LT gain cost uses taxable gains after offsets (CPA finding E)', () => {
+  it('charges no LT cost in collateral-only mode when ST losses fully offset LT gains', () => {
+    // QFAF off: harvested ST losses (23% Y1) far exceed LT gains (2.4%),
+    // so taxable LT gains are $0 — the cost must be $0, not gross × rate.
+    const inputs = createInputs({ qfafEnabled: false, collateralAmount: 10000000 });
+    const result = calculate(inputs);
+    const y1 = result.years[0];
+    expect(y1.ltGainsRealized).toBeGreaterThan(0);
+    expect(y1.ltGainCost).toBe(0);
+  });
+
+  it('still charges full LT cost in QFAF mode (ST losses consumed by QFAF gains)', () => {
+    const inputs = createInputs({ collateralAmount: 10000000, qfafSizingYears: 1 });
+    const result = calculate(inputs);
+    const y1 = result.years[0];
+    // CA: fed LT 23.8% + 13.3% state
+    expect(y1.ltGainCost).toBeCloseTo(y1.ltGainsRealized * (0.238 + 0.133), 0);
+  });
+});
+
 describe('Per-state tax treatment (D-005)', () => {
   // Income $3M MFJ → fed ordinary 37%, fed ST 40.8% (incl. NIIT), fed LT 23.8%
   const base = { annualIncome: 3000000, collateralAmount: 10000000 };
