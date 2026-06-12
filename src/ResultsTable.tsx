@@ -72,6 +72,9 @@ export function ResultsTable({
   const [expandCf, setExpandCf] = useState(false);
   const [expandSavings, setExpandSavings] = useState(false);
   const [showAllDetails, setShowAllDetails] = useState(false);
+  // Transposed orientation: years as columns, metrics as rows — the
+  // financial-statement layout. Handy on phones and short horizons.
+  const [transposed, setTransposed] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('combined');
   const [breakdownGranularity, setBreakdownGranularity] =
     useState<BreakdownGranularity>('quarterly');
@@ -216,11 +219,33 @@ export function ResultsTable({
               </button>
             </div>
           )}
-          <button className="toggle-details-btn" onClick={handleToggleAll}>
-            {showAllDetails ? 'Collapse All' : 'Expand All'}
+          {!transposed && (
+            <button className="toggle-details-btn" onClick={handleToggleAll}>
+              {showAllDetails ? 'Collapse All' : 'Expand All'}
+            </button>
+          )}
+          <button
+            className="toggle-details-btn"
+            onClick={() => setTransposed(t => !t)}
+            title={transposed ? 'Years as rows (default)' : 'Years as columns (financial-statement layout)'}
+          >
+            ⇄ {transposed ? 'Years as Rows' : 'Years as Columns'}
           </button>
         </div>
       </div>
+
+      {transposed && (
+        <TransposedTable
+          data={filteredData}
+          allYears={data}
+          viewMode={viewMode}
+          qfafEnabled={qfafEnabled}
+          startMonth={startMonth}
+        />
+      )}
+
+      {!transposed && (
+      <>
 
       <div className="table-scroll">
         <table className="year-breakdown-table year-breakdown-table--compact">
@@ -819,6 +844,9 @@ export function ResultsTable({
         </table>
       </div>
 
+      </>
+      )}
+
       {/* Carryforward Summary */}
       <div className="carryforward-note">
         <p>
@@ -847,6 +875,254 @@ export function ResultsTable({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Transposed orientation: years across the top, metrics down the side —
+// the financial-statement layout. All metrics shown, grouped in sections
+// (vertical space is cheap; the column count is just the year count).
+// ═══════════════════════════════════════════════════════════════════════
+
+interface RowSpec {
+  label: string;
+  contentKey?: string;
+  /** Formatted cell for a year; return '—' to dash out */
+  cell: (y: YearResult, cumulative: number) => string;
+  className?: (y: YearResult) => string;
+  highlight?: boolean;
+}
+
+interface RowSection {
+  title: string;
+  rows: RowSpec[];
+}
+
+function TransposedTable({
+  data,
+  allYears,
+  viewMode,
+  qfafEnabled,
+  startMonth,
+}: {
+  data: YearResult[];
+  allYears: YearResult[];
+  viewMode: ViewMode;
+  qfafEnabled: boolean;
+  startMonth: number;
+}) {
+  const showQfaf = viewMode === 'combined' || viewMode === 'qfaf-only';
+  const showCollateral = viewMode === 'combined' || viewMode === 'collateral-only';
+  const partialMonths = startMonth > 1 ? 13 - startMonth : null;
+
+  const money = (v: number) => formatCurrency(v);
+  const negMoney = (v: number) => (v > 0 ? `(${formatCurrency(v)})` : '—');
+  const moneyOrDash = (v: number) => (v > 0.01 ? formatCurrency(v) : '—');
+  const active = (y: YearResult) => y.strategyActive;
+
+  const benefitFor = (y: YearResult) =>
+    viewMode === 'qfaf-only'
+      ? y.qfafTaxBenefit
+      : viewMode === 'collateral-only'
+        ? y.collateralTaxBenefit
+        : y.taxSavings;
+
+  // Running cumulative per displayed year (matches the default orientation)
+  const cumulative: number[] = [];
+  data.reduce((sum, y, i) => {
+    const next = sum + benefitFor(y);
+    cumulative[i] = next;
+    return next;
+  }, 0);
+
+  const sections: RowSection[] = [];
+
+  sections.push({
+    title: 'Portfolio',
+    rows: [
+      ...(viewMode === 'combined' && qfafEnabled
+        ? [{ label: 'Total Value', contentKey: 'col-portfolio-value', cell: (y: YearResult) => money(y.totalValue) }]
+        : []),
+      ...(showCollateral
+        ? [{ label: 'Collateral', contentKey: 'col-collateral-value', cell: (y: YearResult) => money(y.collateralValue) }]
+        : []),
+      ...(showQfaf && qfafEnabled
+        ? [
+            { label: 'QFAF', contentKey: 'col-qfaf-value', cell: (y: YearResult) => money(y.qfafValue) },
+            { label: 'Cash Out', contentKey: 'col-cash-returned', cell: (y: YearResult) => moneyOrDash(y.qfafCashReturned) },
+          ]
+        : []),
+    ],
+  });
+
+  if (showCollateral) {
+    sections.push({
+      title: 'Capital Activity',
+      rows: [
+        {
+          label: 'ST Losses Harvested',
+          contentKey: 'col-st-losses',
+          cell: y => (active(y) ? negMoney(y.stLossesHarvested) : '—'),
+          className: () => 'negative',
+        },
+        {
+          label: 'LT Gains Realized',
+          contentKey: 'col-lt-gains',
+          cell: y => (active(y) ? money(y.ltGainsRealized) : '—'),
+        },
+        {
+          label: 'Harvest Rate',
+          contentKey: 'col-eff-rate',
+          cell: y => (active(y) ? formatPercent(y.effectiveStLossRate) : '—'),
+        },
+        ...(qfafEnabled && viewMode === 'combined'
+          ? [
+              {
+                label: 'QFAF ST Gains',
+                contentKey: 'col-st-gains',
+                cell: (y: YearResult) => (active(y) ? money(y.stGainsGenerated) : '—'),
+              },
+            ]
+          : []),
+      ],
+    });
+  }
+
+  if (showQfaf && qfafEnabled) {
+    sections.push({
+      title: 'Ordinary Losses & NOL',
+      rows: [
+        { label: 'Max Shelter', contentKey: 'col-max-offset', cell: y => money(y.maxIncomeOffsetCapacity) },
+        {
+          label: 'Usable Ordinary Loss',
+          contentKey: 'col-usable-loss',
+          cell: y => (active(y) ? negMoney(y.usableOrdinaryLoss) : '—'),
+          className: () => 'negative',
+        },
+        {
+          label: 'Gross Ordinary Loss',
+          contentKey: 'col-ordinary-loss',
+          cell: y => (active(y) ? negMoney(y.ordinaryLossesGenerated) : '—'),
+          className: () => 'negative',
+        },
+        { label: '→ NOL', contentKey: 'col-excess-nol', cell: y => moneyOrDash(y.excessToNol) },
+        { label: 'NOL Applied', contentKey: 'col-nol-used', cell: y => moneyOrDash(y.nolUsedThisYear) },
+        { label: 'NOL Balance', contentKey: 'col-nol-carryforward', cell: y => money(y.nolCarryforward) },
+        {
+          label: "Income Req'd (Full Use)",
+          contentKey: 'col-income-required',
+          cell: y => moneyOrDash(y.incomeRequiredForFullUtilization),
+        },
+      ],
+    });
+  }
+
+  sections.push({
+    title: 'Capital Loss Carryforwards',
+    rows: [
+      { label: 'ST Carryforward', contentKey: 'col-st-carryforward', cell: y => money(y.stLossCarryforward) },
+      { label: 'LT Carryforward', contentKey: 'col-lt-carryforward', cell: y => money(y.ltLossCarryforward) },
+      { label: '$3K Used vs Income', contentKey: 'col-cap-loss-income', cell: y => moneyOrDash(y.capitalLossUsedAgainstIncome) },
+    ],
+  });
+
+  sections.push({
+    title: 'Tax Savings',
+    rows: [
+      { label: 'Ordinary Deduction', contentKey: 'col-ord-loss-benefit', cell: y => moneyOrDash(y.ordinaryLossBenefit) },
+      { label: 'NOL Benefit', contentKey: 'col-nol-benefit', cell: y => moneyOrDash(y.nolUsageBenefit) },
+      { label: '$3K Benefit', contentKey: 'col-capital-loss-benefit', cell: y => moneyOrDash(y.capitalLossBenefit) },
+      {
+        label: 'LT Gain Cost',
+        contentKey: 'col-lt-gain-cost',
+        cell: y => negMoney(y.ltGainCost),
+        className: () => 'negative',
+      },
+      {
+        label: 'ST Gain Cost',
+        contentKey: 'col-st-leak-cost',
+        cell: y => negMoney(y.remainingStGainCost),
+        className: () => 'negative',
+      },
+      {
+        label: viewMode === 'qfaf-only' ? 'QFAF Benefit' : viewMode === 'collateral-only' ? 'Coll. Benefit' : 'Net Savings',
+        contentKey: 'col-tax-savings',
+        cell: y => formatCurrency(benefitFor(y)),
+        highlight: true,
+      },
+      {
+        label: 'Cumulative',
+        contentKey: 'col-cumulative-savings',
+        cell: (_y, cum) => formatCurrency(cum),
+        highlight: true,
+      },
+    ],
+  });
+
+  const totalSavings = allYears.reduce((sum, y) => sum + benefitFor(y), 0);
+
+  return (
+    <div className="table-scroll">
+      <table className="year-breakdown-table year-breakdown-table--compact year-breakdown-table--transposed">
+        <thead>
+          <tr>
+            <th className="col-year">Metric</th>
+            {data.map(y => (
+              <th key={y.year} className={`num ${!y.strategyActive ? 'wind-down-row' : ''}`}>
+                Yr {y.year}
+                {y.year === 1 && partialMonths !== null && (
+                  <span className="partial-year-badge partial-year-badge--compact" title={`Year 1 pro-rated to ${partialMonths} months`}>
+                    {partialMonths} mo
+                  </span>
+                )}
+                {!y.strategyActive && (
+                  <span className="wind-down-badge" title="Wind-down: strategy ended, carryforward usage only">
+                    W/D
+                  </span>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sections
+            .filter(sec => sec.rows.length > 0)
+            .map(sec => (
+              <Fragment key={sec.title}>
+                <tr className="transposed-section-row">
+                  <td colSpan={data.length + 1}>{sec.title}</td>
+                </tr>
+                {sec.rows.map(row => (
+                  <tr key={row.label} className={row.highlight ? 'transposed-highlight-row' : ''}>
+                    <td className="transposed-metric-label">
+                      {row.contentKey ? (
+                        <InfoText contentKey={row.contentKey}>{row.label}</InfoText>
+                      ) : (
+                        row.label
+                      )}
+                    </td>
+                    {data.map((y, i) => (
+                      <td key={y.year} className={`num ${row.className ? row.className(y) : ''}`}>
+                        {row.cell(y, cumulative[i])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>
+              <strong>Total {allYears.length}-Year Projection</strong>
+            </td>
+            <td className="highlight num" colSpan={data.length}>
+              <strong>{formatCurrency(totalSavings)}</strong>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

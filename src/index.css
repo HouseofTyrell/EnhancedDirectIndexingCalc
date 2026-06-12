@@ -7040,3 +7040,31 @@ select:focus:not(:focus-visible) {
 .sticky-header .delta-badge {
   display: none;
 }
+
+/* ── Transposed year-by-year table (years as columns) ── */
+.year-breakdown-table--transposed th.num,
+.year-breakdown-table--transposed td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.year-breakdown-table--transposed .transposed-metric-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.transposed-section-row td {
+  background: var(--section-bg, #f1f5f9);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+  /* Keep the section label visible while horizontally scrolled */
+  position: sticky;
+  left: 0;
+}
+
+.transposed-highlight-row td {
+  font-weight: 700;
+}
