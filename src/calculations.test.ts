@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculate, calculateSizing, calculateWithOverrides } from './calculations';
+import { calculate, calculateSizing, calculateWithOverrides, solveCollateralForTotal } from './calculations';
 import { CalculatorInputs, DEFAULT_SETTINGS, AdvancedSettings } from './types';
 
 // Helper to create base inputs
@@ -77,6 +77,38 @@ describe('calculateSizing', () => {
     // Single limit is $313,000
     expect(sizing.year1UsableOrdinaryLoss).toBe(256000);
     expect(sizing.section461Limit).toBe(256000);
+  });
+});
+
+describe('solveCollateralForTotal (total-budget sizing)', () => {
+  it('splits a total budget so collateral + auto-sized QFAF equals the budget', () => {
+    // overlay-45-45, 1-year window: k = 16.5% / 150% = 0.11 → C = 20M / 1.11
+    const inputs = createInputs({ strategyId: 'overlay-45-45', qfafSizingYears: 1 });
+    const collateral = solveCollateralForTotal(20000000, inputs);
+    expect(collateral).toBeCloseTo(20000000 / 1.11, 0);
+
+    const sizing = calculateSizing({ ...inputs, collateralAmount: collateral });
+    expect(sizing.totalExposure).toBeCloseTo(20000000, 0);
+  });
+
+  it('respects cushion, wash-sale rate, and custom multiplier in the split', () => {
+    const inputs = createInputs({
+      strategyId: 'overlay-45-45',
+      qfafSizingYears: 1,
+      qfafSizingCushion: 0.05,
+    });
+    const collateral = solveCollateralForTotal(20000000, inputs, 1.0, 0.1);
+    const sizing = calculateSizing({ ...inputs, collateralAmount: collateral }, 1.0, 0.1);
+    expect(sizing.totalExposure).toBeCloseTo(20000000, 0);
+  });
+
+  it('allocates the whole budget to collateral when QFAF is disabled', () => {
+    const inputs = createInputs({ qfafEnabled: false });
+    expect(solveCollateralForTotal(20000000, inputs)).toBe(20000000);
+  });
+
+  it('returns 0 for a non-positive budget', () => {
+    expect(solveCollateralForTotal(0, createInputs())).toBe(0);
   });
 });
 

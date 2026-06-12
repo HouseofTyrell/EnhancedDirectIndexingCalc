@@ -2,18 +2,19 @@ import { useState, useEffect } from 'react';
 import { Calculator } from './Calculator';
 import { QfafTestPage } from './pages/QfafTestPage';
 import { EdiOnlyPage } from './pages/EdiOnlyPage';
+import { WorkspaceTab } from './workspace/WorkspaceTab';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-type View = 'calculator' | 'qfaf-test' | 'edi-only';
+type View = 'calculator' | 'workspace' | 'qfaf-test' | 'edi-only';
 
 function getInitialView(): View {
   const params = new URLSearchParams(window.location.search);
   const view = params.get('view');
-  if (view === 'qfaf-test' || view === 'edi-only' || view === 'calculator') {
+  if (view === 'qfaf-test' || view === 'edi-only' || view === 'calculator' || view === 'workspace') {
     return view;
   }
-  return 'calculator';
+  return 'workspace';
 }
 
 export function App() {
@@ -36,10 +37,16 @@ export function App() {
       <nav className="app-nav">
         <div className="nav-container">
           <button
+            className={`nav-tab ${activeView === 'workspace' ? 'active' : ''}`}
+            onClick={() => setActiveView('workspace')}
+          >
+            Workspace
+          </button>
+          <button
             className={`nav-tab ${activeView === 'calculator' ? 'active' : ''}`}
             onClick={() => setActiveView('calculator')}
           >
-            Tax Calculator
+            Classic Calculator
           </button>
           <button
             className={`nav-tab ${activeView === 'edi-only' ? 'active' : ''}`}
@@ -62,6 +69,7 @@ export function App() {
       <main className="app-content">
         <ErrorBoundary>
           {activeView === 'calculator' && <Calculator />}
+          {activeView === 'workspace' && <WorkspaceTab />}
           {activeView === 'qfaf-test' && <QfafTestPage />}
           {activeView === 'edi-only' && <EdiOnlyPage />}
         </ErrorBoundary>

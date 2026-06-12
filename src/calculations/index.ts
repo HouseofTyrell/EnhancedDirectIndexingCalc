@@ -1,4 +1,4 @@
-export { calculateSizing } from './sizing';
+export { calculateSizing, solveCollateralForTotal } from './sizing';
 export { calculate, calculateWithOverrides } from './core';
 export { calculateWithSensitivity } from './sensitivity';
 export { computeExitTaxAnalysis } from './exitTax';

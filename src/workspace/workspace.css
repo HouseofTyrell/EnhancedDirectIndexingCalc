@@ -1,0 +1,300 @@
+/* Workspace (Beta) — two-pane cockpit layout from the 2026-06 UI review.
+   Left: persistent input rail. Right: results-first pane with sub-views. */
+
+.ws {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  align-items: start;
+}
+
+/* ── Input rail ── */
+.ws-rail {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.ws-rail-group {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.ws-rail-group h4 {
+  margin: 0 0 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.ws-field:last-child {
+  margin-bottom: 0;
+}
+
+.ws-field > span {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-field input,
+.ws-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  font-size: 0.88rem;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  background: var(--input-bg, #fff);
+  color: var(--text-primary, #0f172a);
+}
+
+.ws-field input[type='range'] {
+  padding: 0;
+  border: none;
+}
+
+.ws-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-primary, #0f172a);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.ws-toggle:last-child {
+  margin-bottom: 0;
+}
+
+.ws-rail-note {
+  font-size: 0.74rem;
+  color: var(--text-secondary, #64748b);
+  margin: 0;
+  padding: 0 4px;
+  line-height: 1.4;
+}
+
+/* ── Results pane ── */
+.ws-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ws-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.ws-metric {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ws-metric--primary {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb inset;
+}
+
+.ws-metric-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-metric-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-metric--primary .ws-metric-value {
+  color: #16a34a;
+}
+
+.ws-metric-value em {
+  font-style: normal;
+  color: var(--text-secondary, #94a3b8);
+  font-weight: 400;
+}
+
+.ws-metric-sub {
+  font-size: 0.74rem;
+  color: var(--text-secondary, #64748b);
+}
+
+/* ── Sub-navigation ── */
+.ws-subnav {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  padding-bottom: 0;
+}
+
+.ws-subnav-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+}
+
+.ws-subnav-btn.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+/* ── Overview ── */
+.ws-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ws-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.ws-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ws-card-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-card-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-card-sub {
+  font-size: 0.74rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-narrative {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-left: 3px solid #2563eb;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-primary, #1e293b);
+  margin: 0;
+}
+
+.ws-note {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #713f12;
+}
+
+.ws-note--muted {
+  background: var(--card-bg, #f8fafc);
+  border-color: var(--border-color, #e2e8f0);
+  color: var(--text-secondary, #64748b);
+}
+
+.ws-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .ws {
+    grid-template-columns: 1fr;
+  }
+
+  .ws-rail {
+    position: static;
+    max-height: none;
+  }
+}
+
+/* Funding-mode segmented control + derived breakdown */
+.ws-segment {
+  display: flex;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ws-segment button {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--input-bg, #fff);
+  color: var(--text-secondary, #64748b);
+  border: none;
+  cursor: pointer;
+}
+
+.ws-segment button.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.ws-derived {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-secondary, #475569);
+  background: var(--card-bg, #f8fafc);
+  border: 1px dashed var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-variant-numeric: tabular-nums;
+}
