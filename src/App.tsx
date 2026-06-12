@@ -14,7 +14,7 @@ function getInitialView(): View {
   if (view === 'qfaf-test' || view === 'edi-only' || view === 'calculator' || view === 'workspace') {
     return view;
   }
-  return 'calculator';
+  return 'workspace';
 }
 
 export function App() {
@@ -37,16 +37,16 @@ export function App() {
       <nav className="app-nav">
         <div className="nav-container">
           <button
-            className={`nav-tab ${activeView === 'calculator' ? 'active' : ''}`}
-            onClick={() => setActiveView('calculator')}
-          >
-            Tax Calculator
-          </button>
-          <button
             className={`nav-tab ${activeView === 'workspace' ? 'active' : ''}`}
             onClick={() => setActiveView('workspace')}
           >
-            Workspace <span className="nav-tab-badge">Beta</span>
+            Workspace
+          </button>
+          <button
+            className={`nav-tab ${activeView === 'calculator' ? 'active' : ''}`}
+            onClick={() => setActiveView('calculator')}
+          >
+            Classic Calculator
           </button>
           <button
             className={`nav-tab ${activeView === 'edi-only' ? 'active' : ''}`}

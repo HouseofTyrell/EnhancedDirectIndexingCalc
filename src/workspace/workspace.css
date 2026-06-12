@@ -276,3 +276,39 @@
   color: #fff;
   vertical-align: middle;
 }
+
+/* Funding-mode segmented control + derived breakdown */
+.ws-segment {
+  display: flex;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ws-segment button {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--input-bg, #fff);
+  color: var(--text-secondary, #64748b);
+  border: none;
+  cursor: pointer;
+}
+
+.ws-segment button.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.ws-derived {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-secondary, #475569);
+  background: var(--card-bg, #f8fafc);
+  border: 1px dashed var(--border-color, #cbd5e1);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-variant-numeric: tabular-nums;
+}

@@ -106,3 +106,36 @@ export function calculateSizing(
     splitLegs,
   };
 }
+
+/**
+ * Solve for the collateral amount such that collateral + auto-sized QFAF
+ * equals a target total (the client's available portfolio).
+ *
+ * The auto-sized QFAF is proportional to collateral: QFAF = C × k, where
+ * k = avgStLossRate × (1 − washSale) × (1 − cushion) ÷ multiplier. So the
+ * collateral that exhausts a total budget T is C = T / (1 + k). k is
+ * scale-invariant, so we probe calculateSizing once to read it off rather
+ * than duplicating the sizing formula here.
+ *
+ * With the QFAF disabled the whole budget is collateral. With a manual
+ * qfafOverride the remainder after the override is collateral.
+ */
+export function solveCollateralForTotal(
+  totalAvailable: number,
+  inputs: CalculatorInputs,
+  qfafMultiplier?: number,
+  washSaleDisallowanceRate: number = 0
+): number {
+  if (!(totalAvailable > 0)) return 0;
+  if (inputs.qfafEnabled === false) return totalAvailable;
+  if (inputs.qfafOverride !== undefined) {
+    return Math.max(0, totalAvailable - inputs.qfafOverride);
+  }
+  const probe = calculateSizing(
+    { ...inputs, collateralAmount: totalAvailable },
+    qfafMultiplier,
+    washSaleDisallowanceRate
+  );
+  const k = probe.collateralValue > 0 ? probe.qfafValue / probe.collateralValue : 0;
+  return totalAvailable / (1 + k);
+}

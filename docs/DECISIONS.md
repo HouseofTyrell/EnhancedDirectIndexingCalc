@@ -125,6 +125,20 @@ Reuses the same engine, the audit-complete ResultsTable, charts, QP gate, and
 disclosures. Classic Tax Calculator tab untouched (split allocation, year-by-year
 planning, sensitivity, Meeting Mode remain there).
 
+### Owner directive — Workspace as default + total-budget sizing
+**Date:** 2026-06-12
+**Directive:** Make the Workspace view the default tab (classic moves to a background
+tab), and add a funding option where the QFAF and collateral together total the client's
+available portfolio (e.g. a $20M client shouldn't have to guess collateral sizes).
+**Status: IMPLEMENTED (2026-06-12)** — Workspace is the default view ("Classic
+Calculator" remains as the second tab, unchanged). `solveCollateralForTotal`
+(calculations/sizing.ts) solves C = T / (1 + k) where k is the scale-invariant
+QFAF-to-collateral ratio (respects sizing window, cushion, wash-sale rate, and custom
+multiplier). The Workspace rail gains a "Fund by: Collateral | Total portfolio"
+segmented control with a live derived breakdown (e.g. $20M → Collateral $18,018,018 +
+QFAF $1,981,982). In total-budget mode the standard-DI comparison puts the WHOLE budget
+into direct indexing for a true apples-to-apples baseline.
+
 ---
 
 ## Pending decision queue (next batches)

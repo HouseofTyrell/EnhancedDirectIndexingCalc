@@ -17,7 +17,7 @@ import {
   getStateConformityWarning,
 } from '../taxData';
 import { STRATEGIES, getStrategy } from '../strategyData';
-import { calculate, computeExitTaxAnalysis } from '../calculations';
+import { calculate, computeExitTaxAnalysis, solveCollateralForTotal } from '../calculations';
 import { getQuantifiedStateWarning } from '../utils/stateTaxWarnings';
 import { formatCurrency, formatPercent, formatWithCommas, parseFormattedNumber } from '../utils/formatters';
 import { ResultsTable } from '../ResultsTable';
@@ -29,6 +29,7 @@ import { InfoText } from '../InfoPopup';
 import './workspace.css';
 
 type ResultsView = 'overview' | 'table' | 'charts';
+type FundingMode = 'collateral' | 'total';
 
 /**
  * Workspace (Beta) — redesigned single-screen experience from the UI review.
@@ -48,16 +49,44 @@ export function WorkspaceTab() {
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULTS);
   const [settings, setSettings] = useState<AdvancedSettings>(DEFAULT_SETTINGS);
   const [resultsView, setResultsView] = useState<ResultsView>('overview');
+  // Funding mode: enter the collateral directly, or enter the client's TOTAL
+  // available portfolio and let the tool solve collateral + QFAF = total
+  // (no more guessing collateral sizes to hit a budget).
+  const [fundingMode, setFundingMode] = useState<FundingMode>('collateral');
+  const [totalAvailable, setTotalAvailable] = useState<number>(DEFAULTS.collateralAmount);
 
   const set = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) =>
     setInputs(prev => ({ ...prev, [key]: value }));
   const setSetting = <K extends keyof AdvancedSettings>(key: K, value: AdvancedSettings[K]) =>
     setSettings(prev => ({ ...prev, [key]: value }));
 
-  const results = useMemo(() => calculate(inputs, settings), [inputs, settings]);
+  // In total-budget mode, solve for the collateral that makes
+  // collateral + auto-sized QFAF equal the available portfolio.
+  const effectiveInputs = useMemo<CalculatorInputs>(() => {
+    if (fundingMode !== 'total') return inputs;
+    const solved = solveCollateralForTotal(
+      totalAvailable,
+      inputs,
+      settings.qfafMultiplier,
+      settings.washSaleDisallowanceRate
+    );
+    return { ...inputs, collateralAmount: solved };
+  }, [fundingMode, totalAvailable, inputs, settings.qfafMultiplier, settings.washSaleDisallowanceRate]);
+
+  const results = useMemo(() => calculate(effectiveInputs, settings), [effectiveInputs, settings]);
+  // Standard-DI comparison: in total-budget mode a DI-only client would put
+  // the WHOLE budget into direct indexing, so compare against that.
   const collateralOnly = useMemo(
-    () => calculate({ ...inputs, qfafEnabled: false }, settings),
-    [inputs, settings]
+    () =>
+      calculate(
+        {
+          ...effectiveInputs,
+          qfafEnabled: false,
+          collateralAmount: fundingMode === 'total' ? totalAvailable : effectiveInputs.collateralAmount,
+        },
+        settings
+      ),
+    [effectiveInputs, fundingMode, totalAvailable, settings]
   );
 
   const rates = useMemo(() => {
@@ -147,14 +176,57 @@ export function WorkspaceTab() {
               ))}
             </select>
           </label>
-          <label className="ws-field">
-            <span>Collateral amount</span>
-            <input
-              inputMode="numeric"
-              value={formatWithCommas(inputs.collateralAmount)}
-              onChange={e => set('collateralAmount', parseFormattedNumber(e.target.value))}
-            />
-          </label>
+          <div className="ws-field">
+            <span>Fund by</span>
+            <div className="ws-segment">
+              <button
+                type="button"
+                className={fundingMode === 'collateral' ? 'active' : ''}
+                onClick={() => setFundingMode('collateral')}
+              >
+                Collateral
+              </button>
+              <button
+                type="button"
+                className={fundingMode === 'total' ? 'active' : ''}
+                onClick={() => {
+                  // Seed the budget from the current total so the switch is seamless
+                  setTotalAvailable(Math.round(results.sizing.totalExposure));
+                  setFundingMode('total');
+                }}
+              >
+                Total portfolio
+              </button>
+            </div>
+          </div>
+          {fundingMode === 'collateral' ? (
+            <label className="ws-field">
+              <span>Collateral amount</span>
+              <input
+                inputMode="numeric"
+                value={formatWithCommas(inputs.collateralAmount)}
+                onChange={e => set('collateralAmount', parseFormattedNumber(e.target.value))}
+              />
+            </label>
+          ) : (
+            <>
+              <label className="ws-field">
+                <span>Total available portfolio</span>
+                <input
+                  inputMode="numeric"
+                  value={formatWithCommas(totalAvailable)}
+                  onChange={e => setTotalAvailable(parseFormattedNumber(e.target.value))}
+                />
+              </label>
+              <p className="ws-derived">
+                → Collateral {formatCurrency(results.sizing.collateralValue)}
+                {inputs.qfafEnabled && (
+                  <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
+                )}{' '}
+                = {formatCurrency(results.sizing.totalExposure)}
+              </p>
+            </>
+          )}
           <label className="ws-field">
             <span>Start month</span>
             <select
@@ -372,11 +444,11 @@ export function WorkspaceTab() {
           <ResultsTable
             data={results.years}
             sizing={results.sizing}
-            qfafEnabled={inputs.qfafEnabled}
+            qfafEnabled={effectiveInputs.qfafEnabled}
             projectionYears={projectionYears}
-            startMonth={inputs.startMonth}
-            qfafDuration={inputs.qfafDuration}
-            strategyId={inputs.strategyId}
+            startMonth={effectiveInputs.startMonth}
+            qfafDuration={effectiveInputs.qfafDuration}
+            strategyId={effectiveInputs.strategyId}
             ltGainRate={currentStrategy?.ltGainRate}
           />
         )}
