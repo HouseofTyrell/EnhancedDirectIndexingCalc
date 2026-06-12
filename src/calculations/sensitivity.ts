@@ -13,8 +13,6 @@ import {
   QFAF_ST_GAIN_RATE,
   CAPITAL_LOSS_LIMITS,
   SECTION_461L_LIMITS,
-  getLongLeverageRatio,
-  getShortRatio,
   Strategy,
 } from '../strategyData';
 import { safeNumber } from '../utils/formatters';
@@ -26,6 +24,7 @@ import {
   calculateCarryforwards,
   calculateSummary,
 } from './helpers';
+import { getEffectiveFinancingCost, getBlendedFinancingCost } from './financing';
 import { calculateSizing } from './sizing';
 import {
   resolveAllocation,
@@ -34,49 +33,6 @@ import {
   ResolvedAllocation,
   ResolvedLeg,
 } from './splitAllocation';
-
-/**
- * Calculate the effective financing cost based on strategy leverage and user settings.
- * In simple mode, uses the user-specified rate directly.
- * In detailed mode, calculates cost from component rates and strategy leverage.
- * @param strategy - The investment strategy (determines leverage ratios)
- * @param settings - Advanced settings with financing cost configuration
- * @returns Effective financing cost as a decimal (e.g., 0.025 = 2.5% of portfolio per year)
- */
-function getEffectiveFinancingCost(strategy: Strategy, settings: AdvancedSettings): number {
-  if (!settings.financingFeesEnabled) return 0;
-
-  if (settings.financingMode === 'simple') {
-    // Simple mode: wealth management fee + manager fees (base × leverage% + fixed)
-    const leveragePct = getShortRatio(strategy);
-    const managerFee = settings.simpleManagerFeeBase * leveragePct + settings.simpleManagerFeeFixed;
-    return settings.simpleWealthMgmtFee + managerFee;
-  } else {
-    // Detailed mode: calculate from component rates
-    const longLeverage = getLongLeverageRatio(strategy);
-    const shortRatio = getShortRatio(strategy);
-
-    // Margin interest cost: broker rate × long leverage
-    const marginCost = settings.brokerMarginRate * longLeverage;
-
-    // Short position costs: (borrow fees + dividend payments) × short ratio
-    const shortCosts = (settings.shortBorrowRate + settings.shortDividendRate) * shortRatio;
-
-    // Wealth management advisory fee: applied to entire portfolio
-    const advisoryFee = settings.wealthManagementFeeRate;
-
-    return marginCost + shortCosts + advisoryFee;
-  }
-}
-
-function getBlendedFinancingCost(allocation: ResolvedAllocation, settings: AdvancedSettings): number {
-  if (allocation.totalCollateral <= 0) return 0;
-  let weightedSum = 0;
-  for (const leg of allocation.legs) {
-    weightedSum += leg.collateralAmount * getEffectiveFinancingCost(leg.strategy, settings);
-  }
-  return weightedSum / allocation.totalCollateral;
-}
 
 /**
  * Calculate with sensitivity analysis adjustments.
