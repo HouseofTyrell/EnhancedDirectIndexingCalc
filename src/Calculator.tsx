@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { calculate, calculateWithOverrides, calculateWithSensitivity, computeExitTaxAnalysis } from './calculations';
 import { DEFAULTS, getFederalStRate, getFederalLtRate, getStateRate } from './taxData';
 import { STRATEGIES, getStrategy } from './strategyData';
+import { getQuantifiedStateWarning } from './utils/stateTaxWarnings';
 import {
   CalculatorInputs,
   YearOverride,
@@ -161,6 +162,13 @@ export function Calculator() {
     combinedStRate,
     combinedLtRate,
   } = taxRates;
+
+  // Quantified state-math warning (D-005 phase 1): PA/NJ/MA/WA dollar-impact
+  // notes where the flat-state-rate assumption is materially wrong.
+  const stateMathWarning = useMemo(
+    () => getQuantifiedStateWarning(inputs.stateCode, stateRate, results.years),
+    [inputs.stateCode, stateRate, results.years]
+  );
 
   // Exit-tax / deferred-gain analysis (D-003): quantifies the embedded gain
   // created by basis erosion and splits projected savings into permanent vs
@@ -540,6 +548,7 @@ export function Calculator() {
         collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
         collateralAmount={effectiveCollateral}
         exitTaxAnalysis={exitTaxAnalysis}
+        stateMathWarning={stateMathWarning}
         stateCode={inputs.stateCode}
       />
       </PinnableSection>
@@ -703,6 +712,7 @@ export function Calculator() {
                 collateralOnlyTaxSavings={collateralOnlyResults.summary.totalTaxSavings}
                 collateralAmount={effectiveCollateral}
                 exitTaxAnalysis={exitTaxAnalysis}
+                stateMathWarning={stateMathWarning}
                 stateCode={inputs.stateCode}
               />
             ),

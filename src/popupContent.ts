@@ -67,7 +67,7 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'auto-sized-qfaf': {
     title: 'Auto-Sized QFAF',
     definition:
-      'Qualified Family Agricultural Fund allocation, automatically sized to match collateral ST loss capacity.',
+      'Quantinno Fundamental Arbitrage Fund allocation, automatically sized to match collateral ST loss capacity.',
     formula: '(Collateral × Strategy ST Loss Rate) ÷ 150%',
     impact:
       'QFAF generates 150% ST gains and 150% ordinary losses annually. Proper sizing ensures ST gains are fully offset.',

@@ -203,7 +203,7 @@ export function ResultsTable({
               <button
                 className={`view-mode-btn ${viewMode === 'qfaf-only' ? 'active' : ''}`}
                 onClick={() => setViewMode('qfaf-only')}
-                title="Qualified Financial Asset Fund — generates ordinary losses and short-term gains"
+                title="Quantinno Fundamental Arbitrage Fund — generates ordinary losses and short-term gains"
               >
                 QFAF Only
               </button>

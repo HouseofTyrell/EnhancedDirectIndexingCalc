@@ -28,6 +28,8 @@ interface ResultsSummaryProps {
   collateralAmount?: number;
   /** Exit-tax / deferred-gain analysis (D-003): permanent vs deferred split */
   exitTaxAnalysis?: ExitTaxAnalysis;
+  /** Quantified state-math warning (D-005): PA/NJ/MA/WA dollar-impact note */
+  stateMathWarning?: string;
   /** State code for conformity warning (e.g. "CA", "NY") */
   stateCode?: string;
 }
@@ -51,6 +53,7 @@ export const ResultsSummary = React.memo(function ResultsSummary({
   collateralOnlyTaxSavings = 0,
   collateralAmount = 0,
   exitTaxAnalysis,
+  stateMathWarning,
   stateCode,
 }: ResultsSummaryProps) {
   const incrementalBenefit = totalTaxSavings - collateralOnlyTaxSavings;
@@ -231,6 +234,14 @@ export const ResultsSummary = React.memo(function ResultsSummary({
         <div className="state-conformity-warning">
           <strong>⚠️ State Tax Conformity:</strong>
           <p>{getStateConformityWarning(stateCode)}</p>
+        </div>
+      )}
+
+      {/* Quantified state-math warning for PA/NJ/MA/WA (D-005 phase 1) */}
+      {stateMathWarning && (
+        <div className="state-conformity-warning">
+          <strong>⚠️ State Tax Estimate:</strong>
+          <p>{stateMathWarning}</p>
         </div>
       )}
     </CollapsibleSection>

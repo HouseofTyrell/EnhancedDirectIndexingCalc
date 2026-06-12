@@ -1442,15 +1442,25 @@ function PrintPageFooter() {
         marginTop: 32,
         paddingTop: 12,
         borderTop: `1px solid ${M.line}`,
-        fontSize: 9.5,
+        fontSize: 8.5,
         color: M.inkFaint,
-        lineHeight: 1.5,
+        lineHeight: 1.45,
         fontFamily: M.sans,
       }}
     >
-      Estimates do not reflect advisory fees, financing costs, tracking error,
-      transaction costs, or behavioral effects. Actual results will vary. For
-      discussion purposes only.
+      <strong>Important disclosures.</strong> This is a hypothetical illustration for
+      discussion purposes only — not investment, tax, or legal advice, and not an offer of any
+      security. Estimates do not reflect advisory fees, financing costs, tracking error,
+      transaction costs, or behavioral effects; actual results will vary. Tax-loss harvesting
+      reduces cost basis: a portion of projected savings is tax deferral that becomes due if the
+      portfolio is liquidated (it may become permanent via basis step-up at death or charitable
+      transfer). Ordinary loss deductions are limited by IRC §461(l) ($512K MFJ / $256K others,
+      2026); excess becomes an NOL usable against up to 80% of future taxable income. Projections
+      assume 0–15% of harvested losses are disallowed as wash sales and that the QFAF (Quantinno
+      Fundamental Arbitrage Fund) qualifies for the modeled tax treatment under current IRS
+      guidance, which may change. State treatment varies — CA, NY, PA, NJ, MA, and WA differ
+      materially from the federal rules modeled here. Consult qualified tax, legal, and
+      investment advisors before acting. Past performance does not guarantee future results.
     </div>
   );
 }
@@ -1477,7 +1487,7 @@ function MechanicsView({
       title: 'Establish QFAF',
       tone: M.accent,
       body:
-        'A Qualified Fund-of-Funds overlay is established against collateral, giving structured exposure without a taxable sale of the underlying.',
+        'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.',
       metric: fmtCurrency(qfafValue),
       metricLabel: 'QFAF value',
     },
@@ -1502,7 +1512,7 @@ function MechanicsView({
       title: 'Tax savings compound',
       tone: M.good,
       body:
-        'Savings compound year over year — amplifying the baseline return and compounding the advantage vs. standard direct indexing.',
+        'Estimated tax savings, if reinvested, can compound over time — potentially adding to after-tax results vs. standard direct indexing.',
       metric: fmtCurrency(totalTaxSavings),
       metricLabel: 'Est. cumulative savings',
     },

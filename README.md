@@ -1,6 +1,6 @@
 # Tax Optimization Calculator
 
-A React-based financial calculator for high-net-worth individuals to model tax optimization strategies using direct indexing with Quantified Alternative Funds (QFAF).
+A React-based financial calculator for high-net-worth individuals to model tax optimization strategies using direct indexing with the Quantinno Fundamental Arbitrage Fund (QFAF).
 
 ## Overview
 

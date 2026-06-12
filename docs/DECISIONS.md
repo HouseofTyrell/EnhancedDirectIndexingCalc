@@ -69,17 +69,49 @@ carryforward tail and the views agree.
 starts.
 **Status: IMPLEMENTED (2026-06-11)** — all 13 failing tests now pass.
 
+### D-005 — State tax fidelity (phased)
+**Date:** 2026-06-12
+**Decision:** Phased — quantified warnings now, per-state engine adjustments later as a
+separate decision.
+**Status: PHASE 1 IMPLEMENTED (2026-06-12)** — `src/utils/stateTaxWarnings.ts` computes
+dollar-impact warnings from the actual projection: PA/NJ (state-level benefit on ordinary
+deductions unlikely to be available, ≈$ amount shown), MA (split ST/LT rates), WA (7%
+LTCG excise estimate). Shown in ResultsSummary alongside the CA/NY/PA conformity notes.
+Phase 2 (engine adjustments) returns to the queue when warnings prove insufficient.
+
+### D-007 — Official QFAF name
+**Date:** 2026-06-12
+**Decision (owner):** QFAF stands for **"Quantinno Fundamental Arbitrage Fund."**
+**Status: IMPLEMENTED (2026-06-12)** — standardized in README, popup tooltips,
+ResultsTable, and Meeting Mode (which also lost its overstated "is established…giving
+structured exposure" phrasing). `TAX_CALCULATION_REVIEW.md` left as a historical
+point-in-time document. Still open from the original finding: an owner-approved
+one-paragraph description of the 150% tax treatment and its qualification assumptions.
+
+### D-008 — Meeting Mode print handout disclosures
+**Date:** 2026-06-12
+**Decision:** Full disclosure block.
+**Status: IMPLEMENTED (2026-06-12)** — print footer now covers: not advice/not an offer,
+fees and costs excluded, basis-reduction/deferral (with step-up nuance), §461(l) and NOL
+80% limits, wash-sale assumption, QFAF qualification contingency, and state-variation
+notice (CA/NY/PA/NJ/MA/WA). "Amplifying the baseline return" softened to
+compliance-appropriate phrasing.
+
+### Owner directive — audit-complete year-by-year table
+**Date:** 2026-06-12
+**Directive:** The expandable year-by-year table must contain every field any audience
+(advisor, UHNW client, tax advisor) would ask about or need to see.
+**Status: IMPLEMENTED (2026-06-12)** — added per-year ST/LT capital loss carryforward
+balances + $3K deduction (new "Cap. CF" group), full savings reconciliation ($3K benefit
+and net ST gain cost columns so components sum exactly to Savings), QFAF cash returned,
+and effective harvest rate. Treat this as a standing requirement: when the engine gains
+a new per-year output, surface it in the table.
+
 ---
 
 ## Pending decision queue (next batches)
 
-### D-005 — State tax fidelity
-The engine applies one flat state rate everywhere, assuming full federal conformity.
-Materially wrong for PA/NJ (no wage offset for these losses), MA (split ST/LT rates),
-WA (7% LTCG excise coded as 0%), CA (own excess-business-loss regime). Options:
-(a) per-state engine adjustments for the ~5 worst states; (b) keep math as-is but show
-hard per-state warnings with dollar-impact estimates; (c) phased: warnings now,
-adjustments later. **PM recommendation: (c).**
+### D-005 — State tax fidelity *(moved to Decided below)*
 
 ### D-006 — Present-value option for multi-year savings
 "Total Tax Savings" is an undiscounted nominal sum over 10–30 years. Options:
@@ -87,20 +119,9 @@ adjustments later. **PM recommendation: (c).**
 (c) leave nominal (consistent with D-002 high-level philosophy). Interacts with D-003's
 permanent-vs-deferral split. **PM recommendation: decide after D-003 ships.**
 
-### D-007 — Official QFAF name and product description
-"QFAF" is expanded four different ways across the app (README: "Quantified Alternative
-Funds"; popupContent.ts: "Qualified Family Agricultural Fund"; TAX_CALCULATION_REVIEW.md:
-"Qualified Fund of Allocated Funds"; MeetingMode.tsx: "Qualified Fund-of-Funds").
-**Only the owner knows the correct expansion** — needs the real product name, plus a
-one-paragraph approved description of the 150% tax treatment and its qualification
-assumptions. Blocks the copy/disclosure pass.
+### D-007 — Official QFAF name *(moved to Decided below)*
 
-### D-008 — Meeting Mode print handout disclosure depth
-Current print footer is ~50 generic words. Compliance review says inadequate to leave
-with a client. Options: (a) full disclosure block (state conformity, basis reduction,
-QFAF regulatory contingency, wash-sale assumption); (b) minimal additions ("not tax
-advice", basis-reduction caveat) keeping the 3-page layout clean. Depends on whether
-handouts are left with clients or used live-only.
+### D-008 — Print handout disclosures *(moved to Decided below)*
 
 ### D-009 — Qualified purchaser gate hardening
 Gate is localStorage-only and trivially bypassable — fine for an educational tool,
@@ -129,15 +150,14 @@ enable Advanced Settings to include them").
 2. ~~**QFAF unwind principal vanishes**~~ **FIXED 2026-06-11** — terminal unwind proceeds
    recorded as `qfafCashReturned` in the last operating year; summary gains
    `totalQfafCashReturned` and `finalTotalWealth`.
-3. **Custom QFAF multiplier inconsistency** — initial sizing (`sizing.ts:52`) and dynamic
-   resizing (`core.ts`) use the 1.5 constant; infusion resizing
-   (`overrides.ts`) and gains generation use the setting.
-4. **Wash-sale haircut asymmetry** — initial sizing ignores the wash-sale rate, dynamic
-   resizing applies it → Year-1 ST gain leakage in fixed mode when rate > 0.
-5. **`calculateWithOverrides` ignores custom STCG/LTCG/NIIT rates** — Year-by-Year
-   Planning disagrees with the standard view when custom rates are set.
-6. **Negative-income edge** — `min(..., effectiveIncome)` can produce a negative ordinary
-   deduction with negative year-income overrides.
+3. ~~**Custom QFAF multiplier inconsistency**~~ **FIXED 2026-06-12** — sizing (fixed and
+   dynamic) now uses the actual `qfafMultiplier` everywhere.
+4. ~~**Wash-sale haircut asymmetry**~~ **FIXED 2026-06-12** — initial sizing nets out the
+   wash-sale rate, matching the dynamic-resize target.
+5. ~~**`calculateWithOverrides` ignores custom rates**~~ **FIXED 2026-06-12** — overrides
+   path honors custom STCG/LTCG/NIIT rates like `calculate()`.
+6. ~~**Negative-income edge**~~ **FIXED 2026-06-12** — §461(l) income cap clamped at 0
+   (full negative-income modeling remains D-010).
 7. ~~**Test suite red**~~ **FIXED 2026-06-11** — D-004 implemented; suite green (333 tests).
 8. **Three duplicated projection loops** (`core.ts` / `overrides.ts` / `sensitivity.ts`,
    incl. copy-pasted `getEffectiveFinancingCost`) — consolidate to prevent recurrence of
