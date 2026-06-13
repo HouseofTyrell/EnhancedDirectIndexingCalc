@@ -837,6 +837,33 @@ export function WorkspaceTab() {
     { amount: 0, year: 1 }
   );
   const incomeReqYears = results.years.filter(y => y.incomeRequiredForFullUtilization > 0.5);
+  // Decompose the peak income-required figure into its formula terms for the
+  // info popup, straight from the engine (no parallel calc) so advisors can see
+  // where the planning target comes from.
+  const peakIncomeReqYear = results.years.find(y => y.year === peakIncomeReq.year);
+  const incomeReqBreakdown = peakIncomeReqYear
+    ? [
+        {
+          label: '§461(l) Deduction',
+          value: formatCurrency(peakIncomeReqYear.incomeRequiredComponents.section461Deduction),
+        },
+        {
+          label: '$3K Used',
+          value: formatCurrency(peakIncomeReqYear.incomeRequiredComponents.capitalLossUsed),
+        },
+        {
+          label: `Start-of-Year NOL (${formatCurrency(
+            peakIncomeReqYear.incomeRequiredComponents.startOfYearNol
+          )}) ÷ ${formatPercent(peakIncomeReqYear.incomeRequiredComponents.nolLimit, 0)}`,
+          value: formatCurrency(peakIncomeReqYear.incomeRequiredComponents.nolGrossUp),
+        },
+        {
+          label: 'Net Taxable ST/LT Gains',
+          value: formatCurrency(peakIncomeReqYear.incomeRequiredComponents.netTaxableGains),
+          negative: true,
+        },
+      ]
+    : undefined;
   const year1 = results.years[0]?.taxSavings ?? 0;
   const year2 = results.years[1]?.taxSavings ?? 0;
   const projectionYears = settings.projectionYears ?? 10;
@@ -2079,6 +2106,7 @@ export function WorkspaceTab() {
                   <InfoText
                     contentKey="col-income-required"
                     currentValue={formatCurrency(peakIncomeReq.amount)}
+                    breakdown={incomeReqBreakdown}
                   >
                     Income to Fully Utilize
                   </InfoText>

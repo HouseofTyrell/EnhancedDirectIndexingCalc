@@ -623,16 +623,24 @@ function calculateYearWithSensitivity(
     usableOrdinaryLoss + nolUsed + capitalLossUsedAgainstIncome
   );
 
-  // Minimum W-2 income to fully utilize this year's shelter (see core.ts)
+  // Minimum W-2 income to fully utilize this year's shelter (see core.ts).
+  // The grid has no gain events, so the netted-gains term is ST/LT only.
   const nolLimitForRequired = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
+  const incomeRequiredComponents = {
+    section461Deduction: safeNumber(allowedOrdinaryLoss),
+    capitalLossUsed: safeNumber(capitalLossUsedAgainstIncome),
+    startOfYearNol: safeNumber(nolCarryforward),
+    nolLimit: nolLimitForRequired,
+    nolGrossUp: safeNumber(nolLimitForRequired > 0 ? nolCarryforward / nolLimitForRequired : 0),
+    netTaxableGains: safeNumber(taxableSt + taxableLt),
+  };
   const incomeRequiredForFullUtilization = safeNumber(
     Math.max(
       0,
-      allowedOrdinaryLoss +
-        capitalLossUsedAgainstIncome +
-        (nolLimitForRequired > 0 ? nolCarryforward / nolLimitForRequired : 0) -
-        taxableSt -
-        taxableLt
+      incomeRequiredComponents.section461Deduction +
+        incomeRequiredComponents.capitalLossUsed +
+        incomeRequiredComponents.nolGrossUp -
+        incomeRequiredComponents.netTaxableGains
     )
   );
 
@@ -671,6 +679,7 @@ function calculateYearWithSensitivity(
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
     incomeRequiredForFullUtilization,
+    incomeRequiredComponents,
     gainEventAmount: 0,
     gainEventTax: 0,
     gainEventTaxWithoutStrategy: 0,

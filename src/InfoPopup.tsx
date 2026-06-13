@@ -47,35 +47,79 @@ export function InfoPopup({ title, children }: InfoPopupProps) {
   );
 }
 
+// A single labeled term of a formula, shown as a "Your value" sub-breakdown.
+// `negative` renders the term as a subtraction (the netted-out piece).
+export interface PopupBreakdownItem {
+  label: string;
+  value: string;
+  negative?: boolean;
+}
+
+// Shared body for the field-level popups (FieldInfoPopup + InfoText) so the
+// definition / formula / value / breakdown / impact layout stays in one place.
+interface FieldPopupBodyContent {
+  definition: string;
+  formula?: string;
+  impact: string;
+}
+
+function FieldPopupBody({
+  content,
+  currentValue,
+  breakdown,
+}: {
+  content: FieldPopupBodyContent;
+  currentValue?: string;
+  breakdown?: PopupBreakdownItem[];
+}) {
+  return (
+    <div className="field-popup">
+      <p className="field-definition">{content.definition}</p>
+      {content.formula && (
+        <div className="field-formula">
+          <strong>Formula:</strong>
+          <code>{content.formula}</code>
+        </div>
+      )}
+      {currentValue && (
+        <div className="field-current-value">
+          <strong>Your value:</strong> {currentValue}
+        </div>
+      )}
+      {breakdown && breakdown.length > 0 && (
+        <dl className="field-breakdown">
+          {breakdown.map(item => (
+            <div key={item.label} className="field-breakdown-row">
+              <dt>{item.label}</dt>
+              <dd className={item.negative ? 'negative' : undefined}>
+                {item.negative ? '−' : ''}
+                {item.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <p className="field-impact">
+        <strong>Impact:</strong> {content.impact}
+      </p>
+    </div>
+  );
+}
+
 // Field-level info popup - shows definition, formula, and impact
 interface FieldInfoPopupProps {
   contentKey: string;
   currentValue?: string;
+  breakdown?: PopupBreakdownItem[];
 }
 
-export function FieldInfoPopup({ contentKey, currentValue }: FieldInfoPopupProps) {
+export function FieldInfoPopup({ contentKey, currentValue, breakdown }: FieldInfoPopupProps) {
   const content = getPopupContent(contentKey);
   if (!content) return null;
 
   return (
     <InfoPopup title={content.title}>
-      <div className="field-popup">
-        <p className="field-definition">{content.definition}</p>
-        {content.formula && (
-          <div className="field-formula">
-            <strong>Formula:</strong>
-            <code>{content.formula}</code>
-          </div>
-        )}
-        {currentValue && (
-          <div className="field-current-value">
-            <strong>Your value:</strong> {currentValue}
-          </div>
-        )}
-        <p className="field-impact">
-          <strong>Impact:</strong> {content.impact}
-        </p>
-      </div>
+      <FieldPopupBody content={content} currentValue={currentValue} breakdown={breakdown} />
     </InfoPopup>
   );
 }
@@ -85,9 +129,10 @@ interface InfoTextProps {
   contentKey: string;
   children: React.ReactNode;
   currentValue?: string;
+  breakdown?: PopupBreakdownItem[];
 }
 
-export function InfoText({ contentKey, children, currentValue }: InfoTextProps) {
+export function InfoText({ contentKey, children, currentValue, breakdown }: InfoTextProps) {
   const [isOpen, setIsOpen] = useState(false);
   const content = getPopupContent(contentKey);
 
@@ -130,23 +175,11 @@ export function InfoText({ contentKey, children, currentValue }: InfoTextProps) 
                 </button>
               </div>
               <div className="popup-body">
-                <div className="field-popup">
-                  <p className="field-definition">{content.definition}</p>
-                  {content.formula && (
-                    <div className="field-formula">
-                      <strong>Formula:</strong>
-                      <code>{content.formula}</code>
-                    </div>
-                  )}
-                  {currentValue && (
-                    <div className="field-current-value">
-                      <strong>Your value:</strong> {currentValue}
-                    </div>
-                  )}
-                  <p className="field-impact">
-                    <strong>Impact:</strong> {content.impact}
-                  </p>
-                </div>
+                <FieldPopupBody
+                  content={content}
+                  currentValue={currentValue}
+                  breakdown={breakdown}
+                />
               </div>
             </div>
           </div>,
