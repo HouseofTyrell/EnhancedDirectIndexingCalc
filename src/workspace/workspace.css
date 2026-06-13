@@ -1,401 +1,1363 @@
-/* Workspace (Beta) — two-pane cockpit layout from the 2026-06 UI review.
-   Left: persistent input rail. Right: results-first pane with sub-views. */
+/* ════════════════════════════════════════════════════════════════
+   Workspace — D-027 redesign from the Claude Design handoff.
+   One token system, two skins driven by the app's existing theme
+   mechanism: SLATE (cool light fintech) is the light theme,
+   GRAPHITE (dark terminal density) is the dark theme. Bond was the
+   stylistic outlier and is not built (owner decision, D-027).
 
-.ws {
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px;
-  align-items: start;
+   Everything is scoped under `.wx` (the Workspace root) so the
+   tokens and component styles cannot leak into the Classic tab or
+   Meeting Mode (fixed boardroom palette).
+
+   Fonts: Hanken Grotesk (UI) + IBM Plex Mono (Graphite numerals),
+   bundled via @fontsource imports in WorkspaceTab.tsx so the
+   single-file distributable stays self-contained.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ───────── SLATE — cool light, modern fintech (light theme) ───────── */
+.wx {
+  --wx-ui-font: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --wx-r-sm: 6px;
+  --wx-r-md: 9px;
+  --wx-r-lg: 13px;
+  --wx-r-pill: 999px;
+
+  --wx-bg: #eceff4;
+  --wx-panel: #ffffff;
+  --wx-panel-2: #f5f8fc;
+  --wx-panel-3: #eef2f8;
+  --wx-line: #e3e8ef;
+  --wx-line-strong: #cdd5e0;
+  --wx-ink: #131a24;
+  --wx-ink-2: #586575;
+  --wx-ink-3: #8a96a5;
+  --wx-accent: #2f6bdb;
+  --wx-accent-ink: #ffffff;
+  --wx-accent-soft: #e9f0fc;
+  --wx-pos: #138a5e;
+  --wx-pos-soft: #e2f3ec;
+  --wx-neg: #c43c2d;
+  --wx-neg-soft: #fbe9e6;
+  --wx-warn: #a96f17;
+  --wx-warn-soft: #faf0d9;
+  --wx-gold: #a4762a;
+  --wx-num-font: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, sans-serif;
+  --wx-num-display: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, sans-serif;
+  --wx-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.05);
+  --wx-shadow-lg: 0 16px 40px rgba(16, 24, 40, 0.12);
+  --wx-metric-w: 700;
+
+  /* Re-point the app-level aliases so embedded components rendered
+     inside the Workspace (ResultsTable, charts, disclosures, pin
+     strip, events editor) harmonize with the wx palette in BOTH
+     themes without touching their own stylesheets. */
+  --card-bg: var(--wx-panel);
+  --input-bg: var(--wx-panel-2);
+  --section-bg: var(--wx-panel-3);
+  --border: var(--wx-line);
+  --border-color: var(--wx-line);
+  --text: var(--wx-ink);
+  --text-primary: var(--wx-ink);
+  --text-light: var(--wx-ink-2);
+  --text-secondary: var(--wx-ink-2);
+  --primary: var(--wx-accent);
+  --success: var(--wx-pos);
+  --positive: var(--wx-pos);
+  --danger: var(--wx-neg);
+  --negative: var(--wx-neg);
+  --warning: var(--wx-warn);
+  --bg: var(--wx-bg);
 }
 
-/* ── Input rail ── */
-.ws-rail {
-  position: sticky;
-  top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
+/* ───────── GRAPHITE — dark, terminal density (dark theme) ─────────
+   Mirrored exactly like index.css: explicit [data-theme='dark'] AND
+   the prefers-color-scheme block for the unset/system case. */
+[data-theme='dark'] .wx {
+  --wx-bg: #0c1014;
+  --wx-panel: #141a21;
+  --wx-panel-2: #1b232c;
+  --wx-panel-3: #10161c;
+  --wx-line: #283039;
+  --wx-line-strong: #3a4550;
+  --wx-ink: #e9eff5;
+  --wx-ink-2: #96a3b1;
+  --wx-ink-3: #66717d;
+  --wx-accent: #6aa6ff;
+  --wx-accent-ink: #07101e;
+  --wx-accent-soft: rgba(106, 166, 255, 0.15);
+  --wx-pos: #4ecb91;
+  --wx-pos-soft: rgba(78, 203, 145, 0.14);
+  --wx-neg: #f0786b;
+  --wx-neg-soft: rgba(240, 120, 107, 0.14);
+  --wx-warn: #e2b35d;
+  --wx-warn-soft: rgba(226, 179, 93, 0.14);
+  --wx-gold: #c9a96a;
+  --wx-num-font: 'IBM Plex Mono', ui-monospace, monospace;
+  --wx-num-display: 'IBM Plex Mono', ui-monospace, monospace;
+  --wx-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
+  --wx-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --wx-metric-w: 600;
 }
 
-.ws-rail-group {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
-  padding: 14px 16px;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .wx {
+    --wx-bg: #0c1014;
+    --wx-panel: #141a21;
+    --wx-panel-2: #1b232c;
+    --wx-panel-3: #10161c;
+    --wx-line: #283039;
+    --wx-line-strong: #3a4550;
+    --wx-ink: #e9eff5;
+    --wx-ink-2: #96a3b1;
+    --wx-ink-3: #66717d;
+    --wx-accent: #6aa6ff;
+    --wx-accent-ink: #07101e;
+    --wx-accent-soft: rgba(106, 166, 255, 0.15);
+    --wx-pos: #4ecb91;
+    --wx-pos-soft: rgba(78, 203, 145, 0.14);
+    --wx-neg: #f0786b;
+    --wx-neg-soft: rgba(240, 120, 107, 0.14);
+    --wx-warn: #e2b35d;
+    --wx-warn-soft: rgba(226, 179, 93, 0.14);
+    --wx-gold: #c9a96a;
+    --wx-num-font: 'IBM Plex Mono', ui-monospace, monospace;
+    --wx-num-display: 'IBM Plex Mono', ui-monospace, monospace;
+    --wx-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
+    --wx-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --wx-metric-w: 600;
+  }
 }
 
-.ws-rail-group h4 {
-  margin: 0 0 10px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
-}
-
-.ws-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.ws-field:last-child {
-  margin-bottom: 0;
-}
-
-.ws-field > span {
-  font-size: 0.78rem;
-  color: var(--text-secondary, #64748b);
-}
-
-.ws-field input,
-.ws-field select {
-  width: 100%;
+/* ════════════════════ WORKSPACE SHELL ════════════════════ */
+.wx,
+.wx * {
   box-sizing: border-box;
-  padding: 7px 9px;
-  font-size: 0.88rem;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 6px;
-  background: var(--input-bg, #fff);
-  color: var(--text-primary, #0f172a);
+}
+.wx {
+  font-family: var(--wx-ui-font);
+  background: var(--wx-bg);
+  color: var(--wx-ink);
+  width: 100%;
+  min-height: calc(100vh - 54px);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings:
+    'tnum' 1,
+    'cv05' 1;
+}
+.wx-num {
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
 }
 
-.ws-field input[type='range'] {
-  padding: 0;
-  border: none;
+/* ---- Top context bar ---- */
+.wx-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 22px;
+  background: var(--wx-panel);
+  border-bottom: 1px solid var(--wx-line);
+  flex-wrap: wrap;
 }
-
-.ws-toggle {
+.wx-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.wx-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--wx-accent);
+  color: var(--wx-accent-ink);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: -0.03em;
+}
+.wx-brand-name {
+  font-weight: 650;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+.wx-scenario {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
-  color: var(--text-primary, #0f172a);
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-
-.ws-toggle:last-child {
-  margin-bottom: 0;
-}
-
-.ws-rail-note {
-  font-size: 0.74rem;
-  color: var(--text-secondary, #64748b);
-  margin: 0;
-  padding: 0 4px;
-  line-height: 1.4;
-}
-
-/* ── Results pane ── */
-.ws-main {
+  padding-left: 16px;
+  margin-left: 2px;
+  border-left: 1px solid var(--wx-line);
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
 }
-
-.ws-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.ws-metric {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ws-metric--primary {
-  border-color: var(--primary, #2563eb);
-  box-shadow: 0 0 0 1px var(--primary, #2563eb) inset;
-}
-
-.ws-metric-label {
-  font-size: 0.74rem;
+.wx-scenario-name {
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
+  font-size: 13px;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  color: var(--wx-ink);
+  font-family: var(--wx-ui-font);
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: text;
+}
+.wx-scenario-name:hover {
+  background: var(--wx-panel-2);
+}
+.wx-scenario input {
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--wx-ui-font);
+  color: var(--wx-ink);
+  background: var(--wx-panel-2);
+  border: 1px solid var(--wx-accent);
+  border-radius: 4px;
+  padding: 2px 4px;
+  width: 200px;
+}
+.wx-scenario-edit {
+  color: var(--wx-ink-3);
+  font-size: 12px;
+  display: inline-flex;
+}
+.wx-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.wx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--wx-r-pill);
+  background: var(--wx-panel-2);
+  border: 1px solid var(--wx-line);
+  color: var(--wx-ink-2);
+  font-size: 11.5px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+.wx-chip b {
+  color: var(--wx-ink);
+  font-weight: 650;
+}
+.wx-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wx-accent);
+}
+.wx-top-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.wx-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 230px;
+  padding: 8px 11px;
+  border-radius: var(--wx-r-md);
+  background: var(--wx-panel-2);
+  border: 1px solid var(--wx-line);
+  color: var(--wx-ink-3);
+  font-size: 12.5px;
+  font-family: var(--wx-ui-font);
+  cursor: pointer;
+  text-align: left;
+}
+.wx-search:hover {
+  border-color: var(--wx-line-strong);
+}
+.wx-search svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.wx-kbd {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+  font-family: var(--wx-num-font);
+  font-size: 10.5px;
+  color: var(--wx-ink-3);
+  padding: 2px 6px;
+  border: 1px solid var(--wx-line);
+  border-radius: 5px;
+  background: var(--wx-panel);
 }
 
-.ws-metric-value {
-  font-size: 1.45rem;
-  font-weight: 800;
-  color: var(--text-primary, #0f172a);
+/* ---- Body two-pane ---- */
+.wx-body {
+  display: grid;
+  grid-template-columns: 292px 1fr;
+  align-items: start;
+}
+.wx-rail {
+  background: var(--wx-panel-3);
+  border-right: 1px solid var(--wx-line);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  position: sticky;
+  top: 53px;
+  max-height: calc(100vh - 53px);
+  overflow-y: auto;
+}
+
+/* rail search */
+.wx-railsearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border-radius: var(--wx-r-md);
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  color: var(--wx-ink-3);
+}
+.wx-railsearch svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.wx-railsearch input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 9px 0;
+  font-size: 12.5px;
+  font-family: var(--wx-ui-font);
+  color: var(--wx-ink);
+  outline: none;
+}
+.wx-railsearch input::placeholder {
+  color: var(--wx-ink-3);
+}
+
+/* collapsible group with summary value */
+.wx-group {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.wx-group--dim {
+  opacity: 0.35;
+}
+.wx-group--hit {
+  border-color: var(--wx-accent);
+}
+.wx-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--wx-ui-font);
+}
+.wx-group-ic {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--wx-accent-soft);
+  color: var(--wx-accent);
+}
+.wx-group-ic svg {
+  width: 13px;
+  height: 13px;
+}
+.wx-group-titles {
+  min-width: 0;
+  flex: 1;
+  display: block;
+}
+.wx-group-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wx-ink-2);
+}
+.wx-group-summary {
+  display: block;
+  font-size: 12px;
+  color: var(--wx-ink-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.wx-group-summary b {
+  color: var(--wx-ink);
+  font-weight: 600;
+}
+.wx-chev {
+  color: var(--wx-ink-3);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.wx-chev svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+.wx-group[data-open='true'] > .wx-group-head .wx-chev {
+  transform: rotate(180deg);
+}
+.wx-group-body {
+  padding: 4px 13px 14px;
+  border-top: 1px solid var(--wx-line);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.wx-group[data-open='false'] > .wx-group-body {
+  display: none;
+}
+.wx-group[data-active='true'] .wx-group-ic {
+  background: var(--wx-accent);
+  color: var(--wx-accent-ink);
+}
+
+/* fields */
+.wx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.wx-label {
+  font-size: 11.5px;
+  color: var(--wx-ink-2);
+  font-weight: 550;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.wx-field input,
+.wx-field select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: var(--wx-ui-font);
+  border: 1px solid var(--wx-line-strong);
+  border-radius: var(--wx-r-sm);
+  background: var(--wx-panel-2);
+  color: var(--wx-ink);
+}
+.wx-field input[inputmode='numeric'],
+.wx-field input[type='number'] {
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
+}
+.wx-field input[type='range'] {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.wx-help {
+  font-size: 11px;
+  color: var(--wx-ink-3);
+  line-height: 1.45;
+}
+.ws-derived {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--wx-accent);
+  background: var(--wx-accent-soft);
+  border: none;
+  border-radius: var(--wx-r-sm);
+  padding: 7px 9px;
+  line-height: 1.45;
+  font-weight: 550;
   font-variant-numeric: tabular-nums;
 }
 
-.ws-metric--primary .ws-metric-value {
-  color: var(--success, #16a34a);
-}
-
-.ws-metric-value em {
-  font-style: normal;
-  color: var(--text-secondary, #94a3b8);
-  font-weight: 400;
-}
-
-.ws-metric-sub {
-  font-size: 0.74rem;
-  color: var(--text-secondary, #64748b);
-}
-
-/* ── Sub-navigation ──
-   Segmented-control styling: these read as the primary way into the
-   year-by-year table and charts, so they must look like tabs, not links
-   (the owner twice failed to find the views behind the old text style). */
-.ws-subnav {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--section-bg, #f1f5f9);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
-  align-self: flex-start;
-}
-
-.ws-subnav-btn {
-  background: none;
-  border: none;
-  border-radius: 7px;
-  padding: 9px 20px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-secondary, #475569);
+/* toggle row (native checkbox rendered as the mock's switch) */
+.wx-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--wx-ink);
+  font-weight: 500;
   cursor: pointer;
 }
-
-.ws-subnav-btn:hover:not(.active) {
-  background: var(--card-bg, #fff);
+.wx-toggle input[type='checkbox'] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.wx-switch {
+  width: 32px;
+  height: 18px;
+  border-radius: var(--wx-r-pill);
+  background: var(--wx-line-strong);
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s;
+}
+.wx-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.wx-toggle input:checked + .wx-switch {
+  background: var(--wx-accent);
+}
+.wx-toggle input:checked + .wx-switch::after {
+  left: 16px;
+}
+.wx-toggle input:focus-visible + .wx-switch {
+  outline: 2px solid var(--wx-accent);
+  outline-offset: 2px;
 }
 
-.ws-subnav-btn.active {
-  color: #fff;
-  background: var(--primary, #2563eb);
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
+/* segmented control */
+.ws-segment {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  padding: 3px;
+  background: var(--wx-panel-3);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-sm);
+}
+.ws-segment button {
+  border: none;
+  background: transparent;
+  color: var(--wx-ink-2);
+  font-size: 12px;
+  font-weight: 550;
+  font-family: var(--wx-ui-font);
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ws-segment button.active {
+  background: var(--wx-panel);
+  color: var(--wx-ink);
+  box-shadow: var(--wx-shadow);
 }
 
-/* ── Overview ── */
-.ws-overview {
+/* range */
+.wx input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--wx-line-strong);
+  outline: none;
+}
+.wx input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--wx-accent);
+  cursor: pointer;
+  border: 2px solid var(--wx-panel);
+  box-shadow: 0 0 0 1px var(--wx-accent);
+}
+.wx input[type='range']::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--wx-accent);
+  cursor: pointer;
+  border: 2px solid var(--wx-panel);
+  box-shadow: 0 0 0 1px var(--wx-accent);
+}
+
+/* rail buttons (actions block) */
+.wx-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.wx-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--wx-r-sm);
+  border: 1px solid var(--wx-line-strong);
+  background: var(--wx-panel-2);
+  color: var(--wx-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--wx-ui-font);
+  cursor: pointer;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.wx-btn--primary {
+  background: var(--wx-accent);
+  border-color: var(--wx-accent);
+  color: var(--wx-accent-ink);
+}
+.wx-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wx-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+/* compact amber warning inside a rail group (split/deleverage
+   conflict, split-leg validation) — warn tokens, both themes */
+.ws-rail-warn {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: var(--wx-r-sm);
+  font-size: 11.5px;
+  line-height: 1.45;
+  background: var(--wx-warn-soft);
+  border: 1px solid var(--wx-warn);
+  color: var(--wx-warn);
+}
+.ws-rail-note {
+  font-size: 11px;
+  color: var(--wx-ink-3);
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* ════════════════════ COMMAND PALETTE (⌘K) ════════════════════ */
+.wx-palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 20, 0.45);
+  z-index: 1100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+.wx-palette {
+  width: min(560px, calc(100vw - 32px));
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-lg);
+  box-shadow: var(--wx-shadow-lg);
+  overflow: hidden;
+  font-family: var(--wx-ui-font);
+  color: var(--wx-ink);
+}
+.wx-palette-input {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--wx-line);
+  color: var(--wx-ink-3);
+}
+.wx-palette-input svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.wx-palette-input input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: var(--wx-ui-font);
+  color: var(--wx-ink);
+  outline: none;
+}
+.wx-palette-input input::placeholder {
+  color: var(--wx-ink-3);
+}
+.wx-palette-list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.wx-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--wx-r-sm);
+  font-family: var(--wx-ui-font);
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--wx-ink);
+  cursor: pointer;
+  text-align: left;
+}
+.wx-palette-item.sel {
+  background: var(--wx-accent-soft);
+  color: var(--wx-accent);
+}
+.wx-palette-kind {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--wx-ink-3);
+  background: var(--wx-panel-3);
+  border: 1px solid var(--wx-line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  min-width: 52px;
+  text-align: center;
+}
+.wx-palette-empty {
+  padding: 18px 14px;
+  font-size: 12.5px;
+  color: var(--wx-ink-3);
+  text-align: center;
+}
+
+/* ════════════════════ RESULTS PANE ════════════════════ */
+.wx-main {
+  padding: 18px 22px 26px;
+  background: var(--wx-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* metric strip */
+.wx-metrics {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--wx-line);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-lg);
+  overflow: hidden;
+}
+.wx-metric {
+  background: var(--wx-panel);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.wx-metric--primary {
+  position: relative;
+}
+.wx-metric--primary::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--wx-accent);
+}
+.wx-metric-label {
+  font-size: 11.5px;
+  color: var(--wx-ink-2);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.01em;
+}
+.wx-metric-value {
+  font-family: var(--wx-num-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--wx-metric-w);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--wx-ink);
+}
+.wx-metric--primary .wx-metric-value {
+  font-size: clamp(22px, 2.4vw, 34px);
+  color: var(--wx-accent);
+}
+.wx-metric--sec .wx-metric-value {
+  font-size: 20px;
+  white-space: nowrap;
+  line-height: 1.08;
+}
+/* EDI co-headline: accent bar + accent color, secondary size */
+.wx-metric--primary.wx-metric--sec .wx-metric-value {
+  font-size: 20px;
+  color: var(--wx-accent);
+}
+.wx-metric-value em {
+  font-style: normal;
+  color: var(--wx-ink-3);
+  font-weight: 400;
+}
+.wx-metric-sub {
+  font-size: 11px;
+  color: var(--wx-ink-3);
+  line-height: 1.4;
+}
+.wx-metric-sub .pos {
+  color: var(--wx-pos);
+  font-weight: 600;
+}
+
+/* flags / alert tray */
+.wx-flags {
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  background: var(--wx-panel);
+  overflow: hidden;
+}
+.wx-flags-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 15px;
+  cursor: pointer;
+  width: 100%;
+  border: none;
+  background: none;
+  font-family: var(--wx-ui-font);
+  text-align: left;
+}
+.wx-flags-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--wx-ink);
+  white-space: nowrap;
+}
+.wx-flags-badge .ic {
+  width: 18px;
+  height: 18px;
+  color: var(--wx-warn);
+  display: inline-flex;
+}
+.wx-flags-dots {
+  display: flex;
+  gap: 4px;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+.wx-fdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.wx-fdot--warn {
+  background: var(--wx-warn);
+}
+.wx-fdot--info {
+  background: var(--wx-accent);
+}
+.wx-fdot--pos {
+  background: var(--wx-pos);
+}
+.wx-flags-peek {
+  color: var(--wx-ink-3);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+.wx-flags-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--wx-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.wx-flags-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+.wx-flags-body {
+  border-top: 1px solid var(--wx-line);
+  padding: 6px 0;
+}
+.wx-flag {
+  display: flex;
+  gap: 11px;
+  padding: 10px 15px;
+  align-items: flex-start;
+}
+.wx-flag + .wx-flag {
+  border-top: 1px solid var(--wx-line);
+}
+.wx-flag-rail {
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.wx-flag--warn .wx-flag-rail {
+  background: var(--wx-warn);
+}
+.wx-flag--info .wx-flag-rail {
+  background: var(--wx-accent);
+}
+.wx-flag--pos .wx-flag-rail {
+  background: var(--wx-pos);
+}
+.wx-flag-body {
+  font-size: 12px;
+  color: var(--wx-ink-2);
+  line-height: 1.5;
+}
+.wx-flag-body b,
+.wx-flag-body strong {
+  color: var(--wx-ink);
+  font-weight: 650;
+}
+.wx-flag-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+.wx-flag--warn .wx-flag-tag {
+  background: var(--wx-warn-soft);
+  color: var(--wx-warn);
+}
+.wx-flag--info .wx-flag-tag {
+  background: var(--wx-accent-soft);
+  color: var(--wx-accent);
+}
+.wx-flag--pos .wx-flag-tag {
+  background: var(--wx-pos-soft);
+  color: var(--wx-pos);
+}
+
+/* subnav */
+.wx-subnav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--wx-line);
+  align-items: center;
+}
+.wx-subnav-btn {
+  border: none;
+  background: transparent;
+  font-family: var(--wx-ui-font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wx-ink-2);
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.wx-subnav-btn.active {
+  color: var(--wx-accent);
+  border-bottom-color: var(--wx-accent);
+}
+.wx-subnav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--wx-ink-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 2px;
+  border: none;
+  background: none;
+  font-family: var(--wx-ui-font);
+  cursor: pointer;
+}
+.wx-subnav-right:hover {
+  color: var(--wx-accent);
+}
+.wx-subnav-right svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* result cards */
+.wx-overview {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
-.ws-cards {
+.wx-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
-
-.ws-card {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
-  padding: 14px 16px;
+.wx-card {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  padding: 14px 15px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  min-width: 0;
 }
-
-.ws-card-label {
-  font-size: 0.76rem;
+.wx-card-label {
+  font-size: 11.5px;
+  color: var(--wx-ink-2);
   font-weight: 600;
-  color: var(--text-secondary, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
-
-.ws-card-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary, #0f172a);
+.wx-card-value {
+  font-family: var(--wx-num-display);
   font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: var(--wx-metric-w);
+  letter-spacing: -0.01em;
+  color: var(--wx-ink);
 }
-
-.ws-card-sub {
-  font-size: 0.74rem;
-  color: var(--text-secondary, #64748b);
+.wx-card-value.pos {
+  color: var(--wx-pos);
 }
-
-.ws-narrative {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-left: 3px solid var(--primary, #2563eb);
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 0.9rem;
-  line-height: 1.55;
-  color: var(--text-primary, #1e293b);
-  margin: 0;
+.wx-card-value.neg {
+  color: var(--wx-neg);
 }
-
-.ws-note {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 0.82rem;
+.wx-card-sub {
+  font-size: 11px;
+  color: var(--wx-ink-3);
   line-height: 1.45;
-  color: #713f12;
 }
 
-.ws-note--muted {
-  background: var(--card-bg, #f8fafc);
-  border-color: var(--border-color, #e2e8f0);
-  color: var(--text-secondary, #64748b);
+.wx-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wx-ink-3);
+  margin-top: 4px;
 }
 
-.ws-charts {
+/* income-req chips */
+.wx-reqchips {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  padding: 13px 15px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
 }
-
-/* ── Responsive ── */
-@media (max-width: 900px) {
-  .ws {
-    grid-template-columns: 1fr;
-  }
-
-  .ws-rail {
-    position: static;
-    max-height: none;
-  }
-}
-
-/* Funding-mode segmented control + derived breakdown */
-.ws-segment {
-  display: flex;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.ws-segment button {
-  flex: 1;
-  padding: 6px 4px;
-  font-size: 0.78rem;
+.wx-reqchips-label {
+  font-size: 12px;
+  color: var(--wx-ink-2);
   font-weight: 600;
-  background: var(--input-bg, #fff);
-  color: var(--text-secondary, #64748b);
-  border: none;
-  cursor: pointer;
 }
-
-.ws-segment button.active {
-  background: var(--primary, #2563eb);
-  color: #fff;
-}
-
-.ws-derived {
-  margin: 0;
-  font-size: 0.76rem;
-  line-height: 1.4;
-  color: var(--text-secondary, #475569);
-  background: var(--card-bg, #f8fafc);
-  border: 1px dashed var(--border-color, #cbd5e1);
-  border-radius: 6px;
-  padding: 7px 9px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Action buttons (Meeting Mode, exports) */
-.ws-action-btn {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  margin-bottom: 8px;
-  padding: 8px 10px;
-  font-size: 0.84rem;
-  font-weight: 600;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 6px;
-  background: var(--input-bg, #fff);
-  color: var(--text-primary, #1e293b);
-  cursor: pointer;
-}
-
-.ws-action-btn:last-of-type {
-  margin-bottom: 0;
-}
-
-.ws-action-btn--primary {
-  background: var(--primary, #2563eb);
-  border-color: var(--primary, #2563eb);
-  color: #fff;
-}
-
-/* Per-year income-required chips (full-utilization planning targets) */
-.ws-income-req {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
-  padding: 12px 16px;
-}
-
-.ws-income-req-label {
-  display: block;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--text-secondary, #64748b);
-  margin-bottom: 8px;
-}
-
-.ws-income-req-chips {
+.wx-reqchips-row {
   display: flex;
   flex-wrap: wrap;
+  gap: 7px;
+}
+.wx-rchip {
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: var(--wx-r-sm);
+  background: var(--wx-panel-2);
+  border: 1px solid var(--wx-line);
+  color: var(--wx-ink-2);
+}
+.wx-rchip b {
+  color: var(--wx-ink);
+}
+.wx-rchip--peak {
+  background: var(--wx-accent-soft);
+  border-color: transparent;
+  color: var(--wx-accent);
+}
+.wx-rchip--peak b {
+  color: var(--wx-accent);
+}
+
+/* plain-english summary (expandable) */
+.wx-summary {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  overflow: hidden;
+}
+.wx-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 13px;
+  width: 100%;
+  border: none;
+  background: none;
+  font-family: var(--wx-ui-font);
+  color: var(--wx-ink);
+  text-align: left;
+}
+.wx-summary-head .ic {
+  width: 16px;
+  height: 16px;
+  color: var(--wx-accent);
+  display: inline-flex;
+}
+.wx-summary-head .wx-chev {
+  margin-left: auto;
+}
+.wx-summary-body {
+  padding: 0 15px 15px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--wx-ink-2);
+  margin: 0;
+}
+.wx-summary-body b,
+.wx-summary-body strong,
+.wx-summary-body em {
+  color: var(--wx-ink);
+  font-weight: 650;
+  font-style: normal;
+}
+.wx-summary-body .num {
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
+  color: var(--wx-ink);
+  font-weight: 600;
+}
+
+/* QFAF treatment details (draft) — same panel language */
+.wx-details {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  padding: 12px 15px;
+  font-size: 12px;
+  color: var(--wx-ink-2);
+  line-height: 1.55;
+}
+.wx-details summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--wx-ink);
+}
+.wx-details p {
+  margin: 8px 0 0;
+}
+
+/* rates inline strip */
+.wx-rates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+  padding: 12px 15px;
+  background: var(--wx-panel-3);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+}
+.wx-rate {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--wx-ink-3);
+}
+.wx-rate b {
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
+  color: var(--wx-ink);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+/* data table host (year-by-year) — container-level restyle only;
+   ResultsTable internals are untouched (audit-table directive). */
+.wx-table-host .table-container {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  box-shadow: none;
+}
+.wx-table-host .year-breakdown-table td {
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
+}
+
+/* disclaimer line */
+.wx-disc {
+  font-size: 10.5px;
+  color: var(--wx-ink-3);
+  line-height: 1.5;
+  padding-top: 4px;
+}
+
+/* charts */
+.wx-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.wx-charts .chart-container {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  box-shadow: none;
+  min-width: 0;
+}
+
+/* ── D-026 pin strip / events editor / presets / schedule builder ──
+   Retained components, retokened onto the wx palette. */
+.ws-pinstrip {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-left: 3px solid var(--wx-accent);
+  border-radius: var(--wx-r-md);
+  padding: 10px 14px;
+}
+.ws-pinstrip-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ws-pinstrip-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--wx-ink-2);
+  white-space: nowrap;
+}
+.ws-pinstrip-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wx-ink);
+}
+.ws-pinstrip-age {
+  font-size: 11px;
+  color: var(--wx-ink-3);
+}
+.ws-pinstrip-actions {
+  margin-left: auto;
+  display: flex;
   gap: 6px;
 }
-
-.ws-income-chip {
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--section-bg, #f1f5f9);
-  color: var(--text-primary, #1e293b);
-  border: 1px solid var(--border-color, #e2e8f0);
-}
-
-.ws-income-chip--peak {
-  background: var(--primary, #2563eb);
-  border-color: var(--primary, #2563eb);
-  color: #fff;
-  font-weight: 700;
-}
-
-.ws-details summary {
+.ws-pinstrip-btn {
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--wx-ui-font);
+  border: 1px solid var(--wx-line-strong);
+  border-radius: var(--wx-r-sm);
+  background: var(--wx-panel-2);
+  color: var(--wx-ink);
   cursor: pointer;
 }
-
-.ws-details p {
-  margin: 8px 0 0;
-  line-height: 1.5;
+.ws-pinstrip-btn:hover {
+  border-color: var(--wx-accent);
+  color: var(--wx-accent);
 }
-
-/* Card-row section label (EDI Economics) */
-.ws-cards-title {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+.ws-pinstrip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.ws-pinstrip-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ws-pinstrip-metric {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
-  margin: 2px 0 -8px;
+  color: var(--wx-ink-3);
+}
+.ws-pinstrip-values {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wx-ink);
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
+}
+.ws-pinstrip-values em {
+  font-style: normal;
+  color: var(--wx-ink-3);
+  font-weight: 400;
+}
+.ws-pinstrip-delta {
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: var(--wx-num-font);
+  font-variant-numeric: tabular-nums;
+}
+.ws-pinstrip-delta--pos {
+  color: var(--wx-pos);
+}
+.ws-pinstrip-delta--neg {
+  color: var(--wx-neg);
+}
+.ws-pinstrip-delta--neutral {
+  color: var(--wx-ink);
+}
+.ws-pinstrip-delta--zero {
+  color: var(--wx-ink-3);
 }
 
-/* Scenario presets (one-click starting points in the events editor) */
+/* per-year events editor (wider panel in the results pane) */
+.ws-events-editor {
+  background: var(--wx-panel);
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-md);
+  padding: 14px 16px;
+}
 .ws-presets {
   display: flex;
   flex-wrap: wrap;
@@ -403,47 +1365,36 @@
   gap: 8px;
   margin-bottom: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px dashed var(--border-color, #e2e8f0);
+  border-bottom: 1px dashed var(--wx-line);
 }
-
-.ws-presets-label {
-  font-size: 0.7rem;
+.ws-presets-label,
+.ws-sched-label,
+.ws-events-head span {
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
+  color: var(--wx-ink-3);
 }
-
 .ws-preset-btn {
   padding: 5px 11px;
-  font-size: 0.78rem;
+  font-size: 11.5px;
   font-weight: 600;
-  border: 1px solid var(--primary, #2563eb);
-  border-radius: 999px;
-  background: var(--input-bg, #fff);
-  color: var(--primary, #2563eb);
+  font-family: var(--wx-ui-font);
+  border: 1px solid var(--wx-accent);
+  border-radius: var(--wx-r-pill);
+  background: transparent;
+  color: var(--wx-accent);
   cursor: pointer;
 }
-
 .ws-preset-btn:hover {
-  background: var(--primary, #2563eb);
-  color: #fff;
+  background: var(--wx-accent);
+  color: var(--wx-accent-ink);
 }
-
 .ws-presets-note {
-  font-size: 0.72rem;
-  color: var(--text-secondary, #94a3b8);
+  font-size: 11px;
+  color: var(--wx-ink-3);
 }
-
-/* Per-year events editor */
-.ws-events-editor {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 10px;
-  padding: 14px 16px;
-}
-
-/* Income schedule builder (start income × growth → per-year rows) */
 .ws-sched {
   display: flex;
   flex-wrap: wrap;
@@ -451,55 +1402,44 @@
   gap: 10px;
   margin-bottom: 8px;
 }
-
 .ws-sched-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
   align-self: center;
 }
-
 .ws-sched-field {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-
 .ws-sched-field > span {
-  font-size: 0.72rem;
-  color: var(--text-secondary, #64748b);
+  font-size: 11px;
+  color: var(--wx-ink-2);
 }
-
 .ws-sched-field input {
   width: 120px;
-  box-sizing: border-box;
   padding: 5px 8px;
-  font-size: 0.82rem;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 6px;
-  background: var(--input-bg, #fff);
-  color: var(--text-primary, #0f172a);
+  font-size: 12.5px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: var(--wx-r-sm);
+  background: var(--wx-panel-2);
+  color: var(--wx-ink);
+  font-family: var(--wx-num-font);
   font-variant-numeric: tabular-nums;
 }
-
 .ws-sched-btn {
   padding: 6px 12px;
-  font-size: 0.8rem;
+  font-size: 12px;
   font-weight: 600;
-  border: 1px solid var(--primary, #2563eb);
-  border-radius: 6px;
-  background: var(--primary, #2563eb);
-  color: #fff;
+  font-family: var(--wx-ui-font);
+  border: 1px solid var(--wx-accent);
+  border-radius: var(--wx-r-sm);
+  background: var(--wx-accent);
+  color: var(--wx-accent-ink);
   cursor: pointer;
 }
-
 .ws-sched-btn--ghost {
-  background: var(--input-bg, #fff);
-  color: var(--primary, #2563eb);
+  background: transparent;
+  color: var(--wx-accent);
 }
-
 .ws-events-head,
 .ws-events-row {
   display: grid;
@@ -508,206 +1448,48 @@
   align-items: center;
   margin-bottom: 6px;
 }
-
-.ws-events-head span {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
-}
-
 .ws-events-yr {
-  font-size: 0.82rem;
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-primary, #1e293b);
+  color: var(--wx-ink);
 }
-
 .ws-events-row input,
 .ws-events-row select {
   width: 100%;
-  box-sizing: border-box;
   padding: 5px 8px;
-  font-size: 0.82rem;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 6px;
-  background: var(--input-bg, #fff);
-  color: var(--text-primary, #0f172a);
+  font-size: 12.5px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: var(--wx-r-sm);
+  background: var(--wx-panel-2);
+  color: var(--wx-ink);
+  font-family: var(--wx-num-font);
   font-variant-numeric: tabular-nums;
 }
 
-/* ── D-026: pinned-scenario comparison strip ── */
-.ws-pinstrip {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-left: 3px solid var(--primary, #2563eb);
-  border-radius: 10px;
-  padding: 10px 14px;
-}
-
-.ws-pinstrip-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.ws-pinstrip-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
-  white-space: nowrap;
-}
-
-.ws-pinstrip-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-primary, #1e293b);
-}
-
-.ws-pinstrip-age {
-  font-size: 0.72rem;
-  color: var(--text-secondary, #94a3b8);
-}
-
-.ws-pinstrip-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 6px;
-}
-
-.ws-pinstrip-btn {
-  padding: 3px 10px;
-  font-size: 0.74rem;
-  font-weight: 600;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 6px;
-  background: var(--input-bg, #fff);
-  color: var(--text-primary, #1e293b);
-  cursor: pointer;
-}
-
-.ws-pinstrip-btn:hover {
-  border-color: var(--primary, #2563eb);
-  color: var(--primary, #2563eb);
-}
-
-.ws-pinstrip-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-}
-
-.ws-pinstrip-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ws-pinstrip-metric {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--text-secondary, #64748b);
-}
-
-.ws-pinstrip-values {
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--text-primary, #0f172a);
-  font-variant-numeric: tabular-nums;
-}
-
-.ws-pinstrip-values em {
-  font-style: normal;
-  color: var(--text-secondary, #94a3b8);
-  font-weight: 400;
-}
-
-.ws-pinstrip-delta {
-  font-size: 0.76rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.ws-pinstrip-delta--pos {
-  color: var(--success, #16a34a);
-}
-
-.ws-pinstrip-delta--neg {
-  color: var(--danger, #ef4444);
-}
-
-.ws-pinstrip-delta--neutral {
-  color: var(--text-primary, #1e293b);
-}
-
-.ws-pinstrip-delta--zero {
-  color: var(--text-secondary, #94a3b8);
-}
-
-/* Disabled rail action (pin limit) */
-.ws-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Compact amber warning inside a rail group (D-016 deleverage/split conflict,
-   split-leg validation). Same amber treatment as .ws-note. */
-.ws-rail-warn {
-  margin: 0 0 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  font-size: 0.74rem;
-  line-height: 1.4;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #713f12;
-}
-
-/* ── Dark mode ──
-   Everything above themes through the variable aliases in index.css
-   (--text-primary/--text-secondary/--border-color/--input-bg/--section-bg).
-   Only the amber callout needs explicit overrides — same dark-amber
-   treatment as .results-disclosure in index.css. */
-[data-theme='dark'] .ws-note {
-  background: rgba(120, 53, 15, 0.2);
-  border-color: rgba(251, 191, 36, 0.3);
-  color: #fcd34d;
-}
-
-[data-theme='dark'] .ws-note--muted {
-  background: var(--card-bg);
-  border-color: var(--border-color);
-  color: var(--text-secondary);
-}
-
-[data-theme='dark'] .ws-rail-warn {
-  background: rgba(120, 53, 15, 0.2);
-  border-color: rgba(251, 191, 36, 0.3);
-  color: #fcd34d;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .ws-note {
-    background: rgba(120, 53, 15, 0.2);
-    border-color: rgba(251, 191, 36, 0.3);
-    color: #fcd34d;
+/* ── Responsive ── */
+@media (max-width: 980px) {
+  .wx-body {
+    grid-template-columns: 1fr;
   }
-
-  :root:not([data-theme='light']) .ws-note--muted {
-    background: var(--card-bg);
-    border-color: var(--border-color);
-    color: var(--text-secondary);
+  .wx-rail {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--wx-line);
   }
-
-  :root:not([data-theme='light']) .ws-rail-warn {
-    background: rgba(120, 53, 15, 0.2);
-    border-color: rgba(251, 191, 36, 0.3);
-    color: #fcd34d;
+  .wx-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .wx-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+  .wx-charts {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .wx-metrics,
+  .wx-cards {
+    grid-template-columns: 1fr;
   }
 }

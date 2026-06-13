@@ -313,6 +313,89 @@ must be surfaced in the rail when both are enabled.
   variable layer (PR #60 dark-mode pass), with explicit dark-amber overrides for the rail warning
   matching `.ws-note`.
 
+### D-027 — Workspace redesign from the Claude Design handoff (Slate light / Graphite dark)
+**Date:** 2026-06-13
+**Context:** owner mocked a Workspace redesign in claude.ai/design and handed off a
+bundle: one reworked information architecture ("findability is the spine" — context top
+bar with scenario chips + ⌘K jump-to-anything, collapsible rail groups that show their
+set values when closed, a consolidated severity-tagged Flags tray replacing stacked
+yellow notes, emphasized 4-up metric strip, expandable plain-English summary, inline
+rates strip, restyled tabular year view) in three skins: Graphite (dark terminal),
+Slate (cool light fintech), Bond (warm private-bank serif).
+**Decision (owner: "pick the best one and build it"):** implement the unified token
+system with **Slate as the light theme and Graphite as the dark theme**, mapped onto
+the existing app theme toggle. Bond is the stylistic outlier with no dark counterpart
+and is not built. Scope: Workspace tab (the design's surface); Classic tab and Meeting
+Mode (fixed boardroom palette) unchanged. Mock numbers are placeholders — every figure
+renders from the live engine. The single-file distributable stays self-contained
+(fonts bundled, no runtime CDN fetches).
+**Status: IMPLEMENTED (2026-06-13)** —
+- **Token layer** (`src/workspace/workspace.css`): the handoff's Slate and Graphite
+  token blocks ported verbatim as `--wx-*` variables scoped under `.wx` (the Workspace
+  root) — Slate by default, Graphite under `[data-theme='dark']` AND the
+  `prefers-color-scheme: dark` mirror, exactly like index.css. Nothing leaks outside
+  the Workspace: Classic tab and Meeting Mode are byte-identical surfaces. Embedded
+  components (audit-complete ResultsTable, charts, pin strip, events editor, footer)
+  harmonize by re-pointing the app-level aliases (`--card-bg`, `--border-color`,
+  `--text-primary`, `--primary`, …) to the wx tokens inside `.wx` — their own
+  stylesheets and the ResultsTable internals are untouched.
+- **Fonts**: Hanken Grotesk (variable, UI) + IBM Plex Mono (latin 400/500/600,
+  Graphite numerals) bundled via @fontsource imports in WorkspaceTab.tsx so
+  vite-plugin-singlefile inlines them — dist grew 1,516 KB → 1,748 KB (+232 KB), far
+  under the 1.5 MB budget. Font-family is applied at `.wx` only.
+- **Findability spine, all real**: (1) top context bar — brand, inline-editable
+  scenario name (persisted to `taxCalc:scenario-name`, default "Untitled scenario"),
+  live chips (filing · state, collateral $/total budget/combined-split, strategy,
+  QFAF on/off) derived from real inputs; (2) **⌘K command palette** (Ctrl/Cmd+K or
+  clicking "Jump to anything") listing every rail group, sub-view, and action
+  (Meeting Mode, Excel/CSV export+import, pin, events editor) with a fuzzy filter
+  (substring > all-tokens > subsequence ranking) — selecting a group expands it,
+  scrolls it into view, and focuses its first input; (3) the rail's "Find a setting…"
+  box highlights matching groups (accent border) and dims the rest, keyed off
+  per-group keyword indexes.
+- **Collapsible rail groups with set-value summaries**: Client, Strategy (split
+  allocation + funding mode + basis + start month), Carryforwards, QFAF Overlay,
+  Deleveraging, Model, Per-Year Events, then the actions block (Open Meeting Mode
+  primary; Pin/Export Excel and Export/Import CSV rows). Closed groups show real
+  summaries with `<b>` emphasis ("MFJ · California · $3.0M income", "On · 5 yrs ·
+  Dynamic", "None entered", "10 yrs · no growth · gross"); `data-active` (filled icon)
+  = feature on / non-default. Default open: Client, Strategy, QFAF. The wider events
+  editor stays a panel in the results pane (292px rail is too tight), opened from its
+  rail group or the palette.
+- **Consolidated Flags tray** replacing every stacked `.ws-note`: severity-ordered
+  (pos → warn → info), each with a TAG and rail-dot. Inventory: Exit-covered positive
+  (incrementalDeferredTax < 0); warns = quantified state treatment, state conformity,
+  appreciated-stock basis caveat, split×deleverage conflict (also still in the rail per
+  D-026), fixed-QFAF×deleverage leakage, CA state-NOL expiry; infos = per-year gain-
+  event notes (D-012), EDI contingent-reserve note (D-015), step-up framing incl.
+  partial-unwind recommendation (D-018), gross-estimate note (D-011), deleverage
+  summary (D-016/17), NOL-extension horizon note (D-013/19). Collapsed: count +
+  per-flag severity dots + computed peek ("1 positive · 3 attention · 2 notes about
+  assumptions"); expanded: full text — no legally-relevant wording lost, and the
+  DisclaimerFooter stays.
+- **Results pane**: 4-up metric strip (primary accent-barred Est. Tax Savings with the
+  D-011 "before costs & fees" sub; EDI mode keeps the co-equal accent-barred Loss
+  Reserve; Income-to-Fully-Utilize / Year1/Year2+ / Net-If-Liquidated secondaries show
+  abbreviated values with exact-figure tooltips); underline-tab sub-nav with an
+  "Export view" right slot (Excel); Overview = same result cards (+ EDI Economics
+  row), income-required chips with the peak emphasized ("· peak"), the narrative as an
+  expandable **Plain-English summary** (default open, `.num` numerals), and the inline
+  **rates strip** (fed ord/ST/LT, state + ST split, combined ord/LT, wash-sale when on,
+  NIIT notice) replacing the "Rates assumed" note. D-026 pin strip, QFAF-treatment
+  draft details, year table (container-restyled only), and charts all retained; every
+  InfoText popup kept.
+- Tests: all 397 pass with selectors intact (group bodies stay in the DOM,
+  CSS-collapsed); 6 added (scenario rename persistence, ⌘K open + view switch,
+  palette jump expands a closed group, rail filter hit/dim, flags consolidation +
+  expand, fuzzy-filter ranking) — suite at 403. Browser-verified with Playwright in
+  BOTH themes (`/tmp/uxtest/shots/d027-{light,dark}-*.png`): palette jump, flags
+  expand, group collapse summaries, pin −$605K (−26%) delta, split derived line,
+  Year-by-Year/Charts, events editor, Meeting Mode round-trip clean.
+- Deliberate deviations from the mock: no top-bar cog button (the app nav already
+  owns the theme toggle); secondary metrics abbreviate ($2.9M) with full-precision
+  tooltips; CSV import/export kept as a second actions row (mock omitted them);
+  Bond not built (decision).
+
 ---
 
 ## Pending decision queue (next batches)
