@@ -25,4 +25,6 @@ export const STORAGE_KEYS = {
   PINNED_PANEL_HEIGHTS: 'taxCalc:pinned-panel-heights',
   /** Pinned EDI-only scenario for comparison */
   PINNED_EDI_SCENARIO: 'taxCalc:pinned-edi-scenario',
+  /** Workspace scenario display name (D-027 top context bar) */
+  SCENARIO_NAME: 'taxCalc:scenario-name',
 } as const;

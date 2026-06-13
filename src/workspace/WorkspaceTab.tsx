@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalculatorInputs,
   AdvancedSettings,
@@ -42,10 +42,333 @@ import { QualifiedPurchaserModal } from '../components/QualifiedPurchaserModal';
 import { useQualifiedPurchaser } from '../hooks/useQualifiedPurchaser';
 import { InfoText } from '../InfoPopup';
 import { POPUP_CONTENT } from '../popupContent';
+import { STORAGE_KEYS } from '../constants/storageKeys';
+// D-027 fonts: Hanken Grotesk (UI) + IBM Plex Mono (Graphite numerals),
+// bundled from @fontsource so vite-plugin-singlefile inlines them — the
+// distributable stays self-contained (no runtime CDN fetches). Mono is
+// trimmed to the latin 400/500/600 weights actually used.
+import '@fontsource-variable/hanken-grotesk';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource/ibm-plex-mono/latin-600.css';
 import './workspace.css';
 
 type ResultsView = 'overview' | 'table' | 'charts';
 type FundingMode = 'collateral' | 'total';
+
+// ─── D-027: icon set from the design handoff (workspace-mock.jsx) ───
+const I = {
+  search:
+    'M11 4a7 7 0 105.2 11.7l3.55 3.55 1.4-1.4-3.55-3.55A7 7 0 0011 4zm0 2a5 5 0 110 10 5 5 0 010-10z',
+  chevD: 'M6 9l6 6 6-6',
+  user: 'M12 12a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 0114 0',
+  layers: 'M12 3l9 5-9 5-9-5 9-5zm9 9l-9 5-9-5m18 4l-9 5-9-5',
+  archive: 'M3 5h18v4H3zM5 9v10h14V9M9 13h6',
+  overlay: 'M4 4h11v11H4zM9 9h11v11H9',
+  trend: 'M3 17l6-6 4 4 7-7M14 8h5v5',
+  sliders: 'M4 6h16M4 12h16M4 18h16M9 6v0M15 12v0M7 18v0',
+  calendar: 'M5 4h14v16H5zM5 9h14M9 2v4M15 2v4',
+  bolt: 'M13 2L4 14h6l-1 8 9-12h-6z',
+  flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
+  spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18',
+  download: 'M12 3v12m-5-5l5 5 5-5M5 21h14',
+  doc: 'M6 2h8l4 4v16H6zM14 2v4h4',
+} as const;
+
+function Ico({ d, w = 16 }: { d: string; w?: number }) {
+  return (
+    <svg
+      width={w}
+      height={w}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {d
+        .split('M')
+        .filter(Boolean)
+        .map((seg, i) => (
+          <path key={i} d={'M' + seg} />
+        ))}
+    </svg>
+  );
+}
+
+// ─── D-027: collapsible rail group with a set-value summary when closed ───
+type GroupId = 'client' | 'strategy' | 'carryforwards' | 'qfaf' | 'deleverage' | 'model' | 'events';
+
+function RailGroup({
+  id,
+  icon,
+  name,
+  summary,
+  active,
+  open,
+  onToggle,
+  dimmed,
+  hit,
+  groupRef,
+  children,
+}: {
+  id: GroupId;
+  icon: string;
+  name: string;
+  summary: ReactNode;
+  active: boolean;
+  open: boolean;
+  onToggle: () => void;
+  dimmed: boolean;
+  hit: boolean;
+  groupRef: (el: HTMLDivElement | null) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`wx-group${dimmed ? ' wx-group--dim' : ''}${hit ? ' wx-group--hit' : ''}`}
+      data-open={open}
+      data-active={active}
+      data-wx-group={id}
+      ref={groupRef}
+    >
+      <button type="button" className="wx-group-head" onClick={onToggle} aria-expanded={open}>
+        <span className="wx-group-ic">
+          <Ico d={icon} w={13} />
+        </span>
+        <span className="wx-group-titles">
+          <span className="wx-group-name">{name}</span>
+          <span className="wx-group-summary">{summary}</span>
+        </span>
+        <span className="wx-chev">
+          <Ico d={I.chevD} w={14} />
+        </span>
+      </button>
+      <div className="wx-group-body">{children}</div>
+    </div>
+  );
+}
+
+// Searchable keywords per rail group — feeds both the rail's
+// "Find a setting…" filter and the ⌘K palette entries.
+const GROUP_META: Array<{ id: GroupId; label: string; keywords: string }> = [
+  { id: 'client', label: 'Client', keywords: 'filing status state income nyc resident annual' },
+  {
+    id: 'strategy',
+    label: 'Strategy',
+    keywords:
+      'collateral strategy split allocation core overlay cost basis fund total portfolio budget start month',
+  },
+  {
+    id: 'carryforwards',
+    label: 'Carryforwards',
+    keywords: 'carryforward existing st lt nol loss capital',
+  },
+  {
+    id: 'qfaf',
+    label: 'QFAF Overlay',
+    keywords: 'qfaf fund duration sizing dynamic fixed redeploy redemptions',
+  },
+  {
+    id: 'deleverage',
+    label: 'Deleveraging',
+    keywords: 'deleverage unwind glide path long-only leverage target',
+  },
+  {
+    id: 'model',
+    label: 'Model',
+    keywords:
+      'projection years growth lt gains financing costs fees present value discount wash-sale disallowance',
+  },
+  {
+    id: 'events',
+    label: 'Per-Year Events',
+    keywords:
+      'events income schedule gain event cash infusion presets rsu business sale concentrated stock per-year',
+  },
+];
+
+// ─── D-027: ⌘K command palette (the findability spine) ───
+export interface PaletteItem {
+  id: string;
+  kind: 'Inputs' | 'View' | 'Action';
+  label: string;
+  keywords?: string;
+  run: () => void;
+}
+
+function isSubsequence(needle: string, hay: string): boolean {
+  let i = 0;
+  for (const ch of hay) {
+    if (ch === needle[i]) i++;
+    if (i === needle.length) return true;
+  }
+  return needle.length === 0;
+}
+
+export function filterPaletteItems(items: PaletteItem[], query: string): PaletteItem[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return items;
+  const scored = items
+    .map(item => {
+      const hay = `${item.label} ${item.keywords ?? ''}`.toLowerCase();
+      let score = 0;
+      if (hay.includes(q)) score = 3;
+      else if (q.split(/\s+/).every(tok => hay.includes(tok))) score = 2;
+      else if (isSubsequence(q.replace(/\s+/g, ''), hay)) score = 1;
+      return { item, score };
+    })
+    .filter(s => s.score > 0);
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map(s => s.item);
+}
+
+function CommandPalette({ items, onClose }: { items: PaletteItem[]; onClose: () => void }) {
+  const [query, setQuery] = useState('');
+  const [sel, setSel] = useState(0);
+  const filtered = useMemo(() => filterPaletteItems(items, query), [items, query]);
+  const selIndex = Math.min(sel, Math.max(0, filtered.length - 1));
+
+  const runItem = (item: PaletteItem) => {
+    onClose();
+    item.run();
+  };
+
+  return (
+    <div className="wx-palette-overlay" onClick={onClose} data-testid="wx-palette">
+      <div
+        className="wx-palette"
+        role="dialog"
+        aria-label="Jump to anything"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="wx-palette-input">
+          <Ico d={I.search} w={15} />
+          <input
+            autoFocus
+            placeholder="Jump to a setting, view, or action…"
+            aria-label="Jump to a setting, view, or action"
+            value={query}
+            onChange={e => {
+              setQuery(e.target.value);
+              setSel(0);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSel(s => Math.min(s + 1, filtered.length - 1));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSel(s => Math.max(s - 1, 0));
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const item = filtered[selIndex];
+                if (item) runItem(item);
+              } else if (e.key === 'Escape') {
+                onClose();
+              }
+            }}
+          />
+          <span className="wx-kbd">esc</span>
+        </div>
+        <div className="wx-palette-list">
+          {filtered.length === 0 && (
+            <div className="wx-palette-empty">
+              No matches — try a setting name like “wash-sale” or “income”.
+            </div>
+          )}
+          {filtered.map((item, i) => (
+            <button
+              type="button"
+              key={item.id}
+              className={`wx-palette-item${i === selIndex ? ' sel' : ''}`}
+              onMouseEnter={() => setSel(i)}
+              onClick={() => runItem(item)}
+            >
+              <span className="wx-palette-kind">{item.kind}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── D-027: consolidated Flags tray (replaces the stacked notes) ───
+type FlagSev = 'pos' | 'warn' | 'info';
+interface WsFlag {
+  key: string;
+  sev: FlagSev;
+  tag: string;
+  body: ReactNode;
+}
+
+function FlagsTray({ flags }: { flags: WsFlag[] }) {
+  const [open, setOpen] = useState(false);
+  if (flags.length === 0) return null;
+  const nPos = flags.filter(f => f.sev === 'pos').length;
+  const nWarn = flags.filter(f => f.sev === 'warn').length;
+  const nInfo = flags.filter(f => f.sev === 'info').length;
+  const peek = [
+    nPos > 0 && `${nPos} positive`,
+    nWarn > 0 && `${nWarn} attention`,
+    nInfo > 0 && `${nInfo} note${nInfo === 1 ? '' : 's'} about assumptions`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <div className="wx-flags" data-testid="wx-flags">
+      <button
+        type="button"
+        className="wx-flags-head"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+      >
+        <span className="wx-flags-badge">
+          <span className="ic">
+            <Ico d={I.flag} w={16} />
+          </span>
+          {flags.length} flag{flags.length === 1 ? '' : 's'}
+        </span>
+        <span className="wx-flags-dots">
+          {flags.map(f => (
+            <span key={f.key} className={`wx-fdot wx-fdot--${f.sev}`} />
+          ))}
+        </span>
+        <span className="wx-flags-peek">{peek}</span>
+        <span className="wx-flags-toggle">
+          {open ? 'Hide' : 'Review'} <Ico d={I.chevD} w={14} />
+        </span>
+      </button>
+      {open && (
+        <div className="wx-flags-body" data-testid="wx-flags-body">
+          {flags.map(f => (
+            <div className={`wx-flag wx-flag--${f.sev}`} key={f.key}>
+              <span className="wx-flag-rail" />
+              <span className="wx-flag-body">
+                <span className="wx-flag-tag">{f.tag}</span>
+                {f.body}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Numeral helper for the plain-English summary (.num spans per the mock).
+const Num = ({ v }: { v: number }) => <span className="num">{formatCurrency(v)}</span>;
+
+const FILING_ABBREV: Record<string, string> = {
+  mfj: 'MFJ',
+  single: 'Single',
+  mfs: 'MFS',
+  hoh: 'HoH',
+};
 
 // ─── D-026: pinned-scenario comparison strip ───
 // The pin freezes inputs + settings + RESULTS via the SAME usePinnedScenario
@@ -237,18 +560,19 @@ function PinComparisonStrip({
 }
 
 /**
- * Workspace (Beta) — redesigned single-screen experience from the UI review.
+ * Workspace — D-027 redesign from the Claude Design handoff.
  *
- * Design intent (vs. the classic 7,000px single-scroll page):
- * - Persistent input rail: every assumption editable while looking at results,
- *   no scroll round-trips between "change income" and "see the impact".
- * - Results-first hierarchy: headline metrics at the top, detail on demand
- *   via Overview / Year-by-Year / Charts sub-views.
- * - One surface per number: the metric strip is the only headline; deep
- *   detail lives in the (audit-complete) table reused from the classic view.
- * - Sensitivity analysis intentionally stays in the classic tab; split
- *   allocation, scenario pinning (D-026), Meeting Mode and per-year planning
- *   are first-class here.
+ * Findability is the spine (the owner's pain point: "all the data I want,
+ * but it takes too long to find what you're looking for"):
+ * - Top context bar: scenario name + live chips + ⌘K "Jump to anything".
+ * - Collapsible rail groups that show their set values when closed.
+ * - One consolidated, severity-tagged Flags tray replacing stacked notes.
+ * - Scannable results: emphasized 4-up metric strip, result cards, an
+ *   expandable plain-English summary, and an inline rates strip.
+ *
+ * Skins: Slate (light) / Graphite (dark) via the app's existing theme
+ * toggle — see workspace.css. Every figure renders from the live engine
+ * outputs (one-engine rule); the design's numbers were placeholders.
  */
 export function WorkspaceTab() {
   const qualifiedPurchaser = useQualifiedPurchaser();
@@ -274,10 +598,42 @@ export function WorkspaceTab() {
   const [schedStart, setSchedStart] = useState<number>(DEFAULTS.annualIncome);
   const [schedGrowth, setSchedGrowth] = useState<number>(3);
 
+  // ─── D-027 UI state ───
+  const [scenarioName, setScenarioName] = useState<string>(
+    () => localStorage.getItem(STORAGE_KEYS.SCENARIO_NAME) ?? 'Untitled scenario'
+  );
+  const [editingName, setEditingName] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [railFilter, setRailFilter] = useState('');
+  const [summaryOpen, setSummaryOpen] = useState(true); // plain-English summary, default OPEN
+  const [openGroups, setOpenGroups] = useState<Record<GroupId, boolean>>({
+    client: true,
+    strategy: true,
+    carryforwards: false,
+    qfaf: true,
+    deleverage: false,
+    model: false,
+    events: false,
+  });
+  const groupRefs = useRef<Partial<Record<GroupId, HTMLDivElement | null>>>({});
+
   const set = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) =>
     setInputs(prev => ({ ...prev, [key]: value }));
   const setSetting = <K extends keyof AdvancedSettings>(key: K, value: AdvancedSettings[K]) =>
     setSettings(prev => ({ ...prev, [key]: value }));
+
+  // ⌘K / Ctrl+K opens the command palette anywhere in the Workspace.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        if (isMeetingMode) return; // Meeting Mode keeps its own surface
+        e.preventDefault();
+        setPaletteOpen(o => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isMeetingMode]);
 
   // In total-budget mode, solve for the collateral that makes
   // collateral + auto-sized QFAF equal the available portfolio.
@@ -556,1143 +912,1712 @@ export function WorkspaceTab() {
   );
   const nolExtensionYears = Math.max(0, results.years.length - baseHorizonYears);
 
-  return (
-    <div className="ws">
-      {/* ───────────────── Input rail ───────────────── */}
-      <aside className="ws-rail">
-        <div className="ws-rail-group">
-          <h4>Client</h4>
-          <label className="ws-field">
-            <span>Filing status</span>
-            <select
-              value={inputs.filingStatus}
-              onChange={e => set('filingStatus', e.target.value as FilingStatus)}
-            >
-              {FILING_STATUSES.map(f => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ws-field">
-            <span>State</span>
-            <select value={inputs.stateCode} onChange={e => set('stateCode', e.target.value)}>
-              {STATES.map(s => (
-                <option key={s.code} value={s.code}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {inputs.stateCode === 'NY' && (
-            <label className="ws-toggle">
-              <input
-                type="checkbox"
-                checked={inputs.nycResident === true}
-                onChange={e => set('nycResident', e.target.checked)}
-              />
-              <span>NYC resident (+3.876% local)</span>
-            </label>
-          )}
-          <label className="ws-field">
-            <span>Annual income</span>
-            <input
-              inputMode="numeric"
-              value={formatWithCommas(inputs.annualIncome)}
-              onChange={e => set('annualIncome', parseFormattedNumber(e.target.value))}
-            />
-          </label>
-        </div>
+  // ─── D-027: rail group plumbing ───
+  const toggleGroup = (id: GroupId) => setOpenGroups(prev => ({ ...prev, [id]: !prev[id] }));
+  const jumpToGroup = (id: GroupId) => {
+    setOpenGroups(prev => ({ ...prev, [id]: true }));
+    window.setTimeout(() => {
+      const el = groupRefs.current[id];
+      if (!el) return;
+      el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      el.querySelector<HTMLElement>(
+        '.wx-group-body input:not([type="file"]), .wx-group-body select, .wx-group-body button'
+      )?.focus({ preventScroll: true });
+    }, 80);
+  };
+  // Rail "Find a setting…": null = no filter, true = match, false = dim.
+  const groupMatch = (id: GroupId): boolean | null => {
+    const q = railFilter.trim().toLowerCase();
+    if (!q) return null;
+    const meta = GROUP_META.find(g => g.id === id);
+    const hay = `${meta?.label ?? id} ${meta?.keywords ?? ''}`.toLowerCase();
+    return q.split(/\s+/).every(tok => hay.includes(tok));
+  };
+  const groupProps = (id: GroupId, active: boolean) => {
+    const m = groupMatch(id);
+    return {
+      id,
+      active,
+      open: openGroups[id],
+      onToggle: () => toggleGroup(id),
+      dimmed: m === false,
+      hit: m === true,
+      groupRef: (el: HTMLDivElement | null) => {
+        groupRefs.current[id] = el;
+      },
+    };
+  };
 
-        <div className="ws-rail-group">
-          <h4>Strategy</h4>
-          {/* D-026: split allocation as an expandable section (rail is too
-              tight for always-visible dual selectors). Same collapsible
-              pattern as the other rail toggles. */}
-          <label className="ws-toggle">
-            <input
-              type="checkbox"
-              checked={splitOn}
-              onChange={e => {
-                updateSplit({ enabled: e.target.checked });
-                // Total-budget solving has nothing to solve in split mode
-                // (leg amounts set the total) — fall back to collateral mode.
-                if (e.target.checked && fundingMode === 'total') setFundingMode('collateral');
-              }}
-            />
-            <span>Split allocation (core + overlay)</span>
-          </label>
-          {splitOn ? (
+  const exportExcel = () =>
+    exportToExcel({
+      inputs: effectiveInputs,
+      results,
+      settings,
+      taxRates: rates.full,
+      exitAnalysis: exit,
+    });
+
+  // ⌘K palette items: every rail group, sub-view, and action is jumpable.
+  const paletteItems: PaletteItem[] = [
+    ...GROUP_META.map(g => ({
+      id: `group-${g.id}`,
+      kind: 'Inputs' as const,
+      label: g.label,
+      keywords: g.keywords,
+      run: () => jumpToGroup(g.id),
+    })),
+    {
+      id: 'view-overview',
+      kind: 'View',
+      label: 'Overview',
+      keywords: 'results cards summary rates',
+      run: () => setResultsView('overview'),
+    },
+    {
+      id: 'view-table',
+      kind: 'View',
+      label: 'Year-by-Year table',
+      keywords: 'audit detail columns breakdown',
+      run: () => setResultsView('table'),
+    },
+    {
+      id: 'view-charts',
+      kind: 'View',
+      label: 'Charts',
+      keywords: 'graph savings portfolio value',
+      run: () => setResultsView('charts'),
+    },
+    {
+      id: 'action-meeting',
+      kind: 'Action',
+      label: 'Open Meeting Mode',
+      keywords: 'present client boardroom',
+      run: () => setIsMeetingMode(true),
+    },
+    {
+      id: 'action-excel',
+      kind: 'Action',
+      label: 'Export Excel',
+      keywords: 'download workbook xlsx',
+      run: exportExcel,
+    },
+    {
+      id: 'action-csv-export',
+      kind: 'Action',
+      label: 'Export scenario (CSV)',
+      keywords: 'download save',
+      run: () => downloadInputsCsv(effectiveInputs, settings),
+    },
+    {
+      id: 'action-csv-import',
+      kind: 'Action',
+      label: 'Import scenario (CSV)',
+      keywords: 'load open',
+      run: () => csvFileRef.current?.click(),
+    },
+    {
+      id: 'action-pin',
+      kind: 'Action',
+      label: 'Pin scenario',
+      keywords: 'freeze compare snapshot',
+      run: () => pinnedScenario.pin(effectiveInputs, settings, results),
+    },
+    {
+      id: 'action-events',
+      kind: 'Action',
+      label: 'Edit income & events',
+      keywords: 'per-year schedule gain infusion presets',
+      run: () => {
+        setShowEventsEditor(true);
+        jumpToGroup('events');
+      },
+    },
+  ];
+
+  // ─── D-027: consolidated flags (severity-ordered: pos → warn → info) ───
+  const flags: WsFlag[] = [];
+  if (exit.incrementalDeferredTax < 0) {
+    flags.push({
+      key: 'exit-covered',
+      sev: 'pos',
+      tag: 'Exit',
+      body: (
+        <>
+          <strong>Exit covered:</strong> the loss reserve more than covers the strategy&apos;s
+          embedded gain — liquidating in year {projectionYears} costs{' '}
+          {formatCurrency(Math.abs(exit.incrementalDeferredTax))} <b>less</b> than the passive
+          baseline, for a net benefit of {formatCurrency(exit.netBenefitAfterLiquidation)}.
+        </>
+      ),
+    });
+  }
+  if (stateNote) {
+    flags.push({
+      key: 'state',
+      sev: 'warn',
+      tag: 'State',
+      body: (
+        <>
+          <strong>State treatment:</strong> {stateNote}
+        </>
+      ),
+    });
+  }
+  if (conformityNote) {
+    flags.push({
+      key: 'conformity',
+      sev: 'warn',
+      tag: 'Conformity',
+      body: (
+        <>
+          <strong>State conformity:</strong> {conformityNote}
+        </>
+      ),
+    });
+  }
+  if (
+    (view.isSplit || currentStrategy?.type === 'overlay') &&
+    effectiveInputs.collateralCostBasis === undefined
+  ) {
+    flags.push({
+      key: 'basis',
+      sev: 'warn',
+      tag: 'Basis',
+      body: (
+        <>
+          <strong>Appreciated-stock collateral:</strong> the liquidation analysis assumes basis
+          equals today&apos;s value. If this collateral carries unrealized gain, enter its{' '}
+          <strong>cost basis</strong> in the Strategy group so the embedded gain and deferred tax
+          reflect the client&apos;s true exit picture.
+        </>
+      ),
+    });
+  }
+  if (dlvPlan?.enabled && splitOn) {
+    flags.push({
+      key: 'split-dlv',
+      sev: 'warn',
+      tag: 'Split',
+      body: (
+        <>
+          <strong>Deleveraging ignored:</strong> deleveraging isn&apos;t modeled with split
+          allocation yet — plan ignored.
+        </>
+      ),
+    });
+  }
+  if (dlvPlan?.enabled && inputs.qfafEnabled && inputs.qfafSizingMode === 'fixed') {
+    flags.push({
+      key: 'fixed-qfaf-dlv',
+      sev: 'warn',
+      tag: 'QFAF',
+      body: (
+        <>
+          <strong>Fixed QFAF sizing</strong> won&apos;t shrink with deleveraging — expect ST gain
+          leakage as the harvest rate glides down (switch to Dynamic).
+        </>
+      ),
+    });
+  }
+  if (summary.totalStateNolExpired > 0) {
+    flags.push({
+      key: 'state-nol-expiry',
+      sev: 'warn',
+      tag: 'NOL',
+      body: (
+        <>
+          <strong>State NOL expiry:</strong> {formatCurrency(summary.totalStateNolExpired)} of
+          California NOL expires unused within the projection (20-year state carryover; federal NOL
+          is not affected). See the &quot;St. NOL Expired&quot; column in the year-by-year table.
+        </>
+      ),
+    });
+  }
+  for (const y of eventYears) {
+    flags.push({
+      key: `gain-event-${y.year}`,
+      sev: 'info',
+      tag: 'Event',
+      body: (
+        <>
+          <strong>Year {y.year} gain event:</strong> {formatCurrency(y.gainEventAmount)} —
+          carryforwards shelter {formatCurrency(y.gainEventCfShelter)}, leaving{' '}
+          {formatCurrency(y.gainEventTax)} of tax due
+          {y.gainEventTaxWithoutStrategy - y.gainEventTax > 0.5 && (
             <>
-              <label className="ws-field">
-                <span>Core strategy (cash)</span>
-                <select
-                  value={split.coreStrategyId}
-                  onChange={e => updateSplit({ coreStrategyId: e.target.value })}
-                >
-                  {STRATEGIES.filter(s => s.type === 'core').map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} — {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="ws-field">
-                <span>Core amount</span>
-                <input
-                  inputMode="numeric"
-                  value={formatWithCommas(split.coreAmount)}
-                  onChange={e => updateSplit({ coreAmount: parseFormattedNumber(e.target.value) })}
-                />
-              </label>
-              <label className="ws-field">
-                <span>Overlay strategy (appreciated stock)</span>
-                <select
-                  value={split.overlayStrategyId}
-                  onChange={e => updateSplit({ overlayStrategyId: e.target.value })}
-                >
-                  {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} — {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="ws-field">
-                <span>Overlay amount</span>
-                <input
-                  inputMode="numeric"
-                  value={formatWithCommas(split.overlayAmount)}
-                  onChange={e =>
-                    updateSplit({ overlayAmount: parseFormattedNumber(e.target.value) })
-                  }
-                />
-              </label>
-              <p className="ws-derived" data-testid="ws-split-total">
-                → Total collateral {formatCurrency(splitTotal)}
-                {splitTotal > 0 && (
-                  <>
-                    {' '}
-                    ({formatPercent(split.coreAmount / splitTotal)} core /{' '}
-                    {formatPercent(split.overlayAmount / splitTotal)} overlay)
-                  </>
-                )}
-                {inputs.qfafEnabled && <> · QFAF auto-sizes against the combined ST losses</>}
-              </p>
-              {(split.coreAmount <= 0 || split.overlayAmount <= 0) && (
-                <p className="ws-rail-warn">
-                  Both legs need an amount above $0 — until then the projection falls back to the
-                  single-strategy inputs.
-                </p>
-              )}
-              <p className="ws-rail-note" style={{ padding: 0, margin: '6px 0 10px' }}>
-                Total-budget funding isn&apos;t available with split allocation — the two leg
-                amounts set the total.
-              </p>
+              {' '}
+              ({formatCurrency(y.gainEventTaxWithoutStrategy - y.gainEventTax)} less than without
+              the program)
             </>
+          )}
+          . Any NOL absorbed by the event shows in that year&apos;s savings and the
+          income-utilization chips.
+        </>
+      ),
+    });
+  }
+  if (ediMode) {
+    flags.push({
+      key: 'edi-reserve',
+      sev: 'info',
+      tag: 'Reserve',
+      body: (
+        <>
+          <strong>Contingent reserve:</strong> the {formatCurrency(summary.lossReserveShelterValue)}{' '}
+          loss-reserve shelter value is contingent on future gains being realized — it is never
+          added to the realized-savings headline.
+        </>
+      ),
+    });
+  }
+  flags.push({
+    key: 'step-up',
+    sev: 'info',
+    tag: 'Step-up',
+    body: (
+      <>
+        <strong>Step-up framing:</strong> &quot;Net If Held to Step-Up&quot; is mortality-contingent
+        and assumes basis step-up under current law (IRC §1014). Unused loss carryforwards are lost
+        at death (§1212) — their {formatCurrency(stepUp.continueAndDie.carryforwardValueLost)}{' '}
+        contingent shelter value is NOT counted in either figure.
+        {stepUp.recommendation === 'partial_unwind' && (
+          <>
+            {' '}
+            With carryforwards covering only part of the embedded gain, the modeled optimum is a
+            partial unwind of ~{Math.round(stepUp.optimalUnwindPct * 100)}% during life (sheltered
+            by the reserve), holding the rest for step-up.
+          </>
+        )}
+        {stepUp.recommendation === 'unwind' && (
+          <>
+            {' '}
+            Here the carryforward exceeds the embedded gain, so a full unwind during life is
+            tax-free — excess reserve would otherwise be lost at death.
+          </>
+        )}
+      </>
+    ),
+  });
+  if (!settings.financingFeesEnabled) {
+    flags.push({
+      key: 'gross',
+      sev: 'info',
+      tag: 'Gross',
+      body: (
+        <>
+          <strong>Gross estimate:</strong> financing fees are off — the headline is before costs
+          &amp; fees. Toggle them in the Model group (present-value discounting is also opt-in
+          there).
+        </>
+      ),
+    });
+  }
+  if (dlvActive && dlvPlan) {
+    flags.push({
+      key: 'deleverage',
+      sev: 'info',
+      tag: 'Delever',
+      body: (
+        <>
+          <strong>Deleveraging:</strong> unwinding {currentStrategy?.name ?? 'the current strategy'}{' '}
+          to {dlvTargetLabel} starting year {dlvPlan.startYear}
+          {dlvPlan.durationYears > 1 ? ` over ${dlvPlan.durationYears} years` : ' all at once'}{' '}
+          realizes {formatCurrency(dlvTotalGain)} of unwind gains, of which only{' '}
+          {formatCurrency(dlvTotalTax)} is taxed — the remainder is absorbed by the year&apos;s
+          harvested losses and the loss-carryforward reserve.{' '}
+          {settings.financingFeesEnabled ? (
+            <>Financing fees saved vs staying levered: {formatCurrency(dlvTotalFinSaved)}.</>
           ) : (
+            <>Enable financing costs &amp; fees to see the financing saved.</>
+          )}
+          {dlvPlan.target === LONG_ONLY_TARGET && (
             <>
-              <label className="ws-field">
-                <span>Collateral strategy</span>
-                <select value={inputs.strategyId} onChange={e => set('strategyId', e.target.value)}>
-                  {STRATEGIES.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} — {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="ws-field">
-                <span>Fund by</span>
-                <div className="ws-segment">
-                  <button
-                    type="button"
-                    className={fundingMode === 'collateral' ? 'active' : ''}
-                    onClick={() => setFundingMode('collateral')}
-                  >
-                    Collateral
-                  </button>
-                  <button
-                    type="button"
-                    className={fundingMode === 'total' ? 'active' : ''}
-                    onClick={() => {
-                      // Seed the budget from the current total so the switch is seamless
-                      setTotalAvailable(Math.round(results.sizing.totalExposure));
-                      setFundingMode('total');
-                    }}
-                  >
-                    Total portfolio
-                  </button>
-                </div>
-              </div>
-              {fundingMode === 'collateral' ? (
-                <label className="ws-field">
-                  <span>Collateral amount</span>
-                  <input
-                    inputMode="numeric"
-                    value={formatWithCommas(inputs.collateralAmount)}
-                    onChange={e => set('collateralAmount', parseFormattedNumber(e.target.value))}
-                  />
-                </label>
-              ) : (
-                <>
-                  <label className="ws-field">
-                    <span>Total available portfolio</span>
-                    <input
-                      inputMode="numeric"
-                      value={formatWithCommas(totalAvailable)}
-                      onChange={e => setTotalAvailable(parseFormattedNumber(e.target.value))}
-                    />
-                  </label>
-                  <p className="ws-derived">
-                    → Collateral {formatCurrency(results.sizing.collateralValue)}
-                    {inputs.qfafEnabled && (
-                      <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
-                    )}{' '}
-                    = {formatCurrency(results.sizing.totalExposure)}
-                  </p>
-                </>
-              )}
+              {' '}
+              Once long-only, the realistic endgame for an estate-minded client is holding through
+              basis step-up — the &quot;Net If Held to Step-Up&quot; card shows that path with the
+              deferred exit tax never paid.
             </>
           )}
-          <label className="ws-field">
-            <span>Cost basis of collateral (optional)</span>
+        </>
+      ),
+    });
+  }
+  if (nolExtensionYears > 0) {
+    flags.push({
+      key: 'nol-extension',
+      sev: 'info',
+      tag: 'Horizon',
+      body: (
+        <>
+          <strong>Projection extended to year {results.years.length}:</strong> loss carryforwards
+          (NOL or capital) remained at the end of the standard {baseHorizonYears}-year horizon, so
+          the model keeps running wind-down years while something is consuming them (capped at 40).
+          Extension years assume income continues at the final scheduled year&apos;s level (your
+          last income-schedule row, if set). A capital-loss reserve consumed only by the $3,000/yr
+          ordinary offset does not extend the projection — raise &ldquo;Projection years&rdquo; to
+          see more of it.
+        </>
+      ),
+    });
+  }
+  const sevRank: Record<FlagSev, number> = { pos: 0, warn: 1, info: 2 };
+  flags.sort((a, b) => sevRank[a.sev] - sevRank[b.sev]);
+
+  // ─── D-027: top-bar chips + rail summaries (live, from real inputs) ───
+  const filingAbbrev = FILING_ABBREV[inputs.filingStatus] ?? inputs.filingStatus.toUpperCase();
+  const stateName = STATES.find(s => s.code === inputs.stateCode)?.name ?? inputs.stateCode;
+  const cfParts: ReactNode[] = [];
+  if (inputs.existingStLossCarryforward > 0)
+    cfParts.push(
+      <span key="st">
+        ST <b>{formatCurrencyAbbreviated(inputs.existingStLossCarryforward)}</b>
+      </span>
+    );
+  if (inputs.existingLtLossCarryforward > 0)
+    cfParts.push(
+      <span key="lt">
+        LT <b>{formatCurrencyAbbreviated(inputs.existingLtLossCarryforward)}</b>
+      </span>
+    );
+  if (inputs.existingNolCarryforward > 0)
+    cfParts.push(
+      <span key="nol">
+        NOL <b>{formatCurrencyAbbreviated(inputs.existingNolCarryforward)}</b>
+      </span>
+    );
+  const carryforwardsActive = cfParts.length > 0;
+  const modelActive =
+    settings.growthEnabled ||
+    settings.financingFeesEnabled ||
+    settings.presentValueEnabled ||
+    settings.washSaleDisallowanceRate > 0 ||
+    projYears !== 10 ||
+    inputs.ltGainsEnabled === false;
+
+  const commitScenarioName = (raw: string) => {
+    const name = raw.trim() || 'Untitled scenario';
+    setScenarioName(name);
+    localStorage.setItem(STORAGE_KEYS.SCENARIO_NAME, name);
+    setEditingName(false);
+  };
+
+  return (
+    <div className="wx">
+      {paletteOpen && <CommandPalette items={paletteItems} onClose={() => setPaletteOpen(false)} />}
+
+      {/* ───────────────── Top context bar ───────────────── */}
+      <header className="wx-top">
+        <div className="wx-brand">
+          <span className="wx-logo">Q</span>
+          <span className="wx-brand-name">EDI Calculator</span>
+        </div>
+        <div className="wx-scenario">
+          {editingName ? (
             <input
-              inputMode="numeric"
-              placeholder="= collateral value"
-              value={
-                inputs.collateralCostBasis !== undefined
-                  ? formatWithCommas(inputs.collateralCostBasis)
-                  : ''
-              }
-              onChange={e => {
-                const raw = e.target.value.trim();
-                set('collateralCostBasis', raw === '' ? undefined : parseFormattedNumber(raw));
+              autoFocus
+              defaultValue={scenarioName}
+              aria-label="Scenario name"
+              onBlur={e => commitScenarioName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitScenarioName((e.target as HTMLInputElement).value);
+                else if (e.key === 'Escape') setEditingName(false);
               }}
             />
-          </label>
-          <label className="ws-field">
-            <span>Start month</span>
-            <select
-              value={inputs.startMonth}
-              onChange={e => set('startMonth', Number(e.target.value))}
+          ) : (
+            <button
+              type="button"
+              className="wx-scenario-name"
+              title="Rename scenario"
+              data-testid="wx-scenario-name"
+              onClick={() => setEditingName(true)}
             >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {new Date(2026, i, 1).toLocaleString('en-US', { month: 'long' })}
-                </option>
-              ))}
-            </select>
-          </label>
+              {scenarioName}
+            </button>
+          )}
+          <span className="wx-scenario-edit">
+            <Ico d={I.doc} w={13} />
+          </span>
         </div>
-
-        <div className="ws-rail-group">
-          <h4>Carryforwards</h4>
-          <label className="ws-field">
-            <span>Existing ST loss c/f</span>
-            <input
-              inputMode="numeric"
-              value={formatWithCommas(inputs.existingStLossCarryforward)}
-              onChange={e =>
-                set('existingStLossCarryforward', parseFormattedNumber(e.target.value))
-              }
-            />
-          </label>
-          <label className="ws-field">
-            <span>Existing LT loss c/f</span>
-            <input
-              inputMode="numeric"
-              value={formatWithCommas(inputs.existingLtLossCarryforward)}
-              onChange={e =>
-                set('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
-              }
-            />
-          </label>
-          <label className="ws-field">
-            <span>Existing NOL c/f</span>
-            <input
-              inputMode="numeric"
-              value={formatWithCommas(inputs.existingNolCarryforward)}
-              onChange={e => set('existingNolCarryforward', parseFormattedNumber(e.target.value))}
-            />
-          </label>
+        <div className="wx-chips">
+          <span className="wx-chip">
+            <span className="wx-chip-dot" />
+            <b>{filingAbbrev}</b>&nbsp;· {stateName}
+          </span>
+          {splitOn ? (
+            <span className="wx-chip">
+              <b>{formatCurrencyAbbreviated(splitTotal)}</b>&nbsp;combined
+            </span>
+          ) : fundingMode === 'total' ? (
+            <span className="wx-chip">
+              <b>{formatCurrencyAbbreviated(totalAvailable)}</b>&nbsp;total budget
+            </span>
+          ) : (
+            <span className="wx-chip">
+              <b>{formatCurrencyAbbreviated(inputs.collateralAmount)}</b>&nbsp;collateral
+            </span>
+          )}
+          <span className="wx-chip">
+            {splitOn ? (
+              <>
+                Core + Overlay&nbsp;<b>split</b>
+              </>
+            ) : (
+              <b>{currentStrategy?.name ?? inputs.strategyId}</b>
+            )}
+          </span>
+          <span className="wx-chip">
+            QFAF&nbsp;<b>{inputs.qfafEnabled ? 'On' : 'Off'}</b>
+          </span>
         </div>
+        <div className="wx-top-right">
+          <button
+            type="button"
+            className="wx-search"
+            data-testid="wx-search"
+            onClick={() => setPaletteOpen(true)}
+          >
+            <Ico d={I.search} w={14} />
+            <span>Jump to anything</span>
+            <span className="wx-kbd">⌘K</span>
+          </button>
+        </div>
+      </header>
 
-        <div className="ws-rail-group">
-          <h4>QFAF overlay</h4>
-          <label className="ws-toggle">
+      <div className="wx-body">
+        {/* ───────────────── Input rail ───────────────── */}
+        <aside className="wx-rail">
+          <label className="wx-railsearch">
+            <Ico d={I.search} w={14} />
             <input
-              type="checkbox"
-              checked={inputs.qfafEnabled}
-              onChange={e => set('qfafEnabled', e.target.checked)}
+              value={railFilter}
+              onChange={e => setRailFilter(e.target.value)}
+              placeholder="Find a setting…"
+              aria-label="Find a setting"
             />
-            <span>Enable QFAF</span>
           </label>
-          {inputs.qfafEnabled && (
-            <>
-              <label className="ws-field">
-                <span>Duration: {inputs.qfafDuration} yrs</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={10}
-                  value={inputs.qfafDuration}
-                  onChange={e => set('qfafDuration', Number(e.target.value))}
-                />
-              </label>
-              <label className="ws-field">
-                <span>Sizing</span>
-                <select
-                  value={inputs.qfafSizingMode}
-                  onChange={e => set('qfafSizingMode', e.target.value as 'fixed' | 'dynamic')}
-                >
-                  <option value="dynamic">Dynamic (resized yearly)</option>
-                  <option value="fixed">Fixed at inception</option>
-                </select>
-              </label>
-              <label className="ws-toggle">
+
+          <RailGroup
+            {...groupProps('client', true)}
+            icon={I.user}
+            name="Client"
+            summary={
+              <>
+                <b>{filingAbbrev}</b> · {stateName} ·{' '}
+                <b>{formatCurrencyAbbreviated(inputs.annualIncome)}</b> income
+              </>
+            }
+          >
+            <label className="wx-field">
+              <span className="wx-label">Filing status</span>
+              <select
+                value={inputs.filingStatus}
+                onChange={e => set('filingStatus', e.target.value as FilingStatus)}
+              >
+                {FILING_STATUSES.map(f => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="wx-field">
+              <span className="wx-label">State</span>
+              <select value={inputs.stateCode} onChange={e => set('stateCode', e.target.value)}>
+                {STATES.map(s => (
+                  <option key={s.code} value={s.code}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {inputs.stateCode === 'NY' && (
+              <label className="wx-toggle">
                 <input
                   type="checkbox"
-                  checked={inputs.redeployQfafProceeds === true}
-                  onChange={e => set('redeployQfafProceeds', e.target.checked)}
+                  checked={inputs.nycResident === true}
+                  onChange={e => set('nycResident', e.target.checked)}
                 />
-                <span>Redeploy redemptions into core</span>
+                <span className="wx-switch" />
+                <span>NYC resident (+3.876% local)</span>
               </label>
-            </>
-          )}
-        </div>
+            )}
+            <label className="wx-field">
+              <span className="wx-label">Annual income</span>
+              <input
+                inputMode="numeric"
+                value={formatWithCommas(inputs.annualIncome)}
+                onChange={e => set('annualIncome', parseFormattedNumber(e.target.value))}
+              />
+            </label>
+          </RailGroup>
 
-        <div className="ws-rail-group">
-          <h4>
-            <InfoText contentKey="deleverage-plan">Deleveraging</InfoText>
-          </h4>
-          <label className="ws-toggle">
-            <input
-              type="checkbox"
-              checked={dlvPlan?.enabled === true}
-              onChange={e => setDlvPlan({ enabled: e.target.checked })}
-            />
-            <span>Plan deleveraging</span>
-          </label>
-          {/* D-016/D-026: split wins when both are enabled — same wording as
-              the results-pane warning (core.ts ignores the plan). */}
-          {dlvPlan?.enabled && splitOn && (
-            <p className="ws-rail-warn" data-testid="ws-split-dlv-warn">
-              ⚠️ Deleveraging isn&apos;t modeled with split allocation yet — plan ignored.
-            </p>
-          )}
-          {dlvPlan?.enabled && (
-            <>
-              <label className="ws-field">
-                <span>Start year</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={projYears}
-                  value={dlvPlan.startYear}
-                  onChange={e =>
-                    setDlvPlan({
-                      startYear: Math.max(1, Math.min(projYears, Number(e.target.value) || 1)),
-                    })
-                  }
-                />
-              </label>
-              <label className="ws-field">
-                <span>
-                  Duration: {dlvPlan.durationYears} yr{dlvPlan.durationYears > 1 ? 's' : ''}
-                  {dlvPlan.durationYears === 1 ? ' (all at once)' : ''}
-                </span>
-                <input
-                  type="range"
-                  min={1}
-                  max={10}
-                  value={dlvPlan.durationYears}
-                  onChange={e => setDlvPlan({ durationYears: Number(e.target.value) })}
-                />
-              </label>
-              <label className="ws-field">
-                <span>Unwind to</span>
-                <select
-                  value={dlvPlan.target}
-                  onChange={e => setDlvPlan({ target: e.target.value })}
-                >
-                  <option value={LONG_ONLY_TARGET}>Long-only direct indexing</option>
-                  {dlvTargets.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} — {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {/* D-017 disclosure — defaults stay visible while a plan is on */}
-              <p className="ws-rail-note" style={{ padding: 0, marginTop: 6 }}>
-                Assumes short covers realize no gain — shorts are continuously loss-recycled;
-                unwound long-extension gains realized as LT once seasoned. Overridable in code.
-              </p>
-            </>
-          )}
-        </div>
-
-        <div className="ws-rail-group">
-          <h4>Model</h4>
-          <label className="ws-field">
-            <span>
-              <InfoText contentKey="projection-years">Projection years</InfoText>
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={40}
-              value={projYears}
-              onChange={e =>
-                setSetting(
-                  'projectionYears',
-                  Math.max(1, Math.min(40, Number(e.target.value) || 10))
-                )
-              }
-            />
-          </label>
-          <label className="ws-toggle">
-            <input
-              type="checkbox"
-              checked={settings.growthEnabled}
-              onChange={e => setSetting('growthEnabled', e.target.checked)}
-            />
-            <span>Portfolio growth ({formatPercent(settings.defaultAnnualReturn, 0)})</span>
-          </label>
-          <label className="ws-toggle">
-            <input
-              type="checkbox"
-              checked={inputs.ltGainsEnabled !== false}
-              onChange={e => set('ltGainsEnabled', e.target.checked)}
-            />
-            <span>Realize LT gains</span>
-          </label>
-          <label className="ws-toggle">
-            <input
-              type="checkbox"
-              checked={settings.financingFeesEnabled}
-              onChange={e => setSetting('financingFeesEnabled', e.target.checked)}
-            />
-            <span>Financing costs &amp; fees</span>
-          </label>
-          <label className="ws-toggle">
-            <input
-              type="checkbox"
-              checked={settings.presentValueEnabled}
-              onChange={e => setSetting('presentValueEnabled', e.target.checked)}
-            />
-            <span>Show present value ({formatPercent(settings.discountRate, 0)})</span>
-          </label>
-          <label className="ws-field">
-            <span>
-              Wash-sale disallowance: {formatPercent(settings.washSaleDisallowanceRate, 0)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={15}
-              step={1}
-              value={Math.round(settings.washSaleDisallowanceRate * 100)}
-              onChange={e => setSetting('washSaleDisallowanceRate', Number(e.target.value) / 100)}
-            />
-          </label>
-        </div>
-
-        <div className="ws-rail-group">
-          <h4>Per-Year Events</h4>
-          <button className="ws-action-btn" onClick={() => setShowEventsEditor(v => !v)}>
-            {showEventsEditor ? 'Hide' : 'Edit'} income &amp; events
-            {activeOverrides.length > 0 && ` (${activeOverrides.length} active)`}
-          </button>
-          <p className="ws-rail-note" style={{ padding: 0, marginTop: 6 }}>
-            Model variable RSU/bonus years, cash infusions, and planned sale events (business exit,
-            IPO lockup). One-click scenario presets inside.
-          </p>
-        </div>
-
-        <div className="ws-rail-group">
-          <h4>Actions</h4>
-          <button
-            className="ws-action-btn ws-action-btn--primary"
-            onClick={() => setIsMeetingMode(true)}
-          >
-            Open Meeting Mode
-          </button>
-          <button
-            className="ws-action-btn"
-            data-testid="ws-pin-btn"
-            disabled={!pinnedScenario.canPin}
-            title={
-              pinnedScenario.canPin
-                ? 'Freeze the current scenario (inputs + results) for side-by-side comparison'
-                : 'Pin limit reached (4) — unpin a scenario first'
-            }
-            onClick={() => pinnedScenario.pin(effectiveInputs, settings, results)}
-          >
-            Pin scenario
-            {pinnedScenario.scenarios.length > 0 && ` (${pinnedScenario.scenarios.length} pinned)`}
-          </button>
-          <button
-            className="ws-action-btn"
-            onClick={() =>
-              exportToExcel({
-                inputs: effectiveInputs,
-                results,
-                settings,
-                taxRates: rates.full,
-                exitAnalysis: exit,
-              })
+          <RailGroup
+            {...groupProps('strategy', true)}
+            icon={I.overlay}
+            name="Strategy"
+            summary={
+              splitOn ? (
+                <>
+                  <b>Split</b> · {formatCurrencyAbbreviated(split.coreAmount)} core +{' '}
+                  {formatCurrencyAbbreviated(split.overlayAmount)} overlay
+                </>
+              ) : fundingMode === 'total' ? (
+                <>
+                  <b>{currentStrategy?.name ?? inputs.strategyId}</b> ·{' '}
+                  <b>{formatCurrencyAbbreviated(totalAvailable)}</b> total budget
+                </>
+              ) : (
+                <>
+                  <b>{currentStrategy?.name ?? inputs.strategyId}</b> ·{' '}
+                  <b>{formatCurrencyAbbreviated(inputs.collateralAmount)}</b> collateral
+                </>
+              )
             }
           >
-            Export to Excel
-          </button>
-          <button
-            className="ws-action-btn"
-            onClick={() => downloadInputsCsv(effectiveInputs, settings)}
-          >
-            Export Scenario (CSV)
-          </button>
-          <button className="ws-action-btn" onClick={() => csvFileRef.current?.click()}>
-            Import Scenario (CSV)
-          </button>
-          <input
-            ref={csvFileRef}
-            type="file"
-            accept=".csv,text/csv"
-            style={{ display: 'none' }}
-            onChange={e => {
-              const f = e.target.files?.[0];
-              if (f) applyCsvFile(f);
-              e.target.value = '';
-            }}
-          />
-        </div>
-
-        <p className="ws-rail-note">
-          Sensitivity analysis lives in the <strong>Classic Calculator</strong> tab.
-        </p>
-      </aside>
-
-      {/* ───────────────── Results pane ───────────────── */}
-      <section className="ws-main">
-        <div className="ws-metrics">
-          <div className="ws-metric ws-metric--primary">
-            <span className="ws-metric-label">
-              <InfoText
-                contentKey="total-tax-savings"
-                currentValue={formatCurrency(summary.totalTaxSavings)}
-              >
-                Est. Tax Savings
-              </InfoText>
-            </span>
-            <span className="ws-metric-value" data-testid="ws-metric-total-savings">
-              {formatCurrency(summary.totalTaxSavings)}
-            </span>
-            <span className="ws-metric-sub">
-              {results.years.length} yrs
-              {nolExtensionYears > 0 && ' (extended to use losses)'}
-              {!settings.financingFeesEnabled && ' · before costs & fees'}
-              {settings.presentValueEnabled && ` · PV ${formatCurrency(summary.totalTaxSavingsPV)}`}
-            </span>
-          </div>
-          {ediMode ? (
-            // EDI-only co-headline (D-015): the loss reserve IS the product —
-            // contingent shelter value, never folded into realized savings.
-            <div className="ws-metric ws-metric--primary">
-              <span className="ws-metric-label">
-                <InfoText
-                  contentKey="loss-reserve-built"
-                  currentValue={formatCurrency(summary.lossReserveShelterValue)}
-                >
-                  Loss Reserve Built
-                </InfoText>
-              </span>
-              <span className="ws-metric-value">
-                {formatCurrency(summary.lossReserveShelterValue)}
-              </span>
-              <span className="ws-metric-sub">
-                from {formatCurrency(summary.finalStCarryforward + summary.finalLtCarryforward)} of
-                loss carryforwards · contingent on future gains
-              </span>
-            </div>
-          ) : (
-            <div className="ws-metric">
-              <span className="ws-metric-label">
-                <InfoText
-                  contentKey="col-income-required"
-                  currentValue={formatCurrency(peakIncomeReq.amount)}
-                >
-                  Income to Fully Utilize
-                </InfoText>
-              </span>
-              <span className="ws-metric-value">{formatCurrency(peakIncomeReq.amount)}</span>
-              <span className="ws-metric-sub">
-                peak need, year {peakIncomeReq.year} — per-year below
-              </span>
-            </div>
-          )}
-          <div className="ws-metric">
-            <span className="ws-metric-label">Year 1 / Year 2+</span>
-            <span className="ws-metric-value">
-              {formatCurrency(year1)} <em>/</em> {formatCurrency(year2)}
-            </span>
-            <span className="ws-metric-sub">annual savings</span>
-          </div>
-          <div className="ws-metric">
-            <span className="ws-metric-label">
-              <InfoText
-                contentKey="net-benefit-after-liquidation"
-                currentValue={formatCurrency(exit.netBenefitAfterLiquidation)}
-              >
-                Net If Liquidated
-              </InfoText>
-            </span>
-            <span className="ws-metric-value">
-              {formatCurrency(exit.netBenefitAfterLiquidation)}
-            </span>
-            <span className="ws-metric-sub">after deferred tax</span>
-          </div>
-        </div>
-
-        {/* D-026: compact pinned-vs-current comparison strip (frozen values
-            from localStorage; shared with the Classic comparison panel). */}
-        {wsPin && (
-          <PinComparisonStrip
-            pinned={wsPin}
-            current={currentStrip}
-            ediMode={ediMode}
-            onUnpin={() => pinnedScenario.unpin(wsPin.id)}
-            onRepin={() => pinnedScenario.replacePin(effectiveInputs, settings, results)}
-          />
-        )}
-
-        {showEventsEditor && (
-          <div className="ws-events-editor">
-            <div className="ws-presets">
-              <span className="ws-presets-label">Scenario presets</span>
-              <button
-                type="button"
-                className="ws-preset-btn"
-                onClick={() => applyPreset('business-sale')}
-              >
-                Business sale
-              </button>
-              <button
-                type="button"
-                className="ws-preset-btn"
-                onClick={() => applyPreset('rsu-vesting')}
-              >
-                RSU vesting
-              </button>
-              <button
-                type="button"
-                className="ws-preset-btn"
-                onClick={() => applyPreset('concentrated-stock')}
-              >
-                Diversify concentrated stock
-              </button>
-              <span className="ws-presets-note">
-                starting points — each fills the rows below; edit amounts and years to fit the
-                client
-              </span>
-            </div>
-            <div className="ws-sched">
-              <span className="ws-sched-label">Income schedule</span>
-              <label className="ws-sched-field">
-                <span>Start income</span>
-                <input
-                  inputMode="numeric"
-                  value={formatWithCommas(schedStart)}
-                  onChange={e => setSchedStart(parseFormattedNumber(e.target.value))}
-                />
-              </label>
-              <label className="ws-sched-field">
-                <span>Growth %/yr</span>
-                <input
-                  type="number"
-                  step={0.5}
-                  value={schedGrowth}
-                  onChange={e => setSchedGrowth(Number(e.target.value))}
-                />
-              </label>
-              <button type="button" className="ws-sched-btn" onClick={applyIncomeSchedule}>
-                Apply schedule
-              </button>
-              <button
-                type="button"
-                className="ws-sched-btn ws-sched-btn--ghost"
-                onClick={resetIncomeSchedule}
-              >
-                Reset incomes
-              </button>
-            </div>
-            <p className="ws-rail-note" style={{ padding: 0, margin: '0 0 10px' }}>
-              Fills the income column for years 1–{projYears} (start ×{' '}
-              {schedGrowth >= 0 ? 'growth' : 'decline'} compounding). Rows stay editable — adjust
-              individual years after applying (e.g., drop to retirement income).
-            </p>
-            <div className="ws-events-head">
-              <span>Year</span>
-              <span>W-2 / ordinary income</span>
-              <span>Cash infusion</span>
-              <span>Gain event</span>
-              <span>Type</span>
-            </div>
-            {Array.from({ length: projYears }, (_, i) => i + 1).map(yr => {
-              const o = yearEvents.get(yr);
-              return (
-                <div className="ws-events-row" key={yr}>
-                  <span className="ws-events-yr">Yr {yr}</span>
-                  <input
-                    inputMode="numeric"
-                    value={formatWithCommas(o?.w2Income ?? effectiveInputs.annualIncome)}
-                    onChange={e => setEvent(yr, { w2Income: parseFormattedNumber(e.target.value) })}
-                  />
-                  <input
-                    inputMode="numeric"
-                    value={formatWithCommas(o?.cashInfusion ?? 0)}
-                    onChange={e =>
-                      setEvent(yr, { cashInfusion: parseFormattedNumber(e.target.value) })
-                    }
-                  />
-                  <input
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={o?.gainEvent?.amount ? formatWithCommas(o.gainEvent.amount) : ''}
-                    onChange={e => {
-                      const amount = parseFormattedNumber(e.target.value);
-                      setEvent(yr, {
-                        gainEvent:
-                          amount > 0
-                            ? { amount, character: o?.gainEvent?.character ?? 'lt' }
-                            : undefined,
-                      });
-                    }}
-                  />
+            {/* D-026: split allocation as an expandable section (rail is too
+                tight for always-visible dual selectors). */}
+            <label className="wx-toggle">
+              <input
+                type="checkbox"
+                checked={splitOn}
+                onChange={e => {
+                  updateSplit({ enabled: e.target.checked });
+                  // Total-budget solving has nothing to solve in split mode
+                  // (leg amounts set the total) — fall back to collateral mode.
+                  if (e.target.checked && fundingMode === 'total') setFundingMode('collateral');
+                }}
+              />
+              <span className="wx-switch" />
+              <span>Split allocation (core + overlay)</span>
+            </label>
+            {splitOn ? (
+              <>
+                <label className="wx-field">
+                  <span className="wx-label">Core strategy (cash)</span>
                   <select
-                    value={o?.gainEvent?.character ?? 'lt'}
-                    onChange={e =>
-                      setEvent(yr, {
-                        gainEvent: o?.gainEvent
-                          ? { ...o.gainEvent, character: e.target.value as 'st' | 'lt' }
-                          : undefined,
-                      })
-                    }
+                    value={split.coreStrategyId}
+                    onChange={e => updateSplit({ coreStrategyId: e.target.value })}
                   >
-                    <option value="lt">LT</option>
-                    <option value="st">ST</option>
+                    {STRATEGIES.filter(s => s.type === 'core').map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} — {s.label}
+                      </option>
+                    ))}
                   </select>
+                </label>
+                <label className="wx-field">
+                  <span className="wx-label">Core amount</span>
+                  <input
+                    inputMode="numeric"
+                    value={formatWithCommas(split.coreAmount)}
+                    onChange={e =>
+                      updateSplit({ coreAmount: parseFormattedNumber(e.target.value) })
+                    }
+                  />
+                </label>
+                <label className="wx-field">
+                  <span className="wx-label">Overlay strategy (appreciated stock)</span>
+                  <select
+                    value={split.overlayStrategyId}
+                    onChange={e => updateSplit({ overlayStrategyId: e.target.value })}
+                  >
+                    {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} — {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="wx-field">
+                  <span className="wx-label">Overlay amount</span>
+                  <input
+                    inputMode="numeric"
+                    value={formatWithCommas(split.overlayAmount)}
+                    onChange={e =>
+                      updateSplit({ overlayAmount: parseFormattedNumber(e.target.value) })
+                    }
+                  />
+                </label>
+                <p className="ws-derived" data-testid="ws-split-total">
+                  → Total collateral {formatCurrency(splitTotal)}
+                  {splitTotal > 0 && (
+                    <>
+                      {' '}
+                      ({formatPercent(split.coreAmount / splitTotal)} core /{' '}
+                      {formatPercent(split.overlayAmount / splitTotal)} overlay)
+                    </>
+                  )}
+                  {inputs.qfafEnabled && <> · QFAF auto-sizes against the combined ST losses</>}
+                </p>
+                {(split.coreAmount <= 0 || split.overlayAmount <= 0) && (
+                  <p className="ws-rail-warn">
+                    Both legs need an amount above $0 — until then the projection falls back to the
+                    single-strategy inputs.
+                  </p>
+                )}
+                <p className="ws-rail-note">
+                  Total-budget funding isn&apos;t available with split allocation — the two leg
+                  amounts set the total.
+                </p>
+              </>
+            ) : (
+              <>
+                <label className="wx-field">
+                  <span className="wx-label">Collateral strategy</span>
+                  <select
+                    value={inputs.strategyId}
+                    onChange={e => set('strategyId', e.target.value)}
+                  >
+                    {STRATEGIES.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} — {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="wx-field">
+                  <span className="wx-label">Fund by</span>
+                  <div className="ws-segment">
+                    <button
+                      type="button"
+                      className={fundingMode === 'collateral' ? 'active' : ''}
+                      onClick={() => setFundingMode('collateral')}
+                    >
+                      Collateral
+                    </button>
+                    <button
+                      type="button"
+                      className={fundingMode === 'total' ? 'active' : ''}
+                      onClick={() => {
+                        // Seed the budget from the current total so the switch is seamless
+                        setTotalAvailable(Math.round(results.sizing.totalExposure));
+                        setFundingMode('total');
+                      }}
+                    >
+                      Total portfolio
+                    </button>
+                  </div>
                 </div>
-              );
-            })}
-            <p className="ws-rail-note" style={{ marginTop: 8 }}>
-              Gain events flow through the real netting: carryforwards shelter them (after the
-              strategy's own gains), they absorb the §461(l) deduction, and they widen the NOL base.
-              Event tax is reported separately — it is never charged against the strategy's savings.
-            </p>
-          </div>
-        )}
-
-        {eventYears.length > 0 && (
-          <div className="ws-note">
-            {eventYears.map(y => (
-              <div key={y.year}>
-                <strong>Year {y.year} gain event:</strong> {formatCurrency(y.gainEventAmount)} —{' '}
-                carryforwards shelter {formatCurrency(y.gainEventCfShelter)}, leaving{' '}
-                {formatCurrency(y.gainEventTax)} of tax due
-                {y.gainEventTaxWithoutStrategy - y.gainEventTax > 0.5 && (
+                {fundingMode === 'collateral' ? (
+                  <label className="wx-field">
+                    <span className="wx-label">Collateral amount</span>
+                    <input
+                      inputMode="numeric"
+                      value={formatWithCommas(inputs.collateralAmount)}
+                      onChange={e => set('collateralAmount', parseFormattedNumber(e.target.value))}
+                    />
+                  </label>
+                ) : (
                   <>
-                    {' '}
-                    ({formatCurrency(y.gainEventTaxWithoutStrategy - y.gainEventTax)} less than
-                    without the program)
+                    <label className="wx-field">
+                      <span className="wx-label">Total available portfolio</span>
+                      <input
+                        inputMode="numeric"
+                        value={formatWithCommas(totalAvailable)}
+                        onChange={e => setTotalAvailable(parseFormattedNumber(e.target.value))}
+                      />
+                    </label>
+                    <p className="ws-derived">
+                      → Collateral {formatCurrency(results.sizing.collateralValue)}
+                      {inputs.qfafEnabled && (
+                        <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
+                      )}{' '}
+                      = {formatCurrency(results.sizing.totalExposure)}
+                    </p>
                   </>
                 )}
-                . Any NOL absorbed by the event shows in that year's savings and the
-                income-utilization chips.
-              </div>
-            ))}
-          </div>
-        )}
-
-        {dlvPlan?.enabled && inputs.qfafEnabled && inputs.qfafSizingMode === 'fixed' && (
-          <div className="ws-note">
-            ⚠️ <strong>Fixed QFAF sizing</strong> won't shrink with deleveraging — expect ST gain
-            leakage as the harvest rate glides down (switch to Dynamic).
-          </div>
-        )}
-        {dlvPlan?.enabled && inputs.splitAllocation?.enabled && (
-          <div className="ws-note">
-            ⚠️ Deleveraging isn't modeled with split allocation yet — plan ignored.
-          </div>
-        )}
-
-        <div className="ws-subnav">
-          {(['overview', 'table', 'charts'] as ResultsView[]).map(v => (
-            <button
-              key={v}
-              className={`ws-subnav-btn ${resultsView === v ? 'active' : ''}`}
-              onClick={() => setResultsView(v)}
-            >
-              {v === 'overview' ? 'Overview' : v === 'table' ? 'Year-by-Year' : 'Charts'}
-            </button>
-          ))}
-        </div>
-
-        {resultsView === 'overview' && (
-          <div className="ws-overview">
-            <div className="ws-cards">
-              <div className="ws-card">
-                <span className="ws-card-label">
-                  <InfoText
-                    contentKey="embedded-gain-at-horizon"
-                    currentValue={formatCurrency(exit.embeddedGain)}
-                  >
-                    Embedded Gain (Yr {projectionYears})
-                  </InfoText>
-                </span>
-                <span className="ws-card-value">{formatCurrency(exit.embeddedGain)}</span>
-                <span className="ws-card-sub">
-                  incl. {formatCurrency(exit.cumulativeBasisReduction)} basis reduction
-                  {exit.preExistingGain > 0 && (
-                    <> + {formatCurrency(exit.preExistingGain)} pre-existing gain</>
-                  )}
-                </span>
-              </div>
-              <div className="ws-card">
-                <span className="ws-card-label">
-                  <InfoText
-                    contentKey="incremental-deferred-tax"
-                    currentValue={formatCurrency(exit.incrementalDeferredTax)}
-                  >
-                    Deferred Tax If Liquidated
-                  </InfoText>
-                </span>
-                <span className="ws-card-value">{formatCurrency(exit.incrementalDeferredTax)}</span>
-                <span className="ws-card-sub">
-                  {exit.incrementalDeferredTax < 0
-                    ? `negative: exits ${formatCurrency(Math.abs(exit.incrementalDeferredTax))} cheaper than passive — loss-reserve advantage`
-                    : `after ${formatCurrency(exit.cfShelterUsed)} carryforward shelter`}
-                </span>
-              </div>
-              <div className="ws-card">
-                <span className="ws-card-label">
-                  <InfoText
-                    contentKey="net-if-held-to-step-up"
-                    currentValue={formatCurrency(stepUp.netIfHeldToStepUp)}
-                  >
-                    Net If Held to Step-Up
-                  </InfoText>
-                </span>
-                <span className="ws-card-value">{formatCurrency(stepUp.netIfHeldToStepUp)}</span>
-                <span className="ws-card-sub">
-                  vs {formatCurrency(stepUp.netIfLiquidated)} if liquidated · mortality-contingent
-                </span>
-              </div>
-              {hasNol && (
-                <div className="ws-card">
-                  <span className="ws-card-label">
-                    <InfoText
-                      contentKey="total-nol-generated"
-                      currentValue={formatCurrency(summary.totalNolGenerated)}
-                    >
-                      NOL Generated
-                    </InfoText>
-                  </span>
-                  <span className="ws-card-value">{formatCurrency(summary.totalNolGenerated)}</span>
-                  <span className="ws-card-sub">offsets future income (80%/yr)</span>
-                </div>
-              )}
-              <div className="ws-card">
-                <span className="ws-card-label">Final Total Wealth</span>
-                <span className="ws-card-value">{formatCurrency(summary.finalTotalWealth)}</span>
-                <span className="ws-card-sub">
-                  portfolio + {formatCurrency(summary.totalQfafCashReturned)} cash returned
-                </span>
-              </div>
-            </div>
-
-            {ediMode && (
-              <>
-                <span className="ws-cards-title">EDI Economics</span>
-                <div className="ws-cards">
-                  <div className="ws-card">
-                    <span className="ws-card-label">
-                      <InfoText
-                        contentKey="protection-ratio"
-                        currentValue={
-                          insights.protectionRatio !== null
-                            ? `${insights.protectionRatio.toFixed(1)}×`
-                            : '—'
-                        }
-                      >
-                        Protection Ratio
-                      </InfoText>
-                    </span>
-                    <span className="ws-card-value">
-                      {insights.protectionRatio !== null
-                        ? `${insights.protectionRatio.toFixed(1)}×`
-                        : '—'}
-                    </span>
-                    <span className="ws-card-sub">
-                      {insights.protectionRatio !== null
-                        ? 'shelter value ÷ cumulative financing cost'
-                        : 'financing costs disabled'}
-                    </span>
-                  </div>
-                  <div className="ws-card">
-                    <span className="ws-card-label">
-                      <InfoText
-                        contentKey="break-even-gain-event"
-                        currentValue={formatCurrency(insights.breakEvenGainEvent)}
-                      >
-                        Break-Even Gain Event
-                      </InfoText>
-                    </span>
-                    <span className="ws-card-value">
-                      {formatCurrency(insights.breakEvenGainEvent)}
-                    </span>
-                    <span className="ws-card-sub">a gain this size would be fully sheltered</span>
-                  </div>
-                  <div className="ws-card">
-                    <span className="ws-card-label">
-                      <InfoText
-                        contentKey="cumulative-financing-cost"
-                        currentValue={formatCurrency(insights.cumulativeFinancingCost)}
-                      >
-                        Cumulative Financing Cost
-                      </InfoText>
-                    </span>
-                    <span className="ws-card-value">
-                      {formatCurrency(insights.cumulativeFinancingCost)}
-                    </span>
-                    <span className="ws-card-sub">
-                      {settings.financingFeesEnabled
-                        ? `over ${results.years.length} years`
-                        : 'financing costs & fees disabled'}
-                    </span>
-                  </div>
-                </div>
               </>
             )}
+            <label className="wx-field">
+              <span className="wx-label">Cost basis of collateral (optional)</span>
+              <input
+                inputMode="numeric"
+                placeholder="= collateral value"
+                value={
+                  inputs.collateralCostBasis !== undefined
+                    ? formatWithCommas(inputs.collateralCostBasis)
+                    : ''
+                }
+                onChange={e => {
+                  const raw = e.target.value.trim();
+                  set('collateralCostBasis', raw === '' ? undefined : parseFormattedNumber(raw));
+                }}
+              />
+            </label>
+            <label className="wx-field">
+              <span className="wx-label">Start month</span>
+              <select
+                value={inputs.startMonth}
+                onChange={e => set('startMonth', Number(e.target.value))}
+              >
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {new Date(2026, i, 1).toLocaleString('en-US', { month: 'long' })}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </RailGroup>
 
-            {hasNol && incomeReqYears.length > 0 && (
-              <div className="ws-income-req">
-                <span className="ws-income-req-label">
-                  <InfoText contentKey="col-income-required">
-                    Income needed per year to fully utilize §461(l) + NOL
-                  </InfoText>
-                </span>
-                <div className="ws-income-req-chips">
-                  {incomeReqYears.map(y => (
-                    <span
-                      key={y.year}
-                      className={`ws-income-chip ${y.year === peakIncomeReq.year ? 'ws-income-chip--peak' : ''}`}
-                    >
-                      Yr {y.year}: {formatCurrency(y.incomeRequiredForFullUtilization)}
+          <RailGroup
+            {...groupProps('carryforwards', carryforwardsActive)}
+            icon={I.archive}
+            name="Carryforwards"
+            summary={
+              carryforwardsActive ? (
+                <>
+                  {cfParts.map((p, i) => (
+                    <span key={i}>
+                      {i > 0 && ' · '}
+                      {p}
                     </span>
                   ))}
-                </div>
-              </div>
-            )}
+                </>
+              ) : (
+                'None entered'
+              )
+            }
+          >
+            <label className="wx-field">
+              <span className="wx-label">Existing ST loss c/f</span>
+              <input
+                inputMode="numeric"
+                value={formatWithCommas(inputs.existingStLossCarryforward)}
+                onChange={e =>
+                  set('existingStLossCarryforward', parseFormattedNumber(e.target.value))
+                }
+              />
+            </label>
+            <label className="wx-field">
+              <span className="wx-label">Existing LT loss c/f</span>
+              <input
+                inputMode="numeric"
+                value={formatWithCommas(inputs.existingLtLossCarryforward)}
+                onChange={e =>
+                  set('existingLtLossCarryforward', parseFormattedNumber(e.target.value))
+                }
+              />
+            </label>
+            <label className="wx-field">
+              <span className="wx-label">Existing NOL c/f</span>
+              <input
+                inputMode="numeric"
+                value={formatWithCommas(inputs.existingNolCarryforward)}
+                onChange={e => set('existingNolCarryforward', parseFormattedNumber(e.target.value))}
+              />
+            </label>
+          </RailGroup>
 
-            {ediMode ? (
-              <p className="ws-narrative">
-                <strong>What this means:</strong> on a{' '}
-                {formatCurrency(results.sizing.collateralValue)} portfolio with {view.displayName},
-                the program's main output is a loss reserve: an estimated{' '}
-                {formatCurrency(summary.finalStCarryforward + summary.finalLtCarryforward)} of loss
-                carryforwards by year {results.years.length}, worth{' '}
-                {formatCurrency(summary.lossReserveShelterValue)} of shelter against future capital
-                gains — contingent on those gains being realized (a business sale,
-                concentrated-stock exit, RSU diversification). Realized savings along the way are an
-                estimated {formatCurrency(summary.totalTaxSavings)} (the $3,000/yr deduction plus
-                any gain events the reserve shelters — model one with the presets above).{' '}
-                {exit.incrementalDeferredTax < 0 ? (
+          <RailGroup
+            {...groupProps('qfaf', inputs.qfafEnabled)}
+            icon={I.layers}
+            name="QFAF Overlay"
+            summary={
+              inputs.qfafEnabled ? (
+                <>
+                  <b>On</b> · {inputs.qfafDuration} yrs ·{' '}
+                  {inputs.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed'}
+                  {inputs.redeployQfafProceeds === true && ' · redeploy'}
+                </>
+              ) : (
+                'Off'
+              )
+            }
+          >
+            <label className="wx-toggle">
+              <input
+                type="checkbox"
+                checked={inputs.qfafEnabled}
+                onChange={e => set('qfafEnabled', e.target.checked)}
+              />
+              <span className="wx-switch" />
+              <span>Enable QFAF</span>
+            </label>
+            {inputs.qfafEnabled && (
+              <>
+                <label className="wx-field">
+                  <span className="wx-label">Duration: {inputs.qfafDuration} yrs</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={inputs.qfafDuration}
+                    onChange={e => set('qfafDuration', Number(e.target.value))}
+                  />
+                </label>
+                <label className="wx-field">
+                  <span className="wx-label">Sizing</span>
+                  <select
+                    value={inputs.qfafSizingMode}
+                    onChange={e => set('qfafSizingMode', e.target.value as 'fixed' | 'dynamic')}
+                  >
+                    <option value="dynamic">Dynamic (resized yearly)</option>
+                    <option value="fixed">Fixed at inception</option>
+                  </select>
+                </label>
+                <label className="wx-toggle">
+                  <input
+                    type="checkbox"
+                    checked={inputs.redeployQfafProceeds === true}
+                    onChange={e => set('redeployQfafProceeds', e.target.checked)}
+                  />
+                  <span className="wx-switch" />
+                  <span>Redeploy redemptions into core</span>
+                </label>
+              </>
+            )}
+          </RailGroup>
+
+          <RailGroup
+            {...groupProps('deleverage', dlvPlan?.enabled === true)}
+            icon={I.trend}
+            name="Deleveraging"
+            summary={
+              dlvPlan?.enabled ? (
+                <>
+                  Yr <b>{dlvPlan.startYear}</b> ·{' '}
+                  {dlvPlan.durationYears === 1 ? 'all at once' : `${dlvPlan.durationYears} yrs`} ·{' '}
+                  {dlvPlan.target === LONG_ONLY_TARGET ? 'long-only' : dlvTargetLabel}
+                </>
+              ) : (
+                'Off'
+              )
+            }
+          >
+            <label className="wx-toggle">
+              <input
+                type="checkbox"
+                checked={dlvPlan?.enabled === true}
+                onChange={e => setDlvPlan({ enabled: e.target.checked })}
+              />
+              <span className="wx-switch" />
+              <span>Plan deleveraging</span>
+            </label>
+            <p className="wx-help">
+              <InfoText contentKey="deleverage-plan">What the deleverage model assumes</InfoText>
+            </p>
+            {/* D-016/D-026: split wins when both are enabled — same wording as
+                the results-pane flag (core.ts ignores the plan). */}
+            {dlvPlan?.enabled && splitOn && (
+              <p className="ws-rail-warn" data-testid="ws-split-dlv-warn">
+                ⚠️ Deleveraging isn&apos;t modeled with split allocation yet — plan ignored.
+              </p>
+            )}
+            {dlvPlan?.enabled && (
+              <>
+                <label className="wx-field">
+                  <span className="wx-label">Start year</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={projYears}
+                    value={dlvPlan.startYear}
+                    onChange={e =>
+                      setDlvPlan({
+                        startYear: Math.max(1, Math.min(projYears, Number(e.target.value) || 1)),
+                      })
+                    }
+                  />
+                </label>
+                <label className="wx-field">
+                  <span className="wx-label">
+                    Duration: {dlvPlan.durationYears} yr{dlvPlan.durationYears > 1 ? 's' : ''}
+                    {dlvPlan.durationYears === 1 ? ' (all at once)' : ''}
+                  </span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={10}
+                    value={dlvPlan.durationYears}
+                    onChange={e => setDlvPlan({ durationYears: Number(e.target.value) })}
+                  />
+                </label>
+                <label className="wx-field">
+                  <span className="wx-label">Unwind to</span>
+                  <select
+                    value={dlvPlan.target}
+                    onChange={e => setDlvPlan({ target: e.target.value })}
+                  >
+                    <option value={LONG_ONLY_TARGET}>Long-only direct indexing</option>
+                    {dlvTargets.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} — {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {/* D-017 disclosure — defaults stay visible while a plan is on */}
+                <p className="ws-rail-note">
+                  Assumes short covers realize no gain — shorts are continuously loss-recycled;
+                  unwound long-extension gains realized as LT once seasoned. Overridable in code.
+                </p>
+              </>
+            )}
+          </RailGroup>
+
+          <RailGroup
+            {...groupProps('model', modelActive)}
+            icon={I.sliders}
+            name="Model"
+            summary={
+              <>
+                {projYears} yrs ·{' '}
+                {settings.growthEnabled ? (
                   <>
-                    And the reserve already covers the exit: full liquidation in year{' '}
-                    {projectionYears} would cost{' '}
-                    {formatCurrency(Math.abs(exit.incrementalDeferredTax))} <em>less</em> than the
-                    passive baseline, for a net benefit of{' '}
-                    {formatCurrency(exit.netBenefitAfterLiquidation)}.
+                    growth <b>{formatPercent(settings.defaultAnnualReturn, 0)}</b>
                   </>
                 ) : (
-                  <>
-                    Full liquidation in year {projectionYears} would surrender{' '}
-                    {formatCurrency(exit.incrementalDeferredTax)} of deferred tax, leaving{' '}
-                    {formatCurrency(exit.netBenefitAfterLiquidation)}; holding through death (basis
-                    step-up) or donating can make the deferral permanent.
-                  </>
+                  'no growth'
+                )}{' '}
+                · {settings.financingFeesEnabled ? 'net of fees' : 'gross'}
+                {settings.washSaleDisallowanceRate > 0 && (
+                  <> · wash {formatPercent(settings.washSaleDisallowanceRate, 0)}</>
                 )}
-              </p>
-            ) : (
-              <p className="ws-narrative">
-                <strong>What this means:</strong> on a{' '}
-                {formatCurrency(results.sizing.collateralValue)} portfolio with {view.displayName},
-                the program is estimated to save {formatCurrency(summary.totalTaxSavings)} over{' '}
-                {results.years.length} years at a combined ordinary rate of{' '}
-                {formatPercent(rates.combinedOrdinary)}.{' '}
-                {exit.incrementalDeferredTax < 0 ? (
-                  <>
-                    The exit math runs in the strategy's favor: liquidating in year{' '}
-                    {projectionYears} would cost{' '}
-                    {formatCurrency(Math.abs(exit.incrementalDeferredTax))} <em>less</em> than the
-                    passive baseline — the loss reserve more than covers the strategy's embedded
-                    gain — for a net benefit of {formatCurrency(exit.netBenefitAfterLiquidation)}.
-                  </>
-                ) : (
-                  <>
-                    A portion is timing: full liquidation in year {projectionYears} would surrender{' '}
-                    {formatCurrency(exit.incrementalDeferredTax)} of that, leaving{' '}
-                    {formatCurrency(exit.netBenefitAfterLiquidation)}; holding through death (basis
-                    step-up) or donating can make the deferral permanent.
-                  </>
-                )}
-              </p>
-            )}
+              </>
+            }
+          >
+            <label className="wx-field">
+              <span className="wx-label">
+                <InfoText contentKey="projection-years">Projection years</InfoText>
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={40}
+                value={projYears}
+                onChange={e =>
+                  setSetting(
+                    'projectionYears',
+                    Math.max(1, Math.min(40, Number(e.target.value) || 10))
+                  )
+                }
+              />
+            </label>
+            <label className="wx-toggle">
+              <input
+                type="checkbox"
+                checked={settings.growthEnabled}
+                onChange={e => setSetting('growthEnabled', e.target.checked)}
+              />
+              <span className="wx-switch" />
+              <span>Portfolio growth ({formatPercent(settings.defaultAnnualReturn, 0)})</span>
+            </label>
+            <label className="wx-toggle">
+              <input
+                type="checkbox"
+                checked={inputs.ltGainsEnabled !== false}
+                onChange={e => set('ltGainsEnabled', e.target.checked)}
+              />
+              <span className="wx-switch" />
+              <span>Realize LT gains</span>
+            </label>
+            <label className="wx-toggle">
+              <input
+                type="checkbox"
+                checked={settings.financingFeesEnabled}
+                onChange={e => setSetting('financingFeesEnabled', e.target.checked)}
+              />
+              <span className="wx-switch" />
+              <span>Financing costs &amp; fees</span>
+            </label>
+            <label className="wx-toggle">
+              <input
+                type="checkbox"
+                checked={settings.presentValueEnabled}
+                onChange={e => setSetting('presentValueEnabled', e.target.checked)}
+              />
+              <span className="wx-switch" />
+              <span>Show present value ({formatPercent(settings.discountRate, 0)})</span>
+            </label>
+            <label className="wx-field">
+              <span className="wx-label">
+                Wash-sale disallowance: {formatPercent(settings.washSaleDisallowanceRate, 0)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={15}
+                step={1}
+                value={Math.round(settings.washSaleDisallowanceRate * 100)}
+                onChange={e => setSetting('washSaleDisallowanceRate', Number(e.target.value) / 100)}
+              />
+            </label>
+          </RailGroup>
 
-            <div className="ws-note ws-note--muted">
-              <strong>Step-up framing:</strong> "Net If Held to Step-Up" is mortality-contingent and
-              assumes basis step-up under current law (IRC §1014). Unused loss carryforwards are
-              lost at death (§1212) — their{' '}
-              {formatCurrency(stepUp.continueAndDie.carryforwardValueLost)} contingent shelter value
-              is NOT counted in either figure.
-              {stepUp.recommendation === 'partial_unwind' && (
+          <RailGroup
+            {...groupProps('events', activeOverrides.length > 0)}
+            icon={I.calendar}
+            name="Per-Year Events"
+            summary={
+              activeOverrides.length > 0 ? (
                 <>
-                  {' '}
-                  With carryforwards covering only part of the embedded gain, the modeled optimum is
-                  a partial unwind of ~{Math.round(stepUp.optimalUnwindPct * 100)}% during life
-                  (sheltered by the reserve), holding the rest for step-up.
+                  <b>{activeOverrides.length}</b> year{activeOverrides.length === 1 ? '' : 's'}{' '}
+                  customized
                 </>
-              )}
-              {stepUp.recommendation === 'unwind' && (
-                <>
-                  {' '}
-                  Here the carryforward exceeds the embedded gain, so a full unwind during life is
-                  tax-free — excess reserve would otherwise be lost at death.
-                </>
-              )}
+              ) : (
+                'None active'
+              )
+            }
+          >
+            <button className="wx-btn" onClick={() => setShowEventsEditor(v => !v)}>
+              {showEventsEditor ? 'Hide' : 'Edit'} income &amp; events
+              {activeOverrides.length > 0 && ` (${activeOverrides.length} active)`}
+            </button>
+            <p className="ws-rail-note">
+              Model variable RSU/bonus years, cash infusions, and planned sale events (business
+              exit, IPO lockup). One-click scenario presets inside — the editor opens as a wider
+              panel in the results pane.
+            </p>
+          </RailGroup>
+
+          <div className="wx-actions">
+            <button className="wx-btn wx-btn--primary" onClick={() => setIsMeetingMode(true)}>
+              <Ico d={I.bolt} w={14} /> Open Meeting Mode
+            </button>
+            <div className="wx-btn-row">
+              <button
+                className="wx-btn"
+                data-testid="ws-pin-btn"
+                disabled={!pinnedScenario.canPin}
+                title={
+                  pinnedScenario.canPin
+                    ? 'Freeze the current scenario (inputs + results) for side-by-side comparison'
+                    : 'Pin limit reached (4) — unpin a scenario first'
+                }
+                onClick={() => pinnedScenario.pin(effectiveInputs, settings, results)}
+              >
+                Pin scenario
+                {pinnedScenario.scenarios.length > 0 && ` (${pinnedScenario.scenarios.length})`}
+              </button>
+              <button className="wx-btn" onClick={exportExcel}>
+                Export Excel
+              </button>
             </div>
+            <div className="wx-btn-row">
+              <button
+                className="wx-btn"
+                onClick={() => downloadInputsCsv(effectiveInputs, settings)}
+              >
+                Export CSV
+              </button>
+              <button className="wx-btn" onClick={() => csvFileRef.current?.click()}>
+                Import CSV
+              </button>
+            </div>
+            <input
+              ref={csvFileRef}
+              type="file"
+              accept=".csv,text/csv"
+              aria-label="Import scenario CSV file"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) applyCsvFile(f);
+                e.target.value = '';
+              }}
+            />
+            <p className="ws-rail-note">
+              Sensitivity analysis lives in the <strong>Classic Calculator</strong> tab.
+            </p>
+          </div>
+        </aside>
 
-            {dlvActive && dlvPlan && (
-              <div className="ws-note ws-note--muted">
-                <strong>Deleveraging:</strong> unwinding{' '}
-                {currentStrategy?.name ?? 'the current strategy'} to {dlvTargetLabel} starting year{' '}
-                {dlvPlan.startYear}
-                {dlvPlan.durationYears > 1
-                  ? ` over ${dlvPlan.durationYears} years`
-                  : ' all at once'}{' '}
-                realizes {formatCurrency(dlvTotalGain)} of unwind gains, of which only{' '}
-                {formatCurrency(dlvTotalTax)} is taxed — the remainder is absorbed by the year's
-                harvested losses and the loss-carryforward reserve.{' '}
-                {settings.financingFeesEnabled ? (
-                  <>Financing fees saved vs staying levered: {formatCurrency(dlvTotalFinSaved)}.</>
-                ) : (
-                  <>Enable financing costs &amp; fees to see the financing saved.</>
-                )}
-                {dlvPlan.target === LONG_ONLY_TARGET && (
+        {/* ───────────────── Results pane ───────────────── */}
+        <section className="wx-main">
+          <div className="wx-metrics">
+            <div className="wx-metric wx-metric--primary">
+              <span className="wx-metric-label">
+                <InfoText
+                  contentKey="total-tax-savings"
+                  currentValue={formatCurrency(summary.totalTaxSavings)}
+                >
+                  Est. Tax Savings
+                </InfoText>
+              </span>
+              <span className="wx-metric-value" data-testid="ws-metric-total-savings">
+                {formatCurrency(summary.totalTaxSavings)}
+              </span>
+              <span className="wx-metric-sub">
+                {results.years.length} yrs
+                {nolExtensionYears > 0 && ' (extended to use losses)'}
+                {!settings.financingFeesEnabled && (
                   <>
                     {' '}
-                    Once long-only, the realistic endgame for an estate-minded client is holding
-                    through basis step-up — the "Net If Held to Step-Up" card above shows that path
-                    with the deferred exit tax never paid.
+                    · <span className="pos">before costs &amp; fees</span>
                   </>
                 )}
+                {settings.presentValueEnabled &&
+                  ` · PV ${formatCurrency(summary.totalTaxSavingsPV)}`}
+              </span>
+            </div>
+            {ediMode ? (
+              // EDI-only co-headline (D-015): the loss reserve IS the product —
+              // contingent shelter value, never folded into realized savings.
+              <div className="wx-metric wx-metric--primary wx-metric--sec">
+                <span className="wx-metric-label">
+                  <InfoText
+                    contentKey="loss-reserve-built"
+                    currentValue={formatCurrency(summary.lossReserveShelterValue)}
+                  >
+                    Loss Reserve Built
+                  </InfoText>
+                </span>
+                <span
+                  className="wx-metric-value"
+                  title={formatCurrency(summary.lossReserveShelterValue)}
+                >
+                  {formatCurrencyAbbreviated(summary.lossReserveShelterValue)}
+                </span>
+                <span className="wx-metric-sub">
+                  from {formatCurrency(summary.finalStCarryforward + summary.finalLtCarryforward)}{' '}
+                  of loss carryforwards · contingent on future gains
+                </span>
+              </div>
+            ) : (
+              <div className="wx-metric wx-metric--sec">
+                <span className="wx-metric-label">
+                  <InfoText
+                    contentKey="col-income-required"
+                    currentValue={formatCurrency(peakIncomeReq.amount)}
+                  >
+                    Income to Fully Utilize
+                  </InfoText>
+                </span>
+                <span className="wx-metric-value" title={formatCurrency(peakIncomeReq.amount)}>
+                  {formatCurrencyAbbreviated(peakIncomeReq.amount)}
+                </span>
+                <span className="wx-metric-sub">
+                  peak need, year {peakIncomeReq.year} — per-year below
+                </span>
               </div>
             )}
-            {nolExtensionYears > 0 && (
-              <div className="ws-note ws-note--muted">
-                <strong>Projection extended to year {results.years.length}:</strong> loss
-                carryforwards (NOL or capital) remained at the end of the standard{' '}
-                {baseHorizonYears}-year horizon, so the model keeps running wind-down years while
-                something is consuming them (capped at 40). Extension years assume income continues
-                at the final scheduled year's level (your last income-schedule row, if set). A
-                capital-loss reserve consumed only by the $3,000/yr ordinary offset does not extend
-                the projection — raise “Projection years” to see more of it.
+            <div className="wx-metric wx-metric--sec">
+              <span className="wx-metric-label">Year 1 / Year 2+</span>
+              <span
+                className="wx-metric-value"
+                title={`${formatCurrency(year1)} / ${formatCurrency(year2)}`}
+              >
+                {formatCurrencyAbbreviated(year1)} <em>/</em> {formatCurrencyAbbreviated(year2)}
+              </span>
+              <span className="wx-metric-sub">annual savings</span>
+            </div>
+            <div className="wx-metric wx-metric--sec">
+              <span className="wx-metric-label">
+                <InfoText
+                  contentKey="net-benefit-after-liquidation"
+                  currentValue={formatCurrency(exit.netBenefitAfterLiquidation)}
+                >
+                  Net If Liquidated
+                </InfoText>
+              </span>
+              <span
+                className="wx-metric-value"
+                title={formatCurrency(exit.netBenefitAfterLiquidation)}
+              >
+                {formatCurrencyAbbreviated(exit.netBenefitAfterLiquidation)}
+              </span>
+              <span className="wx-metric-sub">after deferred tax</span>
+            </div>
+          </div>
+
+          {/* D-026: compact pinned-vs-current comparison strip (frozen values
+              from localStorage; shared with the Classic comparison panel). */}
+          {wsPin && (
+            <PinComparisonStrip
+              pinned={wsPin}
+              current={currentStrip}
+              ediMode={ediMode}
+              onUnpin={() => pinnedScenario.unpin(wsPin.id)}
+              onRepin={() => pinnedScenario.replacePin(effectiveInputs, settings, results)}
+            />
+          )}
+
+          {/* D-027: consolidated flags tray — all conditional notes in one place */}
+          <FlagsTray flags={flags} />
+
+          {showEventsEditor && (
+            <div className="ws-events-editor">
+              <div className="ws-presets">
+                <span className="ws-presets-label">Scenario presets</span>
+                <button
+                  type="button"
+                  className="ws-preset-btn"
+                  onClick={() => applyPreset('business-sale')}
+                >
+                  Business sale
+                </button>
+                <button
+                  type="button"
+                  className="ws-preset-btn"
+                  onClick={() => applyPreset('rsu-vesting')}
+                >
+                  RSU vesting
+                </button>
+                <button
+                  type="button"
+                  className="ws-preset-btn"
+                  onClick={() => applyPreset('concentrated-stock')}
+                >
+                  Diversify concentrated stock
+                </button>
+                <span className="ws-presets-note">
+                  starting points — each fills the rows below; edit amounts and years to fit the
+                  client
+                </span>
               </div>
-            )}
-            {summary.totalStateNolExpired > 0 && (
-              <div className="ws-note">
-                ⚠️ <strong>State NOL expiry:</strong> {formatCurrency(summary.totalStateNolExpired)}{' '}
-                of California NOL expires unused within the projection (20-year state carryover;
-                federal NOL is not affected). See the "St. NOL Expired" column in the year-by-year
-                table.
+              <div className="ws-sched">
+                <span className="ws-sched-label">Income schedule</span>
+                <label className="ws-sched-field">
+                  <span>Start income</span>
+                  <input
+                    inputMode="numeric"
+                    value={formatWithCommas(schedStart)}
+                    onChange={e => setSchedStart(parseFormattedNumber(e.target.value))}
+                  />
+                </label>
+                <label className="ws-sched-field">
+                  <span>Growth %/yr</span>
+                  <input
+                    type="number"
+                    step={0.5}
+                    value={schedGrowth}
+                    onChange={e => setSchedGrowth(Number(e.target.value))}
+                  />
+                </label>
+                <button type="button" className="ws-sched-btn" onClick={applyIncomeSchedule}>
+                  Apply schedule
+                </button>
+                <button
+                  type="button"
+                  className="ws-sched-btn ws-sched-btn--ghost"
+                  onClick={resetIncomeSchedule}
+                >
+                  Reset incomes
+                </button>
               </div>
-            )}
-            {(view.isSplit || currentStrategy?.type === 'overlay') &&
-              effectiveInputs.collateralCostBasis === undefined && (
-                <div className="ws-note">
-                  ⚠️ <strong>Appreciated-stock collateral:</strong> the liquidation analysis assumes
-                  basis equals today's value. If this collateral carries unrealized gain, enter its{' '}
-                  <strong>cost basis</strong> in the Strategy panel so the embedded gain and
-                  deferred tax reflect the client's true exit picture.
+              <p className="ws-rail-note" style={{ margin: '0 0 10px' }}>
+                Fills the income column for years 1–{projYears} (start ×{' '}
+                {schedGrowth >= 0 ? 'growth' : 'decline'} compounding). Rows stay editable — adjust
+                individual years after applying (e.g., drop to retirement income).
+              </p>
+              <div className="ws-events-head">
+                <span>Year</span>
+                <span>W-2 / ordinary income</span>
+                <span>Cash infusion</span>
+                <span>Gain event</span>
+                <span>Type</span>
+              </div>
+              {Array.from({ length: projYears }, (_, i) => i + 1).map(yr => {
+                const o = yearEvents.get(yr);
+                return (
+                  <div className="ws-events-row" key={yr}>
+                    <span className="ws-events-yr">Yr {yr}</span>
+                    <input
+                      inputMode="numeric"
+                      value={formatWithCommas(o?.w2Income ?? effectiveInputs.annualIncome)}
+                      onChange={e =>
+                        setEvent(yr, { w2Income: parseFormattedNumber(e.target.value) })
+                      }
+                    />
+                    <input
+                      inputMode="numeric"
+                      value={formatWithCommas(o?.cashInfusion ?? 0)}
+                      onChange={e =>
+                        setEvent(yr, { cashInfusion: parseFormattedNumber(e.target.value) })
+                      }
+                    />
+                    <input
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={o?.gainEvent?.amount ? formatWithCommas(o.gainEvent.amount) : ''}
+                      onChange={e => {
+                        const amount = parseFormattedNumber(e.target.value);
+                        setEvent(yr, {
+                          gainEvent:
+                            amount > 0
+                              ? { amount, character: o?.gainEvent?.character ?? 'lt' }
+                              : undefined,
+                        });
+                      }}
+                    />
+                    <select
+                      value={o?.gainEvent?.character ?? 'lt'}
+                      onChange={e =>
+                        setEvent(yr, {
+                          gainEvent: o?.gainEvent
+                            ? { ...o.gainEvent, character: e.target.value as 'st' | 'lt' }
+                            : undefined,
+                        })
+                      }
+                    >
+                      <option value="lt">LT</option>
+                      <option value="st">ST</option>
+                    </select>
+                  </div>
+                );
+              })}
+              <p className="ws-rail-note" style={{ marginTop: 8 }}>
+                Gain events flow through the real netting: carryforwards shelter them (after the
+                strategy&apos;s own gains), they absorb the §461(l) deduction, and they widen the
+                NOL base. Event tax is reported separately — it is never charged against the
+                strategy&apos;s savings.
+              </p>
+            </div>
+          )}
+
+          <div className="wx-subnav">
+            {(['overview', 'table', 'charts'] as ResultsView[]).map(v => (
+              <button
+                key={v}
+                className={`wx-subnav-btn ${resultsView === v ? 'active' : ''}`}
+                onClick={() => setResultsView(v)}
+              >
+                {v === 'overview' ? 'Overview' : v === 'table' ? 'Year-by-Year' : 'Charts'}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="wx-subnav-right"
+              onClick={exportExcel}
+              title="Export the full workbook (Excel)"
+            >
+              <Ico d={I.download} w={13} /> Export view
+            </button>
+          </div>
+
+          {resultsView === 'overview' && (
+            <div className="wx-overview">
+              <div className="wx-cards">
+                <div className="wx-card">
+                  <span className="wx-card-label">
+                    <InfoText
+                      contentKey="embedded-gain-at-horizon"
+                      currentValue={formatCurrency(exit.embeddedGain)}
+                    >
+                      Embedded Gain (Yr {projectionYears})
+                    </InfoText>
+                  </span>
+                  <span className="wx-card-value">{formatCurrency(exit.embeddedGain)}</span>
+                  <span className="wx-card-sub">
+                    incl. {formatCurrency(exit.cumulativeBasisReduction)} basis reduction
+                    {exit.preExistingGain > 0 && (
+                      <> + {formatCurrency(exit.preExistingGain)} pre-existing gain</>
+                    )}
+                  </span>
+                </div>
+                <div className="wx-card">
+                  <span className="wx-card-label">
+                    <InfoText
+                      contentKey="incremental-deferred-tax"
+                      currentValue={formatCurrency(exit.incrementalDeferredTax)}
+                    >
+                      Deferred Tax If Liquidated
+                    </InfoText>
+                  </span>
+                  <span
+                    className={`wx-card-value ${exit.incrementalDeferredTax < 0 ? 'pos' : 'neg'}`}
+                  >
+                    {formatCurrency(exit.incrementalDeferredTax)}
+                  </span>
+                  <span className="wx-card-sub">
+                    {exit.incrementalDeferredTax < 0
+                      ? `negative: exits ${formatCurrency(Math.abs(exit.incrementalDeferredTax))} cheaper than passive — loss-reserve advantage`
+                      : `after ${formatCurrency(exit.cfShelterUsed)} carryforward shelter`}
+                  </span>
+                </div>
+                <div className="wx-card">
+                  <span className="wx-card-label">
+                    <InfoText
+                      contentKey="net-if-held-to-step-up"
+                      currentValue={formatCurrency(stepUp.netIfHeldToStepUp)}
+                    >
+                      Net If Held to Step-Up
+                    </InfoText>
+                  </span>
+                  <span className="wx-card-value pos">
+                    {formatCurrency(stepUp.netIfHeldToStepUp)}
+                  </span>
+                  <span className="wx-card-sub">
+                    vs {formatCurrency(stepUp.netIfLiquidated)} if liquidated · mortality-contingent
+                  </span>
+                </div>
+                {hasNol && (
+                  <div className="wx-card">
+                    <span className="wx-card-label">
+                      <InfoText
+                        contentKey="total-nol-generated"
+                        currentValue={formatCurrency(summary.totalNolGenerated)}
+                      >
+                        NOL Generated
+                      </InfoText>
+                    </span>
+                    <span className="wx-card-value">
+                      {formatCurrency(summary.totalNolGenerated)}
+                    </span>
+                    <span className="wx-card-sub">offsets future income (80%/yr)</span>
+                  </div>
+                )}
+                <div className="wx-card">
+                  <span className="wx-card-label">Final Total Wealth</span>
+                  <span className="wx-card-value">{formatCurrency(summary.finalTotalWealth)}</span>
+                  <span className="wx-card-sub">
+                    portfolio + {formatCurrency(summary.totalQfafCashReturned)} cash returned
+                  </span>
+                </div>
+              </div>
+
+              {ediMode && (
+                <>
+                  <span className="wx-section-title">EDI Economics</span>
+                  <div className="wx-cards">
+                    <div className="wx-card">
+                      <span className="wx-card-label">
+                        <InfoText
+                          contentKey="protection-ratio"
+                          currentValue={
+                            insights.protectionRatio !== null
+                              ? `${insights.protectionRatio.toFixed(1)}×`
+                              : '—'
+                          }
+                        >
+                          Protection Ratio
+                        </InfoText>
+                      </span>
+                      <span
+                        className={`wx-card-value ${insights.protectionRatio !== null ? 'pos' : ''}`}
+                      >
+                        {insights.protectionRatio !== null
+                          ? `${insights.protectionRatio.toFixed(1)}×`
+                          : '—'}
+                      </span>
+                      <span className="wx-card-sub">
+                        {insights.protectionRatio !== null
+                          ? 'shelter value ÷ cumulative financing cost'
+                          : 'financing costs disabled'}
+                      </span>
+                    </div>
+                    <div className="wx-card">
+                      <span className="wx-card-label">
+                        <InfoText
+                          contentKey="break-even-gain-event"
+                          currentValue={formatCurrency(insights.breakEvenGainEvent)}
+                        >
+                          Break-Even Gain Event
+                        </InfoText>
+                      </span>
+                      <span className="wx-card-value">
+                        {formatCurrency(insights.breakEvenGainEvent)}
+                      </span>
+                      <span className="wx-card-sub">a gain this size would be fully sheltered</span>
+                    </div>
+                    <div className="wx-card">
+                      <span className="wx-card-label">
+                        <InfoText
+                          contentKey="cumulative-financing-cost"
+                          currentValue={formatCurrency(insights.cumulativeFinancingCost)}
+                        >
+                          Cumulative Financing Cost
+                        </InfoText>
+                      </span>
+                      <span className="wx-card-value">
+                        {formatCurrency(insights.cumulativeFinancingCost)}
+                      </span>
+                      <span className="wx-card-sub">
+                        {settings.financingFeesEnabled
+                          ? `over ${results.years.length} years`
+                          : 'financing costs & fees disabled'}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {hasNol && incomeReqYears.length > 0 && (
+                <div className="wx-reqchips">
+                  <span className="wx-reqchips-label">
+                    <InfoText contentKey="col-income-required">
+                      Income needed per year to fully utilize §461(l) + NOL
+                    </InfoText>
+                  </span>
+                  <div className="wx-reqchips-row">
+                    {incomeReqYears.map(y => (
+                      <span
+                        key={y.year}
+                        className={`wx-rchip ${y.year === peakIncomeReq.year ? 'wx-rchip--peak' : ''}`}
+                      >
+                        Yr {y.year} <b>{formatCurrency(y.incomeRequiredForFullUtilization)}</b>
+                        {y.year === peakIncomeReq.year && ' · peak'}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
-            {conformityNote && (
-              <div className="ws-note">
-                ⚠️ <strong>State conformity:</strong> {conformityNote}
+
+              {/* D-027: the narrative, tucked into an expandable plain-English
+                  summary (default open) with .num emphasis on the figures. */}
+              <div className="wx-summary">
+                <button
+                  type="button"
+                  className="wx-summary-head"
+                  onClick={() => setSummaryOpen(o => !o)}
+                  aria-expanded={summaryOpen}
+                >
+                  <span className="ic">
+                    <Ico d={I.spark} w={16} />
+                  </span>
+                  Plain-English summary
+                  <span
+                    className="wx-chev"
+                    style={{ transform: summaryOpen ? 'rotate(180deg)' : undefined }}
+                  >
+                    <Ico d={I.chevD} w={14} />
+                  </span>
+                </button>
+                {summaryOpen &&
+                  (ediMode ? (
+                    <p className="wx-summary-body">
+                      On a <Num v={results.sizing.collateralValue} /> portfolio with{' '}
+                      <b>{view.displayName}</b>, the program&apos;s main output is a loss reserve:
+                      an estimated{' '}
+                      <Num v={summary.finalStCarryforward + summary.finalLtCarryforward} /> of loss
+                      carryforwards by year {results.years.length}, worth{' '}
+                      <Num v={summary.lossReserveShelterValue} /> of shelter against future capital
+                      gains — contingent on those gains being realized (a business sale,
+                      concentrated-stock exit, RSU diversification). Realized savings along the way
+                      are an estimated <Num v={summary.totalTaxSavings} /> (the $3,000/yr deduction
+                      plus any gain events the reserve shelters — model one with the presets in the
+                      events editor).{' '}
+                      {exit.incrementalDeferredTax < 0 ? (
+                        <>
+                          And the reserve already covers the exit: full liquidation in year{' '}
+                          {projectionYears} would cost{' '}
+                          <Num v={Math.abs(exit.incrementalDeferredTax)} /> <em>less</em> than the
+                          passive baseline, for a net benefit of{' '}
+                          <Num v={exit.netBenefitAfterLiquidation} />.
+                        </>
+                      ) : (
+                        <>
+                          Full liquidation in year {projectionYears} would surrender{' '}
+                          <Num v={exit.incrementalDeferredTax} /> of deferred tax, leaving{' '}
+                          <Num v={exit.netBenefitAfterLiquidation} />; holding through death (basis
+                          step-up) or donating can make the deferral permanent.
+                        </>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="wx-summary-body">
+                      On a <Num v={results.sizing.collateralValue} /> portfolio with{' '}
+                      <b>{view.displayName}</b>, the program is estimated to save{' '}
+                      <Num v={summary.totalTaxSavings} /> over {results.years.length} years at a
+                      combined ordinary rate of{' '}
+                      <span className="num">{formatPercent(rates.combinedOrdinary)}</span>.{' '}
+                      {exit.incrementalDeferredTax < 0 ? (
+                        <>
+                          The exit math runs in the strategy&apos;s favor: liquidating in year{' '}
+                          {projectionYears} would cost{' '}
+                          <Num v={Math.abs(exit.incrementalDeferredTax)} /> <em>less</em> than the
+                          passive baseline — the loss reserve more than covers the strategy&apos;s
+                          embedded gain — for a net benefit of{' '}
+                          <Num v={exit.netBenefitAfterLiquidation} />.
+                        </>
+                      ) : (
+                        <>
+                          A portion is timing: full liquidation in year {projectionYears} would
+                          surrender <Num v={exit.incrementalDeferredTax} /> of that, leaving{' '}
+                          <Num v={exit.netBenefitAfterLiquidation} />; holding through death (basis
+                          step-up) or donating can make the deferral permanent.
+                        </>
+                      )}
+                    </p>
+                  ))}
               </div>
-            )}
-            {stateNote && (
-              <div className="ws-note">
-                ⚠️ <strong>State treatment:</strong> {stateNote}
+
+              {/* D-027: rates compressed to a single inline strip (for the CPA) */}
+              <div className="wx-rates" data-testid="wx-rates">
+                <span className="wx-rate">
+                  Fed ordinary{' '}
+                  <b>
+                    {formatPercent(
+                      getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus)
+                    )}
+                  </b>
+                </span>
+                <span className="wx-rate">
+                  Fed ST <b>{formatPercent(rates.full.federalStRate)}</b>
+                </span>
+                <span className="wx-rate">
+                  Fed LT <b>{formatPercent(rates.full.federalLtRate)}</b>
+                </span>
+                <span className="wx-rate">
+                  State ({inputs.stateCode}) <b>{formatPercent(rates.profile.ordinaryRate)}</b>
+                </span>
+                {rates.profile.stRate !== rates.profile.ordinaryRate && (
+                  <span className="wx-rate">
+                    State ST <b>{formatPercent(rates.profile.stRate)}</b>
+                  </span>
+                )}
+                <span className="wx-rate">
+                  Combined ord. <b>{formatPercent(rates.combinedOrdinary)}</b>
+                </span>
+                <span className="wx-rate">
+                  Combined LT <b>{formatPercent(rates.combinedLt)}</b>
+                </span>
+                {settings.washSaleDisallowanceRate > 0 && (
+                  <span className="wx-rate">
+                    Wash-sale <b>{formatPercent(settings.washSaleDisallowanceRate, 0)}</b>
+                  </span>
+                )}
+                <span className="wx-rate">Fed ST &amp; LT incl. NIIT</span>
               </div>
-            )}
-            <div className="ws-note ws-note--muted">
-              <strong>Rates assumed:</strong> Fed ordinary{' '}
-              {formatPercent(getFederalOrdinaryRate(inputs.annualIncome, inputs.filingStatus))} ·
-              Fed ST {formatPercent(rates.full.federalStRate)} (incl. NIIT) · Fed LT{' '}
-              {formatPercent(rates.full.federalLtRate)} (incl. NIIT) · State{' '}
-              {formatPercent(rates.profile.ordinaryRate)}
-              {rates.profile.stRate !== rates.profile.ordinaryRate && (
-                <> (ST {formatPercent(rates.profile.stRate)})</>
-              )}{' '}
-              → combined ordinary {formatPercent(rates.combinedOrdinary)} / LT{' '}
-              {formatPercent(rates.combinedLt)}. Wash-sale disallowance{' '}
-              {formatPercent(settings.washSaleDisallowanceRate)}.
+
+              {!ediMode && (
+                <details className="wx-details">
+                  <summary>
+                    <strong>How the QFAF&apos;s tax treatment works</strong> (draft — pending
+                    counsel review)
+                  </summary>
+                  <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
+                </details>
+              )}
             </div>
-            {!ediMode && (
-              <details className="ws-note ws-note--muted ws-details">
-                <summary>
-                  <strong>How the QFAF's tax treatment works</strong> (draft — pending counsel
-                  review)
-                </summary>
-                <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
-              </details>
-            )}
-            <div className="ws-note ws-note--muted">
-              Estimates only — not investment, tax, or legal advice. See full disclosures below.
+          )}
+
+          {resultsView === 'table' && (
+            <div className="wx-table-host">
+              <ResultsTable
+                data={results.years}
+                sizing={results.sizing}
+                qfafEnabled={effectiveInputs.qfafEnabled}
+                projectionYears={projectionYears}
+                startMonth={effectiveInputs.startMonth}
+                qfafDuration={effectiveInputs.qfafDuration}
+                strategyId={view.isSplit ? undefined : effectiveInputs.strategyId}
+                ltGainRate={view.isSplit ? undefined : currentStrategy?.ltGainRate}
+              />
             </div>
-          </div>
-        )}
+          )}
 
-        {resultsView === 'table' && (
-          <ResultsTable
-            data={results.years}
-            sizing={results.sizing}
-            qfafEnabled={effectiveInputs.qfafEnabled}
-            projectionYears={projectionYears}
-            startMonth={effectiveInputs.startMonth}
-            qfafDuration={effectiveInputs.qfafDuration}
-            strategyId={view.isSplit ? undefined : effectiveInputs.strategyId}
-            ltGainRate={view.isSplit ? undefined : currentStrategy?.ltGainRate}
-          />
-        )}
+          {resultsView === 'charts' && (
+            <div className="wx-charts">
+              <TaxSavingsChart data={results.years} startMonth={effectiveInputs.startMonth} />
+              <PortfolioValueChart
+                data={results.years}
+                trackingError={view.primaryStrategy?.trackingError}
+                startMonth={effectiveInputs.startMonth}
+              />
+            </div>
+          )}
 
-        {resultsView === 'charts' && (
-          <div className="ws-charts">
-            <TaxSavingsChart data={results.years} startMonth={effectiveInputs.startMonth} />
-            <PortfolioValueChart
-              data={results.years}
-              trackingError={view.primaryStrategy?.trackingError}
-              startMonth={effectiveInputs.startMonth}
-            />
-          </div>
-        )}
+          <p className="wx-disc">
+            Estimates only — not investment, tax, or legal advice. Headline savings are gross by
+            default; financing fees, wash-sale haircuts, and present-value discounting are opt-in
+            layers. QFAF tax treatment is contingent on qualification. See the full disclosures
+            below.
+          </p>
 
-        <DisclaimerFooter />
-      </section>
+          <DisclaimerFooter />
+        </section>
+      </div>
     </div>
   );
 }

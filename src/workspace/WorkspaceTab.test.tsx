@@ -13,7 +13,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
-import { WorkspaceTab } from './WorkspaceTab';
+import { WorkspaceTab, filterPaletteItems, PaletteItem } from './WorkspaceTab';
 import { calculate } from '../calculations';
 import { DEFAULTS } from '../taxData';
 import { CalculatorInputs, DEFAULT_SETTINGS, SplitAllocation } from '../types';
@@ -183,5 +183,94 @@ describe('Workspace split allocation (D-026)', () => {
     const csv = exportInputsToCsv(inputs, DEFAULT_SETTINGS);
     const parsed = parseInputsFromCsv(csv);
     expect(parsed.inputs?.splitAllocation).toEqual(SPLIT_ON);
+  });
+});
+
+// ─── D-027: Workspace redesign — findability spine ───
+describe('Workspace redesign (D-027)', () => {
+  it('scenario name is inline-editable and persists to localStorage', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    expect(r.getByTestId('wx-scenario-name').textContent).toBe('Untitled scenario');
+
+    fireEvent.click(r.getByTestId('wx-scenario-name'));
+    const input = r.getByLabelText('Scenario name');
+    fireEvent.change(input, { target: { value: 'Henderson — Business Sale' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(r.getByTestId('wx-scenario-name').textContent).toBe('Henderson — Business Sale');
+    expect(localStorage.getItem(STORAGE_KEYS.SCENARIO_NAME)).toBe('Henderson — Business Sale');
+  });
+
+  it('⌘K opens the command palette; selecting a view switches the sub-view', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    expect(r.queryByTestId('wx-palette')).toBeNull();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const palette = r.getByTestId('wx-palette');
+    expect(palette).toBeTruthy();
+
+    const search = r.getByLabelText('Jump to a setting, view, or action');
+    fireEvent.change(search, { target: { value: 'year-by-year' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+
+    // Palette closed, table sub-view active (audit-complete ResultsTable mounted).
+    expect(r.queryByTestId('wx-palette')).toBeNull();
+    expect(r.getByText('Year-by-Year').className).toContain('active');
+    expect(r.container.querySelector('.wx-table-host')).toBeTruthy();
+  });
+
+  it('palette jump expands the target rail group (closed by default)', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    const group = () => r.container.querySelector('[data-wx-group="deleverage"]') as HTMLElement;
+    expect(group().getAttribute('data-open')).toBe('false');
+
+    fireEvent.click(r.getByTestId('wx-search')); // clicking the search box also opens it
+    const search = r.getByLabelText('Jump to a setting, view, or action');
+    fireEvent.change(search, { target: { value: 'unwind' } }); // keyword match, not label
+    fireEvent.keyDown(search, { key: 'Enter' });
+
+    expect(group().getAttribute('data-open')).toBe('true');
+  });
+
+  it('rail "Find a setting…" highlights matching groups and dims the rest', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    fireEvent.change(r.getByLabelText('Find a setting'), { target: { value: 'wash-sale' } });
+    const model = r.container.querySelector('[data-wx-group="model"]') as HTMLElement;
+    const client = r.container.querySelector('[data-wx-group="client"]') as HTMLElement;
+    expect(model.className).toContain('wx-group--hit');
+    expect(client.className).toContain('wx-group--dim');
+  });
+
+  it('flags tray consolidates conditional notes with severity counts (CA defaults)', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    const head = r.getByTestId('wx-flags');
+    // CA defaults: state treatment + conformity + basis caveat (overlay, no
+    // basis) warnings, plus step-up and gross-estimate assumption notes.
+    expect(head.textContent).toContain('attention');
+    expect(head.textContent).toContain('about assumptions');
+    expect(r.queryByTestId('wx-flags-body')).toBeNull(); // collapsed by default
+
+    fireEvent.click(r.getByText(/Review/));
+    const body = r.getByTestId('wx-flags-body');
+    expect(body.textContent).toContain('Gross estimate:');
+    expect(body.textContent).toContain('Step-up framing:');
+    expect(body.textContent).toContain('Appreciated-stock collateral:');
+  });
+
+  it('fuzzy palette filter ranks substring and keyword matches', () => {
+    const items: PaletteItem[] = [
+      { id: 'a', kind: 'Inputs', label: 'Model', keywords: 'wash-sale fees growth', run: () => {} },
+      { id: 'b', kind: 'Inputs', label: 'Client', keywords: 'income state', run: () => {} },
+      { id: 'c', kind: 'Action', label: 'Export Excel', keywords: 'workbook', run: () => {} },
+    ];
+    expect(filterPaletteItems(items, 'wash').map(i => i.id)).toEqual(['a']);
+    expect(filterPaletteItems(items, 'income').map(i => i.id)).toEqual(['b']);
+    expect(filterPaletteItems(items, '').map(i => i.id)).toEqual(['a', 'b', 'c']);
+    expect(filterPaletteItems(items, 'zzzz')).toEqual([]);
   });
 });
