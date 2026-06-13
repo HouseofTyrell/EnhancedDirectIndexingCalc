@@ -269,6 +269,23 @@ strategy comparison are large and need their own decision; small items batched l
 Split allocation lands as an expandable section in the rail's Strategy group (rail is
 too tight for always-visible dual selectors); the D-016 deleverage-conflict warning
 must be surfaced in the rail when both are enabled.
+
+### D-027 — Workspace redesign from the Claude Design handoff (Slate light / Graphite dark)
+**Date:** 2026-06-13
+**Context:** owner mocked a Workspace redesign in claude.ai/design and handed off a
+bundle: one reworked information architecture ("findability is the spine" — context top
+bar with scenario chips + ⌘K jump-to-anything, collapsible rail groups that show their
+set values when closed, a consolidated severity-tagged Flags tray replacing stacked
+yellow notes, emphasized 4-up metric strip, expandable plain-English summary, inline
+rates strip, restyled tabular year view) in three skins: Graphite (dark terminal),
+Slate (cool light fintech), Bond (warm private-bank serif).
+**Decision (owner: "pick the best one and build it"):** implement the unified token
+system with **Slate as the light theme and Graphite as the dark theme**, mapped onto
+the existing app theme toggle. Bond is the stylistic outlier with no dark counterpart
+and is not built. Scope: Workspace tab (the design's surface); Classic tab and Meeting
+Mode (fixed boardroom palette) unchanged. Mock numbers are placeholders — every figure
+renders from the live engine. The single-file distributable stays self-contained
+(fonts bundled, no runtime CDN fetches).
 **Status: IMPLEMENTED (2026-06-12)** —
 - **Scenario pinning**: "Pin scenario" in the Workspace Actions rail group freezes the
   current scenario (inputs + settings + RESULTS, via `structuredClone`) through the
