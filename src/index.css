@@ -3878,6 +3878,44 @@ tfoot td {
   margin-right: 0.5rem;
 }
 
+/* Per-term breakdown of the "Your value" figure (e.g. the income-required
+   formula split into its §461(l) / $3K / NOL / netted-gains components). */
+.field-popup .field-breakdown {
+  margin: 0 0 0.875rem 0;
+  padding: 0.5rem 0.875rem;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.field-popup .field-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.25rem 0;
+}
+
+.field-popup .field-breakdown-row + .field-breakdown-row {
+  border-top: 1px solid var(--border);
+}
+
+.field-popup .field-breakdown-row dt {
+  color: var(--text-light);
+  font-size: 0.8rem;
+}
+
+.field-popup .field-breakdown-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.field-popup .field-breakdown-row dd.negative {
+  color: var(--danger, #dc2626);
+}
+
 .field-popup .field-impact {
   margin: 0;
   padding: 0.75rem 1rem;

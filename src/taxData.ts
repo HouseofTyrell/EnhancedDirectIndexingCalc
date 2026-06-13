@@ -3,20 +3,11 @@ import { CalculatorInputs } from './types';
 // All 50 US States + DC with 2026 top marginal income tax rates
 // Sources: Tax Foundation, state tax authorities
 // Note: Rates shown are top marginal rates for high-income earners
+// Display order: alphabetical by name, with the custom "Other" entry pinned
+// last. States with a 0 rate levy no income tax (e.g. FL, TX, WA).
 export const STATES = [
-  // No income tax states
-  { code: 'AK', name: 'Alaska', rate: 0 },
-  { code: 'FL', name: 'Florida', rate: 0 },
-  { code: 'NV', name: 'Nevada', rate: 0 },
-  { code: 'NH', name: 'New Hampshire', rate: 0 }, // No tax on earned income (only interest/dividends, phasing out)
-  { code: 'SD', name: 'South Dakota', rate: 0 },
-  { code: 'TN', name: 'Tennessee', rate: 0 },
-  { code: 'TX', name: 'Texas', rate: 0 },
-  { code: 'WA', name: 'Washington', rate: 0 }, // No income tax (has capital gains tax of 7% on gains > $270k)
-  { code: 'WY', name: 'Wyoming', rate: 0 },
-
-  // States with income tax (alphabetical)
   { code: 'AL', name: 'Alabama', rate: 0.05 },
+  { code: 'AK', name: 'Alaska', rate: 0 },
   { code: 'AZ', name: 'Arizona', rate: 0.025 }, // Flat rate as of 2023
   { code: 'AR', name: 'Arkansas', rate: 0.039 }, // Reduced in 2026
   { code: 'CA', name: 'California', rate: 0.133 }, // Highest in nation (12.3% + 1% mental health surtax >$1M)
@@ -24,6 +15,7 @@ export const STATES = [
   { code: 'CT', name: 'Connecticut', rate: 0.0699 },
   { code: 'DE', name: 'Delaware', rate: 0.066 },
   { code: 'DC', name: 'District of Columbia', rate: 0.1075 },
+  { code: 'FL', name: 'Florida', rate: 0 },
   { code: 'GA', name: 'Georgia', rate: 0.0519 }, // Reduced from 5.39% mid-2025
   { code: 'HI', name: 'Hawaii', rate: 0.11 },
   { code: 'ID', name: 'Idaho', rate: 0.058 }, // Flat rate
@@ -42,6 +34,8 @@ export const STATES = [
   { code: 'MO', name: 'Missouri', rate: 0.048 }, // Reduced from 4.95%
   { code: 'MT', name: 'Montana', rate: 0.059 }, // Reduced from 6.75%
   { code: 'NE', name: 'Nebraska', rate: 0.0455 }, // Reduced from 5.2% in 2026
+  { code: 'NV', name: 'Nevada', rate: 0 },
+  { code: 'NH', name: 'New Hampshire', rate: 0 }, // No tax on earned income (only interest/dividends, phasing out)
   { code: 'NJ', name: 'New Jersey', rate: 0.1075 },
   { code: 'NM', name: 'New Mexico', rate: 0.059 },
   { code: 'NY', name: 'New York', rate: 0.109 }, // Top rate with temporary high-earner surtax extended
@@ -53,11 +47,16 @@ export const STATES = [
   { code: 'PA', name: 'Pennsylvania', rate: 0.0307 }, // Flat rate
   { code: 'RI', name: 'Rhode Island', rate: 0.0599 },
   { code: 'SC', name: 'South Carolina', rate: 0.064 }, // Being phased down
+  { code: 'SD', name: 'South Dakota', rate: 0 },
+  { code: 'TN', name: 'Tennessee', rate: 0 },
+  { code: 'TX', name: 'Texas', rate: 0 },
   { code: 'UT', name: 'Utah', rate: 0.0465 }, // Flat rate
   { code: 'VT', name: 'Vermont', rate: 0.0875 },
   { code: 'VA', name: 'Virginia', rate: 0.0575 },
+  { code: 'WA', name: 'Washington', rate: 0 }, // No income tax (has capital gains tax of 7% on gains > $270k)
   { code: 'WV', name: 'West Virginia', rate: 0.047 }, // Reduced from 5.12%
   { code: 'WI', name: 'Wisconsin', rate: 0.0765 },
+  { code: 'WY', name: 'Wyoming', rate: 0 },
 
   // Custom entry option
   { code: 'OTHER', name: 'Other (enter rate)', rate: 0 },

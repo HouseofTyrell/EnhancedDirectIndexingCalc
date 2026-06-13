@@ -144,6 +144,22 @@ describe('incomeRequiredForFullUtilization', () => {
     const below = calculateWithOverrides(inputs, DEFAULT_SETTINGS, mkOverride(required * 0.5));
     expect(below.years[1].nolUsedThisYear).toBeLessThan(startNolY2);
   });
+
+  it('exposes formula components that reconcile to the headline figure', () => {
+    // Use a case that exercises every term: a large core builds NOL, so Year 2
+    // has a nonzero §461(l) deduction, NOL gross-up, and netted gains.
+    const result = calculate(createInputs({ collateralAmount: 10000000, annualIncome: 200000 }));
+    for (const year of result.years) {
+      const c = year.incomeRequiredComponents;
+      const reconstructed = Math.max(
+        0,
+        c.section461Deduction + c.capitalLossUsed + c.nolGrossUp - c.netTaxableGains
+      );
+      expect(reconstructed).toBeCloseTo(year.incomeRequiredForFullUtilization, 2);
+      // The gross-up is the start-of-year NOL divided by the 80% offset limit.
+      expect(c.nolGrossUp).toBeCloseTo(c.nolLimit > 0 ? c.startOfYearNol / c.nolLimit : 0, 2);
+    }
+  });
 });
 
 describe('redeployQfafProceeds', () => {

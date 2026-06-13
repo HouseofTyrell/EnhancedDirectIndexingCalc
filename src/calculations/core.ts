@@ -883,16 +883,30 @@ export function calculateYear(
   // start-of-year NOL balance. Capital-gain income already contributes, so
   // it is netted out; nolCarryforward here is the start-of-year balance.
   const nolLimitForRequired = settings.nolOffsetLimit ?? NOL_OFFSET_PERCENTAGE;
+  // Decomposition of the income-required formula, surfaced in the metric's info
+  // popup so advisors can see where the planning target comes from. These are
+  // the literal terms of the formula below — do not recompute them elsewhere.
+  const incomeRequiredComponents = {
+    // §461(l) ordinary deduction that must be absorbed by income this year
+    section461Deduction: safeNumber(allowedOrdinaryLoss),
+    // Capital loss applied against ordinary income this year (≤ $3K / $1.5K MFS)
+    capitalLossUsed: safeNumber(capitalLossUsedAgainstIncome),
+    // Start-of-year NOL balance the 80% limit must consume
+    startOfYearNol: safeNumber(nolCarryforward),
+    // The 80% (or overridden) NOL offset limit applied to the gross-up
+    nolLimit: nolLimitForRequired,
+    // Start-of-year NOL grossed up by the 80% limit (income needed to use it all)
+    nolGrossUp: safeNumber(nolLimitForRequired > 0 ? nolCarryforward / nolLimitForRequired : 0),
+    // Capital-gain income the strategy already generates, netted out of the target
+    netTaxableGains: safeNumber(taxableSt + taxableLt + eventTaxableSt + eventTaxableLt),
+  };
   const incomeRequiredForFullUtilization = safeNumber(
     Math.max(
       0,
-      allowedOrdinaryLoss +
-        capitalLossUsedAgainstIncome +
-        (nolLimitForRequired > 0 ? nolCarryforward / nolLimitForRequired : 0) -
-        taxableSt -
-        taxableLt -
-        eventTaxableSt -
-        eventTaxableLt
+      incomeRequiredComponents.section461Deduction +
+        incomeRequiredComponents.capitalLossUsed +
+        incomeRequiredComponents.nolGrossUp -
+        incomeRequiredComponents.netTaxableGains
     )
   );
 
@@ -936,6 +950,7 @@ export function calculateYear(
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,
     incomeRequiredForFullUtilization,
+    incomeRequiredComponents,
     gainEventAmount: safeNumber(gainEventAmount),
     gainEventTax,
     gainEventTaxWithoutStrategy,

@@ -196,6 +196,21 @@ export interface YearResult {
   // deduction AND lets the 80% limit consume the entire start-of-year NOL
   // balance (planning target for bonuses/option exercises)
   incomeRequiredForFullUtilization: number;
+  /**
+   * Decomposition of `incomeRequiredForFullUtilization` into the literal terms
+   * of its formula (§461(l) deduction + $3K used + start-of-year NOL ÷ limit −
+   * net taxable gains). Surfaced in the metric's info popup so the planning
+   * target is auditable. Not a separate analysis — these are the same values
+   * core.ts nets into the headline figure.
+   */
+  incomeRequiredComponents: {
+    section461Deduction: number;
+    capitalLossUsed: number;
+    startOfYearNol: number;
+    nolLimit: number;
+    nolGrossUp: number;
+    netTaxableGains: number;
+  };
 
   // Tax benefit breakdown (gross benefits and costs)
   ordinaryLossBenefit: number; // usableOrdinaryLoss × combined ST rate
