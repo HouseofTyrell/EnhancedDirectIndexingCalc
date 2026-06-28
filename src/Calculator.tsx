@@ -63,7 +63,11 @@ const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
   }));
 };
 
-export function Calculator() {
+interface CalculatorProps {
+  isActive?: boolean;
+}
+
+export function Calculator({ isActive = true }: CalculatorProps) {
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULTS);
   const advancedMode = useAdvancedMode();
   const { isExpanded } = useScrollHeader('scroll-sentinel');
@@ -209,6 +213,7 @@ export function Calculator() {
       taxRates.stateProfile,
       advancedSettings.growthEnabled,
       advancedSettings.defaultAnnualReturn,
+      inputs.collateralCostBasis,
     ]
   );
 
@@ -266,11 +271,11 @@ export function Calculator() {
 
   // Setup keyboard shortcuts (after all handlers are defined)
   useKeyboardShortcuts({
-    onPrint: printHandler || undefined,
-    onExport: exportHandler || undefined,
-    onShowHelp: () => setShowKeyboardHelp(true),
-    onEscape: () => setShowKeyboardHelp(false),
-    onPin: handlePinScenario,
+    onPrint: isActive ? printHandler || undefined : undefined,
+    onExport: isActive ? exportHandler || undefined : undefined,
+    onShowHelp: isActive ? () => setShowKeyboardHelp(true) : undefined,
+    onEscape: isActive ? () => setShowKeyboardHelp(false) : undefined,
+    onPin: isActive ? handlePinScenario : undefined,
   });
 
   // Input validation (warn-only, does not block calculation)

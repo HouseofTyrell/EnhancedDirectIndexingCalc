@@ -10,6 +10,7 @@ import {
 import { getStrategy } from '../strategyData';
 import { calculate, calculateWithOverrides, computeExitTaxAnalysis } from '../calculations';
 import { MeetingMode, MeetingWhatIfs } from '../components/MeetingMode/MeetingMode';
+import { getEffectiveView } from '../utils/effectiveAllocation';
 
 /**
  * Shared scenario pipeline helpers — used by BOTH the Workspace results pane
@@ -78,13 +79,14 @@ export function createDefaultWhatIfs(
   settings: AdvancedSettings
 ): MeetingWhatIfs {
   const projYears = settings.projectionYears ?? 10;
+  const totalCollateral = getEffectiveView(inputs).totalCollateral;
   return {
     retirementEnabled: false,
     retirementYear: Math.min(3, projYears),
     retirementIncome: Math.round(inputs.annualIncome / 2),
     gainEventEnabled: false,
     gainEventYear: Math.min(3, projYears),
-    gainEventAmount: Math.round(inputs.collateralAmount / 2),
+    gainEventAmount: Math.round(totalCollateral / 2),
   };
 }
 

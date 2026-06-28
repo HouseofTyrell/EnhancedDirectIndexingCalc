@@ -14,7 +14,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { WorkspaceTab, filterPaletteItems, PaletteItem } from './WorkspaceTab';
-import { calculate } from '../calculations';
+import { calculate, solveCollateralForTotal } from '../calculations';
 import { DEFAULTS } from '../taxData';
 import { CalculatorInputs, DEFAULT_SETTINGS, SplitAllocation } from '../types';
 import { STORAGE_KEYS } from '../constants/storageKeys';
@@ -153,6 +153,38 @@ describe('Workspace split allocation (D-026)', () => {
       formatCurrency(expected.summary.totalTaxSavings)
     );
     expect(r.getByTestId('ws-split-total').textContent).toContain('12,000,000');
+  });
+
+  it('total-portfolio funding scales split legs proportionally', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    fireEvent.click(r.getByLabelText('Split allocation (core + overlay)'));
+    fireEvent.click(r.getByText('Total portfolio'));
+
+    const totalInput = r.getAllByLabelText('Total available portfolio')[0];
+    fireEvent.change(totalInput, { target: { value: '20,000,000' } });
+
+    const solvedCollateral = solveCollateralForTotal(
+      20000000,
+      { ...DEFAULTS, splitAllocation: SPLIT_ON },
+      DEFAULT_SETTINGS.qfafMultiplier,
+      DEFAULT_SETTINGS.washSaleDisallowanceRate
+    );
+    const scale = solvedCollateral / (SPLIT_ON.coreAmount + SPLIT_ON.overlayAmount);
+    const scaledSplit = {
+      ...SPLIT_ON,
+      coreAmount: SPLIT_ON.coreAmount * scale,
+      overlayAmount: SPLIT_ON.overlayAmount * scale,
+    };
+    const expected = calculate({ ...DEFAULTS, splitAllocation: scaledSplit }, DEFAULT_SETTINGS);
+
+    expect(r.getByTestId('ws-metric-total-savings').textContent).toBe(
+      formatCurrency(expected.summary.totalTaxSavings)
+    );
+    expect(r.getByTestId('ws-split-total').textContent).toContain(
+      formatCurrency(expected.sizing.totalExposure)
+    );
+    expect(Math.round(expected.sizing.totalExposure)).toBe(20000000);
   });
 
   it('deleverage + split shows the D-016 conflict warning in the rail', () => {

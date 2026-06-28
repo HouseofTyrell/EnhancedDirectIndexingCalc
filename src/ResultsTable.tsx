@@ -173,7 +173,7 @@ export function ResultsTable({
     // Deleverage group (only when a plan is active)
     if (hasDeleverage) {
       cols += 1; // Extension % headline
-      if (expandDeleverage) cols += 3; // Unwind Gain, Unwind Tax, Fin. Saved
+      if (expandDeleverage) cols += 5; // Unwind Gain, ST/LT split, Unwind Tax, Fin. Saved
     }
 
     cols += 1; // Tax Savings column
@@ -446,6 +446,12 @@ export function ResultsTable({
                         <InfoText contentKey="col-deleverage-gain">Unwind Gain</InfoText>
                       </th>
                       <th className="col-detail">
+                        <InfoText contentKey="col-deleverage-st-gain">Unwind ST</InfoText>
+                      </th>
+                      <th className="col-detail">
+                        <InfoText contentKey="col-deleverage-lt-gain">Unwind LT</InfoText>
+                      </th>
+                      <th className="col-detail">
                         <InfoText contentKey="col-deleverage-tax">Unwind Tax</InfoText>
                       </th>
                       <th className="col-detail">
@@ -557,6 +563,8 @@ export function ResultsTable({
                   <td className="starting-note">—</td>
                   {expandCf && (
                     <>
+                      <td className="starting-note">—</td>
+                      <td className="starting-note">—</td>
                       <td className="starting-note">—</td>
                       <td className="starting-note">—</td>
                       <td className="starting-note">—</td>
@@ -812,6 +820,16 @@ export function ResultsTable({
                             <td className="positive">
                               {year.deleverageGainRealized > 0.01
                                 ? formatCurrency(year.deleverageGainRealized)
+                                : '—'}
+                            </td>
+                            <td className="positive">
+                              {year.deleverageGainSt > 0.01
+                                ? formatCurrency(year.deleverageGainSt)
+                                : '—'}
+                            </td>
+                            <td className="positive">
+                              {year.deleverageGainLt > 0.01
+                                ? formatCurrency(year.deleverageGainLt)
                                 : '—'}
                             </td>
                             <td className="negative">
@@ -1186,15 +1204,25 @@ function TransposedTable({
     sections.push({
       title: 'Gain Events',
       rows: [
-        { label: 'Event Amount', cell: y => moneyOrDash(y.gainEventAmount) },
-        { label: 'CF Shelter Applied', cell: y => moneyOrDash(y.gainEventCfShelter) },
+        {
+          label: 'Event Amount',
+          contentKey: 'col-gain-event-amount',
+          cell: y => moneyOrDash(y.gainEventAmount),
+        },
+        {
+          label: 'CF Shelter Applied',
+          contentKey: 'col-gain-event-cf-shelter',
+          cell: y => moneyOrDash(y.gainEventCfShelter),
+        },
         {
           label: 'Event Tax Due',
+          contentKey: 'col-gain-event-tax',
           cell: y => (y.gainEventAmount > 0 ? formatCurrency(y.gainEventTax) : '—'),
           className: () => 'negative',
         },
         {
           label: 'Tax Without Program',
+          contentKey: 'col-gain-event-tax-without-program',
           cell: y => moneyOrDash(y.gainEventTaxWithoutStrategy),
         },
       ],
@@ -1214,6 +1242,16 @@ function TransposedTable({
           label: 'Unwind Gain',
           contentKey: 'col-deleverage-gain',
           cell: y => moneyOrDash(y.deleverageGainRealized),
+        },
+        {
+          label: 'Unwind ST Gain',
+          contentKey: 'col-deleverage-st-gain',
+          cell: y => moneyOrDash(y.deleverageGainSt),
+        },
+        {
+          label: 'Unwind LT Gain',
+          contentKey: 'col-deleverage-lt-gain',
+          cell: y => moneyOrDash(y.deleverageGainLt),
         },
         {
           label: 'Tax on Unwind',

@@ -574,7 +574,11 @@ function PinComparisonStrip({
  * toggle — see workspace.css. Every figure renders from the live engine
  * outputs (one-engine rule); the design's numbers were placeholders.
  */
-export function WorkspaceTab() {
+interface WorkspaceTabProps {
+  isActive?: boolean;
+}
+
+export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
   const qualifiedPurchaser = useQualifiedPurchaser();
   // D-026: same hook + storage as the Classic comparison panel — one shared
   // pin store, so an advisor can pin here and compare there (or vice versa).
@@ -625,6 +629,7 @@ export function WorkspaceTab() {
   // ⌘K / Ctrl+K opens the command palette anywhere in the Workspace.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!isActive) return;
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'k') {
         if (isMeetingMode) return; // Meeting Mode keeps its own surface
         e.preventDefault();
@@ -633,21 +638,33 @@ export function WorkspaceTab() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isMeetingMode]);
+  }, [isActive, isMeetingMode]);
 
   // In total-budget mode, solve for the collateral that makes
-  // collateral + auto-sized QFAF equal the available portfolio.
-  // Split allocation sets the total from its two leg amounts and the engine
-  // ignores `collateralAmount`, so the solver has nothing to solve — total-
-  // budget mode is unavailable while split is on (UI enforces + explains).
+  // collateral + auto-sized QFAF equal the available portfolio. In split mode,
+  // the two leg amounts act as allocation weights and are scaled proportionally.
   const effectiveInputs = useMemo<CalculatorInputs>(() => {
-    if (fundingMode !== 'total' || inputs.splitAllocation?.enabled === true) return inputs;
+    if (fundingMode !== 'total') return inputs;
     const solved = solveCollateralForTotal(
       totalAvailable,
       inputs,
       settings.qfafMultiplier,
       settings.washSaleDisallowanceRate
     );
+    const split = inputs.splitAllocation;
+    if (split?.enabled === true) {
+      const currentTotal = split.coreAmount + split.overlayAmount;
+      if (currentTotal <= 0) return inputs;
+      const scale = solved / currentTotal;
+      return {
+        ...inputs,
+        splitAllocation: {
+          ...split,
+          coreAmount: split.coreAmount * scale,
+          overlayAmount: split.overlayAmount * scale,
+        },
+      };
+    }
     return { ...inputs, collateralAmount: solved };
   }, [
     fundingMode,
@@ -1483,7 +1500,11 @@ export function WorkspaceTab() {
             icon={I.overlay}
             name="Strategy"
             summary={
-              splitOn ? (
+              splitOn && fundingMode === 'total' ? (
+                <>
+                  <b>Split</b> · <b>{formatCurrencyAbbreviated(totalAvailable)}</b> total budget
+                </>
+              ) : splitOn ? (
                 <>
                   <b>Split</b> · {formatCurrencyAbbreviated(split.coreAmount)} core +{' '}
                   {formatCurrencyAbbreviated(split.overlayAmount)} overlay
@@ -1507,12 +1528,7 @@ export function WorkspaceTab() {
               <input
                 type="checkbox"
                 checked={splitOn}
-                onChange={e => {
-                  updateSplit({ enabled: e.target.checked });
-                  // Total-budget solving has nothing to solve in split mode
-                  // (leg amounts set the total) — fall back to collateral mode.
-                  if (e.target.checked && fundingMode === 'total') setFundingMode('collateral');
-                }}
+                onChange={e => updateSplit({ enabled: e.target.checked })}
               />
               <span className="wx-switch" />
               <span>Split allocation (core + overlay)</span>
@@ -1565,16 +1581,62 @@ export function WorkspaceTab() {
                     }
                   />
                 </label>
+                <div className="wx-field">
+                  <span className="wx-label">Fund by</span>
+                  <div className="ws-segment">
+                    <button
+                      type="button"
+                      className={fundingMode === 'collateral' ? 'active' : ''}
+                      onClick={() => setFundingMode('collateral')}
+                    >
+                      Collateral
+                    </button>
+                    <button
+                      type="button"
+                      className={fundingMode === 'total' ? 'active' : ''}
+                      onClick={() => {
+                        setTotalAvailable(Math.round(results.sizing.totalExposure));
+                        setFundingMode('total');
+                      }}
+                    >
+                      Total portfolio
+                    </button>
+                  </div>
+                </div>
+                {fundingMode === 'total' && (
+                  <label className="wx-field">
+                    <span className="wx-label">Total available portfolio</span>
+                    <input
+                      inputMode="numeric"
+                      value={formatWithCommas(totalAvailable)}
+                      onChange={e => setTotalAvailable(parseFormattedNumber(e.target.value))}
+                    />
+                  </label>
+                )}
                 <p className="ws-derived" data-testid="ws-split-total">
-                  → Total collateral {formatCurrency(splitTotal)}
-                  {splitTotal > 0 && (
+                  {fundingMode === 'total' ? (
                     <>
-                      {' '}
-                      ({formatPercent(split.coreAmount / splitTotal)} core /{' '}
-                      {formatPercent(split.overlayAmount / splitTotal)} overlay)
+                      → Core {formatCurrency(effectiveInputs.splitAllocation?.coreAmount ?? 0)} +
+                      overlay {formatCurrency(effectiveInputs.splitAllocation?.overlayAmount ?? 0)}
+                      {inputs.qfafEnabled && (
+                        <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
+                      )}
+                      {' = '}
+                      {formatCurrency(results.sizing.totalExposure)}
+                    </>
+                  ) : (
+                    <>
+                      → Total collateral {formatCurrency(splitTotal)}
+                      {splitTotal > 0 && (
+                        <>
+                          {' '}
+                          ({formatPercent(split.coreAmount / splitTotal)} core /{' '}
+                          {formatPercent(split.overlayAmount / splitTotal)} overlay)
+                        </>
+                      )}
+                      {inputs.qfafEnabled && <> · QFAF auto-sizes against the combined ST losses</>}
                     </>
                   )}
-                  {inputs.qfafEnabled && <> · QFAF auto-sizes against the combined ST losses</>}
                 </p>
                 {(split.coreAmount <= 0 || split.overlayAmount <= 0) && (
                   <p className="ws-rail-warn">
@@ -1582,10 +1644,12 @@ export function WorkspaceTab() {
                     single-strategy inputs.
                   </p>
                 )}
-                <p className="ws-rail-note">
-                  Total-budget funding isn&apos;t available with split allocation — the two leg
-                  amounts set the total.
-                </p>
+                {fundingMode === 'total' && (
+                  <p className="ws-rail-note">
+                    The core and overlay amounts are used as allocation weights; the tool scales
+                    both legs so collateral + QFAF equals the total portfolio.
+                  </p>
+                )}
               </>
             ) : (
               <>

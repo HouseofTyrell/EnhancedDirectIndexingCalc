@@ -60,8 +60,18 @@ export function App() {
 
       <main className="app-content">
         <ErrorBoundary>
-          {activeView === 'calculator' && <Calculator />}
-          {activeView === 'workspace' && <WorkspaceTab />}
+          <div
+            hidden={activeView !== 'workspace'}
+            style={{ display: activeView === 'workspace' ? undefined : 'none' }}
+          >
+            <WorkspaceTab isActive={activeView === 'workspace'} />
+          </div>
+          <div
+            hidden={activeView !== 'calculator'}
+            style={{ display: activeView === 'calculator' ? undefined : 'none' }}
+          >
+            <Calculator isActive={activeView === 'calculator'} />
+          </div>
           {activeView === 'qfaf-test' && <QfafTestPage />}
         </ErrorBoundary>
       </main>
