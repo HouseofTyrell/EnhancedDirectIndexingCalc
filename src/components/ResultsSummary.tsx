@@ -215,8 +215,9 @@ export const ResultsSummary = React.memo(function ResultsSummary({
             </h3>
             <p className="big-number">{formatCurrency(exitTaxAnalysis.embeddedGain)}</p>
             <p className="subtext">
-              Incl. {formatCurrency(exitTaxAnalysis.cumulativeBasisReduction)} basis reduction from
-              harvesting
+              Incl. {formatCurrency(exitTaxAnalysis.cumulativeBasisReduction)} basis reduction
+              {exitTaxAnalysis.preExistingGain > 0 &&
+                ` + ${formatCurrency(exitTaxAnalysis.preExistingGain)} pre-existing gain`}
             </p>
           </div>
           <div className="card">
@@ -225,7 +226,7 @@ export const ResultsSummary = React.memo(function ResultsSummary({
                 contentKey="incremental-deferred-tax"
                 currentValue={formatCurrency(exitTaxAnalysis.incrementalDeferredTax)}
               >
-                Est. Deferred Tax (If Liquidated)
+                Est. Incremental Deferred Tax
               </InfoText>
             </h3>
             <p className="big-number">{formatCurrency(exitTaxAnalysis.incrementalDeferredTax)}</p>
@@ -261,9 +262,10 @@ export const ResultsSummary = React.memo(function ResultsSummary({
               liquidating in year {projectionYears} would cost{' '}
               {formatCurrency(Math.abs(exitTaxAnalysis.incrementalDeferredTax))} LESS than the
               passive baseline, because the remaining loss carryforwards more than cover the
-              strategy's embedded gain. Assumes initial basis equals initial value;
-              appreciated-stock (Overlay) collateral carries additional pre-existing embedded gain
-              not shown here.
+              strategy's embedded gain. Assumes initial basis equals initial value unless a
+              collateral cost basis is entered.
+              {exitTaxAnalysis.preExistingGain > 0 &&
+                ` Includes ${formatCurrency(exitTaxAnalysis.preExistingGain)} of pre-existing embedded gain in both the strategy and passive baseline, so the deferred-tax figure remains incremental to the strategy.`}
             </>
           ) : (
             <>
@@ -272,8 +274,9 @@ export const ResultsSummary = React.memo(function ResultsSummary({
               {formatCurrency(exitTaxAnalysis.incrementalDeferredTax)} of tax would come due on full
               liquidation in year {projectionYears}. If the portfolio is instead held until death
               (basis step-up) or donated, the deferred portion may become permanent. Assumes initial
-              basis equals initial value; appreciated-stock (Overlay) collateral carries additional
-              pre-existing embedded gain not shown here.
+              basis equals initial value unless a collateral cost basis is entered.
+              {exitTaxAnalysis.preExistingGain > 0 &&
+                ` Includes ${formatCurrency(exitTaxAnalysis.preExistingGain)} of pre-existing embedded gain in both the strategy and passive baseline, so the deferred-tax figure remains incremental to the strategy.`}
             </>
           )}
         </div>

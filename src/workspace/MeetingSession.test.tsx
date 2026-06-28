@@ -131,6 +131,20 @@ describe('Meeting rail what-ifs (D-023)', () => {
     expect(DEFAULT_SETTINGS.financingFeesEnabled).toBe(false);
   });
 
+  it('defaults gain-event amount from effective split collateral', () => {
+    const inputs = createInputs({
+      collateralAmount: 100,
+      splitAllocation: {
+        enabled: true,
+        coreStrategyId: 'core-145-45',
+        coreAmount: 3000000,
+        overlayStrategyId: 'overlay-45-45',
+        overlayAmount: 7000000,
+      },
+    });
+    expect(createDefaultWhatIfs(inputs, DEFAULT_SETTINGS).gainEventAmount).toBe(5000000);
+  });
+
   it('renders all four controls unchecked, labeled as resettable what-ifs', () => {
     const { getByTestId, getByText } = renderSession();
     fireEvent.click(getByText('Client questions'));

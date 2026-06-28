@@ -216,13 +216,13 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     definition:
       'Estimated unrealized gain in the collateral portfolio at the end of the projection. ' +
       'Includes both market appreciation and the basis reduction created by tax-loss ' +
-      'harvesting (each harvested loss lowers cost basis; realized LT gains raise it).',
+      'harvesting (each harvested loss lowers cost basis; realized LT gains raise it), plus ' +
+      'any pre-existing embedded gain implied by the collateral cost-basis input.',
     formula:
-      'Embedded Gain = (Final Value − Initial Value) + Σ(ST Losses Harvested − LT Gains Realized)',
+      'Embedded Gain = max(0, Initial Value − Cost Basis) + (Final Value − Initial Value) + Σ(ST Losses Harvested − LT Gains Realized)',
     impact:
-      'This is the gain that would be taxed on full liquidation. Assumes initial basis equals ' +
-      'initial market value; Overlay collateral funded with appreciated stock carries additional ' +
-      'pre-existing embedded gain not shown.',
+      'This is the gain that would be taxed on full liquidation. Leave cost basis blank to ' +
+      'assume initial basis equals initial market value.',
   },
 
   'incremental-deferred-tax': {
@@ -820,6 +820,24 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
       'realized here step up basis, so they are NOT taxed again at the horizon exit.',
   },
 
+  'col-deleverage-st-gain': {
+    title: 'Unwind ST Gain',
+    definition:
+      'Short-term-character portion of the deleveraging gain realized this year, including any modeled short-cover gain.',
+    formula: 'Short-term share of Unwind Gain',
+    impact:
+      'This portion is netted with current-year strategy losses and capital-loss carryforwards before any remaining amount is taxed at short-term rates.',
+  },
+
+  'col-deleverage-lt-gain': {
+    title: 'Unwind LT Gain',
+    definition:
+      'Long-term-character portion of the deleveraging gain realized this year as seasoned extension exposure is unwound.',
+    formula: 'Long-term share of Unwind Gain',
+    impact:
+      'This portion is netted with current-year strategy losses and capital-loss carryforwards before any remaining amount is taxed at long-term rates.',
+  },
+
   'col-deleverage-tax': {
     title: 'Tax on Unwind',
     definition:
@@ -843,6 +861,41 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     impact:
       'The recurring economic benefit of deleveraging — it offsets the one-time unwind tax. ' +
       'Like financing costs, it is informational: fees are netted out of portfolio growth.',
+  },
+
+  'col-gain-event-amount': {
+    title: 'Gain Event Amount',
+    definition:
+      'Planned outside capital gain realized in this year through a year override or Meeting Mode what-if.',
+    impact:
+      'This is exogenous client activity. It can consume strategy carryforwards, but its tax is reported separately and is not charged against strategy savings.',
+  },
+
+  'col-gain-event-cf-shelter': {
+    title: 'Carryforward Shelter Applied',
+    definition:
+      'Amount of the planned gain event absorbed by current-year strategy losses and capital-loss carryforwards.',
+    formula: 'min(Gain Event Amount, Available Current-Year Losses + Capital Loss Carryforwards)',
+    impact:
+      'Shows how much outside gain the strategy loss reserve sheltered before calculating event tax due.',
+  },
+
+  'col-gain-event-tax': {
+    title: 'Gain Event Tax Due',
+    definition:
+      'Tax due on the planned gain event after current-year strategy losses and carryforwards are applied.',
+    formula: 'Unsheltered Gain Event Amount × Applicable Gain Rate',
+    impact:
+      'Reported separately from strategy savings so the model does not make an outside gain event look like a strategy cost.',
+  },
+
+  'col-gain-event-tax-without-program': {
+    title: 'Tax Without Program',
+    definition:
+      'Counterfactual tax that would have been due on the planned gain event without the strategy loss reserve.',
+    formula: 'Gain Event Amount × Applicable Gain Rate',
+    impact:
+      'Comparing this to Event Tax Due shows the tax shelter provided by current losses and carryforwards.',
   },
 };
 

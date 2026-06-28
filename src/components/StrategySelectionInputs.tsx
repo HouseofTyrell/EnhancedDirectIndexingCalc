@@ -210,6 +210,36 @@ export function StrategySelectionInputs({
 
       <div className="input-pair">
         <div className="input-group">
+          <label htmlFor="collateralCostBasis">Collateral Cost Basis</label>
+          <div className="input-with-prefix">
+            <span className="prefix">$</span>
+            <input
+              id="collateralCostBasis"
+              type="text"
+              inputMode="numeric"
+              placeholder="Same as market value"
+              value={
+                inputs.collateralCostBasis === undefined
+                  ? ''
+                  : formatWithCommas(inputs.collateralCostBasis)
+              }
+              onChange={e => {
+                const raw = e.target.value.trim();
+                onUpdateInput(
+                  'collateralCostBasis',
+                  raw === '' ? undefined : parseFormattedNumber(raw)
+                );
+              }}
+            />
+          </div>
+          <span className="input-hint">
+            Optional. Leave blank to assume basis equals today&apos;s collateral value.
+          </span>
+        </div>
+      </div>
+
+      <div className="input-pair">
+        <div className="input-group">
           <label htmlFor="startMonth">Start Month</label>
           <select
             id="startMonth"

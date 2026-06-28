@@ -253,6 +253,8 @@ function Rail({
 }) {
   const projYears = advancedSettings.projectionYears;
   const clampYear = (raw: string) => Math.max(1, Math.min(projYears, parseInt(raw, 10) || 1));
+  const effectiveView = useMemo(() => getEffectiveView(inputs), [inputs]);
+  const splitMode = inputs.splitAllocation?.enabled === true && effectiveView.isSplit;
   const filingLabel =
     FILING_STATUSES.find(f => f.value === inputs.filingStatus)
       ?.label.replace('Married Filing Jointly', 'MFJ')
@@ -403,10 +405,7 @@ function Rail({
             }}
           >
             <div style={{ fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 8 }}>
-              {(() => {
-                const view = getEffectiveView(inputs);
-                return view.displayName;
-              })()}
+              {effectiveView.displayName}
             </div>
             <div
               style={{
@@ -428,7 +427,7 @@ function Rail({
                   COLLATERAL
                 </div>
                 <div style={{ color: 'white', fontWeight: 600, fontFamily: M.mono }}>
-                  {fmtCurrency(getEffectiveView(inputs).totalCollateral)}
+                  {fmtCurrency(effectiveView.totalCollateral)}
                 </div>
               </div>
               <div>
@@ -508,116 +507,114 @@ function Rail({
             Adjust scenario
           </div>
 
-          {inputs.splitAllocation?.enabled === true &&
-            (() => {
-              const view = getEffectiveView(inputs);
-              if (!view.isSplit) return null;
-              return (
-                <div
-                  style={{
-                    marginBottom: 14,
-                    padding: 10,
-                    borderRadius: 8,
-                    background: 'rgba(79,70,229,0.15)',
-                    border: '1px solid rgba(79,70,229,0.35)',
-                    fontSize: 11,
-                    color: M.sidebarInk,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, color: 'white', marginBottom: 4, fontSize: 11.5 }}>
-                    Split allocation active
-                  </div>
-                  {view.legs.map(leg => (
-                    <div
-                      key={leg.strategy.id}
-                      style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}
-                    >
-                      <span>
-                        {leg.label}: {leg.strategy.name}
-                      </span>
-                      <span style={{ fontFamily: M.mono }}>{fmtCurrency(leg.amount)}</span>
-                    </div>
-                  ))}
-                  <div
-                    style={{
-                      marginTop: 6,
-                      fontSize: 10,
-                      fontStyle: 'italic',
-                      color: M.sidebarFaint,
-                    }}
-                  >
-                    Edit split details in the main calculator view. Controls below are not active in
-                    split mode.
-                  </div>
-                </div>
-              );
-            })()}
-
-          {/* Strategy */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={railLabelStyle} htmlFor="mm-strategy">
-              Strategy
-            </label>
-            <select
-              id="mm-strategy"
-              value={inputs.strategyId}
-              onChange={e => onUpdateInput('strategyId', e.target.value)}
-              style={railFieldStyle}
+          {splitMode && (
+            <div
+              style={{
+                marginBottom: 14,
+                padding: 10,
+                borderRadius: 8,
+                background: 'rgba(79,70,229,0.15)',
+                border: '1px solid rgba(79,70,229,0.35)',
+                fontSize: 11,
+                color: M.sidebarInk,
+                lineHeight: 1.4,
+              }}
             >
-              <optgroup label="Core (Cash Funded)">
-                {STRATEGIES.filter(s => s.type === 'core').map(s => (
-                  <option key={s.id} value={s.id} style={{ background: M.sidebar }}>
-                    {s.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Overlay (Appreciated Stock)">
-                {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
-                  <option key={s.id} value={s.id} style={{ background: M.sidebar }}>
-                    {s.name}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          {/* Collateral */}
-          <div style={{ marginBottom: 12 }}>
-            <label style={railLabelStyle} htmlFor="mm-collateral">
-              Collateral
-            </label>
-            <div style={{ position: 'relative' }}>
-              <span
+              <div style={{ fontWeight: 700, color: 'white', marginBottom: 4, fontSize: 11.5 }}>
+                Split allocation active
+              </div>
+              {effectiveView.legs.map(leg => (
+                <div
+                  key={leg.strategy.id}
+                  style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}
+                >
+                  <span>
+                    {leg.label}: {leg.strategy.name}
+                  </span>
+                  <span style={{ fontFamily: M.mono }}>{fmtCurrency(leg.amount)}</span>
+                </div>
+              ))}
+              <div
                 style={{
-                  position: 'absolute',
-                  left: 10,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
+                  marginTop: 6,
+                  fontSize: 10,
+                  fontStyle: 'italic',
                   color: M.sidebarFaint,
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  pointerEvents: 'none',
                 }}
               >
-                $
-              </span>
-              <input
-                id="mm-collateral"
-                type="text"
-                inputMode="numeric"
-                value={formatWithCommas(inputs.collateralAmount)}
-                onChange={e =>
-                  onUpdateInput('collateralAmount', parseFormattedNumber(e.target.value))
-                }
-                style={{
-                  ...railFieldStyle,
-                  paddingLeft: 22,
-                  fontFamily: M.mono,
-                }}
-              />
+                Edit split details in the Workspace before opening Meeting Mode.
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Strategy */}
+          {!splitMode && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={railLabelStyle} htmlFor="mm-strategy">
+                Strategy
+              </label>
+              <select
+                id="mm-strategy"
+                value={inputs.strategyId}
+                onChange={e => onUpdateInput('strategyId', e.target.value)}
+                style={railFieldStyle}
+              >
+                <optgroup label="Core (Cash Funded)">
+                  {STRATEGIES.filter(s => s.type === 'core').map(s => (
+                    <option key={s.id} value={s.id} style={{ background: M.sidebar }}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Overlay (Appreciated Stock)">
+                  {STRATEGIES.filter(s => s.type === 'overlay').map(s => (
+                    <option key={s.id} value={s.id} style={{ background: M.sidebar }}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          )}
+
+          {/* Collateral */}
+          {!splitMode && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={railLabelStyle} htmlFor="mm-collateral">
+                Collateral
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: 10,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: M.sidebarFaint,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  $
+                </span>
+                <input
+                  id="mm-collateral"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithCommas(inputs.collateralAmount)}
+                  onChange={e =>
+                    onUpdateInput('collateralAmount', parseFormattedNumber(e.target.value))
+                  }
+                  style={{
+                    ...railFieldStyle,
+                    paddingLeft: 22,
+                    fontFamily: M.mono,
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Income */}
           <div style={{ marginBottom: 12 }}>
