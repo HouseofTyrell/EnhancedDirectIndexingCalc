@@ -38,6 +38,25 @@ function csvRow(field: string, value: string | number | boolean): string {
   return `${csvEscape(field)},${csvEscape(v)}`;
 }
 
+// Serialize a DeleveragePlan under an arbitrary key prefix (D-028 — the same
+// shape backs the top-level plan and the per-leg split plans). Optional knobs
+// are only emitted when explicitly set, matching the single-plan behavior.
+function pushDeleveragePlan(lines: string[], prefix: string, plan: DeleveragePlan): void {
+  lines.push(csvRow(`${prefix}.enabled`, plan.enabled));
+  lines.push(csvRow(`${prefix}.startYear`, plan.startYear));
+  lines.push(csvRow(`${prefix}.durationYears`, plan.durationYears));
+  lines.push(csvRow(`${prefix}.target`, plan.target));
+  if (plan.unwindGainCharacter !== undefined) {
+    lines.push(csvRow(`${prefix}.unwindGainCharacter`, plan.unwindGainCharacter));
+  }
+  if (plan.lotSelectionHaircut !== undefined) {
+    lines.push(csvRow(`${prefix}.lotSelectionHaircut`, plan.lotSelectionHaircut));
+  }
+  if (plan.shortCoverGainPct !== undefined) {
+    lines.push(csvRow(`${prefix}.shortCoverGainPct`, plan.shortCoverGainPct));
+  }
+}
+
 // Parse a single CSV line into [field, value]. Returns undefined for malformed
 // rows. Handles quoted values with embedded commas and escaped quotes.
 function parseCsvLine(line: string): [string, string] | undefined {
@@ -132,23 +151,10 @@ export function exportInputsToCsv(inputs: CalculatorInputs, settings: AdvancedSe
 
   // Deleveraging plan (D-016/D-017); optional knobs only when overridden
   if (inputs.deleveragePlan) {
-    const plan = inputs.deleveragePlan;
-    lines.push(csvRow('deleveragePlan.enabled', plan.enabled));
-    lines.push(csvRow('deleveragePlan.startYear', plan.startYear));
-    lines.push(csvRow('deleveragePlan.durationYears', plan.durationYears));
-    lines.push(csvRow('deleveragePlan.target', plan.target));
-    if (plan.unwindGainCharacter !== undefined) {
-      lines.push(csvRow('deleveragePlan.unwindGainCharacter', plan.unwindGainCharacter));
-    }
-    if (plan.lotSelectionHaircut !== undefined) {
-      lines.push(csvRow('deleveragePlan.lotSelectionHaircut', plan.lotSelectionHaircut));
-    }
-    if (plan.shortCoverGainPct !== undefined) {
-      lines.push(csvRow('deleveragePlan.shortCoverGainPct', plan.shortCoverGainPct));
-    }
+    pushDeleveragePlan(lines, 'deleveragePlan', inputs.deleveragePlan);
   }
 
-  // Split allocation
+  // Split allocation, incl. per-leg deleverage plans (D-028)
   if (inputs.splitAllocation) {
     lines.push(csvRow('splitAllocation.enabled', inputs.splitAllocation.enabled));
     lines.push(csvRow('splitAllocation.coreStrategyId', inputs.splitAllocation.coreStrategyId));
@@ -157,6 +163,20 @@ export function exportInputsToCsv(inputs: CalculatorInputs, settings: AdvancedSe
       csvRow('splitAllocation.overlayStrategyId', inputs.splitAllocation.overlayStrategyId)
     );
     lines.push(csvRow('splitAllocation.overlayAmount', inputs.splitAllocation.overlayAmount));
+    if (inputs.splitAllocation.coreDeleverage) {
+      pushDeleveragePlan(
+        lines,
+        'splitAllocation.coreDeleverage',
+        inputs.splitAllocation.coreDeleverage
+      );
+    }
+    if (inputs.splitAllocation.overlayDeleverage) {
+      pushDeleveragePlan(
+        lines,
+        'splitAllocation.overlayDeleverage',
+        inputs.splitAllocation.overlayDeleverage
+      );
+    }
   }
 
   // Settings (user-tweakable subset)
@@ -238,6 +258,84 @@ function parseNum(value: string, warnings: string[], field: string): number | un
     return undefined;
   }
   return n;
+}
+
+/**
+ * Parse a DeleveragePlan stored under `prefix` from the field map (D-028 —
+ * shared by the top-level plan and the per-leg split plans). Consumes the keys
+ * it reads (so they don't surface as "unknown field" warnings) and returns
+ * undefined when no key for that prefix is present.
+ */
+function parseDeleveragePlan(
+  prefix: string,
+  map: Map<string, string>,
+  warnings: string[]
+): DeleveragePlan | undefined {
+  const dlv: Partial<DeleveragePlan> = {};
+  let touched = false;
+
+  const enabledRaw = map.get(`${prefix}.enabled`);
+  if (enabledRaw !== undefined) {
+    map.delete(`${prefix}.enabled`);
+    const b = parseBool(enabledRaw, warnings, `${prefix}.enabled`);
+    if (b !== undefined) {
+      dlv.enabled = b;
+      touched = true;
+    }
+  }
+
+  const numKeys = [
+    'startYear',
+    'durationYears',
+    'lotSelectionHaircut',
+    'shortCoverGainPct',
+  ] as const;
+  for (const sub of numKeys) {
+    const key = `${prefix}.${sub}`;
+    const raw = map.get(key);
+    if (raw === undefined) continue;
+    map.delete(key);
+    const n = parseNum(raw, warnings, key);
+    if (n === undefined) continue;
+    touched = true;
+    if (sub === 'startYear') dlv.startYear = n;
+    else if (sub === 'durationYears') dlv.durationYears = n;
+    else if (sub === 'lotSelectionHaircut') dlv.lotSelectionHaircut = n;
+    else dlv.shortCoverGainPct = n;
+  }
+
+  const targetRaw = map.get(`${prefix}.target`);
+  if (targetRaw !== undefined) {
+    map.delete(`${prefix}.target`);
+    if (targetRaw) {
+      dlv.target = targetRaw;
+      touched = true;
+    }
+  }
+
+  const charRaw = map.get(`${prefix}.unwindGainCharacter`);
+  if (charRaw !== undefined) {
+    map.delete(`${prefix}.unwindGainCharacter`);
+    if (charRaw === 'st' || charRaw === 'lt') {
+      dlv.unwindGainCharacter = charRaw;
+      touched = true;
+    } else if (charRaw) {
+      warnings.push(
+        `${prefix}.unwindGainCharacter: expected "st" or "lt", got "${charRaw}" — ignoring.`
+      );
+    }
+  }
+
+  if (!touched) return undefined;
+  return {
+    enabled: dlv.enabled ?? false,
+    startYear: dlv.startYear ?? 1,
+    durationYears: dlv.durationYears ?? 1,
+    target: dlv.target ?? 'long-only',
+    ...(dlv.unwindGainCharacter !== undefined && { unwindGainCharacter: dlv.unwindGainCharacter }),
+    ...(dlv.lotSelectionHaircut !== undefined && { lotSelectionHaircut: dlv.lotSelectionHaircut }),
+    ...(dlv.shortCoverGainPct !== undefined && { shortCoverGainPct: dlv.shortCoverGainPct }),
+  };
 }
 
 const FILING_STATUS_VALUES = new Set<FilingStatus>(FILING_STATUSES.map(s => s.value));
@@ -369,76 +467,9 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
     inputs.nycResident = b;
   });
 
-  // Deleveraging plan: assemble whatever keys are present, then attach if any.
-  const dlv: Partial<DeleveragePlan> = {};
-  let dlvTouched = false;
-  {
-    const raw = map.get('deleveragePlan.enabled');
-    if (raw !== undefined) {
-      map.delete('deleveragePlan.enabled');
-      const b = parseBool(raw, warnings, 'deleveragePlan.enabled');
-      if (b !== undefined) {
-        dlv.enabled = b;
-        dlvTouched = true;
-      }
-    }
-  }
-  for (const key of [
-    'deleveragePlan.startYear',
-    'deleveragePlan.durationYears',
-    'deleveragePlan.lotSelectionHaircut',
-    'deleveragePlan.shortCoverGainPct',
-  ] as const) {
-    const raw = map.get(key);
-    if (raw === undefined) continue;
-    map.delete(key);
-    const n = parseNum(raw, warnings, key);
-    if (n === undefined) continue;
-    dlvTouched = true;
-    if (key === 'deleveragePlan.startYear') dlv.startYear = n;
-    else if (key === 'deleveragePlan.durationYears') dlv.durationYears = n;
-    else if (key === 'deleveragePlan.lotSelectionHaircut') dlv.lotSelectionHaircut = n;
-    else dlv.shortCoverGainPct = n;
-  }
-  {
-    const raw = map.get('deleveragePlan.target');
-    if (raw !== undefined) {
-      map.delete('deleveragePlan.target');
-      if (raw) {
-        dlv.target = raw;
-        dlvTouched = true;
-      }
-    }
-  }
-  {
-    const raw = map.get('deleveragePlan.unwindGainCharacter');
-    if (raw !== undefined) {
-      map.delete('deleveragePlan.unwindGainCharacter');
-      if (raw === 'st' || raw === 'lt') {
-        dlv.unwindGainCharacter = raw;
-        dlvTouched = true;
-      } else if (raw) {
-        warnings.push(
-          `deleveragePlan.unwindGainCharacter: expected "st" or "lt", got "${raw}" — ignoring.`
-        );
-      }
-    }
-  }
-  if (dlvTouched) {
-    inputs.deleveragePlan = {
-      enabled: dlv.enabled ?? false,
-      startYear: dlv.startYear ?? 1,
-      durationYears: dlv.durationYears ?? 1,
-      target: dlv.target ?? 'long-only',
-      ...(dlv.unwindGainCharacter !== undefined && {
-        unwindGainCharacter: dlv.unwindGainCharacter,
-      }),
-      ...(dlv.lotSelectionHaircut !== undefined && {
-        lotSelectionHaircut: dlv.lotSelectionHaircut,
-      }),
-      ...(dlv.shortCoverGainPct !== undefined && { shortCoverGainPct: dlv.shortCoverGainPct }),
-    };
-  }
+  // Deleveraging plan (top-level, single-strategy mode).
+  const topLevelPlan = parseDeleveragePlan('deleveragePlan', map, warnings);
+  if (topLevelPlan) inputs.deleveragePlan = topLevelPlan;
 
   // Split allocation: assemble whatever keys are present, then attach if any.
   const split: Partial<SplitAllocation> = {};
@@ -487,6 +518,10 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
   splitNum('splitAllocation.overlayAmount', n => {
     split.overlayAmount = n;
   });
+  // Per-leg deleverage plans (D-028). Their presence alone implies a split.
+  const coreDeleverage = parseDeleveragePlan('splitAllocation.coreDeleverage', map, warnings);
+  const overlayDeleverage = parseDeleveragePlan('splitAllocation.overlayDeleverage', map, warnings);
+  if (coreDeleverage || overlayDeleverage) splitTouched = true;
   if (splitTouched) {
     inputs.splitAllocation = {
       enabled: split.enabled ?? false,
@@ -494,6 +529,8 @@ export function parseInputsFromCsv(csvText: string): ParsedScenario {
       coreAmount: split.coreAmount ?? 0,
       overlayStrategyId: split.overlayStrategyId ?? 'overlay-45-45',
       overlayAmount: split.overlayAmount ?? 0,
+      ...(coreDeleverage && { coreDeleverage }),
+      ...(overlayDeleverage && { overlayDeleverage }),
     };
   }
 

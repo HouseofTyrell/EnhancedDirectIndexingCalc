@@ -18,6 +18,14 @@ export interface SplitAllocation {
   coreAmount: number;
   overlayStrategyId: string;
   overlayAmount: number;
+  // Per-leg deleverage plans (D-028). In split mode each leg can glide its own
+  // extension to a lower-leverage target on its own schedule; the top-level
+  // `inputs.deleveragePlan` stays single-strategy-only and is ignored when
+  // split is enabled. Each leg resolves and unwinds against its OWN
+  // embedded-gain pool, so a concentrated overlay's unwind cost is attributed
+  // separately from the core. Undefined/absent = that leg stays fully extended.
+  coreDeleverage?: DeleveragePlan;
+  overlayDeleverage?: DeleveragePlan;
 }
 
 // Deleveraging plan (D-016/D-017): unwind the extension strategy to a

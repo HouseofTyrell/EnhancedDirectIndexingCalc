@@ -657,6 +657,16 @@
   line-height: 1.45;
 }
 
+/* Per-leg deleverage editors (D-028): one boxed block per split leg. */
+.ws-leg-dlv {
+  padding: 9px 10px;
+  border: 1px solid var(--wx-line);
+  border-radius: var(--wx-r-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* ════════════════════ COMMAND PALETTE (⌘K) ════════════════════ */
 .wx-palette-overlay {
   position: fixed;

@@ -946,6 +946,103 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
   const dlvTotalGain = results.years.reduce((s, y) => s + y.deleverageGainRealized, 0);
   const dlvTotalTax = results.years.reduce((s, y) => s + y.deleverageTax, 0);
   const dlvTotalFinSaved = results.years.reduce((s, y) => s + y.financingSaved, 0);
+
+  // Per-leg deleverage (D-028): in split mode each leg carries its own plan on
+  // inputs.splitAllocation (legs[0] = core, legs[1] = overlay). The top-level
+  // plan above stays single-strategy-only.
+  const coreDlv = inputs.splitAllocation?.coreDeleverage;
+  const overlayDlv = inputs.splitAllocation?.overlayDeleverage;
+  const setLegDlv = (leg: 'core' | 'overlay', patch: Partial<DeleveragePlan>) => {
+    const existing = leg === 'core' ? coreDlv : overlayDlv;
+    const key = leg === 'core' ? 'coreDeleverage' : 'overlayDeleverage';
+    updateSplit({
+      [key]: {
+        enabled: false,
+        startYear: Math.min(3, projYears),
+        durationYears: 1,
+        target: LONG_ONLY_TARGET,
+        ...existing,
+        ...patch,
+      },
+    });
+  };
+  // Eligible targets for a leg: long-only DI plus lower-leverage strategies of
+  // the same type (deleveraging, not restyling — mirrors the single path).
+  const legDlvTargets = (strategyId: string) => {
+    const s = getStrategy(strategyId);
+    return s
+      ? STRATEGIES.filter(t => t.type === s.type && getShortRatio(t) < getShortRatio(s))
+      : [];
+  };
+  const splitDlvActive = coreDlv?.enabled === true || overlayDlv?.enabled === true;
+  // One leg's deleverage editor — shared by the core and overlay legs in split
+  // mode (D-028). Mirrors the single-strategy editor's controls.
+  const renderLegDlv = (
+    leg: 'core' | 'overlay',
+    legStrategyId: string,
+    legPlan: DeleveragePlan | undefined
+  ) => {
+    const targets = legDlvTargets(legStrategyId);
+    const legStratName = getStrategy(legStrategyId)?.name ?? legStrategyId;
+    const onPatch = (patch: Partial<DeleveragePlan>) => setLegDlv(leg, patch);
+    return (
+      <div className="ws-leg-dlv" data-testid={`ws-leg-dlv-${leg}`}>
+        <label className="wx-toggle">
+          <input
+            type="checkbox"
+            checked={legPlan?.enabled === true}
+            onChange={e => onPatch({ enabled: e.target.checked })}
+          />
+          <span className="wx-switch" />
+          <span>
+            {leg === 'core' ? 'Core' : 'Overlay'} leg — {legStratName}
+          </span>
+        </label>
+        {legPlan?.enabled && (
+          <>
+            <label className="wx-field">
+              <span className="wx-label">Start year</span>
+              <input
+                type="number"
+                min={1}
+                max={projYears}
+                value={legPlan.startYear}
+                onChange={e =>
+                  onPatch({
+                    startYear: Math.max(1, Math.min(projYears, Number(e.target.value) || 1)),
+                  })
+                }
+              />
+            </label>
+            <label className="wx-field">
+              <span className="wx-label">
+                Duration: {legPlan.durationYears} yr{legPlan.durationYears > 1 ? 's' : ''}
+                {legPlan.durationYears === 1 ? ' (all at once)' : ''}
+              </span>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                value={legPlan.durationYears}
+                onChange={e => onPatch({ durationYears: Number(e.target.value) })}
+              />
+            </label>
+            <label className="wx-field">
+              <span className="wx-label">Unwind to</span>
+              <select value={legPlan.target} onChange={e => onPatch({ target: e.target.value })}>
+                <option value={LONG_ONLY_TARGET}>Long-only direct indexing</option>
+                {targets.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} — {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
+      </div>
+    );
+  };
   // The engine extends past the standard horizon when NOL remains unused
   // (mirrors core.ts: QFAF duration + partial-year start + 2 wind-down years).
   const baseHorizonYears = Math.max(
@@ -1138,14 +1235,18 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
     });
   }
   if (dlvPlan?.enabled && splitOn) {
+    // D-028: split mode runs PER-LEG plans; the single-strategy top-level plan
+    // is still ignored. Point the user at the per-leg controls rather than
+    // silently dropping it.
     flags.push({
       key: 'split-dlv',
       sev: 'warn',
       tag: 'Split',
       body: (
         <>
-          <strong>Deleveraging ignored:</strong> deleveraging isn&apos;t modeled with split
-          allocation yet — plan ignored.
+          <strong>Top-level deleverage plan ignored:</strong> with split allocation on, deleveraging
+          is set <strong>per leg</strong> in the Deleveraging group — the single top-level plan
+          doesn&apos;t apply.
         </>
       ),
     });
@@ -1281,6 +1382,34 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
               basis step-up — the &quot;Net If Held to Step-Up&quot; card shows that path with the
               deferred exit tax never paid.
             </>
+          )}
+        </>
+      ),
+    });
+  }
+  if (dlvActive && splitOn && splitDlvActive) {
+    // D-028: per-leg deleverage narrative. Each enabled leg unwinds its own
+    // extension; the book-level totals already aggregate across legs.
+    const legNames = [
+      coreDlv?.enabled ? 'core' : null,
+      overlayDlv?.enabled ? 'overlay' : null,
+    ].filter(Boolean);
+    flags.push({
+      key: 'deleverage-split',
+      sev: 'info',
+      tag: 'Delever',
+      body: (
+        <>
+          <strong>Deleveraging (split):</strong> the {legNames.join(' and ')}{' '}
+          {legNames.length > 1 ? 'legs unwind' : 'leg unwinds'} on{' '}
+          {legNames.length > 1 ? 'their own schedules' : 'its own schedule'}, realizing{' '}
+          {formatCurrency(dlvTotalGain)} of unwind gains across the book, of which only{' '}
+          {formatCurrency(dlvTotalTax)} is taxed — the rest is absorbed by harvested losses and the
+          carryforward reserve. Each leg unwinds against its own embedded-gain pool.{' '}
+          {settings.financingFeesEnabled ? (
+            <>Financing fees saved vs staying levered: {formatCurrency(dlvTotalFinSaved)}.</>
+          ) : (
+            <>Enable financing costs &amp; fees to see the financing saved.</>
           )}
         </>
       ),
@@ -1860,11 +1989,22 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
           </RailGroup>
 
           <RailGroup
-            {...groupProps('deleverage', dlvPlan?.enabled === true)}
+            {...groupProps('deleverage', splitOn ? splitDlvActive : dlvPlan?.enabled === true)}
             icon={I.trend}
             name="Deleveraging"
             summary={
-              dlvPlan?.enabled ? (
+              splitOn ? (
+                splitDlvActive ? (
+                  <>
+                    {coreDlv?.enabled && <>core</>}
+                    {coreDlv?.enabled && overlayDlv?.enabled && <> · </>}
+                    {overlayDlv?.enabled && <>overlay</>} leg
+                    {coreDlv?.enabled && overlayDlv?.enabled ? 's' : ''}
+                  </>
+                ) : (
+                  'Off'
+                )
+              ) : dlvPlan?.enabled ? (
                 <>
                   Yr <b>{dlvPlan.startYear}</b> ·{' '}
                   {dlvPlan.durationYears === 1 ? 'all at once' : `${dlvPlan.durationYears} yrs`} ·{' '}
@@ -1875,73 +2015,90 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
               )
             }
           >
-            <label className="wx-toggle">
-              <input
-                type="checkbox"
-                checked={dlvPlan?.enabled === true}
-                onChange={e => setDlvPlan({ enabled: e.target.checked })}
-              />
-              <span className="wx-switch" />
-              <span>Plan deleveraging</span>
-            </label>
             <p className="wx-help">
               <InfoText contentKey="deleverage-plan">What the deleverage model assumes</InfoText>
             </p>
-            {/* D-016/D-026: split wins when both are enabled — same wording as
-                the results-pane flag (core.ts ignores the plan). */}
-            {dlvPlan?.enabled && splitOn && (
-              <p className="ws-rail-warn" data-testid="ws-split-dlv-warn">
-                ⚠️ Deleveraging isn&apos;t modeled with split allocation yet — plan ignored.
-              </p>
-            )}
-            {dlvPlan?.enabled && (
+            {splitOn ? (
+              // D-028: per-leg deleverage — each split leg glides independently.
               <>
-                <label className="wx-field">
-                  <span className="wx-label">Start year</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={projYears}
-                    value={dlvPlan.startYear}
-                    onChange={e =>
-                      setDlvPlan({
-                        startYear: Math.max(1, Math.min(projYears, Number(e.target.value) || 1)),
-                      })
-                    }
-                  />
-                </label>
-                <label className="wx-field">
-                  <span className="wx-label">
-                    Duration: {dlvPlan.durationYears} yr{dlvPlan.durationYears > 1 ? 's' : ''}
-                    {dlvPlan.durationYears === 1 ? ' (all at once)' : ''}
-                  </span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={10}
-                    value={dlvPlan.durationYears}
-                    onChange={e => setDlvPlan({ durationYears: Number(e.target.value) })}
-                  />
-                </label>
-                <label className="wx-field">
-                  <span className="wx-label">Unwind to</span>
-                  <select
-                    value={dlvPlan.target}
-                    onChange={e => setDlvPlan({ target: e.target.value })}
-                  >
-                    <option value={LONG_ONLY_TARGET}>Long-only direct indexing</option>
-                    {dlvTargets.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} — {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {/* D-017 disclosure — defaults stay visible while a plan is on */}
                 <p className="ws-rail-note">
-                  Assumes short covers realize no gain — shorts are continuously loss-recycled;
-                  unwound long-extension gains realized as LT once seasoned. Overridable in code.
+                  Each leg can unwind its extension to a lower-leverage target on its own schedule.
                 </p>
+                {renderLegDlv('core', split.coreStrategyId, coreDlv)}
+                {renderLegDlv('overlay', split.overlayStrategyId, overlayDlv)}
+                {splitDlvActive && (
+                  <p className="ws-rail-note">
+                    Assumes short covers realize no gain — shorts are continuously loss-recycled;
+                    unwound long-extension gains realized as LT once seasoned. Each leg unwinds
+                    against its own embedded-gain pool.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <label className="wx-toggle">
+                  <input
+                    type="checkbox"
+                    checked={dlvPlan?.enabled === true}
+                    onChange={e => setDlvPlan({ enabled: e.target.checked })}
+                  />
+                  <span className="wx-switch" />
+                  <span>Plan deleveraging</span>
+                </label>
+                {dlvPlan?.enabled && (
+                  <>
+                    <label className="wx-field">
+                      <span className="wx-label">Start year</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={projYears}
+                        value={dlvPlan.startYear}
+                        onChange={e =>
+                          setDlvPlan({
+                            startYear: Math.max(
+                              1,
+                              Math.min(projYears, Number(e.target.value) || 1)
+                            ),
+                          })
+                        }
+                      />
+                    </label>
+                    <label className="wx-field">
+                      <span className="wx-label">
+                        Duration: {dlvPlan.durationYears} yr{dlvPlan.durationYears > 1 ? 's' : ''}
+                        {dlvPlan.durationYears === 1 ? ' (all at once)' : ''}
+                      </span>
+                      <input
+                        type="range"
+                        min={1}
+                        max={10}
+                        value={dlvPlan.durationYears}
+                        onChange={e => setDlvPlan({ durationYears: Number(e.target.value) })}
+                      />
+                    </label>
+                    <label className="wx-field">
+                      <span className="wx-label">Unwind to</span>
+                      <select
+                        value={dlvPlan.target}
+                        onChange={e => setDlvPlan({ target: e.target.value })}
+                      >
+                        <option value={LONG_ONLY_TARGET}>Long-only direct indexing</option>
+                        {dlvTargets.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} — {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {/* D-017 disclosure — defaults stay visible while a plan is on */}
+                    <p className="ws-rail-note">
+                      Assumes short covers realize no gain — shorts are continuously loss-recycled;
+                      unwound long-extension gains realized as LT once seasoned. Overridable in
+                      code.
+                    </p>
+                  </>
+                )}
               </>
             )}
           </RailGroup>
