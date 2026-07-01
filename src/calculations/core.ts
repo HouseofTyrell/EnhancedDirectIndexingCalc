@@ -512,6 +512,10 @@ export function calculateWithOverrides(
     // the long-side realization so each leg's pool can be depleted after the
     // year's harvest is known.
     const legLongUnwindThisYear = yearStartLegs.map(() => 0);
+    // Per-leg TOTAL realized unwind gain this year (long + short cover), for the
+    // ResultsTable per-leg attribution columns (D-028). Sums to the book
+    // `deleverageGainRealized` by construction.
+    const legTotalUnwindThisYear = yearStartLegs.map(() => 0);
     if (allocation.isSplit && anySplitDlv && yearOverrides) {
       let totalUnwindSt = 0;
       let totalUnwindLt = 0;
@@ -539,6 +543,7 @@ export function calculateWithOverrides(
         const shortDollarsCovered =
           dy.fracUnwoundThisYear * Math.max(0, lp.sourceShortRatio - lp.targetShortRatio) * legColl;
         const shortCoverGain = lp.shortCoverGainPct * shortDollarsCovered;
+        legTotalUnwindThisYear[i] = legLongUnwindGain + shortCoverGain;
         totalUnwindSt += (lp.unwindGainCharacter === 'st' ? legLongUnwindGain : 0) + shortCoverGain;
         totalUnwindLt += lp.unwindGainCharacter === 'lt' ? legLongUnwindGain : 0;
       }
@@ -587,7 +592,8 @@ export function calculateWithOverrides(
     // Advance each leg's embedded-gain pool (D-028). Per-leg net harvest uses
     // the leg's own ST/LT rate (Σ legs = the book harvest by construction), so
     // the pools stay consistent with `result` while attributing the unwind cost
-    // to the right sleeve.
+    // to the right sleeve. Also surface each leg's realized unwind gain for the
+    // ResultsTable per-leg attribution columns (legs[0] = core, legs[1] = overlay).
     if (allocation.isSplit && anySplitDlv) {
       for (let i = 0; i < yearStartLegs.length; i++) {
         const legColl = yearStartLegs[i].collateralAmount;
@@ -600,6 +606,8 @@ export function calculateWithOverrides(
         legCumNetHarvest[i] += legHarvested - legLtGain;
         legCumUnwindRealized[i] += legLongUnwindThisYear[i];
       }
+      result.coreDeleverageGain = safeNumber(legTotalUnwindThisYear[0] ?? 0);
+      result.overlayDeleverageGain = safeNumber(legTotalUnwindThisYear[1] ?? 0);
     }
 
     // In split mode, recompute per-leg next-year values. A delevering leg's

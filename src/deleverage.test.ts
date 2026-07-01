@@ -450,6 +450,43 @@ describe('split allocation per-leg deleverage (D-028)', () => {
     );
   });
 
+  it('per-leg unwind attribution: core/overlay gains sum to the book gain', () => {
+    const result = calculate(
+      splitInputs(
+        {},
+        {
+          coreDeleverage: plan({ startYear: 4, durationYears: 1 }),
+          overlayDeleverage: plan({ startYear: 6, durationYears: 1 }),
+        }
+      ),
+      DEFAULT_SETTINGS
+    );
+    for (const y of result.years) {
+      // Fields are defined every year in split+deleverage mode.
+      expect(y.coreDeleverageGain).toBeDefined();
+      expect(y.overlayDeleverageGain).toBeDefined();
+      expect((y.coreDeleverageGain ?? 0) + (y.overlayDeleverageGain ?? 0)).toBeCloseTo(
+        y.deleverageGainRealized,
+        4
+      );
+    }
+    // Year 4: only the core leg unwinds → core gain > 0, overlay gain 0.
+    expect(result.years[3].coreDeleverageGain).toBeGreaterThan(0);
+    expect(result.years[3].overlayDeleverageGain).toBeCloseTo(0, 6);
+    // Year 6: only the overlay leg unwinds → overlay gain > 0, core gain 0.
+    expect(result.years[5].overlayDeleverageGain).toBeGreaterThan(0);
+    expect(result.years[5].coreDeleverageGain).toBeCloseTo(0, 6);
+  });
+
+  it('per-leg attribution fields are undefined in single-strategy mode', () => {
+    const single = calculate(
+      createInputs({ deleveragePlan: plan({ startYear: 4, durationYears: 1 }) }),
+      DEFAULT_SETTINGS
+    );
+    expect(single.years.every(y => y.coreDeleverageGain === undefined)).toBe(true);
+    expect(single.years.every(y => y.overlayDeleverageGain === undefined)).toBe(true);
+  });
+
   it('unwind tax is endogenous: the savings identity still holds (QFAF mode)', () => {
     const withPlan = calculate(
       splitInputs(

@@ -261,6 +261,12 @@ export interface YearResult {
   deleverageTax: number;
   /** (source financing rate − blended rate) × start-of-year collateral; 0 when fees disabled */
   financingSaved: number;
+  // Per-leg unwind attribution (D-028, split mode only). Undefined in
+  // single-strategy mode; when defined they sum to `deleverageGainRealized`.
+  /** Core-leg unwind gain realized this year (long + short cover). */
+  coreDeleverageGain?: number;
+  /** Overlay-leg unwind gain realized this year (long + short cover). */
+  overlayDeleverageGain?: number;
 }
 
 export interface CalculationResult {

@@ -410,8 +410,13 @@ gain assigned to the overlay leg first — the appreciated-stock sleeve — capp
 market value, remainder to core). Book-level deleverage outputs (extensionFraction,
 deleverageGain*/Tax, financingSaved) are the per-leg sums, so the existing ResultsTable
 "Deleverage" column group (both orientations) and Excel export light up in split mode with
-no schema change (data-driven on `extensionFraction < 1`); per-leg breakout COLUMNS are a
-deferred follow-up (aggregate columns satisfy audit-complete — no new silent fields). CSV
+no schema change (data-driven on `extensionFraction < 1`). Per-leg breakout COLUMNS shipped
+as a follow-up in the same PR: `YearResult.coreDeleverageGain`/`overlayDeleverageGain`
+(defined only in split mode, summing to `deleverageGainRealized`) surface as conditional
+"Core Unwind" / "Overlay Unwind" columns in both ResultsTable orientations + Excel, each
+with a `popupContent.ts` entry. (Fixed a pre-existing latent bug found while there: the
+ResultsTable "Start" row emitted 3 placeholder cells for the 5-column expanded Deleverage
+group — now 5 — so the row aligned raggedly when the group was expanded.) CSV
 round-trips `splitAllocation.coreDeleverage.*`/`.overlayDeleverage.*`. Workspace rail: the
 single plan editor becomes two per-leg target selectors in split mode; the two "plan
 ignored" warning chips are removed (a softer note remains only when a stray top-level plan
