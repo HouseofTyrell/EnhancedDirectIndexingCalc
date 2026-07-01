@@ -111,6 +111,8 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
   // Sheet 2: Year-by-Year. Deleverage columns (D-016) appear only when a
   // plan actually unwound something — keeps the default export uncluttered.
   const hasDeleverage = data.results.years.some(y => y.extensionFraction < 1);
+  // Per-leg unwind attribution (D-028) — split mode only.
+  const hasPerLegDeleverage = data.results.years.some(y => y.overlayDeleverageGain !== undefined);
   const yearHeaders: (string | number)[] = [
     'Year',
     'Collateral Value',
@@ -126,6 +128,7 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
     'Tax Savings',
     'Income Offset',
     ...(hasDeleverage ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved'] : []),
+    ...(hasPerLegDeleverage ? ['Core Unwind Gain', 'Overlay Unwind Gain'] : []),
   ];
   const yearRows: (string | number)[][] = [yearHeaders];
   for (const y of data.results.years) {
@@ -146,6 +149,7 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
       ...(hasDeleverage
         ? [y.extensionFraction, y.deleverageGainRealized, y.deleverageTax, y.financingSaved]
         : []),
+      ...(hasPerLegDeleverage ? [y.coreDeleverageGain ?? 0, y.overlayDeleverageGain ?? 0] : []),
     ]);
   }
   const yearSheet = XLSX.utils.aoa_to_sheet(yearRows);

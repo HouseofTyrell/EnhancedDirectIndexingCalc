@@ -396,6 +396,116 @@ renders from the live engine. The single-file distributable stays self-contained
   tooltips; CSV import/export kept as a second actions row (mock omitted them);
   Bond not built (decision).
 
+### D-028 — Deleveraging on a split-allocation book (per-leg plans)
+**Date:** 2026-06-30
+**Status: IMPLEMENTED (2026-06-30)** — top-level scope is per-leg; all four sub-decisions
+settled. Sub-decision (1) — engine build depth — was put to the owner and DECIDED as
+option (a): full combined branch with per-leg embedded-gain pools. Sub-decisions (2)–(4)
+shipped as the recorded proposed defaults. Build: `SplitAllocation` gains
+`coreDeleverage?`/`overlayDeleverage?`; `deleverage.ts` adds `resolveLegDeleveragePlan` +
+`buildDeleverageSchedule` (single-strategy path unchanged); `core.ts` adds a combined
+split+deleverage branch that collateral-weight-blends each leg's per-year
+rate/financing/extension and runs a SEPARATE embedded-gain pool per leg (book pre-existing
+gain assigned to the overlay leg first — the appreciated-stock sleeve — capped at its
+market value, remainder to core). Book-level deleverage outputs (extensionFraction,
+deleverageGain*/Tax, financingSaved) are the per-leg sums, so the existing ResultsTable
+"Deleverage" column group (both orientations) and Excel export light up in split mode with
+no schema change (data-driven on `extensionFraction < 1`). Per-leg breakout COLUMNS shipped
+as a follow-up in the same PR: `YearResult.coreDeleverageGain`/`overlayDeleverageGain`
+(defined only in split mode, summing to `deleverageGainRealized`) surface as conditional
+"Core Unwind" / "Overlay Unwind" columns in both ResultsTable orientations + Excel, each
+with a `popupContent.ts` entry. (Fixed a pre-existing latent bug found while there: the
+ResultsTable "Start" row emitted 3 placeholder cells for the 5-column expanded Deleverage
+group — now 5 — so the row aligned raggedly when the group was expanded.) CSV
+round-trips `splitAllocation.coreDeleverage.*`/`.overlayDeleverage.*`. Workspace rail: the
+single plan editor becomes two per-leg target selectors in split mode; the two "plan
+ignored" warning chips are removed (a softer note remains only when a stray top-level plan
+is set with split on). Sensitivity grid unchanged (still out, D-013/D-016). New tests:
+split×deleverage equivalence (two identical legs == single-strategy), overlay-only
+collateral-weighted extension, independent per-leg schedules, per-leg pools (overlay basis
+raises overlay unwind gain), endogenous-netting invariant, financing-glide, CSV round-trip;
+suite 408 → 417. Browser-verified: enabling the overlay leg plan moved the headline
+$2,686,020 → $1,993,074 with no console errors.
+
+**Context:** Split allocation and deleveraging are currently mutually exclusive: split
+wins, the plan is dropped with a warning chip (`WorkspaceTab.tsx:1140-1152`, and the
+results-pane twin), `resolveDeleveragePlan` returns null when split is on
+(`deleverage.ts:78`), and `core.ts:209` forces `dlvPlan = null` in split mode. Owner
+wants each split leg (core + overlay) to carry and glide its OWN deleverage plan.
+
+**DECIDED (owner, scope):** **Per-leg deleverage plans (Option B).** Each leg gets its
+own `startYear` / `durationYears` / `target` and its own D-017 knobs, gliding
+independently. Chosen explicitly over "overlay-leg-only" (smallest build) and
+"whole-blended-book single plan" (simplest wiring). Constraints carried forward: D-016/
+D-017 attribution (unwind gains are ENDOGENOUS — netted with strategy flows, harvest
+first then CFs per §1211, charged against `taxSavings`; `deleverageTax` stays a reporting
+decomposition, not a second subtraction); D-013/D-016 keep deleverage OUT of the
+sensitivity grid (cells stay comparable — `sensitivity.ts` carries no deleverage path,
+confirmed); audit-complete table directive applies to every new per-year output; D-002
+(plans off by default).
+
+A per-leg model still forces four sub-decisions. (1) is the genuine fork and is being
+put to the owner; (2)–(4) have a mechanically-defensible default recorded here.
+
+**Sub-decision 1 — Engine build depth (FLAGGED FOR OWNER).**
+*Context:* `core.ts` is today a hard `if isSplit {} else if dlvYear {} else {}`
+(`core.ts:209`, `:371-406`). `deleverage.ts` assumes ONE source strategy
+(`plan.source = getStrategy(inputs.strategyId)`, single `sourceLongLeverage`/
+`sourceShortRatio`), and the embedded-gain pool (`core.ts:214-220`, `:380-406`) is a
+single book.
+- (a) **Full combined branch (recommended):** new split+deleverage branch that
+  collateral-weight-blends each leg's per-year rate (a leg may glide OR stay static) AND
+  a SEPARATE embedded-gain pool per leg, so endogenous unwind gains attribute to the
+  right leg. Highest effort; no rework; defensible to a CPA. `resolveDeleverageSchedule`
+  generalizes to take a leg as its source.
+- (b) **Shared gain pool first:** per-leg rate blend now, but ONE blended embedded-gain
+  pool across both legs in v1. Faster; per-leg unwind-gain attribution is approximate
+  until a follow-up.
+- (c) **Overlay-leg glides only:** smallest branch, but the core leg can't glide —
+  contradicts the per-leg scope just chosen, so really a staged delivery of B.
+*Recommendation:* (a) — split exists for clients with a concentrated/appreciated overlay
+leg whose embedded gain differs sharply from the core; a shared pool would mis-attribute
+exactly the unwind cost the split was created to model, failing the CPA bar.
+*DECIDED (owner, 2026-06-30):* **(a)** — full combined branch with a separate
+embedded-gain pool per leg.
+
+**Sub-decision 2 — Plan shape / attach point.** *Proposed default:* move the plan onto
+each `SplitAllocation` leg (`coreDeleverage?: DeleveragePlan` / `overlayDeleverage?:
+DeleveragePlan` on the `SplitAllocation` interface, `types.ts:15-21`), keeping the
+existing top-level `inputs.deleveragePlan` for single-strategy mode untouched. Preferred
+over a `deleveragePlans[]` array keyed by leg: it mirrors the existing per-leg amount
+fields, keeps single-mode bit-identical, and round-trips through CSV by extending the
+existing `deleveragePlan.*` serializer (`csvScenario.ts:134-147`, `:373-428`) with
+`splitAllocation.coreDeleverage.*` / `.overlayDeleverage.*` rows (and the Excel export
+mirror). Reason: smallest schema delta that keeps single-strategy mode and the existing
+round-trip tests unchanged.
+
+**Sub-decision 3 — D-017 defaults per leg.** *Proposed default:* the D-017
+defensible-middle bundle (seasoned-LT unwind character with the `startYear > 2` ST/LT
+split, 0% short-cover, pro-rata lot selection haircut 1.0) applies INDEPENDENTLY per leg,
+each leg's own `startYear` driving its own seasoned/unseasoned character — exactly the
+per-leg logic `resolveDeleveragePlan` already encodes (`deleverage.ts:105-107`), just
+evaluated per leg. All three knobs stay overridable per leg. Reason: D-017 is already
+position-scoped, not book-scoped; per-leg is the faithful generalization, not a new
+philosophy.
+
+**Sub-decision 4 — Surface area / audit-complete.** *Proposed default:* the existing
+"Deleverage" ResultsTable column group (Extension %, Deleverage Gain Realized, Tax on
+Unwind, Financing Saved) plus its `popupContent.ts` entries now render in split mode with
+PER-LEG attribution, in BOTH orientations (rows and transposed years-as-columns), per the
+audit-complete directive. The two "plan ignored" warning chips
+(`WorkspaceTab.tsx:1140-1152` + twin) are replaced by real per-leg target selectors in
+the rail's Deleveraging group. Sensitivity grid stays OUT (D-013/D-016). Reason: this is
+the standing audit-complete requirement applied to a new per-year output, not a new
+decision.
+
+**Implications if owner confirms (a)+defaults:** engine work is in-scope now
+(`core.ts` combined branch, `resolveDeleverageSchedule` takes a leg source, per-leg
+embedded-gain pools); CSV + Excel extend with the two per-leg plan blocks; ResultsTable +
+popups gain per-leg deleverage attribution; the conflict chips become target selectors.
+No change to single-strategy mode, to D-016/D-017 attribution, or to the sensitivity
+grid.
+
 ---
 
 ## Pending decision queue (next batches)

@@ -42,7 +42,14 @@ import {
   ResolvedAllocation,
   ResolvedLeg,
 } from './splitAllocation';
-import { resolveDeleveragePlan, resolveDeleverageSchedule } from './deleverage';
+import {
+  resolveDeleveragePlan,
+  resolveDeleverageSchedule,
+  resolveLegDeleveragePlan,
+  buildDeleverageSchedule,
+  ResolvedDeleveragePlan,
+  DeleverageYearSchedule,
+} from './deleverage';
 
 /**
  * Optional per-year overrides used by the split-allocation and deleverage
@@ -203,11 +210,32 @@ export function calculateWithOverrides(
   // and stopping early if no income is consuming it).
   const hardCapYears = Math.max(effectiveProjectionYears, 40);
 
-  // Deleveraging (D-016/D-017): resolve the per-year glide schedule once.
-  // Null when the plan is disabled/invalid or split allocation is enabled
-  // (split wins in v1; the UI shows a "plan ignored" warning).
+  // Deleveraging (D-016/D-017): resolve the single-strategy glide schedule
+  // once. Null when the plan is disabled/invalid or split allocation is
+  // enabled (split runs its own per-leg plans — D-028).
   const dlvPlan = allocation.isSplit ? null : resolveDeleveragePlan(inputs);
   const dlvSchedule = dlvPlan ? resolveDeleverageSchedule(inputs, settings, hardCapYears) : null;
+
+  // Per-leg deleveraging (D-028): in split mode each leg may carry its own
+  // plan on `inputs.splitAllocation` (legs[0] = core, legs[1] = overlay, per
+  // resolveAllocation order). A leg with no plan stays fully extended. Each
+  // leg schedules and unwinds against its OWN embedded-gain pool.
+  const splitDlv = inputs.splitAllocation;
+  const legDlvPlans: (ResolvedDeleveragePlan | null)[] = allocation.isSplit
+    ? allocation.legs.map((leg, i) =>
+        resolveLegDeleveragePlan(
+          i === 0 ? splitDlv?.coreDeleverage : splitDlv?.overlayDeleverage,
+          leg.strategy
+        )
+      )
+    : [];
+  const legDlvSchedules: (DeleverageYearSchedule[] | null)[] = legDlvPlans.map(p =>
+    p
+      ? buildDeleverageSchedule(p, settings, hardCapYears, inputs.startMonth ?? 1, qfafDuration)
+      : null
+  );
+  const anySplitDlv = legDlvPlans.some(p => p !== null);
+
   // Running embedded-gain state for unwind-gain sizing (consistent with
   // exitTax.ts: market appreciation + pre-existing gain + Σ(harvested ST
   // losses − realized LT gains) − Σ prior unwind gains realized).
@@ -219,6 +247,21 @@ export function calculateWithOverrides(
   const dlvPreExistingGain = Math.max(0, dlvInitialCollateral - dlvCostBasis);
   let dlvCumNetHarvest = 0;
   let dlvCumUnwindRealized = 0;
+
+  // Per-leg embedded-gain pools (D-028). The book-level pre-existing gain
+  // (collateral − basis) is assigned to the OVERLAY leg first — the
+  // appreciated-stock sleeve in the split's framing — capped at its market
+  // value, with any remainder spilling to core, so the overlay's unwind
+  // realizes the concentrated gain the split exists to model.
+  const legInitialCollateral = allocation.legs.map(l => l.collateralAmount);
+  const legPreExistingGain = legInitialCollateral.map(() => 0);
+  if (anySplitDlv && dlvPreExistingGain > 0 && legInitialCollateral.length === 2) {
+    const overlayGain = Math.min(dlvPreExistingGain, legInitialCollateral[1]);
+    legPreExistingGain[1] = overlayGain;
+    legPreExistingGain[0] = dlvPreExistingGain - overlayGain;
+  }
+  const legCumNetHarvest = legInitialCollateral.map(() => 0);
+  const legCumUnwindRealized = legInitialCollateral.map(() => 0);
   // Income for extension years continues the FINAL scheduled year's income
   // (e.g., a retirement schedule persists), not the base input.
   let carryIncome = inputs.annualIncome;
@@ -306,7 +349,54 @@ export function calculateWithOverrides(
 
     // Calendar-year rate blending + operating fraction (see core.ts for derivation).
     const opFraction = getOperatingFraction(year, inputs.startMonth ?? 1, qfafDuration);
+    const strategyActive = opFraction > 0;
+    const yearFractionForCall = strategyActive ? opFraction : 1.0;
     const dlvYear = dlvSchedule ? dlvSchedule[year - 1] : undefined;
+
+    // Per-leg deleverage blend (D-028): in split mode, each leg uses its glide
+    // schedule's rate/financing if it has a plan, else its static calendar-year
+    // values; everything is collateral-weighted into the book-level overrides.
+    // Per-leg ST/LT rates are stashed so the embedded-gain pools below advance
+    // with each leg's OWN harvest (Σ per-leg = the book total by construction).
+    const legStRateThisYear = yearStartLegs.map(() => 0);
+    const legLtRateThisYear = yearStartLegs.map(() => 0);
+    let splitDlvSt = 0;
+    let splitDlvLt = 0;
+    let splitDlvFin = 0;
+    let splitDlvFinSaved = 0;
+    let splitDlvExtension = 0;
+    if (allocation.isSplit && anySplitDlv) {
+      const total = yearStartTotalCollateral;
+      for (let i = 0; i < yearStartLegs.length; i++) {
+        const leg = yearStartLegs[i];
+        const wgt = total > 0 ? leg.collateralAmount / total : 0;
+        const dy = legDlvSchedules[i]?.[year - 1];
+        if (dy) {
+          legStRateThisYear[i] = dy.stLossRate;
+          legLtRateThisYear[i] = dy.ltGainRate;
+          splitDlvSt += wgt * dy.stLossRate;
+          splitDlvLt += wgt * dy.ltGainRate;
+          splitDlvFin += wgt * dy.financingCost;
+          splitDlvFinSaved += leg.collateralAmount * dy.financingSavedRate * yearFractionForCall;
+          splitDlvExtension += wgt * dy.w;
+        } else {
+          const legSt = getCalendarYearStLossRate(
+            leg.strategy.id,
+            leg.strategy.ltGainRate,
+            year,
+            inputs.startMonth ?? 1,
+            qfafDuration
+          );
+          legStRateThisYear[i] = legSt;
+          legLtRateThisYear[i] = leg.strategy.ltGainRate;
+          splitDlvSt += wgt * legSt;
+          splitDlvLt += wgt * leg.strategy.ltGainRate;
+          splitDlvFin += wgt * getEffectiveFinancingCost(leg.strategy, settings);
+          splitDlvExtension += wgt * 1;
+        }
+      }
+    }
+
     // Deleverage years replace the rate with the source→target blend; the
     // dynamic-QFAF sizing below consumes the same blended rate, so dynamic
     // sizing self-corrects as the book delevers (fixed sizing does not —
@@ -314,12 +404,14 @@ export function calculateWithOverrides(
     const calStLossRate = dlvYear
       ? dlvYear.stLossRate
       : allocation.isSplit
-        ? getBlendedCalendarYearStLossRate(
-            yearAllocation,
-            year,
-            inputs.startMonth ?? 1,
-            qfafDuration
-          )
+        ? anySplitDlv
+          ? splitDlvSt
+          : getBlendedCalendarYearStLossRate(
+              yearAllocation,
+              year,
+              inputs.startMonth ?? 1,
+              qfafDuration
+            )
         : getCalendarYearStLossRate(
             allocation.primary.strategy.id,
             allocation.primary.strategy.ltGainRate,
@@ -344,13 +436,22 @@ export function calculateWithOverrides(
       effectiveQfafValue = cappedQfaf;
     }
 
-    const strategyActive = opFraction > 0;
-    const yearFractionForCall = strategyActive ? opFraction : 1.0;
-
     // Pre-blend rates for split mode.
     let yearOverrides: CalculateYearOverrides | undefined;
     let strategyForCalc: StrategyRates;
-    if (allocation.isSplit) {
+    if (allocation.isSplit && anySplitDlv) {
+      // D-028: split + per-leg deleverage. Rates/financing are the
+      // collateral-weighted per-leg blend; extension % is the collateral-
+      // weighted glide weight; financing saved sums the per-leg savings.
+      strategyForCalc = { stLossRate: calStLossRate, ltGainRate: splitDlvLt };
+      yearOverrides = {
+        effectiveStLossRate: calStLossRate,
+        ltGainRate: splitDlvLt,
+        financingCost: splitDlvFin,
+        extensionFraction: splitDlvExtension,
+        deleverageFinancingSaved: splitDlvFinSaved,
+      };
+    } else if (allocation.isSplit) {
       const blendedLt = getBlendedLtGainRate(yearAllocation);
       strategyForCalc = { stLossRate: calStLossRate, ltGainRate: blendedLt };
       yearOverrides = {
@@ -405,6 +506,51 @@ export function calculateWithOverrides(
       yearOverrides.unwindLtGain = dlvPlan.unwindGainCharacter === 'lt' ? dlvLongUnwindGain : 0;
     }
 
+    // Per-leg unwind gains (D-028): each delevering leg realizes a pro-rata
+    // share of its OWN embedded-gain pool, summed into the book-level overrides
+    // (same endogenous netting as single mode). `legLongUnwindThisYear` records
+    // the long-side realization so each leg's pool can be depleted after the
+    // year's harvest is known.
+    const legLongUnwindThisYear = yearStartLegs.map(() => 0);
+    // Per-leg TOTAL realized unwind gain this year (long + short cover), for the
+    // ResultsTable per-leg attribution columns (D-028). Sums to the book
+    // `deleverageGainRealized` by construction.
+    const legTotalUnwindThisYear = yearStartLegs.map(() => 0);
+    if (allocation.isSplit && anySplitDlv && yearOverrides) {
+      let totalUnwindSt = 0;
+      let totalUnwindLt = 0;
+      for (let i = 0; i < yearStartLegs.length; i++) {
+        const lp = legDlvPlans[i];
+        const dy = legDlvSchedules[i]?.[year - 1];
+        if (!lp || !dy || dy.fracUnwoundThisYear <= 0) continue;
+        const legColl = yearStartLegs[i].collateralAmount;
+        const embeddedGain = Math.max(
+          0,
+          legColl -
+            legInitialCollateral[i] +
+            legPreExistingGain[i] +
+            legCumNetHarvest[i] -
+            legCumUnwindRealized[i]
+        );
+        const grossLongValue = legColl * (1 + lp.sourceLongLeverage);
+        const embeddedGainPct = grossLongValue > 0 ? embeddedGain / grossLongValue : 0;
+        const longDollarsUnwound =
+          dy.fracUnwoundThisYear *
+          Math.max(0, lp.sourceLongLeverage - lp.targetLongLeverage) *
+          legColl;
+        const legLongUnwindGain = lp.lotSelectionHaircut * embeddedGainPct * longDollarsUnwound;
+        legLongUnwindThisYear[i] = legLongUnwindGain;
+        const shortDollarsCovered =
+          dy.fracUnwoundThisYear * Math.max(0, lp.sourceShortRatio - lp.targetShortRatio) * legColl;
+        const shortCoverGain = lp.shortCoverGainPct * shortDollarsCovered;
+        legTotalUnwindThisYear[i] = legLongUnwindGain + shortCoverGain;
+        totalUnwindSt += (lp.unwindGainCharacter === 'st' ? legLongUnwindGain : 0) + shortCoverGain;
+        totalUnwindLt += lp.unwindGainCharacter === 'lt' ? legLongUnwindGain : 0;
+      }
+      yearOverrides.unwindStGain = totalUnwindSt;
+      yearOverrides.unwindLtGain = totalUnwindLt;
+    }
+
     const ev = override?.gainEvent;
     if (ev && ev.amount > 0) {
       yearOverrides.eventStGain = ev.character === 'st' ? ev.amount : 0;
@@ -443,12 +589,37 @@ export function calculateWithOverrides(
     dlvCumNetHarvest += result.stLossesHarvested - result.ltGainsRealized;
     dlvCumUnwindRealized += dlvLongUnwindGain;
 
-    // In split mode, recompute per-leg next-year values.
+    // Advance each leg's embedded-gain pool (D-028). Per-leg net harvest uses
+    // the leg's own ST/LT rate (Σ legs = the book harvest by construction), so
+    // the pools stay consistent with `result` while attributing the unwind cost
+    // to the right sleeve. Also surface each leg's realized unwind gain for the
+    // ResultsTable per-leg attribution columns (legs[0] = core, legs[1] = overlay).
+    if (allocation.isSplit && anySplitDlv) {
+      for (let i = 0; i < yearStartLegs.length; i++) {
+        const legColl = yearStartLegs[i].collateralAmount;
+        const grossStLoss = strategyActive ? legColl * legStRateThisYear[i] : 0;
+        const legHarvested = grossStLoss * (1 - settings.washSaleDisallowanceRate);
+        const legLtGain =
+          strategyActive && inputs.ltGainsEnabled !== false
+            ? legColl * legLtRateThisYear[i] * yearFractionForCall
+            : 0;
+        legCumNetHarvest[i] += legHarvested - legLtGain;
+        legCumUnwindRealized[i] += legLongUnwindThisYear[i];
+      }
+      result.coreDeleverageGain = safeNumber(legTotalUnwindThisYear[0] ?? 0);
+      result.overlayDeleverageGain = safeNumber(legTotalUnwindThisYear[1] ?? 0);
+    }
+
+    // In split mode, recompute per-leg next-year values. A delevering leg's
+    // financing follows its glide schedule's interpolated cost (D-028);
+    // static legs keep their strategy's fixed cost.
     if (allocation.isSplit) {
       const baseReturn = settings.growthEnabled ? settings.defaultAnnualReturn : 0;
       for (let i = 0; i < legCollateral.length; i++) {
         const legStrategy = yearStartLegs[i].strategy;
-        const legFinancing = getEffectiveFinancingCost(legStrategy, settings);
+        const legFinancing =
+          legDlvSchedules[i]?.[year - 1]?.financingCost ??
+          getEffectiveFinancingCost(legStrategy, settings);
         const grown = legCollateral[i] * (1 + baseReturn * yearFractionForCall);
         legCollateral[i] = grown * (1 - legFinancing * yearFractionForCall);
       }

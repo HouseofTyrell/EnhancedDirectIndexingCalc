@@ -7,8 +7,10 @@
  *   existing engine support (one-engine rule) — proven by comparing the
  *   Workspace-rendered headline to a direct calculate() run with the same
  *   inputs.splitAllocation.
- * - D-016 conflict: deleverage plan is ignored when split is on; the rail
- *   surfaces the existing warning wording.
+ * - D-028 split + deleverage: in split mode the rail offers PER-LEG deleverage
+ *   plans (core + overlay) instead of the single-strategy plan, and each
+ *   per-leg plan actually delevers its leg in the engine. The top-level plan
+ *   stays single-strategy-only (still ignored when split is on).
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -187,18 +189,23 @@ describe('Workspace split allocation (D-026)', () => {
     expect(Math.round(expected.sizing.totalExposure)).toBe(20000000);
   });
 
-  it('deleverage + split shows the D-016 conflict warning in the rail', () => {
+  it('deleverage + split: the rail offers per-leg plans, not the single plan (D-028)', () => {
     ackQp();
     const r = render(<WorkspaceTab />);
-    fireEvent.click(r.getByLabelText('Plan deleveraging'));
-    expect(r.queryByTestId('ws-split-dlv-warn')).toBeNull(); // no conflict yet
+    // Single mode: the single-strategy "Plan deleveraging" toggle is shown.
+    expect(r.queryByLabelText('Plan deleveraging')).not.toBeNull();
+    expect(r.queryByTestId('ws-leg-dlv-overlay')).toBeNull();
 
+    // Turn split on: the single plan toggle is replaced by per-leg editors.
     fireEvent.click(r.getByLabelText('Split allocation (core + overlay)'));
-    expect(r.getByTestId('ws-split-dlv-warn').textContent).toContain('plan ignored');
+    expect(r.queryByLabelText('Plan deleveraging')).toBeNull();
+    expect(r.getByTestId('ws-leg-dlv-core')).toBeTruthy();
+    expect(r.getByTestId('ws-leg-dlv-overlay')).toBeTruthy();
+  });
 
-    // And the engine really ignores the plan: results match a split run
-    // without any deleverage plan (D-016: split wins).
-    const withPlanIgnored = calculate(
+  it('deleverage + split: a per-leg plan actually delevers that leg (D-028)', () => {
+    // The top-level plan stays single-strategy-only (still ignored in split)…
+    const topLevelIgnored = calculate(
       {
         ...DEFAULTS,
         splitAllocation: SPLIT_ON,
@@ -207,7 +214,23 @@ describe('Workspace split allocation (D-026)', () => {
       DEFAULT_SETTINGS
     );
     const noPlan = calculate({ ...DEFAULTS, splitAllocation: SPLIT_ON }, DEFAULT_SETTINGS);
-    expect(withPlanIgnored.summary.totalTaxSavings).toBe(noPlan.summary.totalTaxSavings);
+    expect(topLevelIgnored.summary.totalTaxSavings).toBe(noPlan.summary.totalTaxSavings);
+    expect(topLevelIgnored.years.every(y => y.extensionFraction === 1)).toBe(true);
+
+    // …but a PER-LEG plan on the overlay leg does delever it (D-028).
+    const perLeg = calculate(
+      {
+        ...DEFAULTS,
+        splitAllocation: {
+          ...SPLIT_ON,
+          overlayDeleverage: { enabled: true, startYear: 3, durationYears: 1, target: 'long-only' },
+        },
+      },
+      DEFAULT_SETTINGS
+    );
+    expect(perLeg.years.some(y => y.extensionFraction < 1)).toBe(true);
+    expect(perLeg.years.some(y => y.deleverageGainRealized > 0)).toBe(true);
+    expect(perLeg.summary.totalTaxSavings).not.toBe(noPlan.summary.totalTaxSavings);
   });
 
   it('split scenario round-trips through the Workspace CSV export path', () => {

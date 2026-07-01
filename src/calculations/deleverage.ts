@@ -1,4 +1,4 @@
-import { CalculatorInputs, AdvancedSettings } from '../types';
+import { CalculatorInputs, AdvancedSettings, DeleveragePlan } from '../types';
 import { Strategy, getStrategy, getLongLeverageRatio, getShortRatio } from '../strategyData';
 import { getEffectiveStLossRate } from './helpers';
 import { getFinancingCostForRatios } from './financing';
@@ -68,18 +68,16 @@ export interface DeleverageYearSchedule {
 }
 
 /**
- * Validate and resolve a plan against the inputs. Returns null when the plan
- * is disabled, malformed, or out of scope: split allocation wins when both
- * are enabled (v1 — the UI shows a "plan ignored" warning).
+ * Resolve a plan against an explicit source strategy (no inputs coupling).
+ * Returns null when the plan is malformed or its target can't be resolved.
+ * Shared by the single-strategy path (`resolveDeleveragePlan`) and the
+ * per-leg split path (`resolveLegDeleveragePlan`, D-028).
  */
-export function resolveDeleveragePlan(inputs: CalculatorInputs): ResolvedDeleveragePlan | null {
-  const plan = inputs.deleveragePlan;
-  if (!plan || !plan.enabled) return null;
-  if (inputs.splitAllocation?.enabled) return null;
+function resolvePlanForSource(
+  plan: DeleveragePlan,
+  source: Strategy
+): ResolvedDeleveragePlan | null {
   if (!(plan.startYear >= 1) || !(plan.durationYears >= 1)) return null;
-
-  const source = getStrategy(inputs.strategyId);
-  if (!source) return null;
 
   let targetLongLeverage: number;
   let targetShortRatio: number;
@@ -111,6 +109,36 @@ export function resolveDeleveragePlan(inputs: CalculatorInputs): ResolvedDelever
     targetLongLeverage,
     targetShortRatio,
   };
+}
+
+/**
+ * Validate and resolve the single-strategy plan against the inputs. Returns
+ * null when the plan is disabled, malformed, or out of scope: split allocation
+ * runs its own PER-LEG plans (D-028), so the top-level plan is ignored when
+ * split is enabled.
+ */
+export function resolveDeleveragePlan(inputs: CalculatorInputs): ResolvedDeleveragePlan | null {
+  const plan = inputs.deleveragePlan;
+  if (!plan || !plan.enabled) return null;
+  if (inputs.splitAllocation?.enabled) return null;
+
+  const source = getStrategy(inputs.strategyId);
+  if (!source) return null;
+
+  return resolvePlanForSource(plan, source);
+}
+
+/**
+ * Resolve a per-leg plan in split mode (D-028). Unlike `resolveDeleveragePlan`
+ * there is no split guard — these plans ARE the split-mode deleverage path —
+ * and the source strategy is the leg's own strategy, not `inputs.strategyId`.
+ */
+export function resolveLegDeleveragePlan(
+  plan: DeleveragePlan | undefined,
+  source: Strategy
+): ResolvedDeleveragePlan | null {
+  if (!plan || !plan.enabled) return null;
+  return resolvePlanForSource(plan, source);
 }
 
 /**
@@ -183,7 +211,22 @@ export function resolveDeleverageSchedule(
 ): DeleverageYearSchedule[] | null {
   const plan = resolveDeleveragePlan(inputs);
   if (!plan) return null;
+  return buildDeleverageSchedule(plan, settings, maxYears, startMonth, qfafDuration);
+}
 
+/**
+ * Build the per-year glide schedule for an already-resolved plan. Split out
+ * from `resolveDeleverageSchedule` (D-028) so the per-leg split path can
+ * schedule each leg's own resolved plan directly, without round-tripping
+ * through `inputs`.
+ */
+export function buildDeleverageSchedule(
+  plan: ResolvedDeleveragePlan,
+  settings: AdvancedSettings,
+  maxYears: number,
+  startMonth: number,
+  qfafDuration: number
+): DeleverageYearSchedule[] {
   const srcLt = plan.source.ltGainRate;
   const tgtLt = targetLtGainRate(plan);
   const sourceFinancing = getFinancingCostForRatios(

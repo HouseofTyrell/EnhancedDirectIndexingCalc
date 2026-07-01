@@ -119,6 +119,9 @@ export function ResultsTable({
 
   // Deleverage column group (D-016): only when a plan actually unwound something.
   const hasDeleverage = data.some(y => y.extensionFraction < 1);
+  // Per-leg unwind attribution columns (D-028): only in split mode, where the
+  // engine populates core/overlay unwind gains.
+  const hasPerLegDeleverage = data.some(y => y.overlayDeleverageGain !== undefined);
 
   // Toggle all details
   const handleToggleAll = () => {
@@ -173,7 +176,7 @@ export function ResultsTable({
     // Deleverage group (only when a plan is active)
     if (hasDeleverage) {
       cols += 1; // Extension % headline
-      if (expandDeleverage) cols += 5; // Unwind Gain, ST/LT split, Unwind Tax, Fin. Saved
+      if (expandDeleverage) cols += 5 + (hasPerLegDeleverage ? 2 : 0); // Unwind Gain, ST/LT split, Unwind Tax, Fin. Saved, [Core/Overlay Unwind]
     }
 
     cols += 1; // Tax Savings column
@@ -457,6 +460,18 @@ export function ResultsTable({
                       <th className="col-detail">
                         <InfoText contentKey="col-financing-saved">Fin. Saved</InfoText>
                       </th>
+                      {hasPerLegDeleverage && (
+                        <>
+                          <th className="col-detail">
+                            <InfoText contentKey="col-deleverage-core-gain">Core Unwind</InfoText>
+                          </th>
+                          <th className="col-detail">
+                            <InfoText contentKey="col-deleverage-overlay-gain">
+                              Overlay Unwind
+                            </InfoText>
+                          </th>
+                        </>
+                      )}
                     </>
                   )}
 
@@ -573,9 +588,18 @@ export function ResultsTable({
                   {hasDeleverage && <td className="starting-note">100%</td>}
                   {hasDeleverage && expandDeleverage && (
                     <>
+                      {/* Unwind Gain, Unwind ST, Unwind LT, Unwind Tax, Fin. Saved */}
                       <td className="starting-note">—</td>
                       <td className="starting-note">—</td>
                       <td className="starting-note">—</td>
+                      <td className="starting-note">—</td>
+                      <td className="starting-note">—</td>
+                      {hasPerLegDeleverage && (
+                        <>
+                          <td className="starting-note">—</td>
+                          <td className="starting-note">—</td>
+                        </>
+                      )}
                     </>
                   )}
                   <td className="starting-note">—</td>
@@ -842,6 +866,20 @@ export function ResultsTable({
                                 ? formatCurrency(year.financingSaved)
                                 : '—'}
                             </td>
+                            {hasPerLegDeleverage && (
+                              <>
+                                <td className="positive">
+                                  {(year.coreDeleverageGain ?? 0) > 0.01
+                                    ? formatCurrency(year.coreDeleverageGain ?? 0)
+                                    : '—'}
+                                </td>
+                                <td className="positive">
+                                  {(year.overlayDeleverageGain ?? 0) > 0.01
+                                    ? formatCurrency(year.overlayDeleverageGain ?? 0)
+                                    : '—'}
+                                </td>
+                              </>
+                            )}
                           </>
                         )}
 
@@ -1264,6 +1302,21 @@ function TransposedTable({
           contentKey: 'col-financing-saved',
           cell: y => moneyOrDash(y.financingSaved),
         },
+        // Per-leg unwind attribution (D-028) — only in split mode.
+        ...(data.some(y => y.overlayDeleverageGain !== undefined)
+          ? [
+              {
+                label: 'Core Unwind Gain',
+                contentKey: 'col-deleverage-core-gain',
+                cell: (y: YearResult) => moneyOrDash(y.coreDeleverageGain ?? 0),
+              },
+              {
+                label: 'Overlay Unwind Gain',
+                contentKey: 'col-deleverage-overlay-gain',
+                cell: (y: YearResult) => moneyOrDash(y.overlayDeleverageGain ?? 0),
+              },
+            ]
+          : []),
       ],
     });
   }

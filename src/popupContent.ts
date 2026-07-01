@@ -838,6 +838,33 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
       'This portion is netted with current-year strategy losses and capital-loss carryforwards before any remaining amount is taxed at long-term rates.',
   },
 
+  'col-deleverage-core-gain': {
+    title: 'Core Unwind Gain',
+    definition:
+      'Portion of this year’s deleveraging gain realized by the CORE leg unwinding its own ' +
+      'extension (split allocation only, D-028). Each leg unwinds against its own ' +
+      'embedded-gain pool; the book’s pre-existing gain is assigned to the overlay ' +
+      '(appreciated-stock) leg first, so the core’s share reflects gains it actually built.',
+    formula: 'Core leg: Lot Haircut × Core Embedded Gain % × Core Extension Dollars Unwound',
+    impact:
+      'Summed with the Overlay Unwind Gain to the book Unwind Gain, which nets with the ' +
+      'strategy’s own flows and carryforwards before any residue is taxed.',
+  },
+
+  'col-deleverage-overlay-gain': {
+    title: 'Overlay Unwind Gain',
+    definition:
+      'Portion of this year’s deleveraging gain realized by the OVERLAY leg unwinding its own ' +
+      'extension (split allocation only, D-028). The overlay is the appreciated-stock sleeve, ' +
+      'so the book’s pre-existing embedded gain is assigned here first — its unwind cost is ' +
+      'typically the larger share.',
+    formula:
+      'Overlay leg: Lot Haircut × Overlay Embedded Gain % × Overlay Extension Dollars Unwound',
+    impact:
+      'Summed with the Core Unwind Gain to the book Unwind Gain, which nets with the ' +
+      'strategy’s own flows and carryforwards before any residue is taxed.',
+  },
+
   'col-deleverage-tax': {
     title: 'Tax on Unwind',
     definition:

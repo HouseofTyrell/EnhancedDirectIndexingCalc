@@ -63,6 +63,23 @@ function plan(overrides: Partial<DeleveragePlan> = {}): DeleveragePlan {
   };
 }
 
+function splitInputs(
+  overrides: Partial<CalculatorInputs> = {},
+  split: Partial<CalculatorInputs['splitAllocation']> = {}
+): CalculatorInputs {
+  return createInputs({
+    splitAllocation: {
+      enabled: true,
+      coreStrategyId: 'core-145-45',
+      coreAmount: 5000000,
+      overlayStrategyId: 'overlay-45-45',
+      overlayAmount: 5000000,
+      ...split,
+    },
+    ...overrides,
+  });
+}
+
 afterEach(() => {
   clearRateOverrides();
 });
@@ -326,6 +343,191 @@ describe('unwind tax attribution (endogenous, opposite of D-012)', () => {
   });
 });
 
+describe('split allocation per-leg deleverage (D-028)', () => {
+  it('a split with no per-leg plans is exactly the no-deleverage split', () => {
+    const base = calculate(splitInputs(), DEFAULT_SETTINGS);
+    const withTopLevel = calculate(splitInputs({ deleveragePlan: plan() }), DEFAULT_SETTINGS);
+    // The top-level plan stays single-strategy-only — ignored in split mode.
+    expect(withTopLevel.summary.totalTaxSavings).toBeCloseTo(base.summary.totalTaxSavings, 6);
+    expect(withTopLevel.years.every(y => y.extensionFraction === 1)).toBe(true);
+    expect(withTopLevel.years.every(y => y.deleverageGainRealized === 0)).toBe(true);
+  });
+
+  it('two identical legs each carrying the same plan == single-strategy deleverage', () => {
+    // Both legs = core-145-45 at $5M each with the same all-at-once plan; the
+    // blended book must match a single-strategy $10M deleverage of core-145-45.
+    const single = calculate(
+      createInputs({ deleveragePlan: plan({ startYear: 4, durationYears: 1 }) }),
+      DEFAULT_SETTINGS
+    );
+    const p = plan({ startYear: 4, durationYears: 1 });
+    const splitBoth = calculate(
+      splitInputs(
+        {},
+        {
+          coreStrategyId: 'core-145-45',
+          overlayStrategyId: 'core-145-45',
+          coreDeleverage: p,
+          overlayDeleverage: p,
+        }
+      ),
+      DEFAULT_SETTINGS
+    );
+    expect(splitBoth.years.length).toBe(single.years.length);
+    for (let i = 0; i < single.years.length; i++) {
+      expect(splitBoth.years[i].effectiveStLossRate).toBeCloseTo(
+        single.years[i].effectiveStLossRate,
+        10
+      );
+      expect(splitBoth.years[i].extensionFraction).toBeCloseTo(
+        single.years[i].extensionFraction,
+        10
+      );
+      expect(splitBoth.years[i].deleverageGainRealized).toBeCloseTo(
+        single.years[i].deleverageGainRealized,
+        2
+      );
+      expect(splitBoth.years[i].taxSavings).toBeCloseTo(single.years[i].taxSavings, 2);
+    }
+  });
+
+  it('overlay-only plan delevers just that leg — extension % is collateral-weighted', () => {
+    // 50/50 split, overlay glides all-at-once at year 4, core stays static.
+    const result = calculate(
+      splitInputs({}, { overlayDeleverage: plan({ startYear: 4, durationYears: 1 }) }),
+      DEFAULT_SETTINGS
+    );
+    // Year 3: nothing unwound yet — fully extended.
+    expect(result.years[2].extensionFraction).toBe(1);
+    // Year 4: overlay (50% of collateral) drops to w=0, core stays w=1 →
+    // collateral-weighted extension = 0.5.
+    expect(result.years[3].extensionFraction).toBeCloseTo(0.5, 6);
+    expect(result.years[3].deleverageGainRealized).toBeGreaterThan(0);
+    // The core leg carries no plan, so it never adds unwind gains.
+    const coreOnly = calculate(
+      splitInputs({}, { coreDeleverage: plan({ startYear: 4, durationYears: 1 }) }),
+      DEFAULT_SETTINGS
+    );
+    expect(coreOnly.years[3].extensionFraction).toBeCloseTo(0.5, 6);
+  });
+
+  it('both legs delever independently on their own schedules', () => {
+    const result = calculate(
+      splitInputs(
+        {},
+        {
+          coreDeleverage: plan({ startYear: 4, durationYears: 1 }),
+          overlayDeleverage: plan({ startYear: 6, durationYears: 1 }),
+        }
+      ),
+      DEFAULT_SETTINGS
+    );
+    // Year 4: only the core leg (50%) unwinds → extension 0.5, gain realized.
+    expect(result.years[3].extensionFraction).toBeCloseTo(0.5, 6);
+    expect(result.years[3].deleverageGainRealized).toBeGreaterThan(0);
+    // Year 6: the overlay leg unwinds → book fully delevered (both at w=0).
+    expect(result.years[5].extensionFraction).toBeCloseTo(0, 6);
+    expect(result.years[5].deleverageGainRealized).toBeGreaterThan(0);
+  });
+
+  it('per-leg pool: concentrated overlay basis raises the overlay unwind gain', () => {
+    // Same overlay plan; with a low book cost basis the embedded gain is
+    // assigned to the overlay leg, so its unwind realizes MORE than the
+    // basis-equals-value case.
+    const noBasis = calculate(
+      splitInputs({}, { overlayDeleverage: plan({ startYear: 4, durationYears: 1 }) }),
+      DEFAULT_SETTINGS
+    );
+    const lowBasis = calculate(
+      splitInputs(
+        { collateralCostBasis: 2000000 },
+        { overlayDeleverage: plan({ startYear: 4, durationYears: 1 }) }
+      ),
+      DEFAULT_SETTINGS
+    );
+    expect(lowBasis.years[3].deleverageGainRealized).toBeGreaterThan(
+      noBasis.years[3].deleverageGainRealized
+    );
+  });
+
+  it('per-leg unwind attribution: core/overlay gains sum to the book gain', () => {
+    const result = calculate(
+      splitInputs(
+        {},
+        {
+          coreDeleverage: plan({ startYear: 4, durationYears: 1 }),
+          overlayDeleverage: plan({ startYear: 6, durationYears: 1 }),
+        }
+      ),
+      DEFAULT_SETTINGS
+    );
+    for (const y of result.years) {
+      // Fields are defined every year in split+deleverage mode.
+      expect(y.coreDeleverageGain).toBeDefined();
+      expect(y.overlayDeleverageGain).toBeDefined();
+      expect((y.coreDeleverageGain ?? 0) + (y.overlayDeleverageGain ?? 0)).toBeCloseTo(
+        y.deleverageGainRealized,
+        4
+      );
+    }
+    // Year 4: only the core leg unwinds → core gain > 0, overlay gain 0.
+    expect(result.years[3].coreDeleverageGain).toBeGreaterThan(0);
+    expect(result.years[3].overlayDeleverageGain).toBeCloseTo(0, 6);
+    // Year 6: only the overlay leg unwinds → overlay gain > 0, core gain 0.
+    expect(result.years[5].overlayDeleverageGain).toBeGreaterThan(0);
+    expect(result.years[5].coreDeleverageGain).toBeCloseTo(0, 6);
+  });
+
+  it('per-leg attribution fields are undefined in single-strategy mode', () => {
+    const single = calculate(
+      createInputs({ deleveragePlan: plan({ startYear: 4, durationYears: 1 }) }),
+      DEFAULT_SETTINGS
+    );
+    expect(single.years.every(y => y.coreDeleverageGain === undefined)).toBe(true);
+    expect(single.years.every(y => y.overlayDeleverageGain === undefined)).toBe(true);
+  });
+
+  it('unwind tax is endogenous: the savings identity still holds (QFAF mode)', () => {
+    const withPlan = calculate(
+      splitInputs(
+        { qfafEnabled: true, qfafSizingYears: 1 },
+        { overlayDeleverage: plan({ startYear: 4, durationYears: 1 }) }
+      ),
+      DEFAULT_SETTINGS
+    );
+    const y4 = withPlan.years[3];
+    expect(y4.deleverageGainRealized).toBeGreaterThan(0);
+    expect(y4.taxSavings).toBeCloseTo(
+      y4.ordinaryLossBenefit +
+        y4.capitalLossBenefit +
+        y4.nolUsageBenefit -
+        y4.ltGainCost -
+        y4.remainingStGainCost,
+      4
+    );
+  });
+
+  it('financing follows each leg glide (financingSaved accrues only with fees on)', () => {
+    const feeSettings = {
+      ...DEFAULT_SETTINGS,
+      financingFeesEnabled: true,
+      financingMode: 'simple' as const,
+    };
+    const result = calculate(
+      splitInputs({}, { overlayDeleverage: plan({ startYear: 4, durationYears: 1 }) }),
+      feeSettings
+    );
+    // Some financing is saved once the overlay delevers (year 4+).
+    expect(result.years[3].financingSaved).toBeGreaterThan(0);
+    // Gross (fees off) → no financing saved anywhere.
+    const gross = calculate(
+      splitInputs({}, { overlayDeleverage: plan({ startYear: 4, durationYears: 1 }) }),
+      DEFAULT_SETTINGS
+    );
+    expect(gross.years.every(y => y.financingSaved === 0)).toBe(true);
+  });
+});
+
 describe('exit-tax interaction (no double taxation)', () => {
   it('embedded gain at horizon is reduced exactly by realized unwind gains', () => {
     const result = calculate(createInputs({ deleveragePlan: plan() }), DEFAULT_SETTINGS);
@@ -454,6 +656,29 @@ describe('CSV round-trip', () => {
     const { inputs: parsed, warnings } = parseInputsFromCsv(csv);
     expect(warnings).toEqual([]);
     expect(parsed.deleveragePlan).toEqual(inputs.deleveragePlan);
+  });
+
+  it('round-trips per-leg split deleverage plans (D-028)', () => {
+    const inputs = splitInputs(
+      {},
+      {
+        coreDeleverage: plan({ startYear: 3, durationYears: 2, target: 'core-130-30' }),
+        overlayDeleverage: plan({
+          startYear: 6,
+          durationYears: 1,
+          target: LONG_ONLY_TARGET,
+          lotSelectionHaircut: 0.8,
+        }),
+      }
+    );
+    const { inputs: parsed, warnings } = parseInputsFromCsv(
+      exportInputsToCsv(inputs, DEFAULT_SETTINGS)
+    );
+    expect(warnings).toEqual([]);
+    expect(parsed.splitAllocation?.coreDeleverage).toEqual(inputs.splitAllocation!.coreDeleverage);
+    expect(parsed.splitAllocation?.overlayDeleverage).toEqual(
+      inputs.splitAllocation!.overlayDeleverage
+    );
   });
 
   it('round-trips a minimal plan (no optional knobs) and omits absent plans', () => {

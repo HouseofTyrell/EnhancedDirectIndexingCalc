@@ -18,6 +18,14 @@ export interface SplitAllocation {
   coreAmount: number;
   overlayStrategyId: string;
   overlayAmount: number;
+  // Per-leg deleverage plans (D-028). In split mode each leg can glide its own
+  // extension to a lower-leverage target on its own schedule; the top-level
+  // `inputs.deleveragePlan` stays single-strategy-only and is ignored when
+  // split is enabled. Each leg resolves and unwinds against its OWN
+  // embedded-gain pool, so a concentrated overlay's unwind cost is attributed
+  // separately from the core. Undefined/absent = that leg stays fully extended.
+  coreDeleverage?: DeleveragePlan;
+  overlayDeleverage?: DeleveragePlan;
 }
 
 // Deleveraging plan (D-016/D-017): unwind the extension strategy to a
@@ -253,6 +261,12 @@ export interface YearResult {
   deleverageTax: number;
   /** (source financing rate − blended rate) × start-of-year collateral; 0 when fees disabled */
   financingSaved: number;
+  // Per-leg unwind attribution (D-028, split mode only). Undefined in
+  // single-strategy mode; when defined they sum to `deleverageGainRealized`.
+  /** Core-leg unwind gain realized this year (long + short cover). */
+  coreDeleverageGain?: number;
+  /** Overlay-leg unwind gain realized this year (long + short cover). */
+  overlayDeleverageGain?: number;
 }
 
 export interface CalculationResult {
