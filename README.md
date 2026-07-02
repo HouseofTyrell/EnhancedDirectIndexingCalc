@@ -1,28 +1,27 @@
 # Enhanced Direct Indexing Calculator
 
 A React + TypeScript calculator for financial advisors to model the tax impact of pairing
-enhanced direct indexing (long/short tax-loss harvesting) with the Quantinno Fundamental
-Arbitrage Fund (QFAF) for ultra-high-net-worth qualified purchasers. It projects
+enhanced direct indexing (long/short tax-loss harvesting) with the extension fund for ultra-high-net-worth qualified purchasers. It projects
 year-by-year tax savings, carryforward balances, and liquidation/estate outcomes from a
 single calculation engine.
 
 ## The two tabs
 
 - **Workspace** (default) — single-screen experience: a persistent input rail (client,
-  strategy, carryforwards, QFAF, deleveraging, model toggles, per-year events, actions)
+  strategy, carryforwards, the fund, deleveraging, model toggles, per-year events, actions)
   beside a results-first pane with a headline metric strip and Overview / Year-by-Year /
   Charts sub-views. Fund by collateral amount or by total portfolio budget (the tool
-  solves collateral + QFAF = total). Meeting Mode, Excel export, and CSV scenario
+  solves collateral + fund = total). Meeting Mode, Excel export, and CSV scenario
   import/export launch from the Actions group.
 - **Classic Calculator** — the full-detail legacy view. Split allocation (Core cash leg +
   Overlay appreciated-stock leg), sensitivity analysis, and year-by-year planning panels
   deliberately live here.
 
-A hidden QFAF Test planner is reachable via `Ctrl+Shift+Q` or `?view=qfaf-test`.
+A hidden test planner is reachable via `Ctrl+Shift+Q`.
 
 ## Key modeling capabilities
 
-- **QFAF mechanics** — 150% ST gains / 150% ordinary losses (configurable multiplier),
+- **Fund mechanics** — 150% ST gains / 150% ordinary losses (configurable multiplier),
   auto-sizing against the collateral's harvested ST losses, fixed or dynamic (yearly
   resize) modes, sizing window/cushion, duration with breakeven unwind, optional
   redeployment of redemptions into the core.
@@ -37,7 +36,7 @@ A hidden QFAF Test planner is reachable via `Ctrl+Shift+Q` or `?view=qfaf-test`.
 - **Exit-tax / embedded-gain analysis** — basis reduction from harvesting, optional
   collateral cost basis for concentrated stock, carryforward shelter at exit, signed
   incremental deferred tax vs. a passive baseline, and a hold-to-step-up estate comparison.
-- **EDI-only mode** — with the QFAF off, the Workspace becomes a first-class EDI-only
+- **EDI-only mode** — with the fund off, the Workspace becomes a first-class EDI-only
   view: realized savings plus a co-equal "loss reserve built" headline (contingent
   carryforward shelter value, never added to realized savings), protection ratio, and
   break-even gain event.
@@ -71,7 +70,7 @@ src/
 ├── calculations/        # The engine (see docs/ARCHITECTURE.md)
 │   ├── core.ts          # calculate() / calculateWithOverrides() — the one projection loop
 │   ├── helpers.ts       # §1211/§1212 netting, $3K, NOL ordering, summary
-│   ├── sizing.ts        # QFAF auto-sizing + total-budget solver
+│   ├── sizing.ts        # Fund auto-sizing + total-budget solver
 │   ├── splitAllocation.ts, deleverage.ts, financing.ts
 │   ├── exitTax.ts, ediInsights.ts, sensitivity.ts, lossBreakdown.ts
 │   └── index.ts         # Public surface (see docs/API.md)
@@ -96,6 +95,6 @@ src/
 This is an advisor-internal educational tool producing **estimates, not tax or
 investment advice**. Headline savings are **gross by default** (D-002): financing fees,
 wash-sale haircuts, present-value discounting, and other complexity are opt-in layers,
-shown with explicit labeling while disabled. QFAF tax treatment is contingent on
+shown with explicit labeling while disabled. The fund's tax treatment is contingent on
 qualification; AMT, §1092 straddles, and §469 are not modeled (disclosed in-app). Clients
 should consult their own tax advisors.
