@@ -8,6 +8,7 @@ import {
   BreakdownGranularity,
 } from './calculations/lossBreakdown';
 import { getEffectiveStLossRate } from './calculations/helpers';
+import { brandText, useBrandRevealed } from './branding';
 
 type ViewMode = 'combined' | 'qfaf-only' | 'collateral-only';
 
@@ -65,6 +66,7 @@ export function ResultsTable({
   strategyId,
   ltGainRate,
 }: ResultsTableProps) {
+  useBrandRevealed();
   const partialFirstYearMonths = startMonth > 1 ? 13 - startMonth : null;
   const [expandPortfolio, setExpandPortfolio] = useState(false);
   const [expandCapital, setExpandCapital] = useState(false);
@@ -222,14 +224,18 @@ export function ResultsTable({
               <button
                 className={`view-mode-btn ${viewMode === 'qfaf-only' ? 'active' : ''}`}
                 onClick={() => setViewMode('qfaf-only')}
-                title="Quantinno Fundamental Arbitrage Fund — generates ordinary losses and short-term gains"
+                title={brandText(
+                  'Quantinno Fundamental Arbitrage Fund — generates ordinary losses and short-term gains'
+                )}
               >
-                QFAF Only
+                {brandText('QFAF Only')}
               </button>
               <button
                 className={`view-mode-btn ${viewMode === 'collateral-only' ? 'active' : ''}`}
                 onClick={() => setViewMode('collateral-only')}
-                title="Direct indexing collateral only (excludes QFAF ordinary loss benefits)"
+                title={brandText(
+                  'Direct indexing collateral only (excludes QFAF ordinary loss benefits)'
+                )}
               >
                 Collateral Only
               </button>
@@ -287,7 +293,7 @@ export function ResultsTable({
                     </th>
                   ) : viewMode === 'qfaf-only' ? (
                     <th className="col-portfolio qfaf-col">
-                      <InfoText contentKey="col-qfaf-value">QFAF Value</InfoText>
+                      <InfoText contentKey="col-qfaf-value">{brandText('QFAF Value')}</InfoText>
                     </th>
                   ) : viewMode === 'collateral-only' ? (
                     <th className="col-portfolio collateral-col">
@@ -306,7 +312,7 @@ export function ResultsTable({
                         <InfoText contentKey="col-collateral-value">Collateral</InfoText>
                       </th>
                       <th className="col-detail qfaf-col">
-                        <InfoText contentKey="col-qfaf-value">QFAF</InfoText>
+                        <InfoText contentKey="col-qfaf-value">{brandText('QFAF')}</InfoText>
                       </th>
                       <th className="col-detail qfaf-col">
                         <InfoText contentKey="col-cash-returned">Cash Out</InfoText>
@@ -486,7 +492,7 @@ export function ResultsTable({
                       </span>
                       <InfoText contentKey="col-tax-savings">
                         {viewMode === 'qfaf-only'
-                          ? 'QFAF Benefit'
+                          ? brandText('QFAF Benefit')
                           : viewMode === 'collateral-only'
                             ? 'Coll. Benefit'
                             : 'Savings'}
@@ -967,7 +973,9 @@ export function ResultsTable({
                                     <th>Period</th>
                                     <th>Deployment Year</th>
                                     <th className="num">ST Losses (Collateral)</th>
-                                    {qfafEnabled && <th className="num">Ord. Losses (QFAF)</th>}
+                                    {qfafEnabled && (
+                                      <th className="num">{brandText('Ord. Losses (QFAF)')}</th>
+                                    )}
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1094,6 +1102,7 @@ function TransposedTable({
   qfafEnabled: boolean;
   startMonth: number;
 }) {
+  useBrandRevealed();
   const showQfaf = viewMode === 'combined' || viewMode === 'qfaf-only';
   const showCollateral = viewMode === 'combined' || viewMode === 'collateral-only';
   const partialMonths = startMonth > 1 ? 13 - startMonth : null;
@@ -1144,7 +1153,7 @@ function TransposedTable({
       ...(showQfaf && qfafEnabled
         ? [
             {
-              label: 'QFAF',
+              label: brandText('QFAF'),
               contentKey: 'col-qfaf-value',
               cell: (y: YearResult) => money(y.qfafValue),
             },
@@ -1181,7 +1190,7 @@ function TransposedTable({
         ...(qfafEnabled && viewMode === 'combined'
           ? [
               {
-                label: 'QFAF ST Gains',
+                label: brandText('QFAF ST Gains'),
                 contentKey: 'col-st-gains',
                 cell: (y: YearResult) => (active(y) ? money(y.stGainsGenerated) : '—'),
               },
@@ -1383,7 +1392,7 @@ function TransposedTable({
       {
         label:
           viewMode === 'qfaf-only'
-            ? 'QFAF Benefit'
+            ? brandText('QFAF Benefit')
             : viewMode === 'collateral-only'
               ? 'Coll. Benefit'
               : 'Net Savings',

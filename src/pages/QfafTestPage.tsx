@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { QfafTestByYear } from '../AdvancedMode/QfafTestByYear';
 import { FILING_STATUSES, FilingStatus } from '../types';
+import { brandText, useBrandRevealed } from '../branding';
 
 export function QfafTestPage() {
+  useBrandRevealed();
   const [filingStatus, setFilingStatus] = useState<FilingStatus>('mfj');
   const [dismissedDisclosure, setDismissedDisclosure] = useState(false);
 
@@ -32,10 +34,11 @@ export function QfafTestPage() {
       )}
 
       <header className="page-header">
-        <h1>QFAF Test (By Year)</h1>
+        <h1>{brandText('QFAF Test (By Year)')}</h1>
         <p className="page-description">
-          Model QFAF economics year-by-year with custom cash infusions, tax rates, and §461(l)
-          carryforward projections.
+          {brandText(
+            'Model QFAF economics year-by-year with custom cash infusions, tax rates, and §461(l) carryforward projections.'
+          )}
         </p>
       </header>
 

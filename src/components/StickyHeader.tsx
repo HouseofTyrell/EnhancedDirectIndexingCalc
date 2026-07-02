@@ -4,6 +4,7 @@ import { useValueFlash } from '../hooks/useValueFlash';
 import { useDelta } from '../hooks/useDelta';
 import { DeltaBadge } from './DeltaBadge';
 import { PartialYearBadge } from './PartialYearBadge';
+import { brandText, useBrandRevealed } from '../branding';
 
 /**
  * Pin/thumbtack icon for the pin scenario button.
@@ -148,6 +149,7 @@ export const StickyHeader = React.memo(function StickyHeader({
   onUnpinScenario,
   pinnedValues,
 }: StickyHeaderProps) {
+  useBrandRevealed();
   // Calculate leverage ratio
   const leverageRatio = collateral > 0 ? totalExposure / collateral : 0;
 
@@ -191,7 +193,7 @@ export const StickyHeader = React.memo(function StickyHeader({
           {pinnedValues && <PinnedDelta current={collateral} pinned={pinnedValues.collateral} />}
         </div>
         <div className="sticky-header__metric">
-          <span className="sticky-header__label">QFAF Value</span>
+          <span className="sticky-header__label">{brandText('QFAF Value')}</span>
           <span className="sticky-header__value" aria-live="polite" ref={qfafFlash}>
             {formatCurrency(qfafValue)}
             <DeltaBadge delta={qfafDelta} />

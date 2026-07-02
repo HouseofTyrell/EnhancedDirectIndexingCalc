@@ -4,6 +4,7 @@ import { QfafTestPage } from './pages/QfafTestPage';
 import { WorkspaceTab } from './workspace/WorkspaceTab';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { brandText, useBrandRevealed } from './branding';
 
 type View = 'calculator' | 'workspace' | 'qfaf-test';
 
@@ -19,6 +20,7 @@ function getInitialView(): View {
 }
 
 export function App() {
+  useBrandRevealed();
   const [activeView, setActiveView] = useState<View>(getInitialView);
 
   // Allow dev access to QFAF Test via Ctrl+Shift+Q
@@ -51,7 +53,7 @@ export function App() {
           </button>
           {activeView === 'qfaf-test' && (
             <button className={`nav-tab active`} onClick={() => setActiveView('qfaf-test')}>
-              QFAF Test
+              {brandText('QFAF Test')}
             </button>
           )}
           <ThemeToggle />

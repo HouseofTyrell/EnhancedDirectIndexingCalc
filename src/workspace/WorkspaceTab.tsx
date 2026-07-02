@@ -41,8 +41,10 @@ import { DisclaimerFooter } from '../components/DisclaimerFooter';
 import { QualifiedPurchaserModal } from '../components/QualifiedPurchaserModal';
 import { useQualifiedPurchaser } from '../hooks/useQualifiedPurchaser';
 import { InfoText } from '../InfoPopup';
-import { POPUP_CONTENT } from '../popupContent';
+import { getPopupContent } from '../popupContent';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { brandText, useBrandRevealed } from '../branding';
+import { useSecretReveal } from '../hooks/useSecretReveal';
 // D-027 fonts: Hanken Grotesk (UI) + IBM Plex Mono (Graphite numerals),
 // bundled from @fontsource so vite-plugin-singlefile inlines them — the
 // distributable stays self-contained (no runtime CDN fetches). Mono is
@@ -579,6 +581,8 @@ interface WorkspaceTabProps {
 }
 
 export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
+  useBrandRevealed(); // re-render when the hidden brand-reveal toggle flips
+  const secretReveal = useSecretReveal();
   const qualifiedPurchaser = useQualifiedPurchaser();
   // D-026: same hook + storage as the Classic comparison panel — one shared
   // pin store, so an advisor can pin here and compare there (or vice versa).
@@ -1103,7 +1107,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
     ...GROUP_META.map(g => ({
       id: `group-${g.id}`,
       kind: 'Inputs' as const,
-      label: g.label,
+      label: brandText(g.label),
       keywords: g.keywords,
       run: () => jumpToGroup(g.id),
     })),
@@ -1255,11 +1259,11 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
     flags.push({
       key: 'fixed-qfaf-dlv',
       sev: 'warn',
-      tag: 'QFAF',
+      tag: brandText('QFAF'),
       body: (
         <>
-          <strong>Fixed QFAF sizing</strong> won&apos;t shrink with deleveraging — expect ST gain
-          leakage as the harvest rate glides down (switch to Dynamic).
+          <strong>{brandText('Fixed QFAF sizing')}</strong> won&apos;t shrink with deleveraging —
+          expect ST gain leakage as the harvest rate glides down (switch to Dynamic).
         </>
       ),
     });
@@ -1480,9 +1484,16 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
 
       {/* ───────────────── Top context bar ───────────────── */}
       <header className="wx-top">
-        <div className="wx-brand">
+        {/* Hidden reveal: 5 rapid clicks on the brand toggle real manager/fund
+            names on/off for internal use. No affordance — invisible to the public. */}
+        <div className="wx-brand" onClick={secretReveal.onClick}>
           <span className="wx-logo">Q</span>
           <span className="wx-brand-name">EDI Calculator</span>
+          {secretReveal.flash !== null && (
+            <span className="wx-brand-reveal-flash" role="status">
+              {secretReveal.flash ? 'Internal names on' : 'Anonymized'}
+            </span>
+          )}
         </div>
         <div className="wx-scenario">
           {editingName ? (
@@ -1539,7 +1550,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
             )}
           </span>
           <span className="wx-chip">
-            QFAF&nbsp;<b>{inputs.qfafEnabled ? 'On' : 'Off'}</b>
+            {brandText('QFAF')}&nbsp;<b>{inputs.qfafEnabled ? 'On' : 'Off'}</b>
           </span>
         </div>
         <div className="wx-top-right">
@@ -1748,7 +1759,10 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                       → Core {formatCurrency(effectiveInputs.splitAllocation?.coreAmount ?? 0)} +
                       overlay {formatCurrency(effectiveInputs.splitAllocation?.overlayAmount ?? 0)}
                       {inputs.qfafEnabled && (
-                        <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
+                        <>
+                          {' '}
+                          + {brandText('QFAF')} {formatCurrency(results.sizing.qfafValue)}
+                        </>
                       )}
                       {' = '}
                       {formatCurrency(results.sizing.totalExposure)}
@@ -1763,7 +1777,9 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                           {formatPercent(split.overlayAmount / splitTotal)} overlay)
                         </>
                       )}
-                      {inputs.qfafEnabled && <> · QFAF auto-sizes against the combined ST losses</>}
+                      {inputs.qfafEnabled && (
+                        <> · {brandText('QFAF auto-sizes against the combined ST losses')}</>
+                      )}
                     </>
                   )}
                 </p>
@@ -1776,7 +1792,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                 {fundingMode === 'total' && (
                   <p className="ws-rail-note">
                     The core and overlay amounts are used as allocation weights; the tool scales
-                    both legs so collateral + QFAF equals the total portfolio.
+                    both legs so collateral + {brandText('QFAF')} equals the total portfolio.
                   </p>
                 )}
               </>
@@ -1840,7 +1856,10 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                     <p className="ws-derived">
                       → Collateral {formatCurrency(results.sizing.collateralValue)}
                       {inputs.qfafEnabled && (
-                        <> + QFAF {formatCurrency(results.sizing.qfafValue)}</>
+                        <>
+                          {' '}
+                          + {brandText('QFAF')} {formatCurrency(results.sizing.qfafValue)}
+                        </>
                       )}{' '}
                       = {formatCurrency(results.sizing.totalExposure)}
                     </p>
@@ -1931,7 +1950,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
           <RailGroup
             {...groupProps('qfaf', inputs.qfafEnabled)}
             icon={I.layers}
-            name="QFAF Overlay"
+            name={brandText('QFAF Overlay')}
             summary={
               inputs.qfafEnabled ? (
                 <>
@@ -1951,7 +1970,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                 onChange={e => set('qfafEnabled', e.target.checked)}
               />
               <span className="wx-switch" />
-              <span>Enable QFAF</span>
+              <span>{brandText('Enable QFAF')}</span>
             </label>
             {inputs.qfafEnabled && (
               <>
@@ -2822,10 +2841,10 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
               {!ediMode && (
                 <details className="wx-details">
                   <summary>
-                    <strong>How the QFAF&apos;s tax treatment works</strong> (draft — pending
-                    counsel review)
+                    <strong>{brandText("How the QFAF's tax treatment works")}</strong> (draft —
+                    pending counsel review)
                   </summary>
-                  <p>{POPUP_CONTENT['qfaf-treatment'].definition}</p>
+                  <p>{getPopupContent('qfaf-treatment')?.definition ?? ''}</p>
                 </details>
               )}
             </div>
@@ -2860,8 +2879,8 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
           <p className="wx-disc">
             Estimates only — not investment, tax, or legal advice. Headline savings are gross by
             default; financing fees, wash-sale haircuts, and present-value discounting are opt-in
-            layers. QFAF tax treatment is contingent on qualification. See the full disclosures
-            below.
+            layers. {brandText('QFAF tax treatment is contingent on qualification.')} See the full
+            disclosures below.
           </p>
 
           <DisclaimerFooter />

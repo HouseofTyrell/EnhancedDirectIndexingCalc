@@ -1,6 +1,8 @@
 import { version } from '../../package.json';
+import { brandText, useBrandRevealed } from '../branding';
 
 export function DisclaimerFooter() {
+  useBrandRevealed();
   return (
     <footer className="disclaimer">
       <div className="disclaimer-header">
@@ -25,8 +27,9 @@ export function DisclaimerFooter() {
             <li>NOL rules (80% offset limit) could be modified by future legislation</li>
             <li>State tax treatment varies; some states do not conform to federal rules</li>
             <li>
-              QFAF tax treatment depends on fund qualification and ongoing IRS guidance — see the
-              draft treatment description in the calculator (pending counsel review)
+              {brandText(
+                'QFAF tax treatment depends on fund qualification and ongoing IRS guidance — see the draft treatment description in the calculator (pending counsel review)'
+              )}
             </li>
             <li>
               Tax-loss harvesting reduces cost basis: a portion of projected savings is tax
@@ -38,8 +41,9 @@ export function DisclaimerFooter() {
               taxpayers
             </li>
             <li>
-              Straddle rules (IRC §1092) and passive activity rules (IRC §469) are not modeled;
-              offsetting positions between the QFAF and collateral could defer loss recognition
+              {brandText(
+                'Straddle rules (IRC §1092) and passive activity rules (IRC §469) are not modeled; offsetting positions between the QFAF and collateral could defer loss recognition'
+              )}
             </li>
           </ul>
         </div>
@@ -57,7 +61,11 @@ export function DisclaimerFooter() {
         <div className="disclaimer-section">
           <h4>Suitability</h4>
           <ul>
-            <li>QFAF strategies are designed for Qualified Purchasers ($5M+ investments)</li>
+            <li>
+              {brandText(
+                'QFAF strategies are designed for Qualified Purchasers ($5M+ investments)'
+              )}
+            </li>
             <li>Not suitable for investors who cannot tolerate significant volatility</li>
             <li>This calculator is for educational purposes only</li>
             <li>Consult qualified tax, legal, and investment advisors before investing</li>

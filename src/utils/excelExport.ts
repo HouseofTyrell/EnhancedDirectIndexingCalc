@@ -3,6 +3,7 @@ import type { AdvancedSettings } from '../types';
 import type { ExitTaxAnalysis } from '../calculations/exitTax';
 import { computeEdiInsights, computeStepUpComparison } from '../calculations/ediInsights';
 import { getEffectiveView } from './effectiveAllocation';
+import { brandText } from '../branding';
 
 interface ExportData {
   inputs: CalculatorInputs;
@@ -51,7 +52,7 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
     ...(view.isSplit
       ? view.legs.map(leg => [`  ${leg.label}: ${leg.strategy.name}`, leg.amount])
       : []),
-    ['Auto-Sized QFAF', data.results.sizing.qfafValue],
+    [brandText('Auto-Sized QFAF'), data.results.sizing.qfafValue],
     ['Total Exposure', data.results.sizing.totalExposure],
     [],
     ['Year 1 Tax Savings', data.results.years[0]?.taxSavings ?? 0],
@@ -116,11 +117,11 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
   const yearHeaders: (string | number)[] = [
     'Year',
     'Collateral Value',
-    'QFAF Value',
+    brandText('QFAF Value'),
     'Total Value',
     'ST Losses Harvested',
     'LT Gains Realized',
-    'ST Gains (QFAF)',
+    brandText('ST Gains (QFAF)'),
     'Ordinary Losses',
     'Usable Ordinary Loss',
     'NOL Carryforward',
@@ -173,7 +174,7 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
     ['Filing Status', data.inputs.filingStatus.toUpperCase()],
     ['State', data.inputs.stateCode],
     ['Annual Income', data.inputs.annualIncome],
-    ['QFAF Enabled', data.inputs.qfafEnabled ? 'Yes' : 'No'],
+    [brandText('QFAF Enabled'), data.inputs.qfafEnabled ? 'Yes' : 'No'],
     [],
     ['Federal ST Rate', data.taxRates.federalStRate],
     ['Federal LT Rate', data.taxRates.federalLtRate],
@@ -183,7 +184,7 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
     ['ST→LT Differential', data.taxRates.rateDifferential],
     [],
     ['Projection Years', data.settings.projectionYears],
-    ['QFAF Multiplier', data.settings.qfafMultiplier],
+    [brandText('QFAF Multiplier'), data.settings.qfafMultiplier],
     ['Annual Return', data.settings.defaultAnnualReturn],
     ['Growth Enabled', data.settings.growthEnabled ? 'Yes' : 'No'],
   ];
@@ -219,7 +220,9 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
     [],
     [
       'Investment Risks: Past performance does not guarantee future results. All investments involve risk ' +
-        'of loss. Strategy returns, loss harvesting rates, and QFAF performance are based on historical ' +
+        brandText(
+          'of loss. Strategy returns, loss harvesting rates, and QFAF performance are based on historical '
+        ) +
         'averages and may not be achieved.',
     ],
     [],

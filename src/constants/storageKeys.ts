@@ -27,4 +27,10 @@ export const STORAGE_KEYS = {
   PINNED_EDI_SCENARIO: 'taxCalc:pinned-edi-scenario',
   /** Workspace scenario display name (D-027 top context bar) */
   SCENARIO_NAME: 'taxCalc:scenario-name',
+  /**
+   * Reveal real manager/fund branding (Quantinno / QFAF) instead of the
+   * anonymized public labels. Off by default; toggled via a hidden click
+   * sequence on the app title for internal use only.
+   */
+  REVEAL_BRAND: 'taxCalc:reveal-brand',
 } as const;

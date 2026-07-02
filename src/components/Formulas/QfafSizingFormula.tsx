@@ -1,19 +1,23 @@
+import { brandText, useBrandRevealed } from '../../branding';
+
 interface QfafSizingFormulaProps {
   qfafMultiplier?: number;
 }
 
 export function QfafSizingFormula({ qfafMultiplier = 1.5 }: QfafSizingFormulaProps) {
+  useBrandRevealed();
   const pct = (qfafMultiplier * 100).toFixed(0);
   const decimal = qfafMultiplier.toFixed(2);
   return (
     <div className="formula-doc">
-      <h4>QFAF Auto-Sizing Formula</h4>
+      <h4>{brandText('QFAF Auto-Sizing Formula')}</h4>
       <p>
-        QFAF is sized so its ST gains match the collateral's average ST losses over the sizing
-        window:
+        {brandText(
+          "QFAF is sized so its ST gains match the collateral's average ST losses over the sizing window:"
+        )}
       </p>
       <pre>
-        {`QFAF Value = (Collateral × Avg ST Loss Rate) / ${pct}%
+        {brandText(`QFAF Value = (Collateral × Avg ST Loss Rate) / ${pct}%
 
 Where:
   • Collateral = Your investment amount
@@ -30,14 +34,14 @@ Example ($10M Core 145/45, Yrs 1–10 avg):
 
 Year 1 only ($10M Core 145/45):
   ST Losses = $10M × 28.5% = $2.85M
-  QFAF Value = $2.85M / ${decimal} = $${Math.round(2850000 / qfafMultiplier).toLocaleString()}`}
+  QFAF Value = $2.85M / ${decimal} = $${Math.round(2850000 / qfafMultiplier).toLocaleString()}`)}
       </pre>
 
       <h4>Why This Sizing?</h4>
       <p>
-        QFAF generates short-term gains that would be taxed at ordinary rates (~40.8%). By matching
-        these with collateral ST losses, you convert them to long-term treatment (~23.8%), saving
-        ~17% in taxes.
+        {brandText(
+          'QFAF generates short-term gains that would be taxed at ordinary rates (~40.8%). By matching these with collateral ST losses, you convert them to long-term treatment (~23.8%), saving ~17% in taxes.'
+        )}
       </p>
     </div>
   );

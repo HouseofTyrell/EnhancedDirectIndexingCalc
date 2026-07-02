@@ -1,5 +1,6 @@
 // Popup content definitions for all calculated fields
 // Each popup includes: definition, formula (if applicable), and impact explanation
+import { brandText } from './branding';
 
 export interface PopupContent {
   title: string;
@@ -926,7 +927,17 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   },
 };
 
-// Helper function to get popup content by key
+// Helper function to get popup content by key.
+// Routes every string field through brandText so manager/fund names are
+// anonymized in the public build (reactive; components reading this must
+// subscribe via useBrandRevealed / useBrandText to re-render on toggle).
 export function getPopupContent(key: string): PopupContent | undefined {
-  return POPUP_CONTENT[key];
+  const content = POPUP_CONTENT[key];
+  if (!content) return undefined;
+  return {
+    title: brandText(content.title),
+    definition: brandText(content.definition),
+    formula: content.formula === undefined ? undefined : brandText(content.formula),
+    impact: brandText(content.impact),
+  };
 }

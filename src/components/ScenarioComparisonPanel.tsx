@@ -3,6 +3,7 @@ import { PinnedScenario, CalculatorInputs, AdvancedSettings, CalculationResult }
 import { formatPercent, formatCurrencyAbbreviated } from '../utils/formatters';
 import { getEffectiveView } from '../utils/effectiveAllocation';
 import './ScenarioComparisonPanel.css';
+import { brandText, useBrandRevealed } from '../branding';
 
 // ============================================
 // MULTI-SCENARIO COMPARISON PANEL
@@ -161,7 +162,7 @@ function detectKeyDifferences(scenarios: PinnedScenario[]): string[] {
   if (collaterals.size > 1) diffs.push('Collateral');
 
   const qfafStates = new Set(scenarios.map(s => s.inputs.qfafEnabled));
-  if (qfafStates.size > 1) diffs.push('QFAF');
+  if (qfafStates.size > 1) diffs.push(brandText('QFAF'));
 
   const states = new Set(scenarios.map(s => s.inputs.stateCode));
   if (states.size > 1) diffs.push('State');
@@ -196,6 +197,7 @@ function MultiScenarioPanel({
   onUnpin,
   onUnpinAll,
 }: ScenarioComparisonPanelProps) {
+  useBrandRevealed();
   const [collapsed, setCollapsed] = useState(false);
 
   const keyDiffs = detectKeyDifferences(scenarios);
@@ -264,7 +266,9 @@ function MultiScenarioPanel({
                                 </span>
                               )}
                               {!summary.qfafEnabled && (
-                                <span className="scenario-tag scenario-tag--no-qfaf">No QFAF</span>
+                                <span className="scenario-tag scenario-tag--no-qfaf">
+                                  {brandText('No QFAF')}
+                                </span>
                               )}
                               <span className="scenario-header__meta">{summary.collateral}</span>
                               {summary.qfafEnabled && (
@@ -293,7 +297,7 @@ function MultiScenarioPanel({
 
                   return (
                     <tr key={metric.label}>
-                      <td className="comparison-table__label">{metric.label}</td>
+                      <td className="comparison-table__label">{brandText(metric.label)}</td>
                       {values.map((val, i) => (
                         <td
                           key={scenarios[i].id}
@@ -325,6 +329,7 @@ function LegacyPanel({
   onRestore,
   onReplacePin,
 }: LegacyScenarioComparisonPanelProps) {
+  useBrandRevealed();
   const [collapsed, setCollapsed] = useState(false);
 
   const metrics = METRIC_DEFS.map(m => {
@@ -422,7 +427,7 @@ function LegacyPanel({
 
                 return (
                   <tr key={metric.label}>
-                    <td className="comparison-table__label">{metric.label}</td>
+                    <td className="comparison-table__label">{brandText(metric.label)}</td>
                     <td className="comparison-table__value">
                       {formatMetricValue(metric.pinnedValue, metric.format)}
                     </td>

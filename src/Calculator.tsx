@@ -51,6 +51,7 @@ import { SensitivityAnalysis } from './AdvancedMode/SensitivityAnalysis';
 import { ScenarioAnalysis } from './AdvancedMode/ScenarioAnalysis';
 import { StrategyComparison } from './AdvancedMode/StrategyComparison';
 import { MeetingMode } from './components/MeetingMode/MeetingMode';
+import { brandText, useBrandRevealed } from './branding';
 
 // Generate default year overrides for 10 years
 const generateDefaultOverrides = (baseIncome: number): YearOverride[] => {
@@ -68,6 +69,7 @@ interface CalculatorProps {
 }
 
 export function Calculator({ isActive = true }: CalculatorProps) {
+  useBrandRevealed();
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULTS);
   const advancedMode = useAdvancedMode();
   const { isExpanded } = useScrollHeader('scroll-sentinel');
@@ -414,9 +416,11 @@ export function Calculator({ isActive = true }: CalculatorProps) {
           <span>Meeting Mode</span>
         </button>
         <h1>Tax Optimization Calculator</h1>
-        <p className="subtitle">QFAF + Collateral Strategy</p>
+        <p className="subtitle">{brandText('QFAF + Collateral Strategy')}</p>
         <p className="header-description">
-          Model tax-loss harvesting strategies with QFAF overlays and collateral optimization.
+          {brandText(
+            'Model tax-loss harvesting strategies with QFAF overlays and collateral optimization.'
+          )}
         </p>
         <div className="header-feedback-banner">
           This tool is in active development. Feedback and suggestions are welcome!{' '}
