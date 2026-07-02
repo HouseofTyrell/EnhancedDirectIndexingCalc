@@ -506,6 +506,30 @@ popups gain per-leg deleverage attribution; the conflict chips become target sel
 No change to single-strategy mode, to D-016/D-017 attribution, or to the sensitivity
 grid.
 
+### D-029 — Public anonymization of manager/fund names + hidden reveal toggle
+**Date:** 2026-07-02
+**Decision (owner):** For the general-public build, the specific manager brand
+**"Quantinno"** and its fund **"QFAF" / "Quantinno Fundamental Arbitrage Fund"** (D-007)
+are replaced with generic labels. Anonymized is the **DEFAULT**; the owner can reveal the
+real names for internal use via a hidden trigger.
+**Mapping (anonymized):** `Quantinno` → **Manager**, `QFAF` → **Fund**, full fund name →
+**Fundamental Arbitrage Fund** (the "Quantinno" prefix and any `(QFAF)` gloss are dropped).
+The bare noun forms are intentional so a preceding article flows through naturally ("the
+QFAF" → "the Fund"; "Quantinno alpha" → "Manager alpha") while standalone labels stay
+clean ("QFAF Value" → "Fund Value", not "the Fund Value").
+**Hidden toggle:** **five rapid clicks on the workspace brand** (`.wx-brand`) flip real
+names on/off, with a brief "Internal names on / Anonymized" confirmation. No cursor,
+tooltip, or ARIA affordance — undiscoverable to public users.
+**Status: IMPLEMENTED (2026-07-02).** New `src/branding.ts` holds the transform +
+a global `localStorage`-backed reveal store (`useSyncExternalStore`, key
+`taxCalc:reveal-brand`, default off) so every subscribed component updates live — no page
+reload, in-progress inputs preserved. All user-visible strings route through `brandText()`;
+the 55 popup strings flow through the single `getPopupContent()` chokepoint. Only display
+strings changed — data-model field names, CSS classes, and CSV/Excel serialization keys
+keep the literal `qfaf`/`quantinno` spelling, so no CalculatorInputs field was added and
+CSV/Excel round-trips are unaffected. **Standing requirement:** new user-visible
+manager/fund text must be wrapped in `brandText()` (or come from `getPopupContent`).
+
 ---
 
 ## Pending decision queue (next batches)

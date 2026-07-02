@@ -1,3 +1,5 @@
+import { brandText, useBrandRevealed } from '../../branding';
+
 interface ProjectionFormulaProps {
   qfafMultiplier?: number;
   projectionYears?: number;
@@ -7,12 +9,13 @@ export function ProjectionFormula({
   qfafMultiplier = 1.5,
   projectionYears = 10,
 }: ProjectionFormulaProps) {
+  useBrandRevealed();
   const pct = (qfafMultiplier * 100).toFixed(0);
   return (
     <div className="formula-doc">
       <h4>{projectionYears}-Year Projection Assumptions</h4>
       <pre>
-        {`Portfolio Growth: 7% annual return (conservative)
+        {brandText(`Portfolio Growth: 7% annual return (conservative)
 
 Each Year:
   QFAF Value(n+1) = QFAF Value(n) × 1.07
@@ -22,7 +25,7 @@ Tax Events (annual, based on year-start values):
   QFAF ST Gains = QFAF Value × ${pct}%
   QFAF Ordinary Losses = QFAF Value × ${pct}%
   Collateral ST Losses = Collateral Value × ST Loss Rate
-  Collateral LT Gains = Collateral Value × LT Gain Rate`}
+  Collateral LT Gains = Collateral Value × LT Gain Rate`)}
       </pre>
 
       <h4>Tax Savings Calculation</h4>

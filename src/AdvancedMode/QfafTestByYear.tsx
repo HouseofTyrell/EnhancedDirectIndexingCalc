@@ -23,6 +23,7 @@ import {
   HIST_ORD_LOSS_AVG,
 } from '../qfafTestData';
 import './QfafTestByYear.css';
+import { brandText, useBrandRevealed } from '../branding';
 
 interface QfafTestByYearProps {
   filingStatus: FilingStatus;
@@ -144,6 +145,7 @@ const ROW_DEFINITIONS: RowDef[] = [
 ];
 
 export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
+  useBrandRevealed();
   const [state, dispatch] = useReducer(reducer, null, () => ({
     assumptions: { ...DEFAULT_ASSUMPTIONS },
   }));
@@ -201,7 +203,7 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
         <h3>Assumptions: Adjust the cells in orange</h3>
         <div className="assumptions-grid">
           <div className="assumption-row">
-            <label>Initial QFAF Investment</label>
+            <label>{brandText('Initial QFAF Investment')}</label>
             <div className="input-with-prefix editable-cell">
               <span className="prefix">$</span>
               <input
@@ -290,7 +292,8 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
 
           <div className="assumption-row assumption-row-wide">
             <label>
-              QFAF Generation Rate: {(state.assumptions.qfafGenerationRate * 100).toFixed(0)}%
+              {brandText('QFAF Generation Rate')}:{' '}
+              {(state.assumptions.qfafGenerationRate * 100).toFixed(0)}%
             </label>
             <div className="generation-rate-slider">
               <input
@@ -349,7 +352,7 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
                   <td className="row-label">
                     {rowDef.key === 'dealsCollateralValue'
                       ? `Deals Collateral Value (${getStrategyLabel(state.assumptions.coreStrategyId)})`
-                      : rowDef.label}
+                      : brandText(rowDef.label)}
                   </td>
                   {results.map(result => (
                     <td key={result.year} className="cell-value">
@@ -370,7 +373,7 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
 
       {/* Historical Performance Section */}
       <div className="historical-performance-section">
-        <h3>Historical QFAF Performance</h3>
+        <h3>{brandText('Historical QFAF Performance')}</h3>
 
         <div className="historical-tables-grid">
           {/* Annual Returns + Breakdown */}
@@ -482,16 +485,16 @@ export function QfafTestByYear({ filingStatus }: QfafTestByYearProps) {
         <h4>Calculation Notes</h4>
         <ul>
           <li>
-            <strong>QFAF Subscription:</strong> Sized based on initial investment with Year 1
-            adjustment factor (1.049×), then decays ~7.7% annually.
+            <strong>{brandText('QFAF Subscription:')}</strong> Sized based on initial investment
+            with Year 1 adjustment factor (1.049×), then decays ~7.7% annually.
           </li>
           <li>
-            <strong>Deals Collateral:</strong> Calculated so total ST losses = QFAF ST gains.
-            Combines Overlay (growing at {(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%) + Core
-            collateral.
+            <strong>Deals Collateral:</strong> Calculated so{' '}
+            {brandText('total ST losses = QFAF ST gains')}. Combines Overlay (growing at{' '}
+            {(QUANTINNO_ALPHA_RATE * 100).toFixed(2)}%) + Core collateral.
           </li>
           <li>
-            <strong>Ordinary Losses:</strong> QFAF generates{' '}
+            <strong>Ordinary Losses:</strong> {brandText('QFAF generates')}{' '}
             {(state.assumptions.qfafGenerationRate * 100).toFixed(0)}% of subscription as ordinary
             losses.
           </li>

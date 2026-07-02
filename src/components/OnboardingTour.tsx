@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { brandText, useBrandRevealed } from '../branding';
 
 const TOUR_KEY = STORAGE_KEYS.TOUR_COMPLETED;
 
@@ -43,6 +44,7 @@ const STEPS: TourStep[] = [
 ];
 
 export function OnboardingTour() {
+  useBrandRevealed();
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
   const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(
@@ -119,9 +121,9 @@ export function OnboardingTour() {
           <span className="tour-tooltip__step">
             {step + 1} / {STEPS.length}
           </span>
-          <h4 className="tour-tooltip__title">{currentStep.title}</h4>
+          <h4 className="tour-tooltip__title">{brandText(currentStep.title)}</h4>
         </div>
-        <p className="tour-tooltip__description">{currentStep.description}</p>
+        <p className="tour-tooltip__description">{brandText(currentStep.description)}</p>
         <div className="tour-tooltip__actions">
           <button className="tour-tooltip__skip" onClick={dismiss}>
             Skip Tour

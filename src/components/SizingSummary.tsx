@@ -6,6 +6,7 @@ import { useValueFlash } from '../hooks/useValueFlash';
 import { useDelta } from '../hooks/useDelta';
 import { DeltaBadge } from './DeltaBadge';
 import { PartialYearBadge } from './PartialYearBadge';
+import { brandText, useBrandRevealed } from '../branding';
 
 interface SizingSummaryProps {
   results: CalculationResult;
@@ -27,6 +28,7 @@ export function SizingSummary({
   qfafMultiplier,
   startMonth = 1,
 }: SizingSummaryProps) {
+  useBrandRevealed();
   const year1Savings = results.years[0]?.taxSavings ?? 0;
   const year2Savings = results.years[1]?.taxSavings ?? 0;
 
@@ -49,11 +51,13 @@ export function SizingSummary({
       stepLabel="Optimized Strategy"
       title="Strategy Sizing"
       headerAction={
-        <InfoPopup title="QFAF Auto-Sizing">
+        <InfoPopup title={brandText('QFAF Auto-Sizing')}>
           <QfafSizingFormula qfafMultiplier={qfafMultiplier} />
         </InfoPopup>
       }
-      guidance="We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits."
+      guidance={brandText(
+        'We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits.'
+      )}
       className="sizing-section"
     >
       <div className="sizing-cards">
@@ -89,7 +93,7 @@ export function SizingSummary({
               contentKey="auto-sized-qfaf"
               currentValue={formatCurrency(results.sizing.qfafValue)}
             >
-              Auto-Sized QFAF
+              {brandText('Auto-Sized QFAF')}
             </InfoText>
           </span>
           <span className="sizing-value" ref={qfafFlash}>
@@ -160,8 +164,8 @@ export function SizingSummary({
                 <span>
                   <InfoText contentKey="year1-st-gains" currentValue={formatCurrency(stGains)}>
                     {results.sizing.sizingYears === 1
-                      ? 'Year 1 ST Gains (QFAF)'
-                      : 'Matched ST Gains (QFAF)'}
+                      ? brandText('Year 1 ST Gains (QFAF)')
+                      : brandText('Matched ST Gains (QFAF)')}
                   </InfoText>
                 </span>
                 <span className="negative">({formatCurrency(stGains)})</span>
@@ -200,7 +204,7 @@ export function SizingSummary({
                     contentKey="year1-ordinary-losses"
                     currentValue={formatCurrency(ordLosses)}
                   >
-                    Year 1 Ordinary Loss (QFAF)
+                    {brandText('Year 1 Ordinary Loss (QFAF)')}
                   </InfoText>
                 </span>
                 <span className="positive">{formatCurrency(ordLosses)}</span>

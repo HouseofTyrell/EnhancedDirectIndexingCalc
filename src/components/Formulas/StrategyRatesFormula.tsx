@@ -1,7 +1,10 @@
+import { brandText, useBrandRevealed } from '../../branding';
+
 export function StrategyRatesFormula() {
+  useBrandRevealed();
   return (
     <div className="formula-doc">
-      <h4>Quantinno Beta 1 Strategy Rates</h4>
+      <h4>{brandText('Quantinno Beta 1 Strategy Rates')}</h4>
       <p>Each strategy has fixed annual ST loss and LT gain rates:</p>
 
       <h5>Core Strategies (Cash Funded)</h5>

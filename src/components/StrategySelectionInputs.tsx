@@ -9,6 +9,7 @@ import {
 } from '../utils/formatters';
 import { getEffectiveView } from '../utils/effectiveAllocation';
 import { InfoPopup } from '../InfoPopup';
+import { brandText, useBrandRevealed } from '../branding';
 
 const DEFAULT_SPLIT: SplitAllocation = {
   enabled: false,
@@ -47,6 +48,7 @@ export function StrategySelectionInputs({
   onSetRateEditorOpen,
   onRateVersionIncrement,
 }: StrategySelectionInputsProps) {
+  useBrandRevealed();
   const split = getSplit(inputs);
   const isSplitEnabled = inputs.splitAllocation?.enabled === true;
 
@@ -72,7 +74,9 @@ export function StrategySelectionInputs({
         </label>
         <span className="input-hint">
           {isSplitEnabled
-            ? 'Cash funds a Core leg; appreciated stock funds an Overlay leg. QFAF auto-sizes against the combined ST losses.'
+            ? brandText(
+                'Cash funds a Core leg; appreciated stock funds an Overlay leg. QFAF auto-sizes against the combined ST losses.'
+              )
             : 'Single strategy: all collateral runs one Core or Overlay strategy.'}
         </span>
       </div>
@@ -354,7 +358,7 @@ export function StrategySelectionInputs({
               onChange={e => onUpdateInput('qfafEnabled', e.target.checked)}
             />
             <span className="toggle-switch"></span>
-            QFAF Overlay
+            {brandText('QFAF Overlay')}
           </label>
           <span className="input-hint">
             {inputs.qfafEnabled ? 'ST gains + ordinary losses' : 'Collateral-only'}
@@ -814,28 +818,37 @@ export function StrategySelectionInputs({
         <>
           <div className="qfaf-inputs-section">
             <div className="qfaf-inputs-header">
-              <h4>QFAF Configuration</h4>
-              <InfoPopup title="QFAF Overlay Parameters">
+              <h4>{brandText('QFAF Configuration')}</h4>
+              <InfoPopup title={brandText('QFAF Overlay Parameters')}>
                 <p>
-                  <strong>Sizing Mode:</strong> Dynamic (default) resizes QFAF each year to match
-                  decaying EDI losses — minimizes ST gain leakage. Fixed holds QFAF constant through
-                  the full duration.
+                  <strong>Sizing Mode:</strong>{' '}
+                  {brandText(
+                    'Dynamic (default) resizes QFAF each year to match decaying EDI losses — minimizes ST gain leakage. Fixed holds QFAF constant through the full duration.'
+                  )}
                 </p>
                 <p>
-                  <strong>QFAF Multiplier:</strong> Controls the size of the QFAF overlay relative
-                  to the collateral. Historical range: 1.31x to 1.58x (avg 1.42x).
+                  <strong>{brandText('QFAF Multiplier:')}</strong>{' '}
+                  {brandText(
+                    'Controls the size of the QFAF overlay relative to the collateral. Historical range: 1.31x to 1.58x (avg 1.42x).'
+                  )}
                 </p>
                 <p>
-                  <strong>Sizing Window:</strong> Number of years averaged for QFAF sizing. Default:
-                  5 years (conservative multi-year average). Capped by Duration.
+                  <strong>Sizing Window:</strong>{' '}
+                  {brandText(
+                    'Number of years averaged for QFAF sizing. Default: 5 years (conservative multi-year average). Capped by Duration.'
+                  )}
                 </p>
                 <p>
-                  <strong>Duration:</strong> Years QFAF runs before breakeven unwind. Default: 5
-                  years. Reducing duration auto-caps the sizing window.
+                  <strong>Duration:</strong>{' '}
+                  {brandText(
+                    'Years QFAF runs before breakeven unwind. Default: 5 years. Reducing duration auto-caps the sizing window.'
+                  )}
                 </p>
                 <p>
-                  <strong>Sizing Cushion:</strong> Reduces auto-sized QFAF for conservative sizing.
-                  Default: 0% (no cushion). Range: 0-10%.
+                  <strong>Sizing Cushion:</strong>{' '}
+                  {brandText(
+                    'Reduces auto-sized QFAF for conservative sizing. Default: 0% (no cushion). Range: 0-10%.'
+                  )}
                 </p>
               </InfoPopup>
             </div>
@@ -845,7 +858,7 @@ export function StrategySelectionInputs({
               <div
                 className="btn-group btn-group--compact"
                 role="radiogroup"
-                aria-label="QFAF sizing mode"
+                aria-label={brandText('QFAF sizing mode')}
               >
                 <button
                   type="button"
@@ -868,14 +881,16 @@ export function StrategySelectionInputs({
               </div>
               <span className="input-hint">
                 {inputs.qfafSizingMode === 'dynamic'
-                  ? 'QFAF resizes each year to match decaying EDI losses — reduces ST gain leakage'
-                  : 'QFAF sized once at inception, held constant through duration'}
+                  ? brandText(
+                      'QFAF resizes each year to match decaying EDI losses — reduces ST gain leakage'
+                    )
+                  : brandText('QFAF sized once at inception, held constant through duration')}
               </span>
             </div>
 
             <div className="input-pair">
               <div className="input-group">
-                <label htmlFor="qfafMultiplier">QFAF Multiplier</label>
+                <label htmlFor="qfafMultiplier">{brandText('QFAF Multiplier')}</label>
                 <input
                   id="qfafMultiplier"
                   type="range"
@@ -899,7 +914,9 @@ export function StrategySelectionInputs({
                   <span>175%</span>
                 </div>
                 <span className="input-hint">
-                  Historical: min 131%, max 158%, avg 142% — QFAF MV as % of collateral
+                  {brandText(
+                    'Historical: min 131%, max 158%, avg 142% — QFAF MV as % of collateral'
+                  )}
                 </span>
               </div>
 
@@ -936,14 +953,14 @@ export function StrategySelectionInputs({
                   </>
                 )}
                 <span className="input-hint">
-                  Years averaged for QFAF sizing — Default: 5 (capped by duration)
+                  {brandText('Years averaged for QFAF sizing — Default: 5 (capped by duration)')}
                 </span>
               </div>
             </div>
 
             <div className="input-pair">
               <div className="input-group">
-                <label htmlFor="qfafDuration">QFAF Duration</label>
+                <label htmlFor="qfafDuration">{brandText('QFAF Duration')}</label>
                 <input
                   id="qfafDuration"
                   type="range"
@@ -971,7 +988,7 @@ export function StrategySelectionInputs({
                   <span>10 years</span>
                 </div>
                 <span className="input-hint">
-                  Years QFAF runs before breakeven unwind — default: 5
+                  {brandText('Years QFAF runs before breakeven unwind — default: 5')}
                 </span>
               </div>
 
@@ -999,7 +1016,9 @@ export function StrategySelectionInputs({
                   </span>
                   <span>10%</span>
                 </div>
-                <span className="input-hint">Reduces auto-sized QFAF for conservative sizing</span>
+                <span className="input-hint">
+                  {brandText('Reduces auto-sized QFAF for conservative sizing')}
+                </span>
               </div>
             </div>
 
@@ -1007,10 +1026,11 @@ export function StrategySelectionInputs({
             {advancedSettings.growthEnabled && (
               <div className="input-group">
                 <label htmlFor="qfafAnnualReturn">
-                  <InfoPopup title="QFAF Return Rate">
+                  <InfoPopup title={brandText('QFAF Return Rate')}>
                     <p>
-                      QFAF may have different return characteristics than index-tracking collateral
-                      due to:
+                      {brandText(
+                        'QFAF may have different return characteristics than index-tracking collateral due to:'
+                      )}
                     </p>
                     <ul>
                       <li>Active management fees</li>
@@ -1022,11 +1042,11 @@ export function StrategySelectionInputs({
                       {(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%)
                     </p>
                     <p>
-                      <strong>Override:</strong> Set a separate return assumption for QFAF growth
-                      modeling
+                      <strong>Override:</strong>{' '}
+                      {brandText('Set a separate return assumption for QFAF growth modeling')}
                     </p>
                   </InfoPopup>{' '}
-                  QFAF Return Rate (%)
+                  {brandText('QFAF Return Rate (%)')}
                 </label>
                 <div className="qfaf-return-controls">
                   <label className="use-default-checkbox">
@@ -1078,8 +1098,12 @@ export function StrategySelectionInputs({
                 </div>
                 <span className="input-hint">
                   {advancedSettings.qfafAnnualReturn === null
-                    ? `QFAF growing at collateral rate (${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%)`
-                    : `QFAF growing at ${(advancedSettings.qfafAnnualReturn * 100).toFixed(1)}% vs collateral ${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%`}
+                    ? brandText(
+                        `QFAF growing at collateral rate (${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%)`
+                      )
+                    : brandText(
+                        `QFAF growing at ${(advancedSettings.qfafAnnualReturn * 100).toFixed(1)}% vs collateral ${(advancedSettings.defaultAnnualReturn * 100).toFixed(1)}%`
+                      )}
                 </span>
               </div>
             )}

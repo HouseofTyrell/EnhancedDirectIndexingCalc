@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getPopupContent } from './popupContent';
+import { useBrandRevealed } from './branding';
 
 interface InfoPopupProps {
   title: string;
@@ -114,6 +115,7 @@ interface FieldInfoPopupProps {
 }
 
 export function FieldInfoPopup({ contentKey, currentValue, breakdown }: FieldInfoPopupProps) {
+  useBrandRevealed(); // re-render when the brand-reveal toggle flips
   const content = getPopupContent(contentKey);
   if (!content) return null;
 
@@ -134,6 +136,7 @@ interface InfoTextProps {
 
 export function InfoText({ contentKey, children, currentValue, breakdown }: InfoTextProps) {
   const [isOpen, setIsOpen] = useState(false);
+  useBrandRevealed(); // re-render when the brand-reveal toggle flips
   const content = getPopupContent(contentKey);
 
   // If no content, just render the children without popup functionality

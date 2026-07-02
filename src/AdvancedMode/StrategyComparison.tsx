@@ -5,6 +5,7 @@ import { CalculatorInputs, ComparisonResult } from '../types';
 import { InfoText } from '../InfoPopup';
 import { formatCurrency, formatPercent } from '../utils/formatters';
 import './StrategyComparison.css';
+import { brandText, useBrandRevealed } from '../branding';
 
 type SizingMode = 'fixed' | 'dynamic';
 
@@ -27,6 +28,7 @@ export const StrategyComparison = memo(function StrategyComparison({
   onChange,
   projectionYears,
 }: StrategyComparisonProps) {
+  useBrandRevealed();
   const years = projectionYears ?? 10;
 
   // Per-strategy sizing modes (defaults to the base input's sizing mode)
@@ -131,7 +133,7 @@ export const StrategyComparison = memo(function StrategyComparison({
         Compare different strategies side-by-side to find the best fit for your situation. Select
         2-3 strategies below.
         {baseInputs.qfafEnabled &&
-          ' Each strategy can use Fixed or Dynamic QFAF sizing independently.'}
+          brandText(' Each strategy can use Fixed or Dynamic QFAF sizing independently.')}
       </p>
 
       {/* Strategy Selector */}
@@ -211,7 +213,7 @@ export const StrategyComparison = memo(function StrategyComparison({
             <tbody>
               <tr className={getBest('qfafRequired') ? 'has-winner' : ''}>
                 <td>
-                  <InfoText contentKey="comp-qfaf-required">QFAF Required</InfoText>
+                  <InfoText contentKey="comp-qfaf-required">{brandText('QFAF Required')}</InfoText>
                 </td>
                 {comparisonResults.map(result => (
                   <td
@@ -311,7 +313,7 @@ export const StrategyComparison = memo(function StrategyComparison({
               if (!best) return 'N/A';
               return `${best.strategyName} (${best.sizingMode})`;
             })()}{' '}
-            (lowest QFAF required)
+            {brandText('(lowest QFAF required)')}
           </p>
         </div>
       )}

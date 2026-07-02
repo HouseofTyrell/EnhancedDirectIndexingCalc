@@ -13,6 +13,7 @@ import {
 import { YearResult } from './types';
 import { formatCurrency, formatCurrencyAbbreviated } from './utils/formatters';
 import { useDarkMode } from './hooks/useDarkMode';
+import { brandText, useBrandRevealed } from './branding';
 
 interface WealthChartProps {
   data: YearResult[];
@@ -117,6 +118,7 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
   startMonth,
 }: WealthChartProps) {
   const { isDark } = useDarkMode();
+  useBrandRevealed(); // re-render legend/tooltip when the brand-reveal toggle flips
 
   // Memoize chart data transformation with confidence bands (007)
   const chartData = useMemo(
@@ -243,6 +245,7 @@ export const PortfolioValueChart = React.memo(function PortfolioValueChart({
           <Line
             type="monotone"
             dataKey="QFAF Value"
+            name={brandText('QFAF Value')}
             stroke="#6366f1"
             strokeWidth={2}
             dot={{ r: 3 }}

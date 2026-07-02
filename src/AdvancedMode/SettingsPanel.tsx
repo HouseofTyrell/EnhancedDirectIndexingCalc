@@ -6,6 +6,7 @@ import {
   formatPercent as formatPercentBase,
 } from '../utils/formatters';
 import './SettingsPanel.css';
+import { brandText, useBrandRevealed } from '../branding';
 
 interface SettingsPanelProps {
   settings: AdvancedSettings;
@@ -17,6 +18,7 @@ interface SettingsPanelProps {
 const formatPercent = (value: number) => formatPercentBase(value, 1);
 
 export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProps) {
+  useBrandRevealed();
   const handleChange = (path: string, value: number | boolean) => {
     const keys = path.split('.');
     if (keys.length === 1) {
@@ -70,14 +72,16 @@ export function SettingsPanel({ settings, onChange, onReset }: SettingsPanelProp
       <div className="settings-grid">
         {/* QFAF Mechanics */}
         <div className="settings-section">
-          <h4>QFAF Mechanics</h4>
+          <h4>{brandText('QFAF Mechanics')}</h4>
 
           <div className="setting-row">
             <div className="setting-label">
               <span className="setting-name">
-                <InfoText contentKey="setting-qfaf-growth">QFAF Growth</InfoText>
+                <InfoText contentKey="setting-qfaf-growth">{brandText('QFAF Growth')}</InfoText>
               </span>
-              <span className="setting-hint">Whether QFAF appreciates with market returns</span>
+              <span className="setting-hint">
+                {brandText('Whether QFAF appreciates with market returns')}
+              </span>
             </div>
             <label className={`toggle-switch ${!settings.qfafGrowthEnabled ? 'modified' : ''}`}>
               <input

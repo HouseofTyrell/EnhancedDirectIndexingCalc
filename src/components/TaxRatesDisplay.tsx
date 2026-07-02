@@ -2,6 +2,7 @@ import React from 'react';
 import { InfoPopup, InfoText, TaxRatesFormula } from '../InfoPopup';
 import { CollapsibleSection } from './CollapsibleSection';
 import { useValueFlash } from '../hooks/useValueFlash';
+import { brandText, useBrandRevealed } from '../branding';
 
 /**
  * Props for the TaxRatesDisplay component.
@@ -31,6 +32,7 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
   combinedStRate,
   combinedLtRate,
 }: TaxRatesDisplayProps) {
+  useBrandRevealed();
   const formatRate = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 
   // Flash on rate changes
@@ -51,7 +53,9 @@ export const TaxRatesDisplay = React.memo(function TaxRatesDisplay({
           <TaxRatesFormula />
         </InfoPopup>
       }
-      guidance="These marginal rates determine the value of each tax event. Higher ordinary rates increase the value of QFAF ordinary loss deductions."
+      guidance={brandText(
+        'These marginal rates determine the value of each tax event. Higher ordinary rates increase the value of QFAF ordinary loss deductions.'
+      )}
       className="tax-rates-section"
     >
       <div className="tax-rates-rows">

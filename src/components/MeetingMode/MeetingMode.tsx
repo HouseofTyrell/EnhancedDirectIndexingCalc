@@ -13,6 +13,7 @@ import { formatWithCommas, parseFormattedNumber } from '../../utils/formatters';
 import { getEffectiveView } from '../../utils/effectiveAllocation';
 import { ExitTaxAnalysis } from '../../calculations/exitTax';
 import { computeEdiInsights, computeStepUpComparison } from '../../calculations/ediInsights';
+import { brandText, useBrandRevealed } from '../../branding';
 
 // Design tokens from EDI Calc Meeting Mode.html
 const M = {
@@ -251,6 +252,7 @@ function Rail({
   onPinScenario: () => void;
   hasPin: boolean;
 }) {
+  useBrandRevealed();
   const projYears = advancedSettings.projectionYears;
   const clampYear = (raw: string) => Math.max(1, Math.min(projYears, parseInt(raw, 10) || 1));
   const effectiveView = useMemo(() => getEffectiveView(inputs), [inputs]);
@@ -469,7 +471,7 @@ function Rail({
                     letterSpacing: 0.4,
                   }}
                 >
-                  QFAF
+                  {brandText('QFAF')}
                 </div>
                 <div
                   style={{
@@ -762,7 +764,7 @@ function Rail({
                   background: inputs.qfafEnabled ? '#4ade80' : '#f87171',
                 }}
               />
-              QFAF overlay
+              {brandText('QFAF overlay')}
             </span>
             <input
               type="checkbox"
@@ -1058,7 +1060,7 @@ function Rail({
           </div>
           {(
             [
-              ['QFAF value', fmtCurrency(results.sizing.qfafValue), '#38bdf8'],
+              [brandText('QFAF value'), fmtCurrency(results.sizing.qfafValue), '#38bdf8'],
               ['Total exposure', fmtCurrency(results.sizing.totalExposure), '#60a5fa'],
               ['Combined ST', fmtPercent(taxRates.combinedStRate), '#fb7185'],
               ['Ordinary (deductions)', fmtPercent(taxRates.combinedOrdinaryRate), '#34d399'],
@@ -1903,6 +1905,7 @@ function PrintPageHeader({
 }
 
 function PrintPageFooter() {
+  useBrandRevealed();
   return (
     <div
       style={{
@@ -1923,11 +1926,12 @@ function PrintPageFooter() {
       (it may become permanent via basis step-up at death or charitable transfer). Ordinary loss
       deductions are limited by IRC §461(l) ($512K MFJ / $256K others, 2026); excess becomes an NOL
       usable against up to 80% of future taxable income. Projections assume 0–15% of harvested
-      losses are disallowed as wash sales and that the QFAF (Quantinno Fundamental Arbitrage Fund)
-      qualifies for the modeled tax treatment under current IRS guidance, which may change. State
-      treatment varies — CA, NY, PA, NJ, MA, and WA differ materially from the federal rules modeled
-      here. Consult qualified tax, legal, and investment advisors before acting. Past performance
-      does not guarantee future results.
+      losses are disallowed as wash sales and that the{' '}
+      {brandText('QFAF (Quantinno Fundamental Arbitrage Fund)')} qualifies for the modeled tax
+      treatment under current IRS guidance, which may change. State treatment varies — CA, NY, PA,
+      NJ, MA, and WA differ materially from the federal rules modeled here. Consult qualified tax,
+      legal, and investment advisors before acting. Past performance does not guarantee future
+      results.
     </div>
   );
 }
@@ -1961,6 +1965,7 @@ function MechanicsView({
   currentStrategy: Strategy | undefined;
   filingLabel: string;
 }) {
+  useBrandRevealed();
   const strategyLabel = currentStrategy?.name ?? 'Overlay strategy';
   const totalStLossesHarvested = visibleYears.reduce((s, y) => s + y.stLossesHarvested, 0);
   // EDI mode (QFAF off): no QFAF, no ordinary losses, no NOL — the story is
@@ -1973,7 +1978,9 @@ function MechanicsView({
           n: 1,
           title: 'Harvest losses systematically',
           tone: M.accent,
-          body: `The long/short ${strategyLabel} overlay realizes short-term losses on constituent positions while maintaining benchmark-like exposure. No QFAF is used in this mode, so there are no ordinary-loss deductions or NOL.`,
+          body: brandText(
+            `The long/short ${strategyLabel} overlay realizes short-term losses on constituent positions while maintaining benchmark-like exposure. No QFAF is used in this mode, so there are no ordinary-loss deductions or NOL.`
+          ),
           metric: fmtCurrency(totalStLossesHarvested),
           metricLabel: 'ST losses harvested',
         },
@@ -2005,11 +2012,13 @@ function MechanicsView({
     : [
         {
           n: 1,
-          title: 'Establish QFAF',
+          title: brandText('Establish QFAF'),
           tone: M.accent,
-          body: 'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.',
+          body: brandText(
+            'A Quantinno Fundamental Arbitrage Fund (QFAF) overlay would be structured against collateral, designed to give exposure without a taxable sale of the underlying. Tax treatment depends on fund qualification and current IRS guidance.'
+          ),
           metric: fmtCurrency(qfafValue),
-          metricLabel: 'QFAF value',
+          metricLabel: brandText('QFAF value'),
         },
         {
           n: 2,
@@ -2060,7 +2069,9 @@ function MechanicsView({
       : {
           heading: 'Why the losses are ordinary (§475(f))',
           body:
-            'The QFAF is modeled as a limited partnership engaged in high-turnover arbitrage trading ' +
+            brandText(
+              'The QFAF is modeled as a limited partnership engaged in high-turnover arbitrage trading '
+            ) +
             'that has made a mark-to-market election under IRC §475(f). Under that election the ' +
             "fund's trading losses are ordinary in character and generally non-passive, which is why " +
             'they can offset W-2 and other ordinary income. This treatment is a working draft pending ' +
@@ -2367,6 +2378,7 @@ export function MeetingMode({
   whatIfs,
   onUpdateWhatIfs,
 }: MeetingModeProps) {
+  useBrandRevealed();
   const [level, setLevel] = useState<Level>('high');
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [showDecomp, setShowDecomp] = useState(true);
@@ -2958,7 +2970,8 @@ export function MeetingMode({
                     </>
                   ) : (
                     <>
-                      Enhanced direct indexing with the QFAF overlay generates an estimated{' '}
+                      Enhanced direct indexing with the {brandText('QFAF overlay')} generates an
+                      estimated{' '}
                       <strong style={{ color: M.good }}>{fmtCurrency(totalTaxSavings)}</strong> of
                       net tax savings through {endYear}, driven by ordinary loss deductions, NOL
                       usage, and capital loss carryforwards.
