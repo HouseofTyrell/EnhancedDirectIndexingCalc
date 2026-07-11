@@ -14,6 +14,7 @@ import {
   getStateRate,
   getStateTaxProfile,
   computeLtcgExcise,
+  computeWashingtonYearTaxImpact,
 } from '../taxData';
 import {
   getStrategy,
@@ -392,7 +393,7 @@ export function calculateWithOverrides(
           splitDlvSt += wgt * legSt;
           splitDlvLt += wgt * leg.strategy.ltGainRate;
           splitDlvFin += wgt * getEffectiveFinancingCost(leg.strategy, settings);
-          splitDlvExtension += wgt * 1;
+          splitDlvExtension += Number(wgt);
         }
       }
     }
@@ -890,10 +891,10 @@ export function calculateYear(
 
   // Benefits:
   // 1. Ordinary loss reduces W2 income tax
-  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
+  let ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
 
   // 2. Capital loss carryforward used against ordinary income ($3k/yr limit)
-  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
+  let capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
 
   // 3. NOL used against taxable income. The STATE component is suppressed
   // when the state suspends NOL deductions (CA SB 167: MAGI ≥ $1M through
@@ -923,12 +924,40 @@ export function calculateYear(
     overrides?.stateNolAvailable !== undefined
       ? Math.min(nolUsed, overrides.stateNolAvailable)
       : nolUsed;
-  const nolUsageBenefit =
+  let nolUsageBenefit =
     stateEligibleNol >= nolUsed
       ? safeNumber(nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate)
       : safeNumber(
           nolAtOrdinary * ordinaryRate + nolAtLt * fedLtNolRate + stateEligibleNol * nolStateRate
         );
+
+  // D-030: projection year 1 is tax year 2026. Washington's enacted income
+  // tax begins in 2028 (projection year 3) and credits capital-gains excise
+  // already paid. Compare each deduction step so the benefit attribution
+  // still reconciles to the headline without double-counting the credit.
+  const strategyLtcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
+  const totalLtcgExciseTax = computeLtcgExcise(taxableLt + eventTaxableLt, state.ltcgExcise);
+  const eventLtcgExciseTax = totalLtcgExciseTax - strategyLtcgExciseTax;
+  const waImpact =
+    inputs.stateCode === 'WA'
+      ? computeWashingtonYearTaxImpact({
+          taxYear: 2025 + year,
+          ordinaryIncome: effectiveIncome,
+          strategyStGain: taxableSt,
+          strategyLtGain: taxableLt,
+          eventStGain: eventTaxableSt,
+          eventLtGain: eventTaxableLt,
+          ordinaryDeduction: usableOrdinaryLoss,
+          capitalLossDeduction: capitalLossUsedAgainstIncome,
+          nolDeduction: nolUsed,
+          strategyCapitalGainsExcise: strategyLtcgExciseTax,
+          eventCapitalGainsExcise: eventLtcgExciseTax,
+        })
+      : null;
+
+  ordinaryLossBenefit = safeNumber(ordinaryLossBenefit + (waImpact?.ordinaryLossBenefit ?? 0));
+  capitalLossBenefit = safeNumber(capitalLossBenefit + (waImpact?.capitalLossBenefit ?? 0));
+  nolUsageBenefit = safeNumber(nolUsageBenefit + (waImpact?.nolUsageBenefit ?? 0));
 
   // Costs:
   // 1. LT gains are taxed at LT rates (+ WA-style excise above the annual exemption).
@@ -937,24 +966,28 @@ export function calculateYear(
   // losses are consumed by QFAF gains), but in collateral-only mode harvested
   // ST losses offset the LT gains and the cost would otherwise be overstated,
   // inflating the incremental benefit of adding the QFAF. (CPA review finding E.)
-  const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
-  const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
+  const ltcgExciseTax = strategyLtcgExciseTax;
+  const ltGainCost = safeNumber(
+    taxableLt * combinedLtRate + ltcgExciseTax + (waImpact?.strategyGainCost ?? 0)
+  );
 
   // Planned gain event (D-012): taxed separately — it is exogenous, so it is
   // NOT charged against the strategy's taxSavings. The program's help shows
   // up as carryforward shelter (event-last), §461(l) absorption, and NOL
   // usage. Marginal excise above the strategy's own gains is event-borne.
   const gainEventAmount = eventStGain + eventLtGain;
-  const totalExcise = computeLtcgExcise(taxableLt + eventTaxableLt, state.ltcgExcise);
+  const totalExcise = totalLtcgExciseTax;
   const gainEventTax = safeNumber(
     eventTaxableSt * combinedStRate +
       eventTaxableLt * combinedLtRate +
-      (totalExcise - ltcgExciseTax)
+      (totalExcise - ltcgExciseTax) +
+      (waImpact?.gainEventTax ?? 0)
   );
   const gainEventTaxWithoutStrategy = safeNumber(
     eventStGain * combinedStRate +
       eventLtGain * combinedLtRate +
-      computeLtcgExcise(eventLtGain, state.ltcgExcise)
+      computeLtcgExcise(eventLtGain, state.ltcgExcise) +
+      (waImpact?.gainEventTaxWithoutStrategy ?? 0)
   );
   const gainEventCfShelter = safeNumber(
     eventStGain - eventTaxableSt + (eventLtGain - eventTaxableLt)
@@ -1117,6 +1150,8 @@ export function calculateYear(
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
     stateNolExpired: 0, // Set by the calling loop's vintage ledger (D-020)
+    waIncomeTax: safeNumber(waImpact?.incomeTax ?? 0),
+    waCapitalGainsTaxCredit: safeNumber(waImpact?.capitalGainsTaxCredit ?? 0),
     effectiveStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,

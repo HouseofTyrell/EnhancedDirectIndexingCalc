@@ -35,10 +35,12 @@ export function getQuantifiedStateWarning(
       );
     case 'WA':
       return (
-        `Modeled per Washington law: no tax on wages or short-term gains; a 7% excise applies ` +
-        `to long-term gains above the annual exemption ($278K, the published 2025 figure — ` +
-        `2026 pending), plus the ESSB 5813 surcharge of 2.9% on taxed gains above $1M ` +
-        `(9.9% top). Applied to annual LT gains and the liquidation analysis.`
+        `Modeled per enacted Washington law: through 2027, the 7% capital-gains excise applies ` +
+        `above the annual exemption ($278K, the published 2025 figure — 2026 pending), plus ` +
+        `the 2.9% surcharge above $1M. Beginning in 2028, the model also applies the enacted ` +
+        `9.9% income tax above a $1M standard deduction and credits capital-gains excise paid ` +
+        `on overlapping income. The 2028 implementation is provisional pending final DOR ` +
+        `regulations and forms; annual and liquidation analyses use the same year-aware path.`
       );
     case 'CA':
       return (

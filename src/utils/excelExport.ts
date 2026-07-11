@@ -126,6 +126,8 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
     'Usable Ordinary Loss',
     'NOL Carryforward',
     'State NOL Expired',
+    'WA Income Tax (2028+)',
+    'WA Capital-Gains Tax Credit',
     'Tax Savings',
     'Income Offset',
     ...(hasDeleverage ? ['Extension %', 'Unwind Gain', 'Tax on Unwind', 'Financing Saved'] : []),
@@ -145,6 +147,8 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
       y.usableOrdinaryLoss,
       y.nolCarryforward,
       y.stateNolExpired,
+      y.waIncomeTax,
+      y.waCapitalGainsTaxCredit,
       y.taxSavings,
       y.incomeOffsetAmount,
       ...(hasDeleverage

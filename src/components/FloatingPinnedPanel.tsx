@@ -230,7 +230,9 @@ export function FloatingPinnedPanel({
   // Derive ordered elements from itemOrder
   const orderedElements =
     itemOrder.length > 0
-      ? itemOrder.map(id => elements.find(e => e.id === id)).filter((e): e is PinnedElement => !!e)
+      ? itemOrder
+          .map(id => elements.find(e => e.id === id))
+          .filter((e): e is PinnedElement => Boolean(e))
       : elements;
 
   // --- Panel drag ---
@@ -356,10 +358,11 @@ export function FloatingPinnedPanel({
 
   const handleItemResizeMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!itemResizing || !itemResizeStartRef.current) return;
-      const dy = e.clientY - itemResizeStartRef.current.py;
-      const newH = Math.max(MIN_ITEM_HEIGHT, itemResizeStartRef.current.h + dy);
-      setItemHeights(prev => ({ ...prev, [itemResizeStartRef.current!.id]: newH }));
+      const resizeStart = itemResizeStartRef.current;
+      if (!itemResizing || !resizeStart) return;
+      const dy = e.clientY - resizeStart.py;
+      const newH = Math.max(MIN_ITEM_HEIGHT, resizeStart.h + dy);
+      setItemHeights(prev => ({ ...prev, [resizeStart.id]: newH }));
     },
     [itemResizing]
   );

@@ -44,6 +44,59 @@ afterEach(() => {
   localStorage.clear();
 });
 
+describe('Workspace calculation flow explainer', () => {
+  it('traces engine outputs from strategy activity through liquidation without parallel totals', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    const flow = r.getByTestId('wx-calc-flow');
+    expect(flow).not.toHaveAttribute('open');
+
+    fireEvent.click(r.getByText('How the calculation flows'));
+    expect(flow).toHaveAttribute('open');
+    const text = flow.textContent ?? '';
+    expect(text).toContain('Strategy activity');
+    expect(text).toContain('Losses keep their tax character');
+    expect(text).toContain('Annual limits are applied');
+    expect(text).toContain('Unused amounts carry forward');
+    expect(text).toContain('Annual benefits become the headline');
+    expect(text).toContain('Liquidation tests the deferral');
+    expect(text).toContain('Carryforward shelter value is contingent');
+  });
+});
+
+describe('Workspace client education surfaces', () => {
+  it('clarifies loss character, CA timing, benefit classes, rates, provenance, and selected-year math', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    expect(r.getByTestId('wx-loss-character-legend').textContent).toContain('Fund ordinary loss');
+    expect(r.getByTestId('wx-ca-timing').textContent).toContain(
+      'Federal and California benefits can occur in different years'
+    );
+    expect(r.getByTestId('wx-benefit-map').textContent).toContain('Unused tax assets');
+    expect(r.getByTestId('wx-rates').textContent).toContain("not the client's effective tax rate");
+    expect(r.getByTestId('wx-tax-provenance').textContent).toContain('Federal §461(l) limits');
+
+    fireEvent.click(r.getByText('Explain this result'));
+    const explanation = r.getByTestId('wx-year-explain').textContent ?? '';
+    expect(explanation).toContain('ordinary-loss benefit');
+    expect(explanation).toContain('gain costs');
+    expect(explanation).toContain('new NOL is deferred, not a current benefit');
+    expect(r.getByText('Ordinary Income Needed to Use Available Deduction Capacity')).toBeTruthy();
+  });
+
+  it('offers software-compensation presets with explicit character guidance', () => {
+    ackQp();
+    const r = render(<WorkspaceTab />);
+    fireEvent.click(r.getByText('Edit income & events'));
+    expect(r.getByText('NSO exercise')).toBeTruthy();
+    expect(r.getByText('IPO / acquisition')).toBeTruthy();
+    expect(r.getByText('Sabbatical year')).toBeTruthy();
+    expect(r.container.textContent).toContain('AMT is not modeled; review separately');
+    fireEvent.click(r.getByText('IPO / acquisition'));
+    expect(r.container.textContent).toContain('1 year customized');
+  });
+});
+
 describe('Workspace scenario pinning (D-026)', () => {
   it('pin freezes values: the pinned side never moves with live input changes', () => {
     ackQp();
@@ -66,6 +119,7 @@ describe('Workspace scenario pinning (D-026)', () => {
     expect(pinnedCell().getAttribute('title')).toBe(frozenTitle);
     expect(currentCell().getAttribute('title')).not.toBe(frozenTitle);
     expect(r.getByTestId('ws-pin-delta-total-savings').textContent).not.toBe('—');
+    expect(r.getByTestId('ws-pin-attribution').textContent).toContain('Why total savings changed');
   });
 
   it('pin survives a reload (localStorage) with the frozen values intact', () => {

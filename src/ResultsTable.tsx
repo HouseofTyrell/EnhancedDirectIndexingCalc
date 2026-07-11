@@ -124,6 +124,7 @@ export function ResultsTable({
   // Per-leg unwind attribution columns (D-028): only in split mode, where the
   // engine populates core/overlay unwind gains.
   const hasPerLegDeleverage = data.some(y => y.overlayDeleverageGain !== undefined);
+  const hasWaIncomeTax = data.some(y => y.waIncomeTax > 0.01 || y.waCapitalGainsTaxCredit > 0.01);
 
   // Toggle all details
   const handleToggleAll = () => {
@@ -183,12 +184,12 @@ export function ResultsTable({
 
     cols += 1; // Tax Savings column
     cols += 1; // Cumulative column
-    if (expandSavings) cols += 6; // Ord Ded., NOL Ben., $3K Ben., LT Cost, ST Cost, Fin. Cost
+    if (expandSavings) cols += 6 + (hasWaIncomeTax ? 2 : 0);
     return cols;
   };
 
   // Savings breakdown columns count for starting row
-  const savingsDetailCols = expandSavings ? 6 : 0;
+  const savingsDetailCols = expandSavings ? 6 + (hasWaIncomeTax ? 2 : 0) : 0;
 
   // Filter out quiet wind-down rows where only the routine $3K capital loss deduction is running.
   // Keep wind-down rows that have meaningful activity: NOL usage, ordinary loss benefits, or
@@ -521,6 +522,16 @@ export function ResultsTable({
                       <th className="col-detail cost-col">
                         <InfoText contentKey="col-financing-cost">Fin. Cost</InfoText>
                       </th>
+                      {hasWaIncomeTax && (
+                        <>
+                          <th className="col-detail cost-col">
+                            <InfoText contentKey="col-wa-income-tax">WA Income Tax</InfoText>
+                          </th>
+                          <th className="col-detail benefit-col">
+                            <InfoText contentKey="col-wa-cgt-credit">WA CGT Credit</InfoText>
+                          </th>
+                        </>
+                      )}
                     </>
                   )}
 
@@ -934,6 +945,20 @@ export function ResultsTable({
                                 ? `(${formatCurrency(year.financingCostPaid)})`
                                 : '—'}
                             </td>
+                            {hasWaIncomeTax && (
+                              <>
+                                <td className="negative cost-col">
+                                  {year.waIncomeTax > 0
+                                    ? `(${formatCurrency(year.waIncomeTax)})`
+                                    : '—'}
+                                </td>
+                                <td className="positive benefit-col">
+                                  {year.waCapitalGainsTaxCredit > 0
+                                    ? formatCurrency(year.waCapitalGainsTaxCredit)
+                                    : '—'}
+                                </td>
+                              </>
+                            )}
                           </>
                         )}
 
@@ -1271,6 +1296,25 @@ function TransposedTable({
           label: 'Tax Without Program',
           contentKey: 'col-gain-event-tax-without-program',
           cell: y => moneyOrDash(y.gainEventTaxWithoutStrategy),
+        },
+      ],
+    });
+  }
+
+  if (data.some(y => y.waIncomeTax > 0.01 || y.waCapitalGainsTaxCredit > 0.01)) {
+    sections.push({
+      title: 'Washington Income Tax (2028+)',
+      rows: [
+        {
+          label: 'WA Income Tax',
+          contentKey: 'col-wa-income-tax',
+          cell: y => negMoney(y.waIncomeTax),
+          className: () => 'negative',
+        },
+        {
+          label: 'WA CGT Credit',
+          contentKey: 'col-wa-cgt-credit',
+          cell: y => moneyOrDash(y.waCapitalGainsTaxCredit),
         },
       ],
     });

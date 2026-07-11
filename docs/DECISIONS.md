@@ -530,6 +530,41 @@ keep the literal `qfaf`/`quantinno` spelling, so no CalculatorInputs field was a
 CSV/Excel round-trips are unaffected. **Standing requirement:** new user-visible
 manager/fund text must be wrapped in `brandText()` (or come from `getPopupContent`).
 
+### D-030 — Washington 2028 income-tax treatment
+**Date:** 2026-07-11
+**Context:** Washington enacted a 9.9% tax on income above the statutory deduction,
+effective for income earned beginning in 2028. The existing Washington profile models
+no general income tax and only the capital-gains excise, while projections can run as
+long as 40 years. The new income tax overlaps with the capital-gains tax through a
+credit, so a simple additional 9.9% rate would double-count some income.
+**Decision (owner):** **Implement the enacted 2028 rules now.** Model the year-aware
+Washington income tax and its capital-gains-tax credit rather than merely warning or
+stopping Washington projections at 2027.
+**Implications:** Tax parameters must be versioned by effective year and carry source,
+verification-date, and provisional-status metadata. Washington projections use the
+existing rules through 2027 and the enacted income-tax regime beginning in 2028, with
+the capital-gains credit preventing double taxation. The UI and disclosures must clearly
+mark implementation details that remain provisional pending agency regulations/forms.
+Tests must cover the 2027/2028 boundary, the statutory deduction, overlapping capital
+gains and credit, and multi-year projections. Apply the audit-complete directive to any
+new per-year engine outputs and use the same year-aware tax path in liquidation analysis.
+
+### D-031 — Results-first mobile Workspace
+**Date:** 2026-07-11
+**Context:** At phone width the Workspace avoids horizontal overflow but becomes an
+extremely long, dense page. Responsive CSS alone does not preserve the results-first
+information hierarchy already chosen for the Workspace.
+**Decision (owner):** Build a **results-first mobile Workspace with an accessible input
+drawer and selected-year detail**.
+**Implications:** At mobile breakpoints, headline metrics and flags appear before the
+input editor. Inputs move into an accessible drawer with focus containment, Escape/close
+behavior, focus restoration, and touch-sized controls. The default year-by-year mobile
+experience becomes a selected-year detail view rather than requiring the full dense
+table; the audit-complete desktop table remains available and no engine outputs may be
+silently omitted. Desktop Workspace behavior and the one-engine rule remain unchanged.
+Browser coverage must verify representative phone widths, keyboard accessibility, dark
+theme, input edits updating results, and selected-year navigation.
+
 ---
 
 ## Pending decision queue (next batches)
@@ -904,6 +939,36 @@ Workspace events map (and drops total-budget funding mode, CSV-import convention
 Clean exits skip the prompt. The Classic-tab Meeting Mode host remains un-sandboxed
 (live edits, as before) and is labeled accordingly in code. Workspace-level test proves
 Discard leaves inputs bit-identical and Keep applies them.
+
+### D-032 — Fast-learning client education layer
+**Date:** 2026-07-11
+**Context:** Owner directed implementation of all findings from a mock presentation to a
+high-income California software engineer with moderate financial knowledge.
+**Decision:** Keep the default results-first surface, then add progressive, engine-backed
+explanations rather than a separate beginner mode or parallel projection.
+**Status: IMPLEMENTED (2026-07-11)** — Workspace Overview now includes: a six-step
+calculation trace; persistent capital/ordinary/NOL character map; federal-versus-CA
+timing timeline; realized-benefit/tax-asset/deferral/liquidation grouping; selected-year
+deterministic savings reconciliation; clearer income-utilization terminology; software-
+compensation presets with character and AMT guidance; marginal-rate labeling; statutory
+source provenance; and component attribution for pinned-scenario savings changes. All
+displayed dollar explanations aggregate existing `CalculationResult` fields. Mixed IPO/
+acquisition presets compose ordinary income and a capital-gain event through the existing
+`YearOverride` engine path.
+
+### D-033 — Meeting Mode education essentials
+**Date:** 2026-07-11
+**Context:** Workspace gained the full fast-learning client education layer in D-032;
+owner asked for Meeting Mode to be complete enough for an advisor-led conversation
+without requiring 100% Workspace parity.
+**Decision:** Port five presentation-critical explanations, keeping construction,
+provenance, presets, and the full audit workflow in Workspace.
+**Status: IMPLEMENTED (2026-07-11)** — High Level adds client-outcome classification
+(realized savings, unused tax assets, signed liquidation tax, net after liquidation) and
+component attribution beneath the existing Was→Now comparison. Detail adds a selected-
+year deterministic benefit/cost reconciliation. Mechanics adds the capital/ordinary/NOL
+character map and a California SB 167 federal-versus-state timing callout. Every dollar
+comes from existing `CalculationResult` / exit-analysis fields; no parallel projection.
 
 ---
 

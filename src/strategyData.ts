@@ -1,4 +1,5 @@
 import { FilingStatus } from './types';
+import { TAX_PARAMETER_MANIFEST } from './taxParameters';
 
 // Strategy definitions for Quantinno Beta 1 Strategies
 export interface Strategy {
@@ -165,10 +166,7 @@ export const QFAF_ORDINARY_LOSS_RATE = 1.5; // 150% of MV per year
 // Section 461(l) Excess Business Loss Limits (2026 values per Rev. Proc. 2025-32)
 // OBBBA reset base to $250K/$500K with new inflation indexing from 2024 base year
 export const SECTION_461L_LIMITS: Record<FilingStatus, number> = {
-  single: 256000,
-  mfj: 512000,
-  mfs: 256000,
-  hoh: 256000,
+  ...TAX_PARAMETER_MANIFEST.federal.section461l.limits,
 };
 
 // Capital Loss Limits per IRC §1211(b)

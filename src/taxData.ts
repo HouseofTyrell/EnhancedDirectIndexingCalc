@@ -1,4 +1,5 @@
 import { CalculatorInputs } from './types';
+import { TAX_PARAMETER_MANIFEST } from './taxParameters';
 
 // All 50 US States + DC with 2026 top marginal income tax rates
 // Sources: Tax Foundation, state tax authorities
@@ -158,6 +159,120 @@ export function computeLtcgExcise(
   return tax;
 }
 
+export interface WashingtonIncomeTaxResult {
+  grossTax: number;
+  capitalGainsTaxCredit: number;
+  netTax: number;
+}
+
+/** D-030: enacted WA income tax, effective for income earned in 2028+. */
+export function computeWashingtonIncomeTax(
+  taxYear: number,
+  washingtonBaseIncome: number,
+  capitalGainsExcisePaid: number
+): WashingtonIncomeTaxResult {
+  const config = TAX_PARAMETER_MANIFEST.washington.incomeTax;
+  if (taxYear < config.effectiveTaxYear) {
+    return { grossTax: 0, capitalGainsTaxCredit: 0, netTax: 0 };
+  }
+
+  const grossTax = Math.max(0, washingtonBaseIncome - config.standardDeduction) * config.rate;
+  const capitalGainsTaxCredit = config.capitalGainsTaxCredit
+    ? Math.min(grossTax, Math.max(0, capitalGainsExcisePaid))
+    : 0;
+  return {
+    grossTax,
+    capitalGainsTaxCredit,
+    netTax: grossTax - capitalGainsTaxCredit,
+  };
+}
+
+export interface WashingtonYearTaxImpact {
+  ordinaryLossBenefit: number;
+  capitalLossBenefit: number;
+  nolUsageBenefit: number;
+  strategyGainCost: number;
+  gainEventTax: number;
+  gainEventTaxWithoutStrategy: number;
+  incomeTax: number;
+  capitalGainsTaxCredit: number;
+}
+
+/**
+ * Values D-030's WA income-tax effects by comparing the enacted tax at each
+ * step of the same deduction ordering used by the projection engine. The
+ * capital-gains excise credit is applied at every comparison point, avoiding
+ * a second 9.9% charge on dollars already covered by the excise.
+ */
+export function computeWashingtonYearTaxImpact(args: {
+  taxYear: number;
+  ordinaryIncome: number;
+  strategyStGain: number;
+  strategyLtGain: number;
+  eventStGain: number;
+  eventLtGain: number;
+  ordinaryDeduction: number;
+  capitalLossDeduction: number;
+  nolDeduction: number;
+  strategyCapitalGainsExcise: number;
+  eventCapitalGainsExcise: number;
+}): WashingtonYearTaxImpact {
+  const {
+    taxYear,
+    ordinaryIncome,
+    strategyStGain,
+    strategyLtGain,
+    eventStGain,
+    eventLtGain,
+    ordinaryDeduction,
+    capitalLossDeduction,
+    nolDeduction,
+    strategyCapitalGainsExcise,
+    eventCapitalGainsExcise,
+  } = args;
+  const totalExcise = strategyCapitalGainsExcise + eventCapitalGainsExcise;
+  const grossBase = ordinaryIncome + strategyStGain + strategyLtGain + eventStGain + eventLtGain;
+  const afterOrdinaryBase = grossBase - ordinaryDeduction;
+  const afterCapitalBase = afterOrdinaryBase - capitalLossDeduction;
+  const afterNolBase = afterCapitalBase - nolDeduction;
+  const tax = (baseIncome: number, excise: number) =>
+    computeWashingtonIncomeTax(taxYear, Math.max(0, baseIncome), excise);
+
+  const gross = tax(grossBase, totalExcise);
+  const afterOrdinary = tax(afterOrdinaryBase, totalExcise);
+  const afterCapital = tax(afterCapitalBase, totalExcise);
+  const afterNol = tax(afterNolBase, totalExcise);
+  const withoutStrategy = tax(ordinaryIncome + eventStGain + eventLtGain, eventCapitalGainsExcise);
+  const withoutEventAfterDeductions = tax(
+    ordinaryIncome +
+      strategyStGain +
+      strategyLtGain -
+      ordinaryDeduction -
+      capitalLossDeduction -
+      nolDeduction,
+    strategyCapitalGainsExcise
+  );
+  const eventWithoutStrategy = tax(
+    ordinaryIncome + eventStGain + eventLtGain,
+    eventCapitalGainsExcise
+  );
+  const noEventNoStrategy = tax(ordinaryIncome, 0);
+
+  return {
+    ordinaryLossBenefit: Math.max(0, gross.netTax - afterOrdinary.netTax),
+    capitalLossBenefit: Math.max(0, afterOrdinary.netTax - afterCapital.netTax),
+    nolUsageBenefit: Math.max(0, afterCapital.netTax - afterNol.netTax),
+    strategyGainCost: Math.max(0, gross.netTax - withoutStrategy.netTax),
+    gainEventTax: Math.max(0, afterNol.netTax - withoutEventAfterDeductions.netTax),
+    gainEventTaxWithoutStrategy: Math.max(
+      0,
+      eventWithoutStrategy.netTax - noEventNoStrategy.netTax
+    ),
+    incomeTax: afterNol.netTax,
+    capitalGainsTaxCredit: afterNol.capitalGainsTaxCredit,
+  };
+}
+
 /** NYC resident income tax, top rate (applies to all income characters). */
 const NYC_LOCAL_RATE = 0.03876;
 
@@ -217,7 +332,8 @@ export function getStateTaxProfile(
         ltRate: 0.09,
         allowsLossOffsetAgainstIncome: true,
       };
-    case 'WA':
+    case 'WA': {
+      const waExcise = TAX_PARAMETER_MANIFEST.washington.capitalGainsExcise;
       return {
         ordinaryRate: 0,
         stRate: 0,
@@ -227,12 +343,13 @@ export function getStateTaxProfile(
         // figure was not yet published by WA DOR as of June 2026. ESSB 5813
         // adds a 2.9% surcharge on taxed gains above $1M (not indexed).
         ltcgExcise: {
-          rate: 0.07,
-          exemptionPerYear: 278000,
-          surchargeRate: 0.029,
-          surchargeThreshold: 1000000,
+          rate: waExcise.rate,
+          exemptionPerYear: waExcise.exemptionPerYear,
+          surchargeRate: waExcise.surchargeRate,
+          surchargeThreshold: waExcise.surchargeThreshold,
         },
       };
+    }
     default:
       return {
         ordinaryRate: fallbackRate,

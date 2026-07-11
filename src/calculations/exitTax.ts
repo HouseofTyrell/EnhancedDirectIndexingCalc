@@ -1,5 +1,5 @@
 import { CalculationResult } from '../types';
-import { StateTaxProfile, computeLtcgExcise } from '../taxData';
+import { StateTaxProfile, computeLtcgExcise, computeWashingtonIncomeTax } from '../taxData';
 import { safeNumber } from '../utils/formatters';
 
 /**
@@ -76,7 +76,9 @@ export function computeExitTaxAnalysis(
   /** WA-style LTCG excise applied to a single-year full liquidation (D-005) */
   ltcgExcise?: StateTaxProfile['ltcgExcise'],
   /** Cost basis of the collateral at inception (default: equals initial value) */
-  collateralCostBasis?: number
+  collateralCostBasis?: number,
+  /** D-030: context for the enacted WA income tax at the liquidation horizon. */
+  washingtonContext?: { stateCode: string; ordinaryIncome: number }
 ): ExitTaxAnalysis {
   const years = result.years;
   const initialCollateral = result.sizing.collateralValue;
@@ -118,8 +120,21 @@ export function computeExitTaxAnalysis(
   const cfShelterUsed = Math.min(remainingCapitalLossCf, embeddedGain);
   const taxableGainAfterShelter = Math.max(0, safeNumber(embeddedGain - cfShelterUsed));
   const exciseOn = (gain: number) => computeLtcgExcise(gain, ltcgExcise);
+  const horizonTaxYear = 2025 + years.length;
+  const waIncomeTaxOnGain = (gain: number) => {
+    if (washingtonContext?.stateCode !== 'WA') return 0;
+    const baseTax = computeWashingtonIncomeTax(horizonTaxYear, washingtonContext.ordinaryIncome, 0);
+    const withGain = computeWashingtonIncomeTax(
+      horizonTaxYear,
+      washingtonContext.ordinaryIncome + gain,
+      exciseOn(gain)
+    );
+    return Math.max(0, withGain.netTax - baseTax.netTax);
+  };
   const exitTax = safeNumber(
-    taxableGainAfterShelter * combinedLtRate + exciseOn(taxableGainAfterShelter)
+    taxableGainAfterShelter * combinedLtRate +
+      exciseOn(taxableGainAfterShelter) +
+      waIncomeTaxOnGain(taxableGainAfterShelter)
   );
 
   // Passive baseline: buy-and-hold the same initial collateral at the same
@@ -129,7 +144,9 @@ export function computeExitTaxAnalysis(
   // The passive holder carries the same pre-existing gain, so it cancels out
   // of the incremental deferred tax (which stays strategy-attributable).
   const passiveGain = Math.max(0, safeNumber(passiveValue - costBasis));
-  const passiveExitTax = safeNumber(passiveGain * combinedLtRate + exciseOn(passiveGain));
+  const passiveExitTax = safeNumber(
+    passiveGain * combinedLtRate + exciseOn(passiveGain) + waIncomeTaxOnGain(passiveGain)
+  );
 
   // Deliberately unclamped: with QFAF off, carryforward shelter can push the
   // strategy's exit tax BELOW the passive baseline's. Clamping at 0 would

@@ -131,6 +131,9 @@ export function Calculator({ isActive = true }: CalculatorProps) {
   );
 
   const results = useMemo(() => {
+    // Custom strategy rates live outside React state; rateVersion is the
+    // explicit invalidation token that forces this memo to read them again.
+    void rateVersion;
     // Priority: Year overrides > Sensitivity > Base calculation
     // Note: Year overrides and sensitivity don't combine (would need a combined function)
     if (hasActiveOverrides) {
@@ -207,7 +210,8 @@ export function Calculator({ isActive = true }: CalculatorProps) {
         combinedLtRate,
         advancedSettings.growthEnabled ? advancedSettings.defaultAnnualReturn : 0,
         taxRates.stateProfile.ltcgExcise,
-        inputs.collateralCostBasis
+        inputs.collateralCostBasis,
+        { stateCode: inputs.stateCode, ordinaryIncome: inputs.annualIncome }
       ),
     [
       results,
@@ -216,6 +220,8 @@ export function Calculator({ isActive = true }: CalculatorProps) {
       advancedSettings.growthEnabled,
       advancedSettings.defaultAnnualReturn,
       inputs.collateralCostBasis,
+      inputs.stateCode,
+      inputs.annualIncome,
     ]
   );
 

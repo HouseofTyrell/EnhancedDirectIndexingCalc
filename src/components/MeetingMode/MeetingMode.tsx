@@ -1904,7 +1904,7 @@ function PrintPageHeader({
   );
 }
 
-function PrintPageFooter() {
+function PrintPageFooter({ financingIncluded }: { financingIncluded: boolean }) {
   useBrandRevealed();
   return (
     <div
@@ -1920,13 +1920,17 @@ function PrintPageFooter() {
     >
       <strong>Important disclosures.</strong> This is a hypothetical illustration for discussion
       purposes only — not investment, tax, or legal advice, and not an offer of any security.
-      Estimates do not reflect advisory fees, financing costs, tracking error, transaction costs, or
-      behavioral effects; actual results will vary. Tax-loss harvesting reduces cost basis: a
-      portion of projected savings is tax deferral that becomes due if the portfolio is liquidated
-      (it may become permanent via basis step-up at death or charitable transfer). Ordinary loss
-      deductions are limited by IRC §461(l) ($512K MFJ / $256K others, 2026); excess becomes an NOL
-      usable against up to 80% of future taxable income. Projections assume 0–15% of harvested
-      losses are disallowed as wash sales and that the{' '}
+      Estimates do not reflect advisory fees, tracking error, transaction costs, or behavioral
+      effects;{' '}
+      {financingIncluded
+        ? 'the selected financing-cost schedule is included'
+        : 'financing costs are excluded'}
+      ; actual results will vary. Tax-loss harvesting reduces cost basis: a portion of projected
+      savings is tax deferral that becomes due if the portfolio is liquidated (it may become
+      permanent via basis step-up at death or charitable transfer). Ordinary loss deductions are
+      limited by IRC §461(l) ($512K MFJ / $256K others, 2026); excess becomes an NOL usable against
+      up to 80% of future taxable income. Projections assume 0–15% of harvested losses are
+      disallowed as wash sales and that the{' '}
       {brandText('QFAF (Quantinno Fundamental Arbitrage Fund)')} qualifies for the modeled tax
       treatment under current IRS guidance, which may change. State treatment varies — CA, NY, PA,
       NJ, MA, and WA differ materially from the federal rules modeled here. Consult qualified tax,
@@ -2030,9 +2034,11 @@ function MechanicsView({
         },
         {
           n: 3,
-          title: 'Loss harvesting generates NOL',
+          title: brandText('QFAF ordinary losses generate NOL'),
           tone: '#f59e0b',
-          body: `Realized short-term losses offset high-tax ordinary income first (combined ${fmtPercent1(taxRates.combinedOrdinaryRate)} ordinary rate), with the balance carried forward as NOL.`,
+          body: brandText(
+            `The QFAF's modeled §475(f) ordinary losses offset ordinary income, subject to §461(l), at the ${fmtPercent1(taxRates.combinedOrdinaryRate)} combined ordinary rate; excess becomes an NOL. Capital losses from the collateral overlay remain capital and follow §1211 netting.`
+          ),
           metric: fmtCurrency(totalNol),
           metricLabel: 'NOL generated',
         },
@@ -2284,7 +2290,11 @@ function MechanicsView({
             [
               ['Fed ST', fmtPercent(taxRates.federalStRate), false],
               ['Fed LT', fmtPercent(taxRates.federalLtRate), false],
-              ['State', fmtPercent(taxRates.stateRate), false],
+              [
+                inputs.stateCode === 'WA' ? 'WA current rate' : 'State',
+                fmtPercent(taxRates.stateRate),
+                false,
+              ],
               ['Combined ST', fmtPercent(taxRates.combinedStRate), true],
               ['Ordinary (deductions)', fmtPercent(taxRates.combinedOrdinaryRate), true],
               ['Combined LT', fmtPercent(taxRates.combinedLtRate), true],
@@ -2315,7 +2325,81 @@ function MechanicsView({
             </div>
           ))}
         </div>
+        {inputs.stateCode === 'WA' && (
+          <div style={{ marginTop: 14, fontSize: 12.5, color: M.inkSoft, lineHeight: 1.5 }}>
+            <strong style={{ color: M.ink }}>Washington changes during this projection:</strong> 0%
+            individual income tax is shown for 2026–2027; the enacted 9.9% income tax is modeled
+            beginning in 2028 after its statutory deduction and Washington capital-gains tax credit.
+            Actual liability depends on final guidance and the client&apos;s full return.
+          </div>
+        )}
       </div>
+
+      <div
+        data-testid="mm-loss-character-map"
+        style={{
+          marginTop: 18,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gap: 8,
+        }}
+      >
+        {[
+          [
+            'Capital loss',
+            'Offsets capital gains',
+            'Then up to $3,000/yr of ordinary income under §1211.',
+          ],
+          [
+            'Fund ordinary loss',
+            'Offsets ordinary income',
+            'Modeled §475(f) treatment; current use is subject to §461(l).',
+          ],
+          [
+            'NOL carryforward',
+            'Offsets future taxable income',
+            'Generally limited to 80% of taxable income in a later year.',
+          ],
+        ].map(([title, use, limit]) => (
+          <div
+            key={title}
+            style={{
+              padding: '11px 12px',
+              background: 'white',
+              border: `1px solid ${M.line}`,
+              borderRadius: 9,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 750, color: M.ink }}>{title}</div>
+            <div style={{ marginTop: 4, fontSize: 11.5, color: M.accent }}>{use}</div>
+            <div style={{ marginTop: 4, fontSize: 10.5, color: M.inkFaint, lineHeight: 1.4 }}>
+              {limit}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {inputs.stateCode === 'CA' && (
+        <div
+          data-testid="mm-ca-timing"
+          style={{
+            marginTop: 14,
+            padding: '12px 15px',
+            background: '#fffbeb',
+            border: '1px solid #fde68a',
+            borderRadius: 10,
+            color: M.inkSoft,
+            fontSize: 11.5,
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ color: M.ink }}>Federal vs. California timing:</strong> eligible federal
+          deductions and NOL use follow the federal limits shown above. For modeled MAGI of $1M or
+          more, California SB 167 suspends the state NOL deduction in tax year 2026, so the state
+          benefit may arrive later. A federal NOL does not automatically create an immediate
+          California benefit.
+        </div>
+      )}
 
       {/* ─── For your CPA (4b) ─── Collapsible on screen; the print handout
           renders the expanded variant instead (page 3, verified to still
@@ -2462,6 +2546,27 @@ export function MeetingMode({
     [results, exitAnalysis]
   );
   const insights = useMemo(() => computeEdiInsights(results), [results]);
+  const gainEventYears = useMemo(
+    () => visibleYears.filter(y => y.gainEventAmount > 0),
+    [visibleYears]
+  );
+  const gainEventTotals = useMemo(
+    () =>
+      gainEventYears.reduce(
+        (totals, y) => ({
+          amount: totals.amount + y.gainEventAmount,
+          tax: totals.tax + y.gainEventTax,
+          taxWithoutStrategy: totals.taxWithoutStrategy + y.gainEventTaxWithoutStrategy,
+          shelter: totals.shelter + y.gainEventCfShelter,
+        }),
+        { amount: 0, tax: 0, taxWithoutStrategy: 0, shelter: 0 }
+      ),
+    [gainEventYears]
+  );
+  const currentBenefitParts = useMemo(
+    () => computeBenefitDecomposition(visibleYears),
+    [visibleYears]
+  );
 
   // Year focus defaults to Year 1 — the start of the story — not the final
   // (often $0 wind-down) year (mock-meeting review, 7b).
@@ -2479,12 +2584,37 @@ export function MeetingMode({
   const [chipBaseline, setChipBaseline] = useState(() => ({
     savings: totalTaxSavings,
     reserve: lossReserve,
+    benefitParts: currentBenefitParts,
   }));
   const chipSavingsMoved = Math.abs(totalTaxSavings - chipBaseline.savings) > 0.5;
   const chipReserveMoved = ediMode && Math.abs(lossReserve - chipBaseline.reserve) > 0.5;
   const showChangeChip = chipSavingsMoved || chipReserveMoved;
   const dismissChangeChip = () =>
-    setChipBaseline({ savings: totalTaxSavings, reserve: lossReserve });
+    setChipBaseline({
+      savings: totalTaxSavings,
+      reserve: lossReserve,
+      benefitParts: currentBenefitParts,
+    });
+  const changeAttribution = [
+    {
+      label: 'ordinary deductions',
+      value:
+        currentBenefitParts.ordinaryLossBenefit - chipBaseline.benefitParts.ordinaryLossBenefit,
+    },
+    {
+      label: 'NOL usage',
+      value: currentBenefitParts.nolUsageBenefit - chipBaseline.benefitParts.nolUsageBenefit,
+    },
+    {
+      label: 'capital-loss use',
+      value: currentBenefitParts.capitalLossBenefit - chipBaseline.benefitParts.capitalLossBenefit,
+    },
+    {
+      label: 'gain costs',
+      value: -(currentBenefitParts.gainAndOtherCosts - chipBaseline.benefitParts.gainAndOtherCosts),
+    },
+  ].filter(item => Math.abs(item.value) > 0.5);
+  const selectedYearResult = yearIdx > 0 ? visibleYears[yearIdx - 1] : undefined;
 
   // Real pin (single slot, replace-on-repin). Values are FROZEN at pin time —
   // a small struct, not live results — so later edits can't mutate the row.
@@ -3038,6 +3168,38 @@ export function MeetingMode({
                     </button>
                   </div>
                 )}
+                {showChangeChip && changeAttribution.length > 0 && !printMode && (
+                  <div
+                    data-testid="mm-change-attribution"
+                    style={{ marginTop: 7, fontSize: 12, color: M.inkSoft, lineHeight: 1.5 }}
+                  >
+                    <strong style={{ color: M.ink }}>Why savings changed:</strong>{' '}
+                    {changeAttribution.map((item, index) => (
+                      <span key={item.label}>
+                        {index > 0 && ' · '}
+                        <b style={{ color: item.value >= 0 ? M.good : '#dc2626' }}>
+                          {item.value >= 0 ? '+' : '−'}
+                          {fmtCurrency(Math.abs(item.value))}
+                        </b>{' '}
+                        {item.label}
+                      </span>
+                    ))}
+                    {whatIfs?.gainEventEnabled && gainEventYears.length > 0 && (
+                      <div style={{ marginTop: 5, color: M.inkFaint }}>
+                        Gain-event context: event tax stays separate from strategy tax savings. The
+                        event can change when strategy NOLs are used, so the savings headline may
+                        move even when the event-tax bridge shows no carryforward shelter.
+                      </div>
+                    )}
+                    {advancedSettings.financingFeesEnabled && (
+                      <div style={{ marginTop: 5, color: M.inkFaint }}>
+                        Financing context: the financing cost is not subtracted from tax savings. It
+                        reduces projected portfolio values, which can change later modeled losses
+                        and NOL utilization; those tax-component changes explain the headline move.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* ─── D-024 pinned ghost row ─── frozen comparison numbers
                     captured by "Pin current scenario" in the rail. */}
@@ -3417,6 +3579,104 @@ export function MeetingMode({
                 ))}
               </div>
 
+              <div
+                data-testid="mm-client-outcomes"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                  gap: 1,
+                  marginBottom: 20,
+                  border: `1px solid ${M.line}`,
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  background: M.line,
+                }}
+              >
+                {[
+                  ['Realized modeled savings', totalTaxSavings, 'recognized during the projection'],
+                  [
+                    'Unused tax assets',
+                    cfReserveBalance +
+                      (visibleYears[visibleYears.length - 1]?.nolCarryforward ?? 0),
+                    'ending loss balances · not added to savings',
+                  ],
+                  [
+                    'Incremental tax at liquidation',
+                    exitAnalysis.incrementalDeferredTax,
+                    'signed reversal versus passive',
+                  ],
+                  [
+                    'Net after liquidation',
+                    exitAnalysis.netBenefitAfterLiquidation,
+                    'conservative everything-sold comparison',
+                  ],
+                ].map(([label, value, note]) => (
+                  <div key={String(label)} style={{ padding: '13px 14px', background: 'white' }}>
+                    <div style={{ fontSize: 10.5, color: M.inkFaint, fontWeight: 700 }}>
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 5,
+                        color: M.ink,
+                        font: `700 18px ${M.mono}`,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {fmtCurrency(value as number)}
+                    </div>
+                    <div style={{ marginTop: 4, color: M.inkFaint, fontSize: 10.5 }}>{note}</div>
+                  </div>
+                ))}
+              </div>
+
+              {gainEventYears.length > 0 && (
+                <div
+                  data-testid="meeting-gain-event-bridge"
+                  style={{
+                    padding: '16px 18px',
+                    background: '#fffbeb',
+                    borderRadius: 12,
+                    border: '1px solid #fde68a',
+                    marginBottom: 20,
+                    color: M.inkSoft,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 750, color: M.ink }}>
+                    Gain-event tax bridge
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginTop: 9 }}>
+                    <span>
+                      <strong>{fmtCurrency(gainEventTotals.amount)}</strong> event in{' '}
+                      {gainEventYears.map(y => `Year ${y.year}`).join(', ')}
+                    </span>
+                    <span>
+                      <strong>{fmtCurrency(gainEventTotals.shelter)}</strong> sheltered by current
+                      losses and carryforwards
+                    </span>
+                    <span>
+                      <strong>{fmtCurrency(gainEventTotals.tax)}</strong> modeled event tax
+                    </span>
+                    <span>
+                      <strong>{fmtCurrency(gainEventTotals.taxWithoutStrategy)}</strong> tax without
+                      the strategy
+                    </span>
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12.5 }}>
+                    Estimated event-tax reduction:{' '}
+                    <strong style={{ color: M.good }}>
+                      {fmtCurrency(gainEventTotals.taxWithoutStrategy - gainEventTotals.tax)}
+                    </strong>
+                    . Event tax is reported separately and is not added to strategy tax savings.
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: M.inkFaint }}>
+                    Why the savings headline can still move: adding the event can change when the
+                    strategy&apos;s NOL is used across the projection. That timing effect belongs to
+                    strategy tax savings; the event tax above remains a separate comparison.
+                  </div>
+                </div>
+              )}
+
               {/* Step-up co-metric (D-018) + EDI protection ratio — included in
                   the printed handout per D-021 (export parity). Compact strip
                   so the page-1 print pagination (exactly 3 sheets) holds. */}
@@ -3465,7 +3725,30 @@ export function MeetingMode({
                       cumulative financing cost
                     </span>
                   )}
+                  {advancedSettings.financingFeesEnabled && (
+                    <span data-testid="meeting-financing-cost">
+                      <strong style={{ color: M.ink }}>Financing cost:</strong>{' '}
+                      <strong style={{ fontFamily: M.mono, fontVariantNumeric: 'tabular-nums' }}>
+                        {fmtCurrency(insights.cumulativeFinancingCost)}
+                      </strong>{' '}
+                      cumulative, already reflected in projected wealth
+                    </span>
+                  )}
                 </div>
+                {advancedSettings.financingFeesEnabled && (
+                  <div style={{ marginTop: 6, fontSize: 12.5, color: M.inkFaint }}>
+                    Modeled using the {advancedSettings.financingMode} financing schedule:{' '}
+                    {advancedSettings.financingMode === 'simple'
+                      ? `${fmtPercent1(advancedSettings.simpleWealthMgmtFee)} wealth-management fee plus ${fmtPercent1(advancedSettings.simpleManagerFeeBase)} × leverage and ${fmtPercent1(advancedSettings.simpleManagerFeeFixed)} fixed manager fee`
+                      : `${fmtPercent1(advancedSettings.brokerMarginRate)} margin, ${fmtPercent1(advancedSettings.shortBorrowRate)} borrow, ${fmtPercent1(advancedSettings.shortDividendRate)} short dividends, and ${fmtPercent1(advancedSettings.wealthManagementFeeRate)} wealth-management fee`}
+                    .
+                    <div style={{ marginTop: 4 }}>
+                      The financing cost reduces projected wealth; it is not subtracted from the
+                      tax-savings headline. Any headline change comes indirectly from changes to
+                      modeled portfolio values, later losses, and NOL utilization.
+                    </div>
+                  </div>
+                )}
                 <div style={{ marginTop: 6, fontSize: 14, color: M.inkFaint }}>
                   &ldquo;Net if held to step-up&rdquo; is mortality-contingent and assumes basis
                   step-up under current law (IRC §1014). Unused loss carryforwards are lost at death
@@ -3588,7 +3871,9 @@ export function MeetingMode({
                   </button>
                 </div>
               </div>
-              {printMode && <PrintPageFooter />}
+              {printMode && (
+                <PrintPageFooter financingIncluded={advancedSettings.financingFeesEnabled} />
+              )}
             </div>
           )}
 
@@ -3691,7 +3976,85 @@ export function MeetingMode({
                   finalPortfolio={finalPortfolio}
                 />
               </div>
-              {printMode && <PrintPageFooter />}
+              {selectedYearResult && (
+                <div
+                  data-testid="mm-selected-year-reconciliation"
+                  style={{
+                    marginTop: 16,
+                    padding: '16px 18px',
+                    background: 'white',
+                    border: `1px solid ${M.line}`,
+                    borderRadius: 12,
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 750, color: M.ink }}>
+                    Explain Year {selectedYearResult.year}
+                  </div>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+                      gap: 8,
+                      marginTop: 10,
+                    }}
+                  >
+                    {[
+                      [
+                        '+',
+                        selectedYearResult.ordinaryLossBenefit,
+                        'ordinary-loss benefit',
+                        `${fmtCurrency(selectedYearResult.usableOrdinaryLoss)} deduction`,
+                      ],
+                      [
+                        '+',
+                        selectedYearResult.nolUsageBenefit,
+                        'NOL-use benefit',
+                        `${fmtCurrency(selectedYearResult.nolUsedThisYear)} NOL used`,
+                      ],
+                      [
+                        '+',
+                        selectedYearResult.capitalLossBenefit,
+                        'capital-loss benefit',
+                        `${fmtCurrency(selectedYearResult.capitalLossUsedAgainstIncome)} used`,
+                      ],
+                      [
+                        '−',
+                        selectedYearResult.ltGainCost + selectedYearResult.remainingStGainCost,
+                        'gain costs',
+                        'LT plus unoffset ST gains',
+                      ],
+                      [
+                        '=',
+                        selectedYearResult.taxSavings,
+                        'year tax savings',
+                        `${fmtCurrency(selectedYearResult.excessToNol)} new NOL deferred`,
+                      ],
+                    ].map(([sign, value, label, note]) => (
+                      <div
+                        key={String(label)}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          background: sign === '=' ? M.accentFaint : M.bg,
+                        }}
+                      >
+                        <div style={{ color: M.ink, font: `700 15px ${M.mono}` }}>
+                          {sign} {fmtCurrency(value as number)}
+                        </div>
+                        <div style={{ marginTop: 4, color: M.inkSoft, fontSize: 11 }}>{label}</div>
+                        <div style={{ marginTop: 3, color: M.inkFaint, fontSize: 10 }}>{note}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 9, color: M.inkFaint, fontSize: 11 }}>
+                    Uses the same character-specific engine fields as the audit table. New NOL is a
+                    future tax asset, not a current-year benefit.
+                  </div>
+                </div>
+              )}
+              {printMode && (
+                <PrintPageFooter financingIncluded={advancedSettings.financingFeesEnabled} />
+              )}
             </div>
           )}
 
@@ -3762,7 +4125,9 @@ export function MeetingMode({
                 currentStrategy={currentStrategy}
                 filingLabel={filingLabel}
               />
-              {printMode && <PrintPageFooter />}
+              {printMode && (
+                <PrintPageFooter financingIncluded={advancedSettings.financingFeesEnabled} />
+              )}
             </div>
           )}
 
@@ -3779,8 +4144,12 @@ export function MeetingMode({
               display: printMode ? 'none' : 'block',
             }}
           >
-            Estimates do not reflect advisory fees, financing costs, tracking error, transaction
-            costs, or behavioral effects. Actual results will vary. For discussion purposes only.
+            Estimates do not reflect advisory fees, tracking error, transaction costs, or behavioral
+            effects.{' '}
+            {advancedSettings.financingFeesEnabled
+              ? 'The selected financing-cost schedule is included.'
+              : 'Financing costs are excluded unless enabled.'}{' '}
+            Actual results will vary. For discussion purposes only.
           </div>
         </div>
       </main>

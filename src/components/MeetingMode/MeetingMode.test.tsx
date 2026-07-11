@@ -136,6 +136,62 @@ describe('Meeting Mode handout — QFAF mode (D-021)', () => {
     // Protection ratio is an EDI-economics metric — not shown with QFAF on.
     expect(text).not.toContain('Protection ratio:');
   });
+
+  it('classifies client outcomes without adding unused tax assets to realized savings', () => {
+    const { getByTestId } = renderMeetingMode(
+      createInputs({ qfafEnabled: true }),
+      DEFAULT_SETTINGS
+    );
+    const text = getByTestId('mm-client-outcomes').textContent ?? '';
+    expect(text).toContain('Realized modeled savings');
+    expect(text).toContain('Unused tax assets');
+    expect(text).toContain('not added to savings');
+    expect(text).toContain('Incremental tax at liquidation');
+    expect(text).toContain('Net after liquidation');
+  });
+
+  it('shows cumulative financing cost and the modeled rate schedule when fees are enabled', () => {
+    const { container } = renderMeetingMode(createInputs({ qfafEnabled: true }), {
+      ...DEFAULT_SETTINGS,
+      financingFeesEnabled: true,
+    });
+    const text = container.textContent ?? '';
+    expect(text).toContain('Financing cost:');
+    expect(text).toContain('cumulative, already reflected in projected wealth');
+    expect(text).toContain('Modeled using the simple financing schedule');
+    expect(text).toContain('not subtracted from the tax-savings headline');
+    expect(text).toContain('later losses, and NOL utilization');
+  });
+});
+
+describe('Meeting Mode gain-event bridge', () => {
+  it('surfaces event amount, shelter, with-strategy tax, and counterfactual tax', () => {
+    const inputs = createInputs({ qfafEnabled: true });
+    const props = buildProps(inputs, DEFAULT_SETTINGS);
+    const years = props.results.years.map((year, index) =>
+      index === 2
+        ? {
+            ...year,
+            gainEventAmount: 10_000_000,
+            gainEventCfShelter: 4_000_000,
+            gainEventTax: 1_500_000,
+            gainEventTaxWithoutStrategy: 2_400_000,
+          }
+        : year
+    );
+    const { getByTestId } = render(
+      <MeetingMode {...props} results={{ ...props.results, years }} />
+    );
+    const text = getByTestId('meeting-gain-event-bridge').textContent ?? '';
+    expect(text).toContain('$10.00M event in Year 3');
+    expect(text).toContain('$4.00M sheltered');
+    expect(text).toContain('$1.50M modeled event tax');
+    expect(text).toContain('$2.40M tax without the strategy');
+    expect(text).toContain('$900K');
+    expect(text).toContain('not added to strategy tax savings');
+    expect(text).toContain("adding the event can change when the strategy's NOL is used");
+    expect(text).toContain('event tax above remains a separate comparison');
+  });
 });
 
 // ─── D-022: the "How we get to {headline}" strip must SUM EXACTLY ───
@@ -215,6 +271,23 @@ describe('Meeting Mode decomposition sums to the headline (D-022)', () => {
   });
 });
 
+describe('Meeting Mode selected-year explanation', () => {
+  it('reconciles the selected engine year into benefits, costs, and net savings', () => {
+    const { getByText, getByTestId } = renderMeetingMode(
+      createInputs({ qfafEnabled: true }),
+      DEFAULT_SETTINGS
+    );
+    fireEvent.click(getByText('Detail'));
+    const text = getByTestId('mm-selected-year-reconciliation').textContent ?? '';
+    expect(text).toContain('Explain Year 1');
+    expect(text).toContain('ordinary-loss benefit');
+    expect(text).toContain('NOL-use benefit');
+    expect(text).toContain('capital-loss benefit');
+    expect(text).toContain('gain costs');
+    expect(text).toContain('future tax asset, not a current-year benefit');
+  });
+});
+
 describe('Meeting Mode mechanics view (mock-meeting review)', () => {
   it('EDI mode: no QFAF steps — harvest → reserve → shelter with real numbers', () => {
     const { container, getByText } = renderMeetingMode(createInputs(), DEFAULT_SETTINGS);
@@ -238,9 +311,35 @@ describe('Meeting Mode mechanics view (mock-meeting review)', () => {
     expect(text).toContain('§475(f)');
     // $3M income, MFJ: year-1 ordinary losses far exceed the $512K cap.
     expect(text).toContain('Year 1 ordinary deduction capped at $512,000 (MFJ)');
+    expect(text).toContain("Fund's modeled §475(f) ordinary losses offset ordinary income");
+    expect(text).toContain('Capital losses from the collateral overlay remain capital');
     expect(text).toContain('Wash-sale assumption');
     // CA scenario → one-line state caveat from the shared warning util.
     expect(text).toContain('Modeled per California law');
+    expect(getByText('Mechanics').ownerDocument.body.textContent).toContain(
+      'Federal vs. California timing'
+    );
+    expect(container.querySelector('[data-testid="mm-loss-character-map"]')?.textContent).toContain(
+      'Capital loss'
+    );
+    expect(container.querySelector('[data-testid="mm-loss-character-map"]')?.textContent).toContain(
+      'Fund ordinary loss'
+    );
+    expect(container.querySelector('[data-testid="mm-loss-character-map"]')?.textContent).toContain(
+      'NOL carryforward'
+    );
+  });
+
+  it('labels Washington as a time-varying rate assumption', () => {
+    const { container, getByText } = renderMeetingMode(
+      createInputs({ qfafEnabled: true, stateCode: 'WA', stateRate: 0 }),
+      DEFAULT_SETTINGS
+    );
+    fireEvent.click(getByText('Mechanics'));
+    const text = container.textContent ?? '';
+    expect(text).toContain('WA current rate');
+    expect(text).toContain('0% individual income tax is shown for 2026–2027');
+    expect(text).toContain('enacted 9.9% income tax is modeled beginning in 2028');
   });
 
   it('explains the dead tail when the QFAF stops before the projection ends', () => {
@@ -280,6 +379,7 @@ describe('Meeting Mode comparison memory (D-024)', () => {
     expect(chip.textContent).toContain(
       `Was ${fmtCompact(oldHeadline)} → Now ${fmtCompact(newHeadline)}`
     );
+    expect(getByTestId('mm-change-attribution').textContent).toContain('Why savings changed');
 
     // Dismiss → chip disappears (baseline re-captured at "now").
     fireEvent.click(getByLabelText('Dismiss comparison'));
