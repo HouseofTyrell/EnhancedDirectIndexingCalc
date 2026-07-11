@@ -77,8 +77,10 @@ export function DisclaimerFooter() {
         This calculator provides estimates for illustrative purposes only and does not constitute
         investment, tax, or legal advice. Past performance does not guarantee future results.
         Federal tax parameters (brackets, LTCG thresholds, §461(l) limits) verified against Rev.
-        Proc. 2025-32 in June 2026. WA's 2026 capital-gains exemption was unpublished at review time
-        (2025 figure used); verify state figures before relying on them.
+        Proc. 2025-32 and IRS 2026 guidance, reverified July 2026. WA's 2026 capital-gains exemption
+        remains unpublished (2025 figure used). The enacted WA income tax is modeled from 2028 with
+        its capital-gains credit; implementation details remain provisional pending final DOR
+        regulations and forms. Verify state figures before relying on them.
       </p>
 
       <div className="version-indicator">v{version}</div>

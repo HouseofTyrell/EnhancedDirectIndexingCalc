@@ -14,6 +14,7 @@ import {
   getStateRate,
   getStateTaxProfile,
   computeLtcgExcise,
+  computeWashingtonYearTaxImpact,
 } from '../taxData';
 import {
   getStrategy,
@@ -526,8 +527,8 @@ function calculateYearWithSensitivity(
   const combinedOrdinaryRate = ordinaryRate + stateDeductionRate;
 
   // Benefits
-  const ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
-  const capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
+  let ordinaryLossBenefit = safeNumber(usableOrdinaryLoss * combinedOrdinaryRate);
+  let capitalLossBenefit = safeNumber(capitalLossUsedAgainstIncome * combinedOrdinaryRate);
   // State NOL component suppressed under CA-style suspension (see core.ts)
   const stateNolSuspended =
     state.nolStateSuspension !== undefined &&
@@ -550,16 +551,39 @@ function calculateYearWithSensitivity(
     overrides?.stateNolAvailable !== undefined
       ? Math.min(nolUsed, overrides.stateNolAvailable)
       : nolUsed;
-  const nolUsageBenefit =
+  let nolUsageBenefit =
     stateEligibleNol >= nolUsed
       ? safeNumber(nolAtOrdinary * (ordinaryRate + nolStateRate) + nolAtLt * ltNolRate)
       : safeNumber(
           nolAtOrdinary * ordinaryRate + nolAtLt * fedLtNolRate + stateEligibleNol * nolStateRate
         );
 
+  const strategyLtcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
+  const waImpact =
+    inputs.stateCode === 'WA'
+      ? computeWashingtonYearTaxImpact({
+          taxYear: 2025 + year,
+          ordinaryIncome: inputs.annualIncome,
+          strategyStGain: taxableSt,
+          strategyLtGain: taxableLt,
+          eventStGain: 0,
+          eventLtGain: 0,
+          ordinaryDeduction: usableOrdinaryLoss,
+          capitalLossDeduction: capitalLossUsedAgainstIncome,
+          nolDeduction: nolUsed,
+          strategyCapitalGainsExcise: strategyLtcgExciseTax,
+          eventCapitalGainsExcise: 0,
+        })
+      : null;
+  ordinaryLossBenefit = safeNumber(ordinaryLossBenefit + (waImpact?.ordinaryLossBenefit ?? 0));
+  capitalLossBenefit = safeNumber(capitalLossBenefit + (waImpact?.capitalLossBenefit ?? 0));
+  nolUsageBenefit = safeNumber(nolUsageBenefit + (waImpact?.nolUsageBenefit ?? 0));
+
   // Costs: charged on taxable (post-offset) LT gains — see core.ts (CPA finding E)
-  const ltcgExciseTax = computeLtcgExcise(taxableLt, state.ltcgExcise);
-  const ltGainCost = safeNumber(taxableLt * combinedLtRate + ltcgExciseTax);
+  const ltcgExciseTax = strategyLtcgExciseTax;
+  const ltGainCost = safeNumber(
+    taxableLt * combinedLtRate + ltcgExciseTax + (waImpact?.strategyGainCost ?? 0)
+  );
   const remainingStGainCost = safeNumber(Math.max(0, netStGainLoss) * combinedStRate);
 
   // Net tax savings: ordinary deductions minus capital gains costs
@@ -675,6 +699,8 @@ function calculateYearWithSensitivity(
     nolUsedThisYear: nolUsed,
     capitalLossUsedAgainstIncome,
     stateNolExpired: 0, // Set by the calling loop's vintage ledger (D-020)
+    waIncomeTax: safeNumber(waImpact?.incomeTax ?? 0),
+    waCapitalGainsTaxCredit: safeNumber(waImpact?.capitalGainsTaxCredit ?? 0),
     effectiveStLossRate: adjustedStLossRate,
     incomeOffsetAmount,
     maxIncomeOffsetCapacity,

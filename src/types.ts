@@ -1,3 +1,5 @@
+import { TAX_PARAMETER_MANIFEST } from './taxParameters';
+
 // Filing Status type and constants
 export const FILING_STATUSES = [
   { value: 'single', label: 'Single' },
@@ -193,6 +195,10 @@ export interface YearResult {
    * NOT reduced by this. 0 for states without a carryover limit.
    */
   stateNolExpired: number;
+  /** WA 9.9% income tax after its statutory deduction and CGT credit (2028+). */
+  waIncomeTax: number;
+  /** WA capital-gains excise credited against the new income tax this year. */
+  waCapitalGainsTaxCredit: number;
 
   // Effective rates (for debugging/display)
   effectiveStLossRate: number; // Actual ST loss rate used (may be custom)
@@ -421,12 +427,7 @@ export const DEFAULT_SETTINGS: AdvancedSettings = {
   qfafMultiplier: 1.5,
   qfafGrowthEnabled: true,
   washSaleDisallowanceRate: 0,
-  section461Limits: {
-    mfj: 512000,
-    single: 256000,
-    mfs: 256000,
-    hoh: 256000,
-  },
+  section461Limits: { ...TAX_PARAMETER_MANIFEST.federal.section461l.limits },
   nolOffsetLimit: 0.8,
   presentValueEnabled: false,
   discountRate: 0.05,
@@ -528,10 +529,7 @@ export interface InputChange {
 // OBBBA reset base to $250K/$500K with inflation indexing from 2024 base year
 // Matches SECTION_461L_LIMITS in strategyData.ts (per Rev. Proc. 2025-32)
 export const SECTION_461_LIMITS_2026: Record<FilingStatus, number> = {
-  single: 256000,
-  mfj: 512000,
-  mfs: 256000,
-  hoh: 256000,
+  ...TAX_PARAMETER_MANIFEST.federal.section461l.limits,
 };
 
 // Summary totals for the QFAF Test table

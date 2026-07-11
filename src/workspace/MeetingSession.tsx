@@ -198,7 +198,8 @@ export function MeetingSession({
         rates.combinedLt,
         meetingSettings.growthEnabled ? meetingSettings.defaultAnnualReturn : 0,
         rates.profile.ltcgExcise,
-        meetingInputs.collateralCostBasis
+        meetingInputs.collateralCostBasis,
+        { stateCode: meetingInputs.stateCode, ordinaryIncome: meetingInputs.annualIncome }
       ),
     [
       results,
@@ -206,6 +207,8 @@ export function MeetingSession({
       meetingSettings.growthEnabled,
       meetingSettings.defaultAnnualReturn,
       meetingInputs.collateralCostBasis,
+      meetingInputs.stateCode,
+      meetingInputs.annualIncome,
     ]
   );
 

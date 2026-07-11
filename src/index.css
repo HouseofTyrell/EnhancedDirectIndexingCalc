@@ -4640,7 +4640,7 @@ tfoot td {
 
 .qp-checkbox-description {
   font-size: 0.8rem;
-  color: var(--text-light);
+  color: #4b5563;
   line-height: 1.4;
 }
 
@@ -4653,7 +4653,7 @@ tfoot td {
 .qp-submit-btn {
   width: 100%;
   padding: 0.875rem 1.5rem;
-  background: var(--primary);
+  background: #1d4ed8;
   color: white;
   border: none;
   border-radius: 8px;
@@ -4664,7 +4664,7 @@ tfoot td {
 }
 
 .qp-submit-btn:hover:not(:disabled) {
-  background: var(--primary-dark);
+  background: #1e40af;
 }
 
 .qp-submit-btn:disabled {
@@ -6632,6 +6632,10 @@ select:focus:not(:focus-visible) {
 
 [data-theme='dark'] .qp-checkbox-item:hover {
   background: #374151;
+}
+
+[data-theme='dark'] .qp-checkbox-description {
+  color: #d1d5db;
 }
 
 /* Rate editor */

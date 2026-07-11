@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { calculate } from './calculations';
 import { computeExitTaxAnalysis } from './calculations/exitTax';
+import { getStateTaxProfile } from './taxData';
 import { CalculatorInputs, DEFAULT_SETTINGS } from './types';
 
 const COMBINED_LT_RATE = 0.238 + 0.133; // 20% + 3.8% NIIT + 13.3% CA
@@ -166,5 +167,25 @@ describe('computeExitTaxAnalysis', () => {
 
     expect(Number.isFinite(analysis.embeddedGain)).toBe(true);
     expect(analysis.exitTax).toBe(0);
+  });
+
+  it('uses the 2028 Washington income-tax path in the liquidation analysis', () => {
+    const inputs = createInputs({
+      stateCode: 'WA',
+      stateRate: 0,
+      qfafEnabled: false,
+      annualIncome: 3000000,
+    });
+    const settings = { ...DEFAULT_SETTINGS, growthEnabled: true, defaultAnnualReturn: 0.07 };
+    const result = calculate(inputs, settings);
+    const excise = getStateTaxProfile('WA', 0).ltcgExcise;
+    const withoutIncomeTax = computeExitTaxAnalysis(result, 0.238, 0.07, excise);
+    const withIncomeTax = computeExitTaxAnalysis(result, 0.238, 0.07, excise, undefined, {
+      stateCode: 'WA',
+      ordinaryIncome: inputs.annualIncome,
+    });
+
+    expect(result.years.length).toBeGreaterThanOrEqual(3);
+    expect(withIncomeTax.passiveExitTax).toBeGreaterThan(withoutIncomeTax.passiveExitTax);
   });
 });

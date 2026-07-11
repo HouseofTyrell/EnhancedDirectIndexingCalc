@@ -36,7 +36,7 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
       // General code quality
-      'no-console': 'warn',
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-debugger': 'error',
       'prefer-const': 'error',
       'no-var': 'error',
@@ -54,6 +54,7 @@ export default tseslint.config(
     files: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
       'no-console': 'off',
     },
   },

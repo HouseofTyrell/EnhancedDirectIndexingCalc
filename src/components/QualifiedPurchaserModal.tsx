@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface QualifiedPurchaserModalProps {
   onAcknowledge: () => void;
@@ -39,6 +39,8 @@ const ACKNOWLEDGMENTS: Acknowledgment[] = [
 
 export function QualifiedPurchaserModal({ onAcknowledge }: QualifiedPurchaserModalProps) {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const firstCheckboxRef = useRef<HTMLInputElement>(null);
 
   const allChecked = ACKNOWLEDGMENTS.every(ack => checked[ack.id]);
 
@@ -52,12 +54,54 @@ export function QualifiedPurchaserModal({ onAcknowledge }: QualifiedPurchaserMod
     }
   };
 
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    firstCheckboxRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, []);
+
   return (
     <div className="qp-modal-overlay">
-      <div className="qp-modal">
+      <div
+        ref={dialogRef}
+        className="qp-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="qp-modal-title"
+        aria-describedby="qp-modal-description qp-modal-storage-note"
+      >
         <div className="qp-modal-header">
-          <h2>Important Acknowledgments</h2>
-          <p>
+          <h2 id="qp-modal-title">Important Acknowledgments</h2>
+          <p id="qp-modal-description">
             This calculator models sophisticated tax optimization strategies involving leveraged
             investments. Please confirm the following before proceeding.
           </p>
@@ -67,6 +111,7 @@ export function QualifiedPurchaserModal({ onAcknowledge }: QualifiedPurchaserMod
           {ACKNOWLEDGMENTS.map(ack => (
             <label key={ack.id} className="qp-checkbox-item">
               <input
+                ref={ack.id === ACKNOWLEDGMENTS[0]?.id ? firstCheckboxRef : undefined}
                 type="checkbox"
                 checked={checked[ack.id] || false}
                 onChange={() => handleCheck(ack.id)}
@@ -88,7 +133,7 @@ export function QualifiedPurchaserModal({ onAcknowledge }: QualifiedPurchaserMod
           >
             I Acknowledge and Wish to Proceed
           </button>
-          <p className="qp-footer-note">
+          <p id="qp-modal-storage-note" className="qp-footer-note">
             Your acknowledgment will be saved locally. You won't need to confirm again on this
             device.
           </p>

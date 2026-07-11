@@ -12,6 +12,7 @@ import {
   YearOverride,
 } from '../types';
 import { DEFAULTS, STATES, getFederalOrdinaryRate, getStateConformityWarning } from '../taxData';
+import { TAX_PARAMETER_MANIFEST } from '../taxParameters';
 import { STRATEGIES, getStrategy, getShortRatio } from '../strategyData';
 import {
   calculate,
@@ -386,6 +387,7 @@ interface StripMetrics {
   year1: number;
   netIfLiquidated: number;
   finalWealth: number;
+  result: CalculationResult;
 }
 
 function computeStripMetrics(
@@ -402,7 +404,8 @@ function computeStripMetrics(
     rates.combinedLt,
     settings.growthEnabled ? settings.defaultAnnualReturn : 0,
     rates.profile.ltcgExcise,
-    inputs.collateralCostBasis
+    inputs.collateralCostBasis,
+    { stateCode: inputs.stateCode, ordinaryIncome: inputs.annualIncome }
   );
   return {
     totalSavings: results.summary.totalTaxSavings,
@@ -414,6 +417,7 @@ function computeStripMetrics(
     year1: results.years[0]?.taxSavings ?? 0,
     netIfLiquidated: exit.netBenefitAfterLiquidation,
     finalWealth: results.summary.finalTotalWealth,
+    result: results,
   };
 }
 
@@ -442,6 +446,26 @@ function PinComparisonStrip({
     () => computeStripMetrics(pinned.inputs, pinned.advancedSettings, pinned.results),
     [pinned]
   );
+  const attribution = useMemo(() => {
+    const parts = (result: CalculationResult) =>
+      result.years.reduce(
+        (sum, year) => ({
+          ordinary: sum.ordinary + year.ordinaryLossBenefit,
+          nol: sum.nol + year.nolUsageBenefit,
+          capital: sum.capital + year.capitalLossBenefit,
+          costs: sum.costs - year.ltGainCost - year.remainingStGainCost,
+        }),
+        { ordinary: 0, nol: 0, capital: 0, costs: 0 }
+      );
+    const before = parts(frozen.result);
+    const after = parts(current.result);
+    return [
+      { label: 'ordinary deductions', value: after.ordinary - before.ordinary },
+      { label: 'NOL usage', value: after.nol - before.nol },
+      { label: 'capital-loss use', value: after.capital - before.capital },
+      { label: 'gain costs', value: after.costs - before.costs },
+    ].filter(item => Math.abs(item.value) >= 0.5);
+  }, [frozen.result, current.result]);
 
   // Row 2 follows the live pane's mode (D-015): loss reserve in EDI mode,
   // peak income-to-fully-utilize otherwise. Both are computable on both
@@ -557,6 +581,21 @@ function PinComparisonStrip({
           );
         })}
       </div>
+      {attribution.length > 0 && (
+        <div className="ws-pinstrip-attribution" data-testid="ws-pin-attribution">
+          <strong>Why total savings changed:</strong>{' '}
+          {attribution.map((item, index) => (
+            <span key={item.label}>
+              {index > 0 && ' · '}
+              <b className={item.value >= 0 ? 'pos' : 'neg'}>
+                {item.value >= 0 ? '+' : '−'}
+                {formatCurrencyAbbreviated(Math.abs(item.value))}
+              </b>{' '}
+              {item.label}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -601,6 +640,12 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
   // keyed by year — income changes, cash infusions, and planned gain events.
   const [yearEvents, setYearEvents] = useState<Map<number, YearOverride>>(new Map());
   const [showEventsEditor, setShowEventsEditor] = useState(false);
+  const [mobileInputsOpen, setMobileInputsOpen] = useState(false);
+  const [isMobileWorkspace, setIsMobileWorkspace] = useState(false);
+  const [mobileSelectedYear, setMobileSelectedYear] = useState(1);
+  const [explainYear, setExplainYear] = useState(1);
+  const mobileDrawerRef = useRef<HTMLElement>(null);
+  const mobileInputsTriggerRef = useRef<HTMLButtonElement>(null);
   // Income schedule builder: start amount + annual growth → per-year w2Income
   // rows (which stay hand-editable afterward).
   const [schedStart, setSchedStart] = useState<number>(DEFAULTS.annualIncome);
@@ -624,6 +669,55 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
     events: false,
   });
   const groupRefs = useRef<Partial<Record<GroupId, HTMLDivElement | null>>>({});
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia('(max-width: 640px)');
+    const update = () => setIsMobileWorkspace(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileWorkspace || !mobileInputsOpen) return;
+    const drawer = mobileDrawerRef.current;
+    if (!drawer) return;
+    const trigger = mobileInputsTriggerRef.current;
+    const priorOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    drawer.querySelector<HTMLElement>('input, select, button')?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileInputsOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(
+        drawer.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(element => element.offsetParent !== null);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = priorOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+      trigger?.focus();
+    };
+  }, [isMobileWorkspace, mobileInputsOpen]);
 
   const set = <K extends keyof CalculatorInputs>(key: K, value: CalculatorInputs[K]) =>
     setInputs(prev => ({ ...prev, [key]: value }));
@@ -704,7 +798,8 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
         rates.combinedLt,
         settings.growthEnabled ? settings.defaultAnnualReturn : 0,
         rates.profile.ltcgExcise,
-        effectiveInputs.collateralCostBasis
+        effectiveInputs.collateralCostBasis,
+        { stateCode: effectiveInputs.stateCode, ordinaryIncome: effectiveInputs.annualIncome }
       ),
     [
       results,
@@ -712,6 +807,8 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
       settings.growthEnabled,
       settings.defaultAnnualReturn,
       effectiveInputs.collateralCostBasis,
+      effectiveInputs.stateCode,
+      effectiveInputs.annualIncome,
     ]
   );
 
@@ -819,7 +916,16 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
   // Scenario presets (D-014 folded default): one-click starting points that
   // fill the per-year events rows via the same setEvent machinery — every
   // value stays hand-editable afterward.
-  const applyPreset = (preset: 'business-sale' | 'rsu-vesting' | 'concentrated-stock') => {
+  const applyPreset = (
+    preset:
+      | 'business-sale'
+      | 'rsu-vesting'
+      | 'concentrated-stock'
+      | 'bonus'
+      | 'nso-exercise'
+      | 'ipo-liquidity'
+      | 'sabbatical'
+  ) => {
     const collateral = results.sizing.collateralValue;
     if (preset === 'business-sale') {
       // Business exit: a large LT gain (2× collateral) once the reserve has
@@ -833,10 +939,21 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
       for (let yr = 1; yr <= Math.min(4, projYears); yr++) {
         setEvent(yr, { w2Income: bumped });
       }
-    } else {
+    } else if (preset === 'concentrated-stock') {
       // Diversify a concentrated position: LT gain of 50% of collateral early.
       const yr = Math.min(2, projYears);
       setEvent(yr, { gainEvent: { amount: Math.round(collateral * 0.5), character: 'lt' } });
+    } else if (preset === 'bonus') {
+      setEvent(1, { w2Income: Math.round(effectiveInputs.annualIncome * 1.25) });
+    } else if (preset === 'nso-exercise') {
+      setEvent(2, { w2Income: Math.round(effectiveInputs.annualIncome * 1.5) });
+    } else if (preset === 'ipo-liquidity') {
+      setEvent(3, {
+        w2Income: Math.round(effectiveInputs.annualIncome * 1.25),
+        gainEvent: { amount: Math.round(collateral * 0.5), character: 'lt' },
+      });
+    } else {
+      setEvent(2, { w2Income: Math.round(effectiveInputs.annualIncome * 0.25) });
     }
     setShowEventsEditor(true);
   };
@@ -844,6 +961,18 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
   const eventYears = results.years.filter(y => y.gainEventAmount > 0);
 
   const { summary } = results;
+  const explainedYear = results.years.find(year => year.year === explainYear) ?? results.years[0];
+  // Client-facing calculation flow: every value is a direct aggregation of
+  // audit-complete engine outputs. This is explanation only — no parallel math.
+  const flowTotals = results.years.reduce(
+    (totals, year) => ({
+      capitalLosses: totals.capitalLosses + year.stLossesHarvested,
+      ordinaryLosses: totals.ordinaryLosses + year.ordinaryLossesGenerated,
+      currentOrdinaryDeductions: totals.currentOrdinaryDeductions + year.usableOrdinaryLoss,
+      nolGenerated: totals.nolGenerated + year.excessToNol,
+    }),
+    { capitalLosses: 0, ordinaryLosses: 0, currentOrdinaryDeductions: 0, nolGenerated: 0 }
+  );
   // §461(l)/NOL surfaces are QFAF-shaped: hide them whenever the projection
   // generated no NOL (covers EDI-only mode without hardcoding on qfafEnabled).
   const hasNol = summary.totalNolGenerated >= 1;
@@ -887,6 +1016,8 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
     : undefined;
   const year1 = results.years[0]?.taxSavings ?? 0;
   const year2 = results.years[1]?.taxSavings ?? 0;
+  const selectedMobileYear =
+    results.years.find(y => y.year === mobileSelectedYear) ?? results.years[0];
   const projectionYears = settings.projectionYears ?? 10;
   const currentStrategy = getStrategy(inputs.strategyId);
 
@@ -920,6 +1051,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
     year1,
     netIfLiquidated: exit.netBenefitAfterLiquidation,
     finalWealth: summary.finalTotalWealth,
+    result: results,
   };
 
   // Deleveraging plan (D-016/D-017)
@@ -1488,7 +1620,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
             names on/off for internal use. No affordance — invisible to the public. */}
         <div className="wx-brand" onClick={secretReveal.onClick}>
           <span className="wx-logo">Q</span>
-          <span className="wx-brand-name">EDI Calculator</span>
+          <h1 className="wx-brand-name">EDI Calculator</h1>
           {secretReveal.flash !== null && (
             <span className="wx-brand-reveal-flash" role="status">
               {secretReveal.flash ? 'Internal names on' : 'Anonymized'}
@@ -1555,6 +1687,16 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
         </div>
         <div className="wx-top-right">
           <button
+            ref={mobileInputsTriggerRef}
+            type="button"
+            className="wx-mobile-inputs-btn"
+            aria-controls="wx-input-drawer"
+            aria-expanded={mobileInputsOpen}
+            onClick={() => setMobileInputsOpen(true)}
+          >
+            Edit inputs
+          </button>
+          <button
             type="button"
             className="wx-search"
             data-testid="wx-search"
@@ -1568,8 +1710,31 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
       </header>
 
       <div className="wx-body">
+        {mobileInputsOpen && (
+          <button
+            type="button"
+            className="wx-mobile-drawer-backdrop"
+            aria-label="Close scenario inputs"
+            onClick={() => setMobileInputsOpen(false)}
+          />
+        )}
         {/* ───────────────── Input rail ───────────────── */}
-        <aside className="wx-rail">
+        <aside
+          ref={mobileDrawerRef}
+          id="wx-input-drawer"
+          className={`wx-rail ${mobileInputsOpen ? 'is-open' : ''}`}
+          role={isMobileWorkspace ? 'dialog' : undefined}
+          aria-modal={isMobileWorkspace ? true : undefined}
+          aria-hidden={isMobileWorkspace && !mobileInputsOpen ? true : undefined}
+          inert={isMobileWorkspace && !mobileInputsOpen ? true : undefined}
+          aria-label={isMobileWorkspace ? 'Scenario inputs' : 'Scenario inputs and actions'}
+        >
+          <div className="wx-mobile-drawer-head">
+            <strong>Scenario inputs</strong>
+            <button type="button" onClick={() => setMobileInputsOpen(false)}>
+              Close
+            </button>
+          </div>
           <label className="wx-railsearch">
             <Ico d={I.search} w={14} />
             <input
@@ -2348,14 +2513,14 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                     currentValue={formatCurrency(peakIncomeReq.amount)}
                     breakdown={incomeReqBreakdown}
                   >
-                    Income to Fully Utilize
+                    Ordinary Income Needed to Use Available Deduction Capacity
                   </InfoText>
                 </span>
                 <span className="wx-metric-value" title={formatCurrency(peakIncomeReq.amount)}>
                   {formatCurrencyAbbreviated(peakIncomeReq.amount)}
                 </span>
                 <span className="wx-metric-sub">
-                  peak need, year {peakIncomeReq.year} — per-year below
+                  planning threshold, not recommended income · peak year {peakIncomeReq.year}
                 </span>
               </div>
             )}
@@ -2428,9 +2593,53 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                 >
                   Diversify concentrated stock
                 </button>
+                <button
+                  type="button"
+                  className="ws-preset-btn"
+                  onClick={() => applyPreset('bonus')}
+                >
+                  Bonus year
+                </button>
+                <button
+                  type="button"
+                  className="ws-preset-btn"
+                  onClick={() => applyPreset('nso-exercise')}
+                  title="Models the ordinary-income component of a nonqualified option exercise"
+                >
+                  NSO exercise
+                </button>
+                <button
+                  type="button"
+                  className="ws-preset-btn"
+                  onClick={() => applyPreset('ipo-liquidity')}
+                  title="Models both ordinary compensation and a separate long-term gain"
+                >
+                  IPO / acquisition
+                </button>
+                <button
+                  type="button"
+                  className="ws-preset-btn"
+                  onClick={() => applyPreset('sabbatical')}
+                >
+                  Sabbatical year
+                </button>
                 <span className="ws-presets-note">
                   starting points — each fills the rows below; edit amounts and years to fit the
                   client
+                </span>
+              </div>
+              <div className="ws-event-character-guide">
+                <span>
+                  <b>RSU vesting, bonus, NSO spread</b> → ordinary/W-2 income
+                </span>
+                <span>
+                  <b>Share sale after vesting/exercise</b> → separate ST or LT capital gain
+                </span>
+                <span>
+                  <b>IPO/acquisition preset</b> → both buckets in the same year
+                </span>
+                <span>
+                  <b>ISO exercise</b> → AMT is not modeled; review separately
                 </span>
               </div>
               <div className="ws-sched">
@@ -2704,7 +2913,7 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                 <div className="wx-reqchips">
                   <span className="wx-reqchips-label">
                     <InfoText contentKey="col-income-required">
-                      Income needed per year to fully utilize §461(l) + NOL
+                      Ordinary income needed to use available deduction capacity
                     </InfoText>
                   </span>
                   <div className="wx-reqchips-row">
@@ -2718,6 +2927,10 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                       </span>
                     ))}
                   </div>
+                  <span className="wx-reqchips-note">
+                    Planning threshold only — not recommended income and not necessarily eliminated
+                    dollar-for-dollar in every jurisdiction.
+                  </span>
                 </div>
               )}
 
@@ -2800,6 +3013,242 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                   ))}
               </div>
 
+              <details className="wx-calc-flow" data-testid="wx-calc-flow">
+                <summary>
+                  <span>
+                    <strong>How the calculation flows</strong>
+                    <small>Trace the current scenario from activity to net benefit</small>
+                  </span>
+                  <span className="wx-calc-flow-action">
+                    <span className="wx-calc-flow-closed">Show calculation path</span>
+                    <span className="wx-calc-flow-open">Hide calculation path</span>
+                  </span>
+                </summary>
+                <ol className="wx-calc-flow-steps">
+                  <li>
+                    <span className="wx-calc-flow-num">1</span>
+                    <div>
+                      <strong>Strategy activity</strong>
+                      <p>
+                        The projection models <Num v={flowTotals.capitalLosses} /> of harvested
+                        capital losses
+                        {!ediMode && (
+                          <>
+                            {' '}
+                            and <Num v={flowTotals.ordinaryLosses} /> of Fund ordinary losses
+                          </>
+                        )}
+                        .
+                      </p>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="wx-calc-flow-num">2</span>
+                    <div>
+                      <strong>Losses keep their tax character</strong>
+                      <p>
+                        Capital losses net against capital gains under §1211. Fund losses are
+                        modeled as ordinary under §475(f); the two buckets are not interchangeable.
+                      </p>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="wx-calc-flow-num">3</span>
+                    <div>
+                      <strong>Annual limits are applied</strong>
+                      <p>
+                        <Num v={flowTotals.currentOrdinaryDeductions} /> is modeled as usable
+                        current ordinary loss after §461(l); excess ordinary loss moves to the NOL
+                        bucket.
+                      </p>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="wx-calc-flow-num">4</span>
+                    <div>
+                      <strong>Unused amounts carry forward</strong>
+                      <p>
+                        The program generates <Num v={flowTotals.nolGenerated} /> of NOL and ends
+                        with <Num v={summary.finalStCarryforward + summary.finalLtCarryforward} />{' '}
+                        of capital-loss carryforwards after modeled use.
+                      </p>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="wx-calc-flow-num">5</span>
+                    <div>
+                      <strong>Annual benefits become the headline</strong>
+                      <p>
+                        Character-specific deductions and gain costs reconcile to{' '}
+                        <Num v={summary.totalTaxSavings} /> of cumulative modeled tax savings.
+                      </p>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="wx-calc-flow-num">6</span>
+                    <div>
+                      <strong>Liquidation tests the deferral</strong>
+                      <p>
+                        After the modeled incremental liquidation tax, the strategy retains{' '}
+                        <Num v={exit.netBenefitAfterLiquidation} /> of net benefit versus the
+                        passive baseline.
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+                <p className="wx-calc-flow-foot">
+                  Every amount above comes from the same year-by-year engine shown in the audit
+                  table. Carryforward shelter value is contingent and is not added to cumulative tax
+                  savings.
+                </p>
+              </details>
+
+              <div className="wx-loss-legend" data-testid="wx-loss-character-legend">
+                <div className="wx-section-title">Loss-character map</div>
+                <div className="wx-loss-legend-grid">
+                  <div>
+                    <strong>Capital loss</strong>
+                    <span>Offsets capital gains</span>
+                    <small>Then up to $3,000/yr of ordinary income under §1211</small>
+                  </div>
+                  <div>
+                    <strong>Fund ordinary loss</strong>
+                    <span>Offsets ordinary income</span>
+                    <small>Current use subject to §461(l); modeled §475(f) treatment</small>
+                  </div>
+                  <div>
+                    <strong>NOL carryforward</strong>
+                    <span>Offsets future taxable income</span>
+                    <small>Generally limited to 80% of taxable income per year</small>
+                  </div>
+                </div>
+              </div>
+
+              {inputs.stateCode === 'CA' && (
+                <div className="wx-ca-timeline" data-testid="wx-ca-timing">
+                  <div className="wx-section-title">Federal vs. California timing</div>
+                  <div className="wx-ca-timeline-grid">
+                    <div>
+                      <strong>Federal</strong>
+                      <span>
+                        Eligible current deductions and later NOL use follow the federal limits
+                        modeled year by year.
+                      </span>
+                    </div>
+                    <div>
+                      <strong>California · Year 1</strong>
+                      <span>
+                        For modeled MAGI of $1M or more, SB 167 suspends the California NOL
+                        deduction in tax year 2026.
+                      </span>
+                    </div>
+                    <div>
+                      <strong>California · Later years</strong>
+                      <span>
+                        The state benefit may arrive later than the federal benefit; the state
+                        carryover remains separately tracked and may expire.
+                      </span>
+                    </div>
+                  </div>
+                  <p>
+                    Federal and California benefits can occur in different years. A federal NOL does
+                    not automatically create an immediate California benefit.
+                  </p>
+                </div>
+              )}
+
+              <div className="wx-benefit-map" data-testid="wx-benefit-map">
+                <div>
+                  <span>Realized modeled benefit</span>
+                  <strong>{formatCurrency(summary.totalTaxSavings)}</strong>
+                  <small>Annual tax savings already recognized in the projection</small>
+                </div>
+                <div>
+                  <span>Unused tax assets</span>
+                  <strong>
+                    {formatCurrency(
+                      summary.finalStCarryforward +
+                        summary.finalLtCarryforward +
+                        (results.years[results.years.length - 1]?.nolCarryforward ?? 0)
+                    )}
+                  </strong>
+                  <small>Ending NOL and capital-loss balances; not added to savings</small>
+                </div>
+                <div>
+                  <span>Incremental tax at liquidation</span>
+                  <strong>{formatCurrency(exit.incrementalDeferredTax)}</strong>
+                  <small>Signed reversal versus passive; negative means a cheaper exit</small>
+                </div>
+                <div>
+                  <span>Net after liquidation</span>
+                  <strong>{formatCurrency(exit.netBenefitAfterLiquidation)}</strong>
+                  <small>Conservative comparison after the modeled exit</small>
+                </div>
+              </div>
+
+              {explainedYear && (
+                <details className="wx-year-explain" data-testid="wx-year-explain">
+                  <summary>
+                    <span>
+                      <strong>Explain this result</strong>
+                      <small>Deterministic reconciliation from the selected engine year</small>
+                    </span>
+                    <label onClick={event => event.stopPropagation()}>
+                      Year{' '}
+                      <select
+                        value={explainedYear.year}
+                        onChange={event => setExplainYear(Number(event.target.value))}
+                      >
+                        {results.years.map(year => (
+                          <option key={year.year} value={year.year}>
+                            {year.year}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </summary>
+                  <div className="wx-year-explain-equation">
+                    <span>
+                      <b>+ {formatCurrency(explainedYear.ordinaryLossBenefit)}</b> ordinary-loss
+                      benefit
+                      <small>
+                        {formatCurrency(explainedYear.usableOrdinaryLoss)} current ordinary
+                        deduction
+                      </small>
+                    </span>
+                    <span>
+                      <b>+ {formatCurrency(explainedYear.nolUsageBenefit)}</b> NOL-use benefit
+                      <small>{formatCurrency(explainedYear.nolUsedThisYear)} NOL used</small>
+                    </span>
+                    <span>
+                      <b>+ {formatCurrency(explainedYear.capitalLossBenefit)}</b> capital-loss
+                      benefit
+                      <small>
+                        {formatCurrency(explainedYear.capitalLossUsedAgainstIncome)} used against
+                        income
+                      </small>
+                    </span>
+                    <span>
+                      <b>
+                        −{' '}
+                        {formatCurrency(
+                          explainedYear.ltGainCost + explainedYear.remainingStGainCost
+                        )}
+                      </b>{' '}
+                      gain costs<small>LT gains plus unoffset ST gains</small>
+                    </span>
+                    <span className="total">
+                      <b>= {formatCurrency(explainedYear.taxSavings)}</b> Year {explainedYear.year}{' '}
+                      tax savings
+                      <small>
+                        {formatCurrency(explainedYear.excessToNol)} new NOL is deferred, not a
+                        current benefit
+                      </small>
+                    </span>
+                  </div>
+                </details>
+              )}
+
               {/* D-027: rates compressed to a single inline strip (for the CPA) */}
               <div className="wx-rates" data-testid="wx-rates">
                 <span className="wx-rate">
@@ -2817,8 +3266,16 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                   Fed LT <b>{formatPercent(rates.full.federalLtRate)}</b>
                 </span>
                 <span className="wx-rate">
-                  State ({inputs.stateCode}) <b>{formatPercent(rates.profile.ordinaryRate)}</b>
+                  {inputs.stateCode === 'WA'
+                    ? 'WA current (2026–27)'
+                    : `State (${inputs.stateCode})`}{' '}
+                  <b>{formatPercent(rates.profile.ordinaryRate)}</b>
                 </span>
+                {inputs.stateCode === 'WA' && (
+                  <span className="wx-rate">
+                    WA income tax (2028+) <b>9.90%</b> before deduction &amp; CGT credit
+                  </span>
+                )}
                 {rates.profile.stRate !== rates.profile.ordinaryRate && (
                   <span className="wx-rate">
                     State ST <b>{formatPercent(rates.profile.stRate)}</b>
@@ -2836,7 +3293,85 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                   </span>
                 )}
                 <span className="wx-rate">Fed ST &amp; LT incl. NIIT</span>
+                <span className="wx-rate wx-rate-note">
+                  Marginal statutory rates used to value eligible deductions and gains — not the
+                  client&apos;s effective tax rate.
+                </span>
               </div>
+
+              <details className="wx-provenance" data-testid="wx-tax-provenance">
+                <summary>
+                  <strong>Tax assumption provenance</strong>
+                  <span>Sources, effective years, and verification status</span>
+                </summary>
+                <div className="wx-provenance-grid">
+                  <div>
+                    <b>Federal §461(l) limits</b>
+                    <span>
+                      Tax year {TAX_PARAMETER_MANIFEST.federal.section461l.effectiveTaxYear}
+                    </span>
+                    <span>Verified {TAX_PARAMETER_MANIFEST.federal.section461l.verifiedAt}</span>
+                    <a
+                      href={TAX_PARAMETER_MANIFEST.federal.section461l.source}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      IRS source
+                    </a>
+                  </div>
+                  <div>
+                    <b>California NOL timing</b>
+                    <span>SB 167 · modeled for 2026 high-income cases</span>
+                    <span>Enacted; state carryover character approximated</span>
+                    <a
+                      href="https://www.ftb.ca.gov/file/business/deductions/net-operating-loss.html"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      California FTB source
+                    </a>
+                  </div>
+                  <div>
+                    <b>Washington income tax</b>
+                    <span>
+                      Effective {TAX_PARAMETER_MANIFEST.washington.incomeTax.effectiveTaxYear}
+                    </span>
+                    <span>
+                      Verified {TAX_PARAMETER_MANIFEST.washington.incomeTax.verifiedAt} ·
+                      provisional implementation guidance
+                    </span>
+                    <a
+                      href={TAX_PARAMETER_MANIFEST.washington.incomeTax.source}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Enacted statute
+                    </a>
+                  </div>
+                  <div>
+                    <b>Washington capital-gains excise</b>
+                    <span>
+                      Effective{' '}
+                      {TAX_PARAMETER_MANIFEST.washington.capitalGainsExcise.effectiveTaxYear}
+                    </span>
+                    <span>
+                      Verified {TAX_PARAMETER_MANIFEST.washington.capitalGainsExcise.verifiedAt} ·
+                      2026 exemption provisional
+                    </span>
+                    <a
+                      href={TAX_PARAMETER_MANIFEST.washington.capitalGainsExcise.source}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Washington DOR source
+                    </a>
+                  </div>
+                </div>
+                <p>
+                  Other federal and state rates are the 2026 model parameters shown above.
+                  User-entered assumptions and opt-in model settings remain scenario-specific.
+                </p>
+              </details>
 
               {!ediMode && (
                 <details className="wx-details">
@@ -2852,16 +3387,119 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
 
           {resultsView === 'table' && (
             <div className="wx-table-host">
-              <ResultsTable
-                data={results.years}
-                sizing={results.sizing}
-                qfafEnabled={effectiveInputs.qfafEnabled}
-                projectionYears={projectionYears}
-                startMonth={effectiveInputs.startMonth}
-                qfafDuration={effectiveInputs.qfafDuration}
-                strategyId={view.isSplit ? undefined : effectiveInputs.strategyId}
-                ltGainRate={view.isSplit ? undefined : currentStrategy?.ltGainRate}
-              />
+              <div className="wx-mobile-year-detail" data-testid="wx-mobile-year-detail">
+                <div className="wx-mobile-year-nav">
+                  <button
+                    type="button"
+                    disabled={mobileSelectedYear <= 1}
+                    onClick={() => setMobileSelectedYear(year => Math.max(1, year - 1))}
+                  >
+                    Previous
+                  </button>
+                  <label>
+                    <span>Selected year</span>
+                    <select
+                      value={selectedMobileYear?.year ?? 1}
+                      onChange={e => setMobileSelectedYear(Number(e.target.value))}
+                    >
+                      {results.years.map(y => (
+                        <option key={y.year} value={y.year}>
+                          Year {y.year}
+                          {!y.strategyActive ? ' · wind-down' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={mobileSelectedYear >= results.years.length}
+                    onClick={() =>
+                      setMobileSelectedYear(year => Math.min(results.years.length, year + 1))
+                    }
+                  >
+                    Next
+                  </button>
+                </div>
+                {selectedMobileYear && (
+                  <dl className="wx-mobile-year-grid">
+                    <div>
+                      <dt>Portfolio value</dt>
+                      <dd>{formatCurrency(selectedMobileYear.totalValue)}</dd>
+                    </div>
+                    <div>
+                      <dt>Tax savings</dt>
+                      <dd>{formatCurrency(selectedMobileYear.taxSavings)}</dd>
+                    </div>
+                    <div>
+                      <dt>ST losses harvested</dt>
+                      <dd>{formatCurrency(selectedMobileYear.stLossesHarvested)}</dd>
+                    </div>
+                    <div>
+                      <dt>LT gains realized</dt>
+                      <dd>{formatCurrency(selectedMobileYear.ltGainsRealized)}</dd>
+                    </div>
+                    <div>
+                      <dt>Ordinary loss used</dt>
+                      <dd>{formatCurrency(selectedMobileYear.usableOrdinaryLoss)}</dd>
+                    </div>
+                    <div>
+                      <dt>NOL balance</dt>
+                      <dd>{formatCurrency(selectedMobileYear.nolCarryforward)}</dd>
+                    </div>
+                    <div>
+                      <dt>Capital loss reserve</dt>
+                      <dd>
+                        {formatCurrency(
+                          selectedMobileYear.stLossCarryforward +
+                            selectedMobileYear.ltLossCarryforward
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Income for full utilization</dt>
+                      <dd>{formatCurrency(selectedMobileYear.incomeRequiredForFullUtilization)}</dd>
+                    </div>
+                    {(selectedMobileYear.waIncomeTax > 0 ||
+                      selectedMobileYear.waCapitalGainsTaxCredit > 0) && (
+                      <>
+                        <div>
+                          <dt>WA income tax</dt>
+                          <dd>{formatCurrency(selectedMobileYear.waIncomeTax)}</dd>
+                        </div>
+                        <div>
+                          <dt>WA capital-gains credit</dt>
+                          <dd>{formatCurrency(selectedMobileYear.waCapitalGainsTaxCredit)}</dd>
+                        </div>
+                      </>
+                    )}
+                  </dl>
+                )}
+                <details className="wx-mobile-full-table">
+                  <summary>Open full audit table</summary>
+                  <ResultsTable
+                    data={results.years}
+                    sizing={results.sizing}
+                    qfafEnabled={effectiveInputs.qfafEnabled}
+                    projectionYears={projectionYears}
+                    startMonth={effectiveInputs.startMonth}
+                    qfafDuration={effectiveInputs.qfafDuration}
+                    strategyId={view.isSplit ? undefined : effectiveInputs.strategyId}
+                    ltGainRate={view.isSplit ? undefined : currentStrategy?.ltGainRate}
+                  />
+                </details>
+              </div>
+              <div className="wx-desktop-year-table">
+                <ResultsTable
+                  data={results.years}
+                  sizing={results.sizing}
+                  qfafEnabled={effectiveInputs.qfafEnabled}
+                  projectionYears={projectionYears}
+                  startMonth={effectiveInputs.startMonth}
+                  qfafDuration={effectiveInputs.qfafDuration}
+                  strategyId={view.isSplit ? undefined : effectiveInputs.strategyId}
+                  ltGainRate={view.isSplit ? undefined : currentStrategy?.ltGainRate}
+                />
+              </div>
             </div>
           )}
 
