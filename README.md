@@ -5,6 +5,10 @@ enhanced direct indexing (long/short tax-loss harvesting) with the extension fun
 year-by-year tax savings, carryforward balances, and liquidation/estate outcomes from a
 single calculation engine.
 
+![Enhanced Direct Indexing Calculator workspace](docs/workspace-overview.png)
+
+[Try the live demo](https://houseoftyrell.github.io/EnhancedDirectIndexingCalc/)
+
 ## The two tabs
 
 - **Workspace** (default) — single-screen experience: a persistent input rail (client,
