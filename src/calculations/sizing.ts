@@ -55,8 +55,12 @@ export function calculateSizing(
     // and dynamic modes agree in Year 1.
     const cushion = inputs.qfafSizingCushion ?? 0;
     const harvestableStLosses = year1StLosses * (1 - washSaleDisallowanceRate);
-    const baseSizing = inputs.qfafOverride ?? harvestableStLosses / stGainRate;
-    qfafValue = baseSizing * (1 - cushion);
+    // A manual override is an exact dollar amount the advisor typed — the
+    // conservative sizing cushion only applies to the auto-sized value.
+    qfafValue =
+      inputs.qfafOverride !== undefined
+        ? inputs.qfafOverride
+        : (harvestableStLosses / stGainRate) * (1 - cushion);
     // QFAF generates ST gains and ordinary losses at the user-selected generation rate
     year1StGains = qfafValue * stGainRate;
     year1OrdinaryLosses = qfafValue * ordLossRate;

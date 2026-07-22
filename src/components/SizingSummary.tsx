@@ -17,6 +17,8 @@ interface SizingSummaryProps {
   combinedOrdinaryRate: number;
   qfafMultiplier?: number;
   startMonth?: number;
+  /** Set when the advisor entered an exact QFAF dollar amount (qfafOverride). */
+  qfafManual?: boolean;
 }
 
 export function SizingSummary({
@@ -27,6 +29,7 @@ export function SizingSummary({
   combinedOrdinaryRate,
   qfafMultiplier,
   startMonth = 1,
+  qfafManual = false,
 }: SizingSummaryProps) {
   useBrandRevealed();
   const year1Savings = results.years[0]?.taxSavings ?? 0;
@@ -55,9 +58,15 @@ export function SizingSummary({
           <QfafSizingFormula qfafMultiplier={qfafMultiplier} />
         </InfoPopup>
       }
-      guidance={brandText(
-        'We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits.'
-      )}
+      guidance={
+        qfafManual
+          ? brandText(
+              'Manual QFAF amount — the Net ST Position below shows how far it is from a perfect offset.'
+            )
+          : brandText(
+              'We auto-size the QFAF to offset short-term gains, maximizing your tax efficiency within IRS limits.'
+            )
+      }
       className="sizing-section"
     >
       <div className="sizing-cards">
@@ -93,7 +102,7 @@ export function SizingSummary({
               contentKey="auto-sized-qfaf"
               currentValue={formatCurrency(results.sizing.qfafValue)}
             >
-              {brandText('Auto-Sized QFAF')}
+              {qfafManual ? brandText('Manual QFAF') : brandText('Auto-Sized QFAF')}
             </InfoText>
           </span>
           <span className="sizing-value" ref={qfafFlash}>

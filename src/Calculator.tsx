@@ -564,6 +564,7 @@ export function Calculator({ isActive = true }: CalculatorProps) {
             combinedOrdinaryRate={combinedOrdinaryRate}
             qfafMultiplier={advancedSettings.qfafMultiplier}
             startMonth={inputs.startMonth}
+            qfafManual={inputs.qfafOverride !== undefined}
           />
         </PinnableSection>
       </div>
@@ -925,6 +926,7 @@ export function Calculator({ isActive = true }: CalculatorProps) {
                       combinedLtRate={combinedLtRate}
                       combinedOrdinaryRate={combinedOrdinaryRate}
                       qfafMultiplier={advancedSettings.qfafMultiplier}
+                      qfafManual={inputs.qfafOverride !== undefined}
                     />
                   ),
                 },

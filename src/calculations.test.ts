@@ -691,6 +691,67 @@ describe('fixed issues', () => {
   });
 });
 
+describe('Manual QFAF amount (qfafOverride)', () => {
+  const NO_GROWTH: AdvancedSettings = {
+    ...DEFAULT_SETTINGS,
+    growthEnabled: false,
+    qfafGrowthEnabled: false,
+  };
+
+  it('is exact — the sizing cushion does not shave a manual amount', () => {
+    const sizing = calculateSizing(createInputs({ qfafOverride: 200000, qfafSizingCushion: 0.1 }));
+    expect(sizing.qfafValue).toBe(200000);
+    expect(sizing.year1StGains).toBeCloseTo(300000, 0); // 200K × 150%
+  });
+
+  it('holds constant across operating years in fixed mode', () => {
+    const result = calculate(createInputs({ qfafOverride: 200000 }), NO_GROWTH);
+    for (let i = 0; i < 5; i++) {
+      expect(result.years[i].qfafValue).toBeCloseTo(200000, 0);
+    }
+  });
+
+  it('is never dynamically resized — a manual amount wins over dynamic mode', () => {
+    const manual = calculate(
+      createInputs({ qfafOverride: 200000, qfafSizingMode: 'dynamic' }),
+      NO_GROWTH
+    );
+    // Without the override, dynamic mode shrinks the QFAF as loss rates decay.
+    const auto = calculate(createInputs({ qfafSizingMode: 'dynamic' }), NO_GROWTH);
+    expect(auto.years[1].qfafValue).toBeLessThan(auto.years[0].qfafValue);
+    // With the override, year 2 keeps the manual amount.
+    expect(manual.years[1].qfafValue).toBeCloseTo(200000, 0);
+  });
+
+  it('surfaces the offset gap when the manual amount over-offsets', () => {
+    // core-130-30 harvests 230K ST losses in year 1; a 400K QFAF generates
+    // 600K ST gains → 370K unmatched gains taxed at ST rates.
+    const result = calculate(createInputs({ qfafOverride: 400000 }), NO_GROWTH);
+    const y1 = result.years[0];
+    expect(y1.stGainsGenerated).toBeCloseTo(600000, 0);
+    expect(y1.stGainsGenerated - y1.stLossesHarvested).toBeCloseTo(370000, 0);
+    expect(y1.netStGainLoss).toBeCloseTo(370000, 0);
+    expect(y1.remainingStGainCost).toBeGreaterThan(0);
+  });
+
+  it('surfaces the offset gap when the manual amount under-offsets', () => {
+    // A 100K QFAF generates 150K ST gains vs 230K losses → 80K excess ST
+    // losses. Per §1211 netting they absorb the 24K LT gains (1M × 2.4%) and
+    // the $3K ordinary-income allowance; the remaining 53K carries forward.
+    const result = calculate(createInputs({ qfafOverride: 100000 }), NO_GROWTH);
+    const y1 = result.years[0];
+    expect(y1.stGainsGenerated - y1.stLossesHarvested).toBeCloseTo(-80000, 0);
+    expect(y1.netStGainLoss).toBe(0);
+    expect(y1.stLossCarryforward).toBeCloseTo(53000, 0);
+    expect(y1.remainingStGainCost).toBe(0);
+  });
+
+  it('solveCollateralForTotal allocates the remainder after a manual amount', () => {
+    const inputs = createInputs({ qfafOverride: 250000 });
+    expect(solveCollateralForTotal(1000000, inputs)).toBe(750000);
+  });
+});
+
 describe('QFAF Duration', () => {
   it('should zero out QFAF contributions after duration expires', () => {
     const inputs = createInputs({ qfafDuration: 3 });

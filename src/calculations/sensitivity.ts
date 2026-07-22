@@ -139,7 +139,11 @@ export function calculateWithSensitivity(
   let ltCarryforward = inputs.existingLtLossCarryforward;
   let nolCarryforward = inputs.existingNolCarryforward;
   const initialQfafValue = sizing.qfafValue;
-  const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
+  // Mirrors core.ts: a manual qfafOverride always holds fixed (never resized).
+  const isDynamic =
+    inputs.qfafSizingMode === 'dynamic' &&
+    inputs.qfafEnabled !== false &&
+    inputs.qfafOverride === undefined;
   // QFAF redemptions awaiting redeployment into the collateral (toggle).
   const redeployProceeds = inputs.redeployQfafProceeds === true;
   let pendingRedeploy = 0;

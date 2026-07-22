@@ -162,9 +162,9 @@ export function ResultsTable({
     // Expanded Capital Details - ST Losses, LT Gains, Harvest Rate (collateral)
     if (expandCapital && showCollateral) cols += 3;
 
-    // QFAF ST Gains column
+    // QFAF ST Gains column (+ Net ST Offset next to it in combined mode)
     if (viewMode === 'qfaf-only') cols += 1;
-    if (expandCapital && viewMode === 'combined' && qfafEnabled) cols += 1;
+    if (expandCapital && viewMode === 'combined' && qfafEnabled) cols += 2;
 
     // QFAF columns - Total Losses Realized (expandable)
     if (showQfaf && qfafEnabled) {
@@ -358,9 +358,14 @@ export function ResultsTable({
                     </th>
                   )}
                   {expandCapital && viewMode === 'combined' && qfafEnabled && (
-                    <th className="col-detail qfaf-col">
-                      <InfoText contentKey="col-st-gains">ST Gain</InfoText>
-                    </th>
+                    <>
+                      <th className="col-detail qfaf-col">
+                        <InfoText contentKey="col-st-gains">ST Gain</InfoText>
+                      </th>
+                      <th className="col-detail qfaf-col">
+                        <InfoText contentKey="col-net-st-offset">ST Offset</InfoText>
+                      </th>
+                    </>
                   )}
 
                   {/* QFAF columns - show in combined and qfaf-only */}
@@ -574,7 +579,10 @@ export function ResultsTable({
                   )}
                   {viewMode === 'qfaf-only' && <td className="starting-note qfaf-col">—</td>}
                   {expandCapital && viewMode === 'combined' && qfafEnabled && (
-                    <td className="starting-note qfaf-col">—</td>
+                    <>
+                      <td className="starting-note qfaf-col">—</td>
+                      <td className="starting-note qfaf-col">—</td>
+                    </>
                   )}
                   {showQfaf && qfafEnabled && (
                     <>
@@ -759,9 +767,28 @@ export function ResultsTable({
                           </td>
                         )}
                         {expandCapital && viewMode === 'combined' && qfafEnabled && (
-                          <td className="positive qfaf-col">
-                            {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
-                          </td>
+                          <>
+                            <td className="positive qfaf-col">
+                              {isWindDown ? '—' : formatCurrency(year.stGainsGenerated)}
+                            </td>
+                            {/* Net ST Offset: fund ST gains − collateral ST losses.
+                                Positive = unmatched gains (taxed); negative = excess
+                                losses (carry forward). */}
+                            {(() => {
+                              const gap = year.stGainsGenerated - year.stLossesHarvested;
+                              return (
+                                <td className={`qfaf-col ${gap > 1 ? 'negative' : 'positive'}`}>
+                                  {isWindDown
+                                    ? '—'
+                                    : Math.abs(gap) < 1
+                                      ? '$0'
+                                      : gap > 0
+                                        ? formatCurrency(gap)
+                                        : `(${formatCurrency(Math.abs(gap))})`}
+                                </td>
+                              );
+                            })()}
+                          </>
                         )}
 
                         {/* QFAF columns - show in combined and qfaf-only */}
@@ -1218,6 +1245,23 @@ function TransposedTable({
                 label: brandText('QFAF ST Gains'),
                 contentKey: 'col-st-gains',
                 cell: (y: YearResult) => (active(y) ? money(y.stGainsGenerated) : '—'),
+              },
+              {
+                // Fund ST gains − collateral ST losses: how far the two are
+                // from a perfect offset this year (nonzero with manual sizing).
+                label: 'Net ST Offset',
+                contentKey: 'col-net-st-offset',
+                cell: (y: YearResult) => {
+                  if (!active(y)) return '—';
+                  const gap = y.stGainsGenerated - y.stLossesHarvested;
+                  return Math.abs(gap) < 1
+                    ? '$0'
+                    : gap > 0
+                      ? money(gap)
+                      : `(${money(Math.abs(gap))})`;
+                },
+                className: (y: YearResult) =>
+                  y.stGainsGenerated - y.stLossesHarvested > 1 ? 'negative' : 'positive',
               },
             ]
           : []),
