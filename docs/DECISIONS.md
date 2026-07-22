@@ -994,6 +994,13 @@ comes from existing `CalculationResult` / exit-analysis fields; no parallel proj
    3–5.
 9. **Pre-existing broken type-check build** — **FIXED 2026-06-11** (`ltGainsEnabled` made
    optional to match all consumers; dead props removed from ScenarioComparisonPanel).
+10. ~~**e2e suite red on main since the mobile year-detail redesign**~~ **FIXED
+    2026-07-22** — `.year-breakdown-table` `.first()` matched the mobile copy of the
+    audit table (hidden on desktop; behind a closed disclosure on mobile), and the
+    mobile-drawer test edited income $3M→$4M, which cannot change total savings (at $3M
+    the NOL is already fully consumed — verified equal engine outputs). Tests now assert
+    the project-appropriate table wrapper and edit collateral instead. Product code was
+    correct; no app change.
 
 ### Found in CFP/CFA usability test session (2026-06-12)
 
