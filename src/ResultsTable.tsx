@@ -776,14 +776,22 @@ export function ResultsTable({
                                 losses (carry forward). */}
                             {(() => {
                               const gap = year.stGainsGenerated - year.stLossesHarvested;
+                              const excess = !isWindDown && gap > 1;
                               return (
-                                <td className={`qfaf-col ${gap > 1 ? 'negative' : 'positive'}`}>
+                                <td
+                                  className={`qfaf-col ${gap > 1 ? 'negative' : 'positive'}${excess ? ' st-offset-excess' : ''}`}
+                                  title={
+                                    excess
+                                      ? 'ST gains exceed harvested losses — the excess is taxed at ST rates'
+                                      : undefined
+                                  }
+                                >
                                   {isWindDown
                                     ? '—'
                                     : Math.abs(gap) < 1
                                       ? '$0'
                                       : gap > 0
-                                        ? formatCurrency(gap)
+                                        ? `▲ ${formatCurrency(gap)}`
                                         : `(${formatCurrency(Math.abs(gap))})`}
                                 </td>
                               );
@@ -1257,11 +1265,13 @@ function TransposedTable({
                   return Math.abs(gap) < 1
                     ? '$0'
                     : gap > 0
-                      ? money(gap)
+                      ? `▲ ${money(gap)}`
                       : `(${money(Math.abs(gap))})`;
                 },
                 className: (y: YearResult) =>
-                  y.stGainsGenerated - y.stLossesHarvested > 1 ? 'negative' : 'positive',
+                  active(y) && y.stGainsGenerated - y.stLossesHarvested > 1
+                    ? 'negative st-offset-excess'
+                    : 'positive',
               },
             ]
           : []),
