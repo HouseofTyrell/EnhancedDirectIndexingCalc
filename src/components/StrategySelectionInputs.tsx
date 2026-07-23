@@ -855,37 +855,85 @@ export function StrategySelectionInputs({
 
             <div className="qfaf-sizing-mode-toggle">
               <label className="qfaf-sizing-mode-label">Sizing Mode</label>
-              <div
-                className="btn-group btn-group--compact"
-                role="radiogroup"
-                aria-label={brandText('QFAF sizing mode')}
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={inputs.qfafSizingMode === 'dynamic'}
-                  className={`btn-group__btn${inputs.qfafSizingMode === 'dynamic' ? ' btn-group__btn--active' : ''}`}
-                  onClick={() => onUpdateInput('qfafSizingMode', 'dynamic')}
-                >
-                  Dynamic
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={inputs.qfafSizingMode === 'fixed'}
-                  className={`btn-group__btn${inputs.qfafSizingMode === 'fixed' ? ' btn-group__btn--active' : ''}`}
-                  onClick={() => onUpdateInput('qfafSizingMode', 'fixed')}
-                >
-                  Fixed
-                </button>
-              </div>
-              <span className="input-hint">
-                {inputs.qfafSizingMode === 'dynamic'
-                  ? brandText(
-                      'QFAF resizes each year to match decaying EDI losses — reduces ST gain leakage'
-                    )
-                  : brandText('QFAF sized once at inception, held constant through duration')}
-              </span>
+              {(() => {
+                const isManual = inputs.qfafOverride !== undefined;
+                const uiMode = isManual ? 'manual' : inputs.qfafSizingMode;
+                return (
+                  <>
+                    <div
+                      className="btn-group btn-group--compact"
+                      role="radiogroup"
+                      aria-label={brandText('QFAF sizing mode')}
+                    >
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={uiMode === 'dynamic'}
+                        className={`btn-group__btn${uiMode === 'dynamic' ? ' btn-group__btn--active' : ''}`}
+                        onClick={() => {
+                          onUpdateInput('qfafSizingMode', 'dynamic');
+                          onUpdateInput('qfafOverride', undefined);
+                        }}
+                      >
+                        Dynamic
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={uiMode === 'fixed'}
+                        className={`btn-group__btn${uiMode === 'fixed' ? ' btn-group__btn--active' : ''}`}
+                        onClick={() => {
+                          onUpdateInput('qfafSizingMode', 'fixed');
+                          onUpdateInput('qfafOverride', undefined);
+                        }}
+                      >
+                        Fixed
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={uiMode === 'manual'}
+                        className={`btn-group__btn${uiMode === 'manual' ? ' btn-group__btn--active' : ''}`}
+                        onClick={() => {
+                          // Seed with the current auto-sized value so the
+                          // advisor edits from a sensible baseline.
+                          onUpdateInput('qfafSizingMode', 'fixed');
+                          onUpdateInput('qfafOverride', Math.round(results.sizing.qfafValue));
+                        }}
+                      >
+                        Manual $
+                      </button>
+                    </div>
+                    <span className="input-hint">
+                      {uiMode === 'dynamic'
+                        ? brandText(
+                            'QFAF resizes each year to match decaying EDI losses — reduces ST gain leakage'
+                          )
+                        : uiMode === 'fixed'
+                          ? brandText(
+                              'QFAF sized once at inception, held constant through duration'
+                            )
+                          : brandText(
+                              'Enter an exact QFAF dollar amount — held constant through duration; the Net ST Position below shows how far it is from a perfect offset'
+                            )}
+                    </span>
+                    {isManual && (
+                      <div className="input-group">
+                        <label htmlFor="qfafManualAmount">{brandText('QFAF Amount ($)')}</label>
+                        <input
+                          id="qfafManualAmount"
+                          type="text"
+                          inputMode="numeric"
+                          value={formatWithCommas(inputs.qfafOverride ?? 0)}
+                          onChange={e =>
+                            onUpdateInput('qfafOverride', parseFormattedNumber(e.target.value))
+                          }
+                        />
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             <div className="input-pair">

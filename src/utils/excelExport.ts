@@ -189,6 +189,14 @@ export async function buildWorkbook(data: ExportData): Promise<Workbook> {
     [],
     ['Projection Years', data.settings.projectionYears],
     [brandText('QFAF Multiplier'), data.settings.qfafMultiplier],
+    [
+      brandText('QFAF Sizing'),
+      data.inputs.qfafOverride !== undefined
+        ? `Manual ($${data.inputs.qfafOverride.toLocaleString()})`
+        : data.inputs.qfafSizingMode === 'dynamic'
+          ? 'Dynamic (resized yearly)'
+          : 'Fixed at inception',
+    ],
     ['Annual Return', data.settings.defaultAnnualReturn],
     ['Growth Enabled', data.settings.growthEnabled ? 'Yes' : 'No'],
   ];

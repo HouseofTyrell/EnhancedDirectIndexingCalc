@@ -2120,7 +2120,11 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
               inputs.qfafEnabled ? (
                 <>
                   <b>On</b> · {inputs.qfafDuration} yrs ·{' '}
-                  {inputs.qfafSizingMode === 'dynamic' ? 'Dynamic' : 'Fixed'}
+                  {inputs.qfafOverride !== undefined
+                    ? `Manual ${formatCurrencyAbbreviated(inputs.qfafOverride)}`
+                    : inputs.qfafSizingMode === 'dynamic'
+                      ? 'Dynamic'
+                      : 'Fixed'}
                   {inputs.redeployQfafProceeds === true && ' · redeploy'}
                 </>
               ) : (
@@ -2152,13 +2156,70 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                 <label className="wx-field">
                   <span className="wx-label">Sizing</span>
                   <select
-                    value={inputs.qfafSizingMode}
-                    onChange={e => set('qfafSizingMode', e.target.value as 'fixed' | 'dynamic')}
+                    value={inputs.qfafOverride !== undefined ? 'manual' : inputs.qfafSizingMode}
+                    onChange={e => {
+                      const mode = e.target.value;
+                      if (mode === 'manual') {
+                        // Seed the manual amount with the current auto-sized
+                        // value so the advisor edits from a sensible baseline.
+                        set('qfafSizingMode', 'fixed');
+                        set('qfafOverride', Math.round(results.sizing.qfafValue));
+                      } else {
+                        set('qfafSizingMode', mode as 'fixed' | 'dynamic');
+                        set('qfafOverride', undefined);
+                      }
+                    }}
                   >
                     <option value="dynamic">Dynamic (resized yearly)</option>
                     <option value="fixed">Fixed at inception</option>
+                    <option value="manual">Manual amount ($)</option>
                   </select>
                 </label>
+                {inputs.qfafOverride !== undefined && (
+                  <>
+                    <label className="wx-field">
+                      <span className="wx-label">
+                        <InfoText contentKey="qfaf-manual-amount">
+                          {brandText('QFAF amount')}
+                        </InfoText>
+                      </span>
+                      <input
+                        inputMode="numeric"
+                        value={formatWithCommas(inputs.qfafOverride)}
+                        onChange={e => set('qfafOverride', parseFormattedNumber(e.target.value))}
+                      />
+                    </label>
+                    {(() => {
+                      // Offset check vs the sizing window's collateral ST losses —
+                      // manual amounts rarely offset exactly; show by how much.
+                      const netSt = results.sizing.year1StLosses - results.sizing.year1StGains;
+                      const matched = Math.abs(netSt) < 1;
+                      const windowNote =
+                        results.sizing.sizingYears > 1
+                          ? ` (avg, yrs 1–${results.sizing.sizingYears})`
+                          : '';
+                      return (
+                        <p className={`ws-rail-note${netSt < -1 ? ' ws-rail-warn' : ''}`}>
+                          {matched ? (
+                            <>ST gains fully offset harvested losses{windowNote}.</>
+                          ) : netSt < 0 ? (
+                            <>
+                              {brandText('QFAF ST gains exceed collateral ST losses by')}{' '}
+                              <b>{formatCurrency(Math.abs(netSt))}</b>
+                              {windowNote} — the excess is taxed at ST rates.
+                            </>
+                          ) : (
+                            <>
+                              {brandText('Collateral ST losses exceed QFAF ST gains by')}{' '}
+                              <b>{formatCurrency(netSt)}</b>
+                              {windowNote} — the excess carries forward.
+                            </>
+                          )}
+                        </p>
+                      );
+                    })()}
+                  </>
+                )}
                 <label className="wx-toggle">
                   <input
                     type="checkbox"

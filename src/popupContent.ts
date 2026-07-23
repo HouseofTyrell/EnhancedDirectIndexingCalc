@@ -68,10 +68,19 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
   'auto-sized-qfaf': {
     title: 'Auto-Sized QFAF',
     definition:
-      'Quantinno Fundamental Arbitrage Fund allocation, automatically sized to match collateral ST loss capacity.',
+      'Quantinno Fundamental Arbitrage Fund allocation, automatically sized to match collateral ST loss capacity. With Manual sizing this is the exact dollar amount you entered instead.',
     formula: '(Collateral × Strategy ST Loss Rate) ÷ 150%',
     impact:
-      'QFAF generates 150% ST gains and 150% ordinary losses annually. Proper sizing ensures ST gains are fully offset.',
+      'QFAF generates 150% ST gains and 150% ordinary losses annually. Proper sizing ensures ST gains are fully offset; a manual amount can leave a gap in either direction (see Net ST Position).',
+  },
+
+  'qfaf-manual-amount': {
+    title: 'Manual QFAF Amount',
+    definition:
+      'An exact QFAF dollar amount you set, replacing auto-sizing. It is held constant through the QFAF duration (never resized) and the sizing cushion does not apply.',
+    formula: 'QFAF Value = entered amount (held fixed)',
+    impact:
+      'QFAF ST gains and collateral ST losses will rarely offset exactly. Excess ST gains are taxed at ST rates; excess ST losses carry forward. The Net ST Position and per-year Net ST Offset show the gap.',
   },
 
   'qfaf-treatment': {
@@ -125,7 +134,8 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     title: 'Net ST Position',
     definition: 'Result of matching QFAF ST gains against collateral ST losses.',
     formula: 'QFAF ST Gains - Collateral ST Losses',
-    impact: 'Should be $0 or near-zero with proper auto-sizing.',
+    impact:
+      'Should be $0 or near-zero with proper auto-sizing. With a manual QFAF amount this shows exactly how far the position is from a perfect offset.',
   },
 
   'year1-ordinary-losses': {
@@ -321,6 +331,15 @@ export const POPUP_CONTENT: Record<string, PopupContent> = {
     definition: 'Short-term capital losses from tax-loss harvesting and short closures.',
     formula: 'Collateral Value × Strategy ST Loss Rate',
     impact: 'Used to offset QFAF ST gains, converting them to LT treatment.',
+  },
+
+  'col-net-st-offset': {
+    title: 'Net ST Offset',
+    definition:
+      'How far QFAF ST gains and collateral ST losses are from a perfect offset this year. Near $0 with auto-sizing; typically nonzero with a manual QFAF amount.',
+    formula: 'QFAF ST Gains − Collateral ST Losses',
+    impact:
+      'Positive (red): unmatched ST gains taxed at ST rates after carryforwards. Negative (parentheses): excess ST losses that carry forward under §1211.',
   },
 
   'col-ordinary-loss': {

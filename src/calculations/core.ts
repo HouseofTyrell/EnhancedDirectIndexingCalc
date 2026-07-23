@@ -193,7 +193,12 @@ export function calculateWithOverrides(
   const redeployProceeds = inputs.redeployQfafProceeds === true;
   let pendingRedeploy = 0;
   const initialQfafValue = baseSizing.qfafValue;
-  const isDynamic = inputs.qfafSizingMode === 'dynamic' && inputs.qfafEnabled !== false;
+  // A manual qfafOverride is an exact position the advisor chose — dynamic
+  // resizing would silently replace it, so the override always holds fixed.
+  const isDynamic =
+    inputs.qfafSizingMode === 'dynamic' &&
+    inputs.qfafEnabled !== false &&
+    inputs.qfafOverride === undefined;
 
   // Use projectionYears from settings (defaults to 10)
   const projectionYears = settings.projectionYears ?? 10;

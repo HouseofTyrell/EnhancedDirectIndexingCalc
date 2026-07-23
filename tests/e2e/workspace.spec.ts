@@ -7,7 +7,7 @@ async function openAcknowledgedWorkspace(page: Page) {
   await page.addInitScript(key => {
     localStorage.setItem(
       key,
-      JSON.stringify({ acknowledged: true, acknowledgedAt: '2026-07-11T00:00:00.000Z' }),
+      JSON.stringify({ acknowledged: true, acknowledgedAt: '2026-07-11T00:00:00.000Z' })
     );
   }, ACK_KEY);
   await page.goto('/');
@@ -52,22 +52,31 @@ test('workspace renders without horizontal page overflow or browser errors', asy
   expect(errors).toEqual([]);
 });
 
-test('dark theme and core Workspace navigation remain operable', async ({ page }) => {
+test('dark theme and core Workspace navigation remain operable', async ({ page }, testInfo) => {
   await openAcknowledgedWorkspace(page);
 
   await page.getByRole('button', { name: /switch to dark mode/i }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
   await page.getByRole('button', { name: 'Year-by-Year' }).click();
-  await expect(page.locator('.year-breakdown-table').first()).toBeVisible();
+  // Desktop renders the full audit table; mobile renders the per-year detail
+  // panel with the table tucked behind an "Open full audit table" disclosure.
+  if (testInfo.project.name === 'mobile') {
+    await expect(page.getByTestId('wx-mobile-year-detail')).toBeVisible();
+    await page.getByText('Open full audit table').click();
+    await expect(
+      page.getByTestId('wx-mobile-year-detail').locator('.year-breakdown-table')
+    ).toBeVisible();
+  } else {
+    await expect(page.locator('.wx-desktop-year-table .year-breakdown-table')).toBeVisible();
+  }
   await page.getByRole('button', { name: 'Charts' }).click();
   await expect(page.locator('.wx-charts')).toBeVisible();
 });
 
-test('mobile inputs drawer and selected-year detail are keyboard operable', async (
-  { page },
-  testInfo,
-) => {
+test('mobile inputs drawer and selected-year detail are keyboard operable', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'mobile-specific product shape');
   await openAcknowledgedWorkspace(page);
 
@@ -79,8 +88,12 @@ test('mobile inputs drawer and selected-year detail are keyboard operable', asyn
   await expect(drawer).toBeVisible();
   await expect(drawer.locator(':focus')).toBeVisible();
 
-  const income = drawer.getByText('Annual income').locator('..').locator('input');
-  await income.fill('4,000,000');
+  // Edit collateral, not income: at the default $3M income the NOL is already
+  // fully consumed (80% × income covers it), so raising income leaves total
+  // savings unchanged and can't prove the edit propagated. Collateral always
+  // rescales savings.
+  const collateral = drawer.getByText('Collateral amount').locator('..').locator('input');
+  await collateral.fill('12,000,000');
   await page.keyboard.press('Escape');
   await expect(drawer).not.toBeVisible();
   await expect(trigger).toBeFocused();
