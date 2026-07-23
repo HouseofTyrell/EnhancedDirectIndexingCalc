@@ -4771,6 +4771,14 @@ tfoot td {
   white-space: nowrap;
 }
 
+/* Highlight per-year cells where the Fund's ST gains exceed harvested losses —
+   the unmatched excess is taxed at ST rates. Red tint + bold so it stands out
+   in a dense table. */
+.year-breakdown-table td.st-offset-excess {
+  background: rgba(196, 60, 45, 0.13);
+  font-weight: 650;
+}
+
 /* Expandable column headers */
 .col-expandable {
   cursor: pointer;

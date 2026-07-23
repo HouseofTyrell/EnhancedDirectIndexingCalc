@@ -73,6 +73,7 @@ const I = {
   calendar: 'M5 4h14v16H5zM5 9h14M9 2v4M15 2v4',
   bolt: 'M13 2L4 14h6l-1 8 9-12h-6z',
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
+  warn: 'M12 3L2 20h20L12 3zM12 10v4M12 17v.5',
   spark: 'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18',
   download: 'M12 3v12m-5-5l5 5 5-5M5 21h14',
   doc: 'M6 2h8l4 4v16H6zM14 2v4h4',
@@ -1311,8 +1312,51 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
     },
   ];
 
+  // Excess ST gains: years where the Fund generates MORE short-term gains than
+  // the collateral harvests in losses. The unmatched portion is offset by any
+  // ST carryforwards first, then taxed at short-term rates — the opposite of
+  // the strategy's goal. Common with a manual Fund amount set too high, or with
+  // Fixed sizing as the collateral's loss rate decays while the Fund is held
+  // constant. $1 floor ignores rounding noise (auto-sizing matches to cents).
+  const stExcessYears = results.years
+    .filter(y => y.strategyActive)
+    .map(y => ({ year: y.year, gap: y.stGainsGenerated - y.stLossesHarvested }))
+    .filter(y => y.gap > 1);
+  const stExcessTotal = stExcessYears.reduce((s, y) => s + y.gap, 0);
+  const stExcessTaxCost = results.years.reduce((s, y) => s + (y.remainingStGainCost ?? 0), 0);
+  const hasStExcess = stExcessYears.length > 0;
+  const stExcessPeakYear = stExcessYears.reduce(
+    (peak, y) => (y.gap > peak.gap ? y : peak),
+    stExcessYears[0] ?? { year: 0, gap: 0 }
+  );
+
   // ─── D-027: consolidated flags (severity-ordered: pos → warn → info) ───
   const flags: WsFlag[] = [];
+  if (hasStExcess) {
+    flags.push({
+      key: 'st-gain-excess',
+      sev: 'warn',
+      tag: brandText('QFAF'),
+      body: (
+        <>
+          <strong>Excess ST gains:</strong> in {stExcessYears.length} year
+          {stExcessYears.length === 1 ? '' : 's'} the {brandText('Fund')} generates more short-term
+          gains than the collateral harvests in losses — up to{' '}
+          <b>{formatCurrency(stExcessPeakYear.gap)}</b> in year {stExcessPeakYear.year} (
+          {formatCurrency(stExcessTotal)} total).{' '}
+          {stExcessTaxCost > 1 ? (
+            <>
+              The unmatched gains add roughly <b>{formatCurrency(stExcessTaxCost)}</b> of short-term
+              tax over the projection.
+            </>
+          ) : (
+            <>Existing ST carryforwards currently absorb them, but they erode that reserve.</>
+          )}{' '}
+          Reduce the {brandText('Fund')} size or use Dynamic sizing to tighten the offset.
+        </>
+      ),
+    });
+  }
   if (exit.incrementalDeferredTax < 0) {
     flags.push({
       key: 'exit-covered',
@@ -2199,12 +2243,12 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
                           ? ` (avg, yrs 1–${results.sizing.sizingYears})`
                           : '';
                       return (
-                        <p className={`ws-rail-note${netSt < -1 ? ' ws-rail-warn' : ''}`}>
+                        <p className={`ws-rail-note${netSt < -1 ? ' ws-rail-danger' : ''}`}>
                           {matched ? (
                             <>ST gains fully offset harvested losses{windowNote}.</>
                           ) : netSt < 0 ? (
                             <>
-                              {brandText('QFAF ST gains exceed collateral ST losses by')}{' '}
+                              ⚠ {brandText('QFAF ST gains exceed collateral ST losses by')}{' '}
                               <b>{formatCurrency(Math.abs(netSt))}</b>
                               {windowNote} — the excess is taxed at ST rates.
                             </>
@@ -2628,6 +2672,32 @@ export function WorkspaceTab({ isActive = true }: WorkspaceTabProps) {
 
           {/* D-027: consolidated flags tray — all conditional notes in one place */}
           <FlagsTray flags={flags} />
+
+          {/* Always-visible alert (not tucked in the tray) when the Fund
+              over-generates ST gains vs harvested losses. */}
+          {hasStExcess && (
+            <div className="wx-excess-banner" role="alert" data-testid="wx-st-excess-banner">
+              <span className="wx-excess-banner__icon" aria-hidden="true">
+                <Ico d={I.warn} w={20} />
+              </span>
+              <span className="wx-excess-banner__text">
+                <strong>
+                  {brandText('QFAF')} ST gains exceed harvested losses by{' '}
+                  {formatCurrency(stExcessPeakYear.gap)} in year {stExcessPeakYear.year}
+                </strong>
+                <span>
+                  {stExcessYears.length === 1
+                    ? 'One year runs'
+                    : `${stExcessYears.length} years run`}{' '}
+                  a net ST gain ({formatCurrency(stExcessTotal)} total unmatched).{' '}
+                  {stExcessTaxCost > 1
+                    ? `About ${formatCurrency(stExcessTaxCost)} of short-term tax over the projection.`
+                    : 'Currently sheltered by ST carryforwards, which it draws down.'}{' '}
+                  Reduce the {brandText('Fund')} size or use Dynamic sizing to close the gap.
+                </span>
+              </span>
+            </div>
+          )}
 
           {showEventsEditor && (
             <div className="ws-events-editor">

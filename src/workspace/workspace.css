@@ -667,6 +667,52 @@
   border: 1px solid var(--wx-warn);
   color: var(--wx-warn);
 }
+/* High-visibility alert when the Fund over-generates ST gains vs harvested
+   losses — a genuinely undesirable state, so it uses the negative (red)
+   tokens and sits inline above the results, not tucked in the flags tray. */
+.wx-excess-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: var(--wx-r-sm, 8px);
+  background: var(--wx-neg-soft);
+  border: 1px solid var(--wx-neg);
+  border-left: 4px solid var(--wx-neg);
+  box-shadow: var(--wx-shadow);
+}
+.wx-excess-banner__icon {
+  color: var(--wx-neg);
+  flex-shrink: 0;
+  line-height: 0;
+  margin-top: 1px;
+}
+.wx-excess-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--wx-ink-1);
+}
+.wx-excess-banner__text strong {
+  color: var(--wx-neg);
+  font-weight: 650;
+  font-size: 13px;
+}
+/* Red variant of the rail note for the excess-ST-gains case (undesirable). */
+.ws-rail-danger {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: var(--wx-r-sm);
+  font-size: 11.5px;
+  line-height: 1.45;
+  font-weight: 550;
+  background: var(--wx-neg-soft);
+  border: 1px solid var(--wx-neg);
+  color: var(--wx-neg);
+}
 .ws-rail-note {
   font-size: 11px;
   color: var(--wx-ink-3);
